@@ -1,0 +1,9 @@
+Flask
+Flask-WTF
+bootstrap-flask
+boto3
+s3fs
+pyyaml
+ruamel.yaml
+gunicorn
+sphinx

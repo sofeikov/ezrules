@@ -1,0 +1,6 @@
+All available rules<br>
+<a href="{{ url_for('create_rule') }}">Add rule</a><br>
+{% for rule in rules %}
+<a href="/rule/{{ rule.rid }}">{{rule.rid}}</a> - {{rule.description}}
+<br>
+{% endfor %}

@@ -1,0 +1,351 @@
+from abc import ABC, abstractmethod
+from core.rule import Rule, RuleFactory, RuleConverter
+from typing import Optional, List, Union, Tuple
+from pathlib import Path
+import os
+import hashlib
+import json
+from ruamel.yaml import scalarstring
+import ruamel
+import yaml
+import shutil
+import s3fs
+
+
+class UnableToLockStorageException(Exception):
+    """Generic exception for when it is impossible to lock a storage."""
+
+    pass
+
+
+class RuleDoesNotExistInTheStorage(Exception):
+    """Generic exception thrown when the requested rule does not exist in the storage."""
+
+    pass
+
+
+def calculate_md5(input_string: str) -> str:
+    """
+    Return md5 hash of the given string.
+
+    :param input_string: input string
+    :return: md5 hash as string.
+    """
+    md5_hash = hashlib.md5(input_string.encode("utf-8")).hexdigest()
+    return md5_hash
+
+
+class RuleManager(ABC):
+    """Abstract class for managing rules' lifecycle."""
+
+    def save_rule(self, rule: Rule) -> None:
+        """
+        A wrapper around an abstract method :meth:`_save_rule`. The general flow is to lock the storage, \
+        save the changes, and unlock the storage. By default, locking storage does nothing. It may be useful for \
+        implementing a local file system rule manager where it is desirable to prevent race conditions. It is less \
+        important when using a database as a target storage, but still may be useful in certain conditions.
+
+        :param rule: an instance of `core.rule.Rule`
+        :return:
+        """
+        self.lock_storage()
+        self._backup_version(rule)
+        self._save_rule(rule)
+        self.release_storage()
+
+    def lock_storage(self):
+        """Lock storage. Override in subclasses if lock is required."""
+        pass
+
+    def release_storage(self):
+        """Unlock storage. Override in subclasses if lock is required."""
+        pass
+
+    @abstractmethod
+    def _save_rule(self, rule: Rule) -> None:
+        """Storage specific saving mechanism."""
+
+    @abstractmethod
+    def _backup_version(self, rule: Rule) -> None:
+        """Storage specific backup mechanism."""
+
+    @abstractmethod
+    def get_rule_version_list(self, rule: Rule) -> List[int]:
+        """Storage specific way to get a list of rule revisions."""
+
+    @abstractmethod
+    def load_rule(self, rule_id: str, revision_number: Optional[str] = None) -> Rule:
+        """Storage specific way to load a specific rule, possibly specific revision."""
+
+    def load_rules(self, rules_id: List[str]) -> List[Rule]:
+        """
+        Load the latest revisions of the given rules. It is a simple wrapper around :meth:`load_rule`
+
+        :param rules_id:
+        :return:
+        """
+        res = []
+        for rid in rules_id:
+            new_rule = self.load_rule(rid, revision_number=None)
+            res.append(new_rule)
+        return res
+
+    @abstractmethod
+    def load_all_rules(self) -> List[Rule]:
+        """Storage specific mechanism to load all available rules."""
+
+
+class RuleEngineConfigProducer:
+    @staticmethod
+    def to_yaml(file_path: str, rule_manager: RuleManager):
+        open_fn = open
+        if file_path.startswith("s3://"):
+            s3 = s3fs.S3FileSystem()
+            open_fn = s3.open
+
+        all_rules = rule_manager.load_all_rules()
+        rules_json = [RuleConverter.to_json(r) for r in all_rules]
+        full_rule_config = {"Rules": rules_json}
+        yaml = ruamel.yaml.YAML()
+        yaml.indent(offset=2, sequence=4)
+        with open_fn(file_path, "w") as yaml_f:
+            scalarstring.walk_tree(full_rule_config)
+            yaml.dump(full_rule_config, yaml_f)
+
+
+class FSRuleManager(RuleManager):
+    """
+    Rule manager that uses a local file system for keeping rule records. It is intended for local debugging and \
+    illustrative purposes only and must never be used for any production deployments.
+    """
+
+    def __init__(self, fs_path: Union[str, Path]) -> None:
+        """
+        Initialise the class.
+
+        :param fs_path: specify the location where the rule records will be kept. The process running the manager \
+        must have write/read access to the target file system.
+        """
+        self.fs_path = Path(fs_path)
+        self.fs_path.mkdir(parents=True, exist_ok=True)
+        self._lock_fn = self.fs_path / "lock"
+        self.manifest_fn = self.fs_path / "manifest.json"
+
+    def lock_storage(self):
+        """Lock file system. Create a special file that indicates that an update is in progress."""
+        if self._lock_fn.exists():
+            raise UnableToLockStorageException(
+                f"File {str(self._lock_fn)} exists. Lock has not been released."
+            )
+        open(self._lock_fn, "w").close()
+
+    def release_storage(self):
+        """Delete the lock indicator file."""
+        os.remove(self._lock_fn)
+
+    def __get_rule_folder_hash(
+        self, rule_or_rid: Union[Rule, str]
+    ) -> Tuple[Union[str, Path], str]:
+        """
+        Having an instance of :class:`core.rule_updater.RuleManager` or its id, get `pathlib.Path` for rule storages \
+        and its md5 representation.
+
+        :param rule_or_rid: :class:`core.rule_updater.RuleManager` or its string ID
+        :return: Tuple with path and md5
+        """
+        if not isinstance(rule_or_rid, str):
+            rule_or_rid = rule_or_rid.rid
+        rid_hash = calculate_md5(rule_or_rid)
+        rule_folder = self.fs_path / rid_hash
+        return rule_folder, rid_hash
+
+    def _save_rule(self, rule: Rule) -> None:
+        """
+        Save rule to disk. The rule configs are saved as YAML files.
+
+        :param rule: instance of `core.rule_updater.RuleManager`
+        :return:
+        """
+        rule_folder, rid_hash = self.__get_rule_folder_hash(rule)
+        rule_folder.mkdir(exist_ok=True, parents=True)
+        rule_fn = rule_folder / "rule.yaml"
+        yaml = ruamel.yaml.YAML()
+        yaml.indent(offset=2)
+        with open(rule_fn, "w") as yaml_f:
+            d = RuleConverter.to_json(rule)
+            scalarstring.walk_tree(d)
+            yaml.dump(d, yaml_f)
+        if self.manifest_fn.exists():
+            with open(self.manifest_fn, "r") as f:
+                manifest = json.load(f)
+        else:
+            manifest = {}
+        manifest[rule.rid] = rid_hash
+        with open(self.manifest_fn, "w") as json_f:
+            json.dump(manifest, json_f, indent=4)
+
+    def _backup_version(self, rule: Rule) -> None:
+        """
+        Backup the current version so a new can be created. The way a backup is created is by taking the current \
+        version and put into a new folder named after the number of the current revision(0,1,...,N).
+
+        :param rule: instance of `core.rule_updater.RuleManager`
+        :return:
+        """
+        rule_folder, _ = self.__get_rule_folder_hash(rule)
+        all_versions = self.get_rule_version_list(rule)
+        print(f"Versions: {all_versions}")
+        if not all_versions:
+            this_version = 1
+        else:
+            this_version = max(all_versions) + 1
+        if not rule_folder.exists():
+            return
+        version_dir = rule_folder / str(this_version)
+        version_dir.mkdir()
+        shutil.copy(rule_folder / "rule.yaml", version_dir / "rule.yaml")
+
+    def get_rule_version_list(self, rule_id: str) -> List[int]:
+        rule_folder, _ = self.__get_rule_folder_hash(rule_id)
+        all_versions = sorted(
+            [
+                int(item.parts[-1])
+                for item in rule_folder.glob("*")
+                if item.is_dir() and item.parts[-1].isdigit()
+            ]
+        )
+        return all_versions
+
+    def load_rule(self, rule_id: str, revision_number: Optional[str] = None) -> Rule:
+        """
+        Load the latest version of the rule from the disk.
+
+        :param rule_id: instance of `core.rule_updater.RuleManager`
+        :param revision_number: rule revision number.
+        :return:
+        """
+        rule_folder, _ = self.__get_rule_folder_hash(rule_id)
+        if revision_number:
+            rule_folder = rule_folder / str(revision_number)
+        rule_path = rule_folder / "rule.yaml"
+        if not rule_path.exists():
+            raise RuleDoesNotExistInTheStorage(
+                f"Rule {rule_id} is not found at {rule_path}"
+            )
+        with open(rule_path) as f:
+            rule_config = yaml.safe_load(f)
+        return RuleFactory.from_json(rule_config)
+
+    def load_all_rules(self) -> List[Rule]:
+        self.lock_storage()
+        with open(self.manifest_fn) as f:
+            rules_id = list(json.load(f).keys())
+        print(rules_id)
+        ret_rules = [self.load_rule(rid) for rid in rules_id]
+        self.release_storage()
+        return ret_rules
+
+
+class DynamoDBRuleManager(RuleManager):
+    """Rule manager that uses AWS DynamoDB as storage backend. This implementation is stable enough to be used in
+    production environment.
+    """
+
+    def __init__(self, table_name: str):
+        """
+        Instantiate object.
+
+        :param table_name: the name of the DynamoDB table to be used. See class description for required table format.
+        """
+        import boto3
+
+        self.table_name = table_name
+        self.dynamodb = boto3.resource("dynamodb")
+        self.table = self.dynamodb.Table(self.table_name)
+
+    def _save_rule(self, rule: Rule) -> None:
+        rule_json = RuleConverter.to_json(rule)
+        self.table.put_item(Item={**rule_json, "revision": 1})
+
+    def get_rule_version_list(self, rule_id: str) -> List[int]:
+        from boto3.dynamodb.conditions import Key
+
+        if isinstance(rule_id, Rule):
+            rule_id = rule_id.rid
+        response = self.table.query(KeyConditionExpression=Key("rid").eq(rule_id))
+        items = response["Items"]
+        all_versions = sorted([int(item["revision"]) for item in items])
+        return all_versions
+
+    def _backup_version(self, rule: Rule) -> None:
+        all_versions = self.get_rule_version_list(rule.rid)
+        print(f"Versions: {all_versions}")
+        if not all_versions:
+            this_version = 1
+        else:
+            this_version = max(all_versions) + 1
+        rule_json = RuleConverter.to_json(rule)
+        self.table.put_item(Item={**rule_json, "revision": this_version})
+
+    def load_rule(
+        self, rule_id: str, revision_number: Optional[str] = None
+    ) -> Optional[Rule]:
+        if not revision_number:
+            revision_number = 1
+        response = self.table.query(
+            KeyConditions={
+                "rid": {"AttributeValueList": [rule_id], "ComparisonOperator": "EQ"},
+                "revision": {
+                    "AttributeValueList": [revision_number],
+                    "ComparisonOperator": "EQ",
+                },
+            }
+        )
+        items = response["Items"]
+        if items:
+            return RuleFactory.from_json(items[0])
+        return None
+
+    def load_all_rules(self) -> List[Rule]:
+        response = self.table.scan(
+            ScanFilter={
+                "revision": {
+                    "AttributeValueList": [1],
+                    "ComparisonOperator": "EQ",
+                },
+            }
+        )
+        items = response["Items"]
+        ret_rules = [RuleFactory.from_json(item) for item in items]
+        return ret_rules
+
+
+RULE_MANAGERS = {
+    "FSRuleManager": FSRuleManager,
+    "DynamoDBRuleManager": DynamoDBRuleManager,
+}
+
+
+class RuleManagerFactory:
+    @staticmethod
+    def get_rule_manager(rule_manager_type: str, **kwargs):
+        return RULE_MANAGERS[rule_manager_type](**kwargs)
+
+
+# if __name__ == "__main__":
+#     p = Path("/Users/sofeikov/Downloads/ezroolsdb")
+#     print(p)
+#     # if p.exists():
+#     # shutil.rmtree(p)
+#     # fsrm = FSRuleManager(fs_path=p)
+#     fsrm = DynamoDBRuleManager("ezrules-rules-dev")
+#     with open("rule-config.yaml", "r") as f:
+#         config = yaml.safe_load(f)
+#     rules_config = config["Rules"]
+#     for rule_config in rules_config:
+#         rule = RuleFactory.from_json(rule_config)
+#         fsrm.save_rule(rule)
+#
+#     print("loaded rule", fsrm.load_rule("[NA:049]"))
+#
+#     print("all loaded rules", fsrm.load_all_rules())

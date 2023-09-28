@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  Environment:
+    Type: String
+    Description: The environment name
+    Default: dev
+
+Resources:
+  PageSummaryLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ezrule-executor-${Environment}
+      Handler: lambda_rule_executor.lambda_handler
+      Runtime: python3.8
+      Timeout: 60
+      Code:
+        S3Bucket: ezrules-bucket
+        S3Key: lambda/deployment_package.zip
+      Role: !GetAtt LambdaExecutionRole.Arn
+      TracingConfig:
+        Mode: Active
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource: "arn:aws:s3:::ezrules-bucket/*"
+  # MyS3Bucket:
+  #   Type: AWS::S3::Bucket
+  #   Properties:
+  #     BucketName: !Sub ezrules-bucket

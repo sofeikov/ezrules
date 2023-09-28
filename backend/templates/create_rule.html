@@ -1,0 +1,19 @@
+{% from 'bootstrap5/form.html' import render_form %}
+
+{% block title %}
+Create a new rule
+{% endblock %}
+
+
+{% block content %}
+<a href="/rules">Full rule list</a>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-10 col-lg-8 mx-lg-auto mx-md-auto">
+            {{ render_form(form) }}
+        </div>
+    </div>
+</div>
+
+{% endblock %}

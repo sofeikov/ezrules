@@ -1,0 +1,416 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  Environment:
+    Type: String
+    Description: The environment name
+    Default: dev
+
+Resources:
+  ApplicationVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 172.31.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub ezrule-vpc-${Environment}
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref ApplicationVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ezrules-rt-${Environment}
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: EzRulesInternetGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref EzRulesInternetGateway
+
+  EzRulesInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ezrule-ig-${Environment}
+
+  VPCInternetAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    DependsOn:
+      - ApplicationVPC
+      - EzRulesInternetGateway
+    Properties:
+      InternetGatewayId: !Ref EzRulesInternetGateway
+      VpcId: !Ref ApplicationVPC
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref EZRuleSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref EZRuleSubnet2
+
+  EZRuleManagerServiceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: ApplicationVPC
+    Properties:
+      GroupDescription: "SG for the service"
+      GroupName: !Sub EZRulesSecurityGroup-${Environment}
+      VpcId: !Ref ApplicationVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ezrule-security-group-${Environment}
+
+  EZRuleSubnet1:
+    Type: AWS::EC2::Subnet
+    DependsOn: ApplicationVPC
+    Properties:
+      VpcId: !Ref ApplicationVPC
+      CidrBlock: 172.31.48.0/20
+      AvailabilityZone: eu-west-1a
+
+  EZRuleSubnet2:
+    Type: AWS::EC2::Subnet
+    DependsOn: ApplicationVPC
+    Properties:
+      VpcId: !Ref ApplicationVPC
+      CidrBlock: 172.31.64.0/20
+      AvailabilityZone: eu-west-1b
+
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ezrules-app-${Environment}
+      CapacityProviders:
+        - FARGATE
+        - FARGATE_SPOT
+
+  TaskRoleDefinition:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ezrules-task-role-${Environment}
+      AssumeRolePolicyDocument: >
+        {
+            "Version": "2008-10-17",
+            "Statement": [
+                {
+                    "Sid": "",
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": [
+                            "ecs.amazonaws.com",
+                            "ecs-tasks.amazonaws.com"
+                        ]
+                    },
+                    "Action": "sts:AssumeRole"
+                }
+            ]
+        }
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole
+        - arn:aws:iam::aws:policy/AmazonECS_FullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AWSLambda_FullAccess
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ezrules-execution-role-${Environment}
+      AssumeRolePolicyDocument: >
+        {
+            "Version": "2008-10-17",
+            "Statement": [
+                {
+                    "Sid": "",
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": [
+                            "ecs.amazonaws.com",
+                            "ecs-tasks.amazonaws.com"
+                        ]
+                    },
+                    "Action": "sts:AssumeRole"
+                }
+            ]
+        }
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/CloudWatchFullAccess
+
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ezrules-alb-${Environment}
+      Type: application
+      Subnets:
+        - !Ref EZRuleSubnet1
+        - !Ref EZRuleSubnet2
+      SecurityGroups:
+        - !Ref EZRuleManagerServiceSecurityGroup
+      Scheme: internet-facing
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
+
+  EvaluatorALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ezrules-evaluator-alb-${Environment}
+      Type: application
+      Subnets:
+        - !Ref EZRuleSubnet1
+        - !Ref EZRuleSubnet2
+      SecurityGroups:
+        - !Ref EZRuleManagerServiceSecurityGroup
+      Scheme: internet-facing
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn: ALB
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: "/ping"
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 4
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: 200
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref ApplicationVPC
+
+  EvaluatorTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn: EvaluatorALB
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: "/ping"
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 4
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: 200
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref ApplicationVPC
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: 200
+            ContentType: text/plain
+            MessageBody: "Default OK here"
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+
+  EvaluatorALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: 200
+            ContentType: text/plain
+            MessageBody: "Default OK here"
+      LoadBalancerArn: !Ref EvaluatorALB
+      Port: 80
+      Protocol: HTTP
+
+  ALBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Priority: 1
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      Conditions:
+        - Field: path-pattern
+          PathPatternConfig:
+            Values:
+              - /*
+      ListenerArn: !Ref ALBListener
+
+  EvaluatorALBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Priority: 2
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref EvaluatorTargetGroup
+      Conditions:
+        - Field: path-pattern
+          PathPatternConfig:
+            Values:
+              - /*
+      ListenerArn: !Ref EvaluatorALBListener
+
+  EZRuleManagerApp:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ezrules-app-tas-${Environment}
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      NetworkMode: awsvpc
+      Cpu: 512
+      Memory: 1024
+      ExecutionRoleArn: !Ref ExecutionRole
+      TaskRoleArn: !Ref TaskRoleDefinition
+      ContainerDefinitions:
+        - Name: ezrules-manager-app
+          Image: 349229516285.dkr.ecr.eu-west-1.amazonaws.com/ezrule-manager:latest
+          Essential: true
+          Cpu: 512
+          Memory: 1024
+          PortMappings:
+            - AppProtocol: http
+              ContainerPort: 80
+              Name: http-80-port
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: eu-west-1
+              awslogs-group: !Sub ezrule-app-logs-${Environment}
+              awslogs-create-group: true
+              awslogs-stream-prefix: !Sub ezrules-${Environment}
+
+  EZRuleEvaluatorApp:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ezrules-evaluator-task-${Environment}
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      NetworkMode: awsvpc
+      Cpu: 512
+      Memory: 1024
+      ExecutionRoleArn: !Ref ExecutionRole
+      TaskRoleArn: !Ref TaskRoleDefinition
+      ContainerDefinitions:
+        - Name: ezrules-evaluator-app
+          Image: 349229516285.dkr.ecr.eu-west-1.amazonaws.com/ezrule-manager:latest
+          Command:
+            - "--workers"
+            - "1"
+            - "--threads"
+            - "3"
+            - "--bind"
+            - "0.0.0.0:80"
+            - "backend.ezrulevalapp:app"
+          Essential: true
+          Cpu: 512
+          Memory: 1024
+          PortMappings:
+            - AppProtocol: http
+              ContainerPort: 80
+              Name: http-80-port
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: eu-west-1
+              awslogs-group: !Sub ezrule-app-logs-${Environment}
+              awslogs-create-group: true
+              awslogs-stream-prefix: !Sub ezrules-${Environment}
+
+  EZRuleManagerService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - EZRuleManagerApp
+      - ECSCluster
+      - ApplicationVPC
+      - ALBListenerRule
+      - ALBListener
+    Properties:
+      Cluster: !Ref ECSCluster
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      DesiredCount: 1
+      TaskDefinition: !Ref EZRuleManagerApp
+      ServiceName: !Sub ezrules-manager-app-service-${Environment}
+      LoadBalancers:
+        - ContainerName: ezrules-manager-app
+          ContainerPort: 80
+          TargetGroupArn: !Ref TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref EZRuleManagerServiceSecurityGroup
+          Subnets:
+            - !Ref EZRuleSubnet1
+            - !Ref EZRuleSubnet2
+
+  EvaluatorEZRuleManagerService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - EZRuleEvaluatorApp
+      - ECSCluster
+      - ApplicationVPC
+      - EvaluatorALBListenerRule
+      - EvaluatorALBListener
+    Properties:
+      Cluster: !Ref ECSCluster
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      DesiredCount: 1
+      TaskDefinition: !Ref EZRuleEvaluatorApp
+      ServiceName: !Sub ezrules-evaluator-service-${Environment}
+      LoadBalancers:
+        - ContainerName: ezrules-evaluator-app
+          ContainerPort: 80
+          TargetGroupArn: !Ref EvaluatorTargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref EZRuleManagerServiceSecurityGroup
+          Subnets:
+            - !Ref EZRuleSubnet1
+            - !Ref EZRuleSubnet2
+
+
+
+
+
+
+
+
+
+
+

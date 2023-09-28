@@ -1,0 +1,21 @@
+Rules:
+  - rid: "[NA:047]"
+    tags:
+      - NA
+      - FirstTime
+    params:
+      - score
+    logic: >
+      if t["send_country"]=="US" and t["score"] > 900: 
+          return "$CANCEL" 
+      return "$RELEASE" 
+  - rid: "[NA:049]"
+    tags:
+      - NA
+      - FirstTime
+    params:
+      - score
+    logic: >
+      if t["send_country"]=="US" and t["score"] > 900: 
+          return "$CANCEL" 
+      return "$RELEASE" 

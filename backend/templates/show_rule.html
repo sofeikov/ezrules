@@ -1,0 +1,41 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Page Title</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css')}}">
+</head>
+<body>
+    <form action="/rule/{{ rule["RID"] }}" method="post">
+    <p>Rule ID: <input type="text" id="RID" name="RID" value="{{ rule["RID"] }}" readonly title="Can not be changed"></p>
+
+    <div class="form-group">
+        <label for="Description">Rule Description:</label>
+        <textarea id="Description" name="Description" rows="4" cols="50">{{ rule["Description"] }}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="Logic">Rule Logic:</label>
+        <textarea id="Logic" name="Logic" rows="4" cols="50">{{ rule["Logic"] }}</textarea>
+    </div>
+    <p>Tags(comma-separated): <input type="text" id="Tags" name="Tags" value="{{ rule["Tags"] | join(",") }}"></p>
+    <p>Params(comma-separated): <input type="text" id="Params" name="Params" value="{{ rule["Params"] | join(",") }}"></p>
+    <input type="submit" value="Submit">
+</form>
+</body>
+</html> -->
+{% from 'bootstrap5/form.html' import render_form %}
+<a href="/rules">Full rule list</a><br>
+{% block title %}
+Create a new rule
+{% endblock %}
+
+{% block content %}
+{{ render_form(form) }}
+Other rule versions:
+<a href="/rule/{{rule['rid']}}">latest</a>
+{% for rev in revision_list%}
+<a href="/rule/{{rule['rid']}}/{{rev}}">{{rev}}</a>
+{% endfor %}
+{% endblock %}

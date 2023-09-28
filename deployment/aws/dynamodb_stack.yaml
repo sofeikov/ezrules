@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  Environment:
+    Type: String
+    Description: The environment name
+    Default: dev
+
+Resources:
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "ezrules-rules-${Environment}"
+      AttributeDefinitions:
+        - AttributeName: rid
+          AttributeType: S
+        - AttributeName: revision
+          AttributeType: N
+      KeySchema:
+        - AttributeName: rid
+          KeyType: HASH
+        - AttributeName: revision
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
