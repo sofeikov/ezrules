@@ -296,6 +296,13 @@ Resources:
           Essential: true
           Cpu: 512
           Memory: 1024
+          Environment:
+            - Name: DYNAMODB_RULE_MANAGER_TABLE_NAME
+              Value: !Sub ezrules-rules-${Environment}
+            - Name: EZRULES_BUCKET
+              Value: !Sub ezrules-bucket-${Environment}
+            - Name: APP_SECRET
+              Value: insert_your_secret
           PortMappings:
             - AppProtocol: http
               ContainerPort: 80
@@ -336,6 +343,9 @@ Resources:
           Essential: true
           Cpu: 512
           Memory: 1024
+          Environment:
+            - Name: EVALUATOR_LAMBDA_NAME
+              Value: !Sub ezrule-executor-${Environment}
           PortMappings:
             - AppProtocol: http
               ContainerPort: 80

@@ -1,6 +1,5 @@
 import secrets
 import os
-from pathlib import Path
 
 from flask import Flask, render_template, Response, redirect, url_for
 from flask import request
@@ -25,10 +24,12 @@ bootstrap = Bootstrap5(app)
 csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)
 app.secret_key = url_safe_token
-
-p = Path("/Users/sofeikov/Downloads/ezroolsdb")
+EZRULES_BUCKET = os.environ["EZRULES_BUCKET"]
+DYNAMODB_TABLE_NAME = os.environ["DYNAMODB_RULE_MANAGER_TABLE_NAME"]
+app.logger.info(f"DynamoDB table is {DYNAMODB_TABLE_NAME}")
 fsrm = RuleManagerFactory.get_rule_manager(
-    "DynamoDBRuleManager", **{"table_name": "ezrules-rules-dev"}
+    "DynamoDBRuleManager",
+    **{"table_name": DYNAMODB_TABLE_NAME},
 )
 
 
@@ -95,7 +96,9 @@ def create_rule():
         rule = RuleFactory.from_json(rule_raw_config)
         fsrm.save_rule(rule)
         app.logger.info("Saving new version of the rules")
-        RuleEngineConfigProducer.to_yaml("s3://ezrules-bucket/rule-config.yaml", fsrm)
+        RuleEngineConfigProducer.to_yaml(
+            os.path.join(EZRULES_BUCKET, "rule-config.yaml"), fsrm
+        )
         app.logger.info(rule)
         return redirect(url_for("show_rule", rule_id=rule.rid))
 
@@ -137,7 +140,9 @@ def show_rule(rule_id=None, revision_number=None):
         rule.params = form.params.data
         fsrm.save_rule(rule)
         app.logger.info("Saving new version of the rules")
-        RuleEngineConfigProducer.to_yaml("s3://ezrules-bucket/rule-config.yaml", fsrm)
+        RuleEngineConfigProducer.to_yaml(
+            os.path.join(EZRULES_BUCKET, "rule-config.yaml"), fsrm
+        )
         app.logger.info(f"Changing {rule_id}")
         return redirect(url_for("show_rule", rule_id=rule_id))
 
