@@ -1,8 +1,5 @@
-if [ -z "$EZRULES_BUCKET" ]
-then
-    echo "EZRULES_BUCKET env is not set"
-    exit 1
-fi
+env=$1
+EZRULES_BUCKET="ezrules-bucket-${env}"
 docker run -v "$PWD":/var/task "public.ecr.aws/sam/build-python3.8:latest-x86_64" /bin/sh -c "yum install -y libxml2 libxslt && pip install --target /var/task/package -r requirements.txt"
 
 cd package
