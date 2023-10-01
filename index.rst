@@ -30,6 +30,7 @@ In order to deploy the infrastructure, from the root of the project run the foll
    ./deployment/aws/deploy_all.sh environment_name
 
 This command will do the following:
+
 #. Create a bucket that will be used by the application
 #. Package and upload lambda function code
 #. Deploy a lambda function that will execute the business logic
