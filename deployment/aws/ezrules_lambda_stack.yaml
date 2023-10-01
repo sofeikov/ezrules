@@ -23,6 +23,7 @@ Resources:
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
+          RULE_ENGINE_YAML_PATH: !Sub s3://ezrules-bucket-${Environment}/rule-config.yaml
 
   LambdaExecutionRole:
     Type: AWS::IAM::Role
