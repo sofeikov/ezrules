@@ -343,6 +343,9 @@ Resources:
           Essential: true
           Cpu: 512
           Memory: 1024
+          Environment:
+            - Name: EVALUATOR_LAMBDA_NAME
+              Value: !Sub ezrule-executor-${Environment}
           PortMappings:
             - AppProtocol: http
               ContainerPort: 80

@@ -1,5 +1,6 @@
 v0.2
 
+* Rule evaluator app now accepts lambda function name through an environment variable
 * Rule manager fetched the s3 bucket name from an environment variable now
 * Rule manager backend table name is now automatically configured with `DYNAMODB_RULE_MANAGER_TABLE_NAME` environment variable
 * General code cleanup
