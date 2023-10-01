@@ -27,13 +27,13 @@ In order to deploy the infrastructure, from the root of the project run the foll
 
 .. code-block:: bash
 
-   ./deployment/aws/deploy_stack.sh lambda_stack production
-   ./deployment/aws/ezrule_app_stack.sh dynamodb_stack production
-   ./deployment/aws/deploy_stack.sh ezrule_app_stack production
+   ./deployment/aws/deploy_all.sh environment_name
 
-The first command deploys a lambda function responsible for running the generated rules. The second command deploys
-a dynamodb table that serves as a storage backend. The last command deploys load balancers and ECS resources needed
-for application serving.
+This command will do the following:
+#. Create a bucket that will be used by the application
+#. Package and upload lambda function code
+#. Deploy a lambda function that will execute the business logic
+#. Create UI application for analysts
 
 Head over to `Load balancers AWS page <https://eu-west-1.console.aws.amazon.com/ec2/home?region=eu-west-1#LoadBalancers:>`_
 (make sure a correct region is set) to see the deployed endpoints.

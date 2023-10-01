@@ -7,7 +7,7 @@ Parameters:
     Default: dev
 
 Resources:
-  PageSummaryLambdaFunction:
+  RuleExecutor:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub ezrule-executor-${Environment}
@@ -15,7 +15,7 @@ Resources:
       Runtime: python3.8
       Timeout: 60
       Code:
-        S3Bucket: ezrules-bucket
+        S3Bucket: !Sub ezrules-bucket-${Environment}
         S3Key: lambda/deployment_package.zip
       Role: !GetAtt LambdaExecutionRole.Arn
       TracingConfig:
@@ -44,8 +44,4 @@ Resources:
               - Effect: Allow
                 Action:
                   - s3:*
-                Resource: "arn:aws:s3:::ezrules-bucket/*"
-  # MyS3Bucket:
-  #   Type: AWS::S3::Bucket
-  #   Properties:
-  #     BucketName: !Sub ezrules-bucket
+                Resource: !Sub "arn:aws:s3:::ezrules-bucket-${Environment}/*"
