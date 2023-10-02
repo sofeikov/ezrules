@@ -25,6 +25,7 @@ csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)
 app.secret_key = url_safe_token
 EZRULES_BUCKET = os.environ["EZRULES_BUCKET"]
+EZRULES_BUCKET_PATH = f"s3://{EZRULES_BUCKET}"
 DYNAMODB_TABLE_NAME = os.environ["DYNAMODB_RULE_MANAGER_TABLE_NAME"]
 app.logger.info(f"DynamoDB table is {DYNAMODB_TABLE_NAME}")
 fsrm = RuleManagerFactory.get_rule_manager(
@@ -97,7 +98,7 @@ def create_rule():
         fsrm.save_rule(rule)
         app.logger.info("Saving new version of the rules")
         RuleEngineConfigProducer.to_yaml(
-            os.path.join(EZRULES_BUCKET, "rule-config.yaml"), fsrm
+            os.path.join(EZRULES_BUCKET_PATH, "rule-config.yaml"), fsrm
         )
         app.logger.info(rule)
         return redirect(url_for("show_rule", rule_id=rule.rid))
@@ -141,7 +142,7 @@ def show_rule(rule_id=None, revision_number=None):
         fsrm.save_rule(rule)
         app.logger.info("Saving new version of the rules")
         RuleEngineConfigProducer.to_yaml(
-            os.path.join(EZRULES_BUCKET, "rule-config.yaml"), fsrm
+            os.path.join(EZRULES_BUCKET_PATH, "rule-config.yaml"), fsrm
         )
         app.logger.info(f"Changing {rule_id}")
         return redirect(url_for("show_rule", rule_id=rule_id))

@@ -21,8 +21,8 @@ In development:
 #. Easy A/B testing of multiple rule configurations
 #. Automated rule parameters adjustment
 
-Deployment
-==========
+Quick start
+===========
 In order to deploy the infrastructure, from the root of the project run the following
 
 .. code-block:: bash
@@ -37,23 +37,19 @@ This command will do the following:
 #. Create UI application for analysts
 
 Head over to `Load balancers AWS page <https://eu-west-1.console.aws.amazon.com/ec2/home?region=eu-west-1#LoadBalancers:>`_
-(make sure a correct region is set) to see the deployed endpoints.
+(make sure a correct region is set) to see the deployed endpoints. You may chose to point some of your sub-domains to load balancers
+so you have a permanent link to the deployed resources.
 
-.. toctree::
-   :maxdepth: 1
-   :glob:
-   :caption: Contents:
+Two load balancers are deployed:
 
-   docs/core/rule.rst
-   docs/core/rule_engine.rst
-   docs/core/rule_updater.rst
-
-
+.. _deployed_load_balancers:
+#. ezrules-alb-``environment`` - points to the UI for analysts to write and create rules. See the :ref:`UI guide <usage-label>` for more details.
+#. ezrules-evaluator-alb-``environment`` - points to the API executing the business logic. See the :ref:`executor API description <executor_api>` for more details.
 
 Indices and tables
 ==================
 
-
+* :ref:`whatsnew-label`
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
