@@ -2,6 +2,9 @@
 
 What's new
 ----------
+v0.3
+
+* It is now possible to refer to attributes of transactions/objects as "$attribute", e.g. "$amount", "$risk_score"
 
 v0.2
 
