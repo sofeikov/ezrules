@@ -18,7 +18,7 @@ class Rule:
     def __init__(
         self,
         logic: str,
-        description: str,
+        description: Optional[str] = None,
         rid: Optional[str] = None,
         tags: Optional[List[str]] = None,
         params: Optional[List[str]] = None,
@@ -53,6 +53,7 @@ class Rule:
         code = f"def rule(t):\n{code}"
         rule_ast = ast.parse(code)
         DollarLookupTransformer().visit(rule_ast)
+        ast.fix_missing_locations(rule_ast)
         compiled_code = compile(rule_ast, filename="<string>", mode="exec")
         namespace = {}
         exec(compiled_code, namespace)
