@@ -6,6 +6,7 @@ import os
 import hashlib
 import json
 from ruamel.yaml import scalarstring
+from datetime import datetime
 import ruamel
 import yaml
 import shutil
@@ -268,7 +269,13 @@ class DynamoDBRuleManager(RuleManager):
 
     def _save_rule_with_revision(self, rule: Rule, revision: int):
         rule_json = RuleConverter.to_json(rule)
-        self.table.put_item(Item={**rule_json, "revision": revision})
+        self.table.put_item(
+            Item={
+                **rule_json,
+                "revision": revision,
+                "created": int(datetime.now().timestamp()),
+            }
+        )
 
     def get_rule_version_list(self, rule_id: str) -> List[int]:
         from boto3.dynamodb.conditions import Key
