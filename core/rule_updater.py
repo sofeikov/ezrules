@@ -264,8 +264,11 @@ class DynamoDBRuleManager(RuleManager):
         self.table = self.dynamodb.Table(self.table_name)
 
     def _save_rule(self, rule: Rule) -> None:
+        self._save_rule_with_revision(rule, 1)
+
+    def _save_rule_with_revision(self, rule: Rule, revision: int):
         rule_json = RuleConverter.to_json(rule)
-        self.table.put_item(Item={**rule_json, "revision": 1})
+        self.table.put_item(Item={**rule_json, "revision": revision})
 
     def get_rule_version_list(self, rule_id: str) -> List[int]:
         from boto3.dynamodb.conditions import Key
@@ -284,8 +287,7 @@ class DynamoDBRuleManager(RuleManager):
             this_version = 1
         else:
             this_version = max(all_versions) + 1
-        rule_json = RuleConverter.to_json(rule)
-        self.table.put_item(Item={**rule_json, "revision": this_version})
+        self._save_rule_with_revision(rule, this_version)
 
     def load_rule(
         self, rule_id: str, revision_number: Optional[str] = None
@@ -332,20 +334,15 @@ class RuleManagerFactory:
         return RULE_MANAGERS[rule_manager_type](**kwargs)
 
 
-# if __name__ == "__main__":
-#     p = Path("/Users/sofeikov/Downloads/ezroolsdb")
-#     print(p)
-#     # if p.exists():
-#     # shutil.rmtree(p)
-#     # fsrm = FSRuleManager(fs_path=p)
-#     fsrm = DynamoDBRuleManager("ezrules-rules-dev")
-#     with open("rule-config.yaml", "r") as f:
-#         config = yaml.safe_load(f)
-#     rules_config = config["Rules"]
-#     for rule_config in rules_config:
-#         rule = RuleFactory.from_json(rule_config)
-#         fsrm.save_rule(rule)
-#
-#     print("loaded rule", fsrm.load_rule("[NA:049]"))
-#
-#     print("all loaded rules", fsrm.load_all_rules())
+if __name__ == "__main__":
+    fsrm = DynamoDBRuleManager("ezrules-rules-prod")
+    with open("rule-config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+    rules_config = config["Rules"]
+    for rule_config in rules_config:
+        rule = RuleFactory.from_json(rule_config)
+        fsrm.save_rule(rule)
+
+    print("loaded rule", fsrm.load_rule("[NA:049]"))
+
+    print("all loaded rules", fsrm.load_all_rules())
