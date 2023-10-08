@@ -122,7 +122,7 @@ def show_rule(rule_id=None, revision_number=None):
             rule_json = RuleConverter.to_json(rule)
             app.logger.info(rule_json)
             form.process(**rule_json)
-            revision_list = fsrm.get_rule_version_list(rule)
+            revision_list = fsrm.get_rule_revision_list(rule)
             return render_template(
                 "show_rule.html",
                 rule=rule_json,
