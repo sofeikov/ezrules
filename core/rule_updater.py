@@ -11,6 +11,10 @@ import ruamel
 import yaml
 import shutil
 import s3fs
+import operator
+from collections import namedtuple
+
+RuleRevision = namedtuple("RuleRevision", ["revision_number", "created"])
 
 
 class UnableToLockStorageException(Exception):
@@ -49,10 +53,9 @@ class RuleManager(ABC):
         :param rule: an instance of `core.rule.Rule`
         :return:
         """
-        self.lock_storage()
-        self._backup_version(rule)
+        # self.lock_storage()
         self._save_rule(rule)
-        self.release_storage()
+        # self.release_storage()
 
     def lock_storage(self):
         """Lock storage. Override in subclasses if lock is required."""
@@ -67,12 +70,13 @@ class RuleManager(ABC):
         """Storage specific saving mechanism."""
 
     @abstractmethod
-    def _backup_version(self, rule: Rule) -> None:
-        """Storage specific backup mechanism."""
-
-    @abstractmethod
-    def get_rule_version_list(self, rule: Rule) -> List[int]:
-        """Storage specific way to get a list of rule revisions."""
+    def get_rule_revision_list(
+        self, rule: Rule, return_dates=False
+    ) -> List[RuleRevision]:
+        """Storage specific way to get a list of rule revisions.
+        :param rule:
+        :param return_dates:
+        """
 
     @abstractmethod
     def load_rule(self, rule_id: str, revision_number: Optional[str] = None) -> Rule:
@@ -131,6 +135,9 @@ class FSRuleManager(RuleManager):
         self.fs_path.mkdir(parents=True, exist_ok=True)
         self._lock_fn = self.fs_path / "lock"
         self.manifest_fn = self.fs_path / "manifest.json"
+        if not self.manifest_fn.exists():
+            with open(self.manifest_fn, "w") as f:
+                json.dump({}, f)
 
     def lock_storage(self):
         """Lock file system. Create a special file that indicates that an update is in progress."""
@@ -169,7 +176,18 @@ class FSRuleManager(RuleManager):
         """
         rule_folder, rid_hash = self.__get_rule_folder_hash(rule)
         rule_folder.mkdir(exist_ok=True, parents=True)
-        rule_fn = rule_folder / "rule.yaml"
+        this_revision = 1
+        revisions = self.get_rule_revision_list(rule)
+        if revisions:
+            this_revision = (
+                max(
+                    revisions, key=operator.attrgetter("revision_number")
+                ).revision_number
+                + 1
+            )
+        this_version_folder = rule_folder / str(this_revision)
+        this_version_folder.mkdir(exist_ok=True, parents=True)
+        rule_fn = this_version_folder / "rule.yaml"
         yaml = ruamel.yaml.YAML()
         yaml.indent(offset=2)
         with open(rule_fn, "w") as yaml_f:
@@ -185,37 +203,21 @@ class FSRuleManager(RuleManager):
         with open(self.manifest_fn, "w") as json_f:
             json.dump(manifest, json_f, indent=4)
 
-    def _backup_version(self, rule: Rule) -> None:
-        """
-        Backup the current version so a new can be created. The way a backup is created is by taking the current \
-        version and put into a new folder named after the number of the current revision(0,1,...,N).
-
-        :param rule: instance of `core.rule_updater.RuleManager`
-        :return:
-        """
+    def get_rule_revision_list(
+        self, rule: str, return_dates=False
+    ) -> List[RuleRevision]:
         rule_folder, _ = self.__get_rule_folder_hash(rule)
-        all_versions = self.get_rule_version_list(rule)
-        print(f"Versions: {all_versions}")
-        if not all_versions:
-            this_version = 1
-        else:
-            this_version = max(all_versions) + 1
-        if not rule_folder.exists():
-            return
-        version_dir = rule_folder / str(this_version)
-        version_dir.mkdir()
-        shutil.copy(rule_folder / "rule.yaml", version_dir / "rule.yaml")
-
-    def get_rule_version_list(self, rule_id: str) -> List[int]:
-        rule_folder, _ = self.__get_rule_folder_hash(rule_id)
-        all_versions = sorted(
+        revision_list = sorted(
             [
                 int(item.parts[-1])
                 for item in rule_folder.glob("*")
                 if item.is_dir() and item.parts[-1].isdigit()
             ]
         )
-        return all_versions
+        return [
+            RuleRevision(revision_number=r, created=datetime.now())
+            for r in revision_list
+        ]
 
     def load_rule(self, rule_id: str, revision_number: Optional[str] = None) -> Rule:
         """
@@ -228,6 +230,13 @@ class FSRuleManager(RuleManager):
         rule_folder, _ = self.__get_rule_folder_hash(rule_id)
         if revision_number:
             rule_folder = rule_folder / str(revision_number)
+        else:
+            rule_folder = rule_folder / str(
+                max(
+                    self.get_rule_revision_list(rule_id),
+                    key=operator.attrgetter("revision_number"),
+                ).revision_number
+            )
         rule_path = rule_folder / "rule.yaml"
         if not rule_path.exists():
             raise RuleDoesNotExistInTheStorage(
@@ -265,7 +274,16 @@ class DynamoDBRuleManager(RuleManager):
         self.table = self.dynamodb.Table(self.table_name)
 
     def _save_rule(self, rule: Rule) -> None:
-        self._save_rule_with_revision(rule, 1)
+        revisions = self.get_rule_revision_list(rule)
+        this_revision = 1
+        if revisions:
+            this_revision = (
+                max(
+                    revisions, key=operator.attrgetter("revision_number")
+                ).revision_number
+                + 1
+            )
+        self._save_rule_with_revision(rule, this_revision)
 
     def _save_rule_with_revision(self, rule: Rule, revision: int):
         rule_json = RuleConverter.to_json(rule)
@@ -277,30 +295,46 @@ class DynamoDBRuleManager(RuleManager):
             }
         )
 
-    def get_rule_version_list(self, rule_id: str) -> List[int]:
+    def get_rule_revision_list(
+        self, rule: Union[str, Rule], return_dates=False
+    ) -> List[RuleRevision]:
         from boto3.dynamodb.conditions import Key
 
+        rule_id = rule
         if isinstance(rule_id, Rule):
-            rule_id = rule_id.rid
+            rule_id = rule.rid
         response = self.table.query(KeyConditionExpression=Key("rid").eq(rule_id))
         items = response["Items"]
-        all_versions = sorted([int(item["revision"]) for item in items])
-        return all_versions
-
-    def _backup_version(self, rule: Rule) -> None:
-        all_versions = self.get_rule_version_list(rule.rid)
-        print(f"Versions: {all_versions}")
-        if not all_versions:
-            this_version = 1
-        else:
-            this_version = max(all_versions) + 1
-        self._save_rule_with_revision(rule, this_version)
+        all_revisions = sorted(
+            [
+                RuleRevision(
+                    revision_number=int(item["revision"]),
+                    created=datetime.fromtimestamp(item["created"]),
+                )
+                for item in items
+            ],
+            key=operator.attrgetter("revision_number"),
+        )
+        return all_revisions
 
     def load_rule(
         self, rule_id: str, revision_number: Optional[str] = None
     ) -> Optional[Rule]:
         if not revision_number:
-            revision_number = 1
+            # Extract the latest revision number
+            revision_resp = self.table.query(
+                KeyConditions={
+                    "rid": {
+                        "AttributeValueList": [rule_id],
+                        "ComparisonOperator": "EQ",
+                    },
+                },
+                Select="SPECIFIC_ATTRIBUTES",
+                ProjectionExpression="revision",
+            )
+            revision_number = max(
+                [int(item["revision"]) for item in revision_resp["Items"]]
+            )
         response = self.table.query(
             KeyConditions={
                 "rid": {"AttributeValueList": [rule_id], "ComparisonOperator": "EQ"},
@@ -342,13 +376,14 @@ class RuleManagerFactory:
 
 
 if __name__ == "__main__":
-    fsrm = DynamoDBRuleManager("ezrules-rules-prod")
-    with open("rule-config.yaml", "r") as f:
-        config = yaml.safe_load(f)
-    rules_config = config["Rules"]
-    for rule_config in rules_config:
-        rule = RuleFactory.from_json(rule_config)
-        fsrm.save_rule(rule)
+    # fsrm = DynamoDBRuleManager("ezrules-rules-dev")
+    fsrm = FSRuleManager("/Users/sofeikov/Downloads/ezrulesdb")
+    with open("rule-config.yaml", "r") as fp:
+        config = yaml.safe_load(fp)
+    this_rules_config = config["Rules"]
+    for rule_config in this_rules_config:
+        this_rule = RuleFactory.from_json(rule_config)
+        fsrm.save_rule(this_rule)
 
     print("loaded rule", fsrm.load_rule("[NA:049]"))
 

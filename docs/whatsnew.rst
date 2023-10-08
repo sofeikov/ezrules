@@ -3,6 +3,10 @@
 What's new
 ----------
 
+v0.3
+
+* Each rule revision now has a timestamp associated with it
+
 v0.2
 
 * A better documentation on rules writing
