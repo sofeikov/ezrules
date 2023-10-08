@@ -17,7 +17,7 @@ return "RELEASE"
         ),
         (
             """
-if "$a" > 30:
+if t["a"] > 30:
     return "CANCEL"
 return "RELEASE"
         """,
@@ -26,7 +26,7 @@ return "RELEASE"
         ),
         (
             """
-if 30 < "$a":
+if 30 < t["a"]:
     return "CANCEL"
 return "RELEASE"
         """,
@@ -35,7 +35,7 @@ return "RELEASE"
         ),
         (
             """
-if "$a" > "$b":
+if t["a"] > t["b"]:
     return "CANCEL"
 return "RELEASE"
         """,

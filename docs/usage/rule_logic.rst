@@ -11,13 +11,8 @@ writing a rule's logic, with its `if`, `then`, loops, and everything else.
 
 Most of the time, a rule's logic will rely on transaction attributes to be compared either with each other
 (think of comparing the current transaction volume versus the average weekly volume for the customer). In order to access
-these attributes, there are two options. The easiest one is to use the dollar sign notation, like this: ``$amount``.
-The other option is a bit more technical but still viable. The transaction information is available to you through an
+these attributes, the transaction information is available to you through an
 object called ``t``, so you can look up the ``amount`` value by doing ``t["amount"]``.
-
-.. warning::
-    Due to internal limitations, using the ``$`` sign is not possible in string constants that are used to compare attributes.
-    For example, a comparison of the type ``$currency == "$"`` is not possible. This issue will be fixed in future versions.
 
 Examples
 ********
@@ -27,7 +22,7 @@ Example 1 - react on transactions above certain value
 
 .. code-block:: python
 
-    if "$amount_usd" > 500:
+    if t["amount_usd"] > 500:
         return "HOLD"
     return "RELEASE"
 
@@ -36,7 +31,7 @@ Example 2 - this send is at least two times of standard deviation of weekly send
 
 .. code-block:: python
 
-    if "$amount" > 2 * "$send_std_weekly":
+    if t["amount"] > 2 * t["send_std_weekly"]:
         return "HOLD"
     return "RELEASE"
 
@@ -46,8 +41,8 @@ Example 3 - there are at least three small transactions within the past hour
 .. code-block:: python
 
     small_count = 0
-    for amount, tx_datetime in "$previous_transactions":
-        time_difference = "$datetime" - tx_datetime
+    for amount, tx_datetime in t["previous_transactions"]:
+        time_difference = t["datetime"] - tx_datetime
         if time_difference < 3600:
             small_count = small_count + 1
         if small_count >= 3:

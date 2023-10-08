@@ -1,5 +1,4 @@
 from typing import Any, Optional, List
-from core.rule_logic import DollarLookupTransformer
 import ast
 import yaml
 
@@ -52,8 +51,6 @@ class Rule:
         code = "\n".join(["\t" + l for l in code])
         code = f"def rule(t):\n{code}"
         rule_ast = ast.parse(code)
-        DollarLookupTransformer().visit(rule_ast)
-        ast.fix_missing_locations(rule_ast)
         compiled_code = compile(rule_ast, filename="<string>", mode="exec")
         namespace = {}
         exec(compiled_code, namespace)
