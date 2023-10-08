@@ -48,7 +48,7 @@ Example 3 - there are at least three small transactions within the past hour
     small_count = 0
     for amount, tx_datetime in "$previous_transactions":
         time_difference = "$datetime" - tx_datetime
-        if time_difference.total_second() < 3600:
+        if time_difference < 3600:
             small_count = small_count + 1
         if small_count >= 3:
             return "HOLD"
