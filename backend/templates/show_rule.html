@@ -35,6 +35,9 @@ Create a new rule
 {{ render_form(form) }}
 Other rule versions:
 <a href="/rule/{{rule['rid']}}">latest</a><br>
+    {% if revision_list | length >= 2 %}
+<a href="/rule/{{rule['rid']}}/timeline">visualise changes</a><br>
+    {% endif %}
 {% for rev in revision_list%}
 <a href="/rule/{{rule['rid']}}/{{rev.revision_number}}">Revision {{rev.revision_number}} created at {{ rev.created.strftime('%Y-%m-%d %H:%M:%S') }}</a> <br>
 {% endfor %}
