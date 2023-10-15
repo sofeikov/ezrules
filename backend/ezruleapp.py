@@ -16,6 +16,11 @@ from core.rule_updater import (
     RuleDoesNotExistInTheStorage,
     RuleEngineConfigProducer,
 )
+from core.rule_locker import DynamoDBStorageLocker
+
+rule_locker = DynamoDBStorageLocker(
+    table_name=os.environ["DYNAMODB_RULE_LOCKER_TABLE_NAME"]
+)
 
 app = Flask(__name__)
 app.secret_key = os.environ["APP_SECRET"]
@@ -145,11 +150,13 @@ def show_rule(rule_id=None, revision_number=None):
             app.logger.info(rule_json)
             form.process(**rule_json)
             revision_list = fsrm.get_rule_revision_list(rule)
+            rule_lock = rule_locker.is_record_locked(rule)
             return render_template(
                 "show_rule.html",
                 rule=rule_json,
                 form=form,
                 revision_list=revision_list,
+                rule_lock=rule_lock,
             )
         except RuleDoesNotExistInTheStorage:
             return Response("Rule not found", 404)
@@ -170,7 +177,24 @@ def show_rule(rule_id=None, revision_number=None):
         return redirect(url_for("show_rule", rule_id=rule_id))
 
 
+@app.route("/lock_rule/<rule_id>", methods=["POST"])
+@csrf.exempt
+def lock_rule(rule_id):
+    rule = fsrm.load_rule(rule_id)
+    success, result = rule_locker.lock_storage(rule)
+    return {"success": success, **result._asdict()}
+
+
+@app.route("/unlock/<rule_id>", methods=["POST"])
+@csrf.exempt
+def unlock_rule(rule_id):
+    rule = fsrm.load_rule(rule_id)
+    rule_locker.release_storage(rule)
+    return "OK"
+
+
 @app.route("/ping", methods=["GET"])
+@csrf.exempt
 def ping():
     return "OK"
 
