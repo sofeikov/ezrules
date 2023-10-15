@@ -6,6 +6,7 @@ What's new
 v0.3
 
 * Each rule revision now has a timestamp associated with it
+* For rules with modification history, see the changelog with highlighted diffs
 
 v0.2
 

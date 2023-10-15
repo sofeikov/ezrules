@@ -1,3 +1,4 @@
+import difflib
 import secrets
 import os
 
@@ -108,6 +109,27 @@ def create_rule():
 def get_all_rules():
     all_rules = [RuleConverter.to_json(r) for r in fsrm.load_all_rules()]
     return all_rules
+
+
+@app.route("/rule/<rule_id>/timeline", methods=["GET"])
+def timeline(rule_id):
+    revision_list = fsrm.get_rule_revision_list(rule_id)
+    rules = [
+        fsrm.load_rule(rule_id, revision_number=r.revision_number)
+        for r in revision_list
+    ]
+    logics = [r._source for r in rules]
+    diff_timeline = []
+    for ct, (l1, l2) in enumerate(zip(logics[:-1], logics[1:])):
+        diff = difflib.HtmlDiff().make_file(
+            fromlines=l1.split("\n"),
+            tolines=l2.split("\n"),
+            fromdesc=f"Revision {revision_list[ct].revision_number}",
+            todesc=f"Revision {revision_list[ct+1].revision_number}",
+        )
+        diff_timeline.append(diff)
+
+    return render_template("timeline.html", timeline=diff_timeline, rule=rule_id)
 
 
 @app.route("/rule/<rule_id>", methods=["GET", "POST"])
