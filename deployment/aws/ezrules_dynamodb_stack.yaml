@@ -24,3 +24,20 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: 1
         WriteCapacityUnits: 1
+
+  RuleLockTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "ezrules-lock-${Environment}"
+      AttributeDefinitions:
+        - AttributeName: rid
+          AttributeType: S
+      KeySchema:
+        - AttributeName: rid
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expires_on
+        Enabled: true
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1

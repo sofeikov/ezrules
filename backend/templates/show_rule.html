@@ -1,16 +1,30 @@
 <head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script src="{{ url_for('static', filename="scripts.js") }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             initializeTabCapture("{{ form.logic.id }}");
+            $("#lock_button").click(function () {
+                lockRuleForModification("{{ form.rid._value() }}");
+            })
+            $("#force_unlock_button").click(function () {
+                forceUnlockRuleForModification("{{ form.rid._value() }}");
+            })
         });
     </script>
     <title>Rule {{ rule['rid'] }}</title>
 </head>
+<body>
 {% from 'bootstrap5/form.html' import render_form %}
 <a href="/rules">Full rule list</a><br>
+{% if rule_lock %}
+    <span style="color: red; "> This rule is locked by {{ rule_lock.locked_by }} until at least {{ rule_lock.expires_on }}</span>
+{% endif %}<br>
 {% block title %}
-    Create a new rule
+    <button id="lock_button">Modify this rule</button>
+    {% if rule_lock %}
+    <button id="force_unlock_button">Force unlock the rule(NOT RECOMMENDED)</button>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
@@ -25,3 +39,4 @@
             at {{ rev.created.strftime('%Y-%m-%d %H:%M:%S') }}</a> <br>
     {% endfor %}
 {% endblock %}
+</body>
