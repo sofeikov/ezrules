@@ -149,6 +149,7 @@ def show_rule(rule_id=None, revision_number=None):
             rule_json = RuleConverter.to_json(rule)
             app.logger.info(rule_json)
             form.process(**rule_json)
+            del form.rid
             revision_list = fsrm.get_rule_revision_list(rule)
             rule_lock = rule_locker.is_record_locked(rule)
             return render_template(
@@ -163,6 +164,7 @@ def show_rule(rule_id=None, revision_number=None):
     elif request.method == "POST":
         app.logger.info(request.form)
         rule = fsrm.load_rule(rule_id)
+        # TODO reject the change is the rule is locked
         app.logger.info(f"Current rule state {rule}")
         rule.description = form.description.data
         rule.logic = form.logic.data

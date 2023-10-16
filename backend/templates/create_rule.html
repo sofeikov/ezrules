@@ -8,13 +8,6 @@
     <title>Create new rule</title>
 </head>
 {% from 'bootstrap5/form.html' import render_form %}
-
-{% block title %}
-    Create a new rule
-{% endblock %}
-
-
-{% block content %}
-    <a href="/rules">Full rule list</a>
-    {{ render_form(form) }}
-{% endblock %}
+<a href="/rules">Full rule list</a><br>
+Create a new rule
+{{ render_form(form) }}
