@@ -1,0 +1,8 @@
+{% from 'bootstrap5/form.html' import render_form %}
+<a href="/rules">Back to rule list</a><br>
+
+This is a list of outcomes allowed to be used by business rules:
+{{ render_form(form) }}
+{% for outcome in outcomes %}
+    {{ outcome }}<br>
+{% endfor %}

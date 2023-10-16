@@ -5,12 +5,12 @@ import os
 from flask import Flask, render_template, Response, redirect, url_for
 from flask import request
 from flask_bootstrap import Bootstrap5
-from flask_wtf import FlaskForm, CSRFProtect
-from wtforms import StringField, SubmitField, Field, TextAreaField
-from wtforms.validators import DataRequired
-from wtforms.widgets import TextInput
+from flask_wtf import CSRFProtect
+from forms import RuleForm, OutcomeForm
+
 
 from core.rule import RuleFactory, RuleConverter
+from core.outcomes import FixedOutcome
 from core.rule_updater import (
     RuleManagerFactory,
     RuleDoesNotExistInTheStorage,
@@ -21,7 +21,7 @@ from core.rule_locker import DynamoDBStorageLocker
 rule_locker = DynamoDBStorageLocker(
     table_name=os.environ["DYNAMODB_RULE_LOCKER_TABLE_NAME"]
 )
-
+outcome_manager = FixedOutcome()
 app = Flask(__name__)
 app.secret_key = os.environ["APP_SECRET"]
 # Bootstrap-Flask requires this line
@@ -45,51 +45,6 @@ fsrm = RuleManagerFactory.get_rule_manager(
 def rules():
     rules = fsrm.load_all_rules()
     return render_template("rules.html", rules=rules)
-
-
-class TagListField(Field):
-    widget = TextInput()
-
-    def _value(self):
-        if self.data:
-            return ", ".join(self.data)
-        else:
-            return ""
-
-    def process_formdata(self, valuelist):
-        if valuelist:
-            self.data = [x.strip() for x in valuelist[0].split(",")]
-        else:
-            self.data = []
-
-
-class BetterTagListField(TagListField):
-    def __init__(self, label="", validators=None, remove_duplicates=True, **kwargs):
-        super(BetterTagListField, self).__init__(label, validators, **kwargs)
-        self.remove_duplicates = remove_duplicates
-
-    def process_formdata(self, valuelist):
-        super(BetterTagListField, self).process_formdata(valuelist)
-        if self.remove_duplicates:
-            self.data = list(self._remove_duplicates(self.data))
-
-    @classmethod
-    def _remove_duplicates(cls, seq):
-        """Remove duplicates in a case-insensitive, but case preserving manner"""
-        d = {}
-        for item in seq:
-            if item.lower() not in d:
-                d[item.lower()] = True
-                yield item
-
-
-class RuleForm(FlaskForm):
-    rid = StringField("A Unique rule ID", validators=[DataRequired()])
-    description = StringField("Rule description")
-    logic = TextAreaField("Rule logic", validators=[DataRequired()])
-    tags = BetterTagListField("Rule tags")
-    params = BetterTagListField("Rule params")
-    submit = SubmitField("Submit")
 
 
 @app.route("/create_rule", methods=["GET", "POST"])
@@ -193,6 +148,19 @@ def unlock_rule(rule_id):
     rule = fsrm.load_rule(rule_id)
     rule_locker.release_storage(rule)
     return "OK"
+
+
+@app.route("/management/outcomes", methods=["GET", "POST"])
+def verified_outcomes():
+    form = OutcomeForm()
+    if request.method == "GET":
+        return render_template(
+            "outcomes.html", form=form, outcomes=outcome_manager.get_allowed_outcomes()
+        )
+    else:
+        if form.validate():
+            outcome_manager.add_outcome(form.outcome.data)
+            return redirect(url_for("verified_outcomes"))
 
 
 @app.route("/ping", methods=["GET"])
