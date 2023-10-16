@@ -5,10 +5,10 @@
         document.addEventListener('DOMContentLoaded', function () {
             initializeTabCapture("{{ form.logic.id }}");
             $("#lock_button").click(function () {
-                lockRuleForModification("{{ form.rid._value() }}");
+                lockRuleForModification("{{ rule['rid'] }}");
             })
             $("#force_unlock_button").click(function () {
-                forceUnlockRuleForModification("{{ form.rid._value() }}");
+                forceUnlockRuleForModification("{{ rule['rid'] }}");
             })
         });
     </script>
@@ -20,6 +20,7 @@
 {% if rule_lock %}
     <span style="color: red; "> This rule is locked by {{ rule_lock.locked_by }} until at least {{ rule_lock.expires_on }}</span>
 {% endif %}<br>
+<h2 id="page_header">Rule {{ rule['rid'] }}</h2>
 {% block title %}
     <button id="lock_button">Modify this rule</button>
     {% if rule_lock %}
