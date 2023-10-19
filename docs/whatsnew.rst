@@ -5,6 +5,7 @@ What's new
 
 v0.3
 
+* Outcomes of rules are now controlled against a list of allowed outcomes
 * When a rule is edited, there is now a warning that someone else is working on it too
 * Each rule revision now has a timestamp associated with it
 * For rules with modification history, see the changelog with highlighted diffs
