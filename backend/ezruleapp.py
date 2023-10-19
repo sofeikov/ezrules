@@ -2,15 +2,18 @@ import difflib
 import secrets
 import os
 
-from flask import Flask, render_template, Response, redirect, url_for
+from flask import Flask, render_template, Response, redirect, url_for, flash
 from flask import request
 from flask_bootstrap import Bootstrap5
 from flask_wtf import CSRFProtect
 from forms import RuleForm, OutcomeForm
 
-
 from core.rule import RuleFactory, RuleConverter
 from core.outcomes import FixedOutcome
+from core.rule_checkers import (
+    RuleCheckingPipeline,
+    OnlyAllowedOutcomesAreReturnedChecker,
+)
 from core.rule_updater import (
     RuleManagerFactory,
     RuleDoesNotExistInTheStorage,
@@ -22,11 +25,12 @@ rule_locker = DynamoDBStorageLocker(
     table_name=os.environ["DYNAMODB_RULE_LOCKER_TABLE_NAME"]
 )
 outcome_manager = FixedOutcome()
+rule_checker = RuleCheckingPipeline(
+    checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)]
+)
 app = Flask(__name__)
 app.secret_key = os.environ["APP_SECRET"]
-# Bootstrap-Flask requires this line
 bootstrap = Bootstrap5(app)
-# Flask-WTF requires this line
 csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)
 app.secret_key = url_safe_token
@@ -53,6 +57,12 @@ def create_rule():
     if request.method == "GET":
         return render_template("create_rule.html", form=form)
     elif request.method == "POST":
+        rule_status_check = form.validate(rule_checker=rule_checker)
+        if not rule_status_check.rule_ok:
+            flash("The rule changes have not been saved, because:")
+            for r in rule_status_check.reasons:
+                flash(r)
+            return render_template("create_rule.html", form=form)
         rule_raw_config = form.data
         app.logger.info(rule_raw_config)
         rule = RuleFactory.from_json(rule_raw_config)
@@ -117,6 +127,12 @@ def show_rule(rule_id=None, revision_number=None):
         except RuleDoesNotExistInTheStorage:
             return Response("Rule not found", 404)
     elif request.method == "POST":
+        rule_status_check = form.validate(rule_checker=rule_checker)
+        if not rule_status_check.rule_ok:
+            flash("The rule changes have not been saved, because:")
+            for r in rule_status_check.reasons:
+                flash(r)
+            return redirect(url_for("show_rule", rule_id=rule_id))
         app.logger.info(request.form)
         rule = fsrm.load_rule(rule_id)
         # TODO reject the change is the rule is locked
@@ -125,13 +141,20 @@ def show_rule(rule_id=None, revision_number=None):
         rule.logic = form.logic.data
         rule.tags = form.tags.data
         rule.params = form.params.data
+
         fsrm.save_rule(rule)
         app.logger.info("Saving new version of the rules")
         RuleEngineConfigProducer.to_yaml(
             os.path.join(EZRULES_BUCKET_PATH, "rule-config.yaml"), fsrm
         )
         app.logger.info(f"Changing {rule_id}")
+        flash(f"Changes to {rule_id} were saved")
         return redirect(url_for("show_rule", rule_id=rule_id))
+
+
+@app.route("/verify_rule", methods=["POST"])
+def verify_rule():
+    pass
 
 
 @app.route("/lock_rule/<rule_id>", methods=["POST"])
@@ -140,14 +163,6 @@ def lock_rule(rule_id):
     rule = fsrm.load_rule(rule_id)
     success, result = rule_locker.lock_storage(rule)
     return {"success": success, **result._asdict()}
-
-
-@app.route("/unlock/<rule_id>", methods=["POST"])
-@csrf.exempt
-def unlock_rule(rule_id):
-    rule = fsrm.load_rule(rule_id)
-    rule_locker.release_storage(rule)
-    return "OK"
 
 
 @app.route("/management/outcomes", methods=["GET", "POST"])

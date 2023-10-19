@@ -16,9 +16,9 @@ class Rule:
 
     def __init__(
         self,
+        rid: str,
         logic: str,
         description: Optional[str] = None,
-        rid: Optional[str] = None,
         tags: Optional[List[str]] = None,
         params: Optional[List[str]] = None,
     ) -> None:
@@ -31,6 +31,7 @@ class Rule:
         :param tags: rule tags, not used atm
         :param params: rule params, not used atm
         """
+        self._rule_ast = None
         self._logic = None
         self.description = description
         self.logic = logic
@@ -51,6 +52,7 @@ class Rule:
         code = "\n".join(["\t" + l for l in code])
         code = f"def rule(t):\n{code}"
         rule_ast = ast.parse(code)
+        self._rule_ast = rule_ast
         compiled_code = compile(rule_ast, filename="<string>", mode="exec")
         namespace = {}
         exec(compiled_code, namespace)
