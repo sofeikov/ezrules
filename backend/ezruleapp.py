@@ -2,15 +2,18 @@ import difflib
 import secrets
 import os
 
-from flask import Flask, render_template, Response, redirect, url_for
+from flask import Flask, render_template, Response, redirect, url_for, flash
 from flask import request
 from flask_bootstrap import Bootstrap5
-from flask_wtf import FlaskForm, CSRFProtect
-from wtforms import StringField, SubmitField, Field, TextAreaField
-from wtforms.validators import DataRequired
-from wtforms.widgets import TextInput
+from flask_wtf import CSRFProtect
+from forms import RuleForm, OutcomeForm
 
 from core.rule import RuleFactory, RuleConverter
+from core.outcomes import FixedOutcome
+from core.rule_checkers import (
+    RuleCheckingPipeline,
+    OnlyAllowedOutcomesAreReturnedChecker,
+)
 from core.rule_updater import (
     RuleManagerFactory,
     RuleDoesNotExistInTheStorage,
@@ -21,12 +24,13 @@ from core.rule_locker import DynamoDBStorageLocker
 rule_locker = DynamoDBStorageLocker(
     table_name=os.environ["DYNAMODB_RULE_LOCKER_TABLE_NAME"]
 )
-
+outcome_manager = FixedOutcome()
+rule_checker = RuleCheckingPipeline(
+    checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)]
+)
 app = Flask(__name__)
 app.secret_key = os.environ["APP_SECRET"]
-# Bootstrap-Flask requires this line
 bootstrap = Bootstrap5(app)
-# Flask-WTF requires this line
 csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)
 app.secret_key = url_safe_token
@@ -47,57 +51,18 @@ def rules():
     return render_template("rules.html", rules=rules)
 
 
-class TagListField(Field):
-    widget = TextInput()
-
-    def _value(self):
-        if self.data:
-            return ", ".join(self.data)
-        else:
-            return ""
-
-    def process_formdata(self, valuelist):
-        if valuelist:
-            self.data = [x.strip() for x in valuelist[0].split(",")]
-        else:
-            self.data = []
-
-
-class BetterTagListField(TagListField):
-    def __init__(self, label="", validators=None, remove_duplicates=True, **kwargs):
-        super(BetterTagListField, self).__init__(label, validators, **kwargs)
-        self.remove_duplicates = remove_duplicates
-
-    def process_formdata(self, valuelist):
-        super(BetterTagListField, self).process_formdata(valuelist)
-        if self.remove_duplicates:
-            self.data = list(self._remove_duplicates(self.data))
-
-    @classmethod
-    def _remove_duplicates(cls, seq):
-        """Remove duplicates in a case-insensitive, but case preserving manner"""
-        d = {}
-        for item in seq:
-            if item.lower() not in d:
-                d[item.lower()] = True
-                yield item
-
-
-class RuleForm(FlaskForm):
-    rid = StringField("A Unique rule ID", validators=[DataRequired()])
-    description = StringField("Rule description")
-    logic = TextAreaField("Rule logic", validators=[DataRequired()])
-    tags = BetterTagListField("Rule tags")
-    params = BetterTagListField("Rule params")
-    submit = SubmitField("Submit")
-
-
 @app.route("/create_rule", methods=["GET", "POST"])
 def create_rule():
     form = RuleForm()
     if request.method == "GET":
         return render_template("create_rule.html", form=form)
     elif request.method == "POST":
+        rule_status_check = form.validate(rule_checker=rule_checker)
+        if not rule_status_check.rule_ok:
+            flash("The rule changes have not been saved, because:")
+            for r in rule_status_check.reasons:
+                flash(r)
+            return render_template("create_rule.html", form=form)
         rule_raw_config = form.data
         app.logger.info(rule_raw_config)
         rule = RuleFactory.from_json(rule_raw_config)
@@ -162,6 +127,12 @@ def show_rule(rule_id=None, revision_number=None):
         except RuleDoesNotExistInTheStorage:
             return Response("Rule not found", 404)
     elif request.method == "POST":
+        rule_status_check = form.validate(rule_checker=rule_checker)
+        if not rule_status_check.rule_ok:
+            flash("The rule changes have not been saved, because:")
+            for r in rule_status_check.reasons:
+                flash(r)
+            return redirect(url_for("show_rule", rule_id=rule_id))
         app.logger.info(request.form)
         rule = fsrm.load_rule(rule_id)
         # TODO reject the change is the rule is locked
@@ -170,13 +141,20 @@ def show_rule(rule_id=None, revision_number=None):
         rule.logic = form.logic.data
         rule.tags = form.tags.data
         rule.params = form.params.data
+
         fsrm.save_rule(rule)
         app.logger.info("Saving new version of the rules")
         RuleEngineConfigProducer.to_yaml(
             os.path.join(EZRULES_BUCKET_PATH, "rule-config.yaml"), fsrm
         )
         app.logger.info(f"Changing {rule_id}")
+        flash(f"Changes to {rule_id} were saved")
         return redirect(url_for("show_rule", rule_id=rule_id))
+
+
+@app.route("/verify_rule", methods=["POST"])
+def verify_rule():
+    pass
 
 
 @app.route("/lock_rule/<rule_id>", methods=["POST"])
@@ -187,12 +165,17 @@ def lock_rule(rule_id):
     return {"success": success, **result._asdict()}
 
 
-@app.route("/unlock/<rule_id>", methods=["POST"])
-@csrf.exempt
-def unlock_rule(rule_id):
-    rule = fsrm.load_rule(rule_id)
-    rule_locker.release_storage(rule)
-    return "OK"
+@app.route("/management/outcomes", methods=["GET", "POST"])
+def verified_outcomes():
+    form = OutcomeForm()
+    if request.method == "GET":
+        return render_template(
+            "outcomes.html", form=form, outcomes=outcome_manager.get_allowed_outcomes()
+        )
+    else:
+        if form.validate():
+            outcome_manager.add_outcome(form.outcome.data)
+            return redirect(url_for("verified_outcomes"))
 
 
 @app.route("/ping", methods=["GET"])
