@@ -165,6 +165,14 @@ def lock_rule(rule_id):
     return {"success": success, **result._asdict()}
 
 
+@app.route("/unlock/<rule_id>", methods=["POST"])
+@csrf.exempt
+def unlock_rule(rule_id):
+    rule = fsrm.load_rule(rule_id)
+    rule_locker.release_storage(rule)
+    return {}
+
+
 @app.route("/management/outcomes", methods=["GET", "POST"])
 def verified_outcomes():
     form = OutcomeForm()

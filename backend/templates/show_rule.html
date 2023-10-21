@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% block head %}
 <head>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script src="{{ url_for('static', filename="scripts.js") }}"></script>
@@ -15,6 +16,7 @@
     </script>
     <title>Rule {{ rule['rid'] }}</title>
 </head>
+{% endblock %}
 {% block body %}
 <body>
 {% from 'bootstrap5/form.html' import render_form %}

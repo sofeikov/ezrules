@@ -55,7 +55,6 @@ function forceUnlockRuleForModification(rule_id) {
         data: postData, // Data to be sent (if needed)
         success: function (response) {
             // Handle the success response here
-            console.log(response);
             window.location.href = `/rule/${rule_id}`
         },
         error: function (error) {
