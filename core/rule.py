@@ -1,4 +1,5 @@
 from typing import Any, Optional, List
+from core.rule_helpers import RuleParamExtractor
 import ast
 import yaml
 
@@ -58,6 +59,11 @@ class Rule:
         exec(compiled_code, namespace)
         self._logic = namespace["rule"]
         self._source = logic
+
+    def get_rule_params(self):
+        pe = RuleParamExtractor()
+        pe.visit(self._rule_ast)
+        return pe.params
 
     def __call__(self, t) -> Any:
         """Executes rule logic."""
