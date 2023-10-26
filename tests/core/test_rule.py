@@ -45,6 +45,38 @@ return "RELEASE"
     ],
 )
 def test_rule_does_whats_expected(rule_logic, rule_input, expected_output):
-    rule = Rule(logic=rule_logic)
+    rule = Rule(rid="", logic=rule_logic)
     rule_output = rule(rule_input)
     assert rule_output == expected_output
+
+
+@pytest.mark.parametrize(
+    ["rule_logic", "expected_params"],
+    [
+        (
+            """
+if t["amount"] == 3:
+    return "CANCEL"
+            """,
+            {"amount"},
+        ),
+        (
+            """
+if t["amount"] == t["previous_amount"]:
+    return "CANCEL"
+            """,
+            {"amount", "previous_amount"},
+        ),
+        (
+            """
+if t["amounts"]["first"] == t["previous_amount"] + 50:
+    return "CANCEL"
+    """,
+            {"amounts", "previous_amount"},
+        ),
+    ],
+)
+def test_extract_params_from_rule(rule_logic, expected_params):
+    rule = Rule(rid="", logic=rule_logic)
+    params = rule.get_rule_params()
+    assert params == expected_params

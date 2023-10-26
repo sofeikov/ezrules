@@ -1,14 +1,14 @@
 import difflib
 import secrets
 import os
-
+import json
 from flask import Flask, render_template, Response, redirect, url_for, flash
 from flask import request
 from flask_bootstrap import Bootstrap5
 from flask_wtf import CSRFProtect
 from forms import RuleForm, OutcomeForm
 
-from core.rule import RuleFactory, RuleConverter
+from core.rule import RuleFactory, RuleConverter, Rule
 from core.outcomes import FixedOutcome
 from core.rule_checkers import (
     RuleCheckingPipeline,
@@ -153,8 +153,42 @@ def show_rule(rule_id=None, revision_number=None):
 
 
 @app.route("/verify_rule", methods=["POST"])
+@csrf.exempt
 def verify_rule():
-    pass
+    source_ = None
+    try:
+        source_ = request.get_json()["rule_source"]
+        rule = Rule(rid="", logic=source_)
+    except:
+        app.logger.debug(f"Failed to compile logic: {source_}")
+        return {}
+    return {"params": sorted(list(rule.get_rule_params()), key=str)}
+
+
+@app.route("/test_rule", methods=["POST"])
+@csrf.exempt
+def test_rule():
+    test_json = request.get_json()
+    rule_source = test_json["rule_source"]
+    print(rule_source)
+    try:
+        test_object = json.loads(test_json["test_json"])
+    except json.decoder.JSONDecodeError:
+        return {
+            "status": "error",
+            "reason": "Example is malformed",
+            "rule_outcome": None,
+        }
+    try:
+        rule = Rule(rid="", logic=rule_source)
+    except SyntaxError:
+        return {
+            "status": "error",
+            "reason": "Rule source is invalid",
+            "rule_outcome": None,
+        }
+    rule_outcome = rule(test_object)
+    return {"rule_outcome": rule_outcome, "status": "ok", "reason": "ok"}
 
 
 @app.route("/lock_rule/<rule_id>", methods=["POST"])
