@@ -8,7 +8,6 @@ class RuleParamExtractor(ast.NodeVisitor):
 
     def visit_Subscript(self, node: ast.Subscript) -> Any:
         super().generic_visit(node)
-        print(ast.dump(node))
         if isinstance(node.value, ast.Name):
             if node.value.id == "t" and isinstance(node.slice, ast.Constant):
                 self.params.add(node.slice.value)
