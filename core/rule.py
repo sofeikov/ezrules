@@ -70,8 +70,8 @@ class Rule:
     @logic.setter
     def logic(self, logic):
         """Compile the code."""
-        logic = dollar_converter.transform_rule(logic)
-        code = self._wrap_with_function_header(logic)
+        post_proc_logic = dollar_converter.transform_rule(logic)
+        code = self._wrap_with_function_header(post_proc_logic)
         self._compiled_rule, self._rule_ast = self.compile_function(code)
         self._source = logic
 
