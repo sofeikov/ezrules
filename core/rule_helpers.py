@@ -25,9 +25,8 @@ class DollarNotationConverter:
 
         line_parser = dollar_word
         line_parser.ignore(pp.QuotedString('"'))
-        # line_parser.ignore(pp.QuotedString("'"))
         line_parser.setParseAction(self.replace_with_matched_text)
         self._parser = line_parser
 
-    def replace_dollar_notation(self, code: str):
+    def transform_rule(self, code: str):
         return self._parser.transform_string(code)

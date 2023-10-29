@@ -29,7 +29,7 @@ from core.rule_helpers import DollarNotationConverter
 )
 def test_replace_dollar_notation_quotes(input_code, expected_output):
     converter = DollarNotationConverter()
-    result = converter.replace_dollar_notation(input_code)
+    result = converter.transform_rule(input_code)
     assert result == expected_output
 
 
@@ -51,5 +51,5 @@ def test_replace_dollar_notation_quotes(input_code, expected_output):
 )
 def test_replace_dollar_notation(input_code, expected_output):
     converter = DollarNotationConverter()
-    result = converter.replace_dollar_notation(input_code)
+    result = converter.transform_rule(input_code)
     assert result == expected_output
