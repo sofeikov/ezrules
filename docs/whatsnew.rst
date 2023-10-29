@@ -5,6 +5,7 @@ What's new
 
 v0.3
 
+* Dollar-notation can be used to refer to attributes, e.g. `if $amount>1000...`
 * When you create a rule, you can now test it right away before deploying
 * Outcomes of rules are now controlled against a list of allowed outcomes
 * When a rule is edited, there is now a warning that someone else is working on it too
