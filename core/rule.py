@@ -1,7 +1,9 @@
 from typing import Any, Optional, List, Callable, Tuple
-from core.rule_helpers import RuleParamExtractor
+from core.rule_helpers import RuleParamExtractor, DollarNotationConverter
 import ast
 import yaml
+
+dollar_converter = DollarNotationConverter()
 
 
 class Fields:
@@ -32,14 +34,18 @@ class Rule:
         :param tags: rule tags, not used atm
         :param params: rule params, not used atm
         """
-        self._rule_ast = None
-        self._compiled_rule = None
-        self.description = description
-        self.logic = logic
-        self._source = logic
+        # Generic params
         self.rid = rid
+        self.description = description
         self.tags = tags
         self.params = params
+        # Compiled rule function
+        self._compiled_rule = None
+        # AST representation of the compiled function
+        self._rule_ast = None
+        # Trigger the rule compilation
+        self.logic = logic
+        self._source = logic
 
     @property
     def logic(self):
@@ -64,6 +70,7 @@ class Rule:
     @logic.setter
     def logic(self, logic):
         """Compile the code."""
+        logic = dollar_converter.transform_rule(logic)
         code = self._wrap_with_function_header(logic)
         self._compiled_rule, self._rule_ast = self.compile_function(code)
         self._source = logic
