@@ -1,7 +1,9 @@
-from typing import Any, Optional, List
-from core.rule_helpers import RuleParamExtractor
+from typing import Any, Optional, List, Callable, Tuple
+from core.rule_helpers import RuleParamExtractor, DollarNotationConverter
 import ast
 import yaml
+
+dollar_converter = DollarNotationConverter()
 
 
 class Fields:
@@ -32,32 +34,45 @@ class Rule:
         :param tags: rule tags, not used atm
         :param params: rule params, not used atm
         """
-        self._rule_ast = None
-        self._logic = None
-        self.description = description
-        self.logic = logic
-        self._source = logic
+        # Generic params
         self.rid = rid
+        self.description = description
         self.tags = tags
         self.params = params
+        # Compiled rule function
+        self._compiled_rule = None
+        # AST representation of the compiled function
+        self._rule_ast = None
+        # Trigger the rule compilation
+        self.logic = logic
+        self._source = logic
 
     @property
     def logic(self):
         """Property."""
-        return self._logic
+        return self._compiled_rule
+
+    @staticmethod
+    def _wrap_with_function_header(logic: str) -> str:
+        code = logic.split("\n")
+        code = "\n".join(["\t" + line for line in code])
+        code = f"def rule(t):\n{code}"
+        return code
+
+    @staticmethod
+    def compile_function(code: str) -> Tuple[Callable, ast.Module]:
+        rule_ast = ast.parse(code)
+        compiled_code = compile(rule_ast, filename="<string>", mode="exec")
+        namespace = {}
+        exec(compiled_code, namespace)
+        return namespace["rule"], rule_ast
 
     @logic.setter
     def logic(self, logic):
         """Compile the code."""
-        code = logic.split("\n")
-        code = "\n".join(["\t" + l for l in code])
-        code = f"def rule(t):\n{code}"
-        rule_ast = ast.parse(code)
-        self._rule_ast = rule_ast
-        compiled_code = compile(rule_ast, filename="<string>", mode="exec")
-        namespace = {}
-        exec(compiled_code, namespace)
-        self._logic = namespace["rule"]
+        post_proc_logic = dollar_converter.transform_rule(logic)
+        code = self._wrap_with_function_header(post_proc_logic)
+        self._compiled_rule, self._rule_ast = self.compile_function(code)
         self._source = logic
 
     def get_rule_params(self):

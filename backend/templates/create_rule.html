@@ -1,5 +1,6 @@
 {% extends "layout.html" %}
 {% from 'bootstrap5/form.html' import render_form %}
+{% block head %}
 <head>
     <script src="{{ url_for('static', filename="scripts.js") }}"></script>
     <script>
@@ -9,6 +10,7 @@
     </script>
     <title>Create new rule</title>
 </head>
+{% endblock %}
 {% block body %}
 <body>
 <a href="/rules">Full rule list</a><br>
