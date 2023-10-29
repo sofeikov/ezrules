@@ -8,3 +8,4 @@ ruamel.yaml
 gunicorn
 sphinx
 pynamoDB
+pyparsing
