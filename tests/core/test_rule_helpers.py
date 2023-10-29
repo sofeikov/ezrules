@@ -11,7 +11,7 @@ from core.rule_helpers import DollarNotationConverter
         ),  # Dollar notation within quoted string
         (
             '$variable inside "$quoted string".',
-            'f["variable"] inside "$quoted string".',
+            't["variable"] inside "$quoted string".',
         ),  # Dollar notation and quoted string
         (
             '"No $variable inside quotes."',
@@ -36,10 +36,10 @@ def test_replace_dollar_notation_quotes(input_code, expected_output):
 @pytest.mark.parametrize(
     "input_code, expected_output",
     [
-        ("$variable", 'f["variable"]'),
+        ("$variable", 't["variable"]'),
         (
             "This is $text with $multiple $variables.",
-            'This is f["text"] with f["multiple"] f["variables"].',
+            'This is t["text"] with t["multiple"] t["variables"].',
         ),
         (
             "$1invalid",

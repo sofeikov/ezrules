@@ -18,7 +18,7 @@ class RuleParamExtractor(ast.NodeVisitor):
 class DollarNotationConverter:
     @staticmethod
     def replace_with_matched_text(tokens):
-        return f'f["{tokens[0][1:]}"]'
+        return f't["{tokens[0][1:]}"]'
 
     def __init__(self):
         dollar_word = pp.Combine("$" + pp.Word(pp.alphas + "_", pp.alphanums + "_"))
