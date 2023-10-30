@@ -10,6 +10,7 @@ from forms import RuleForm, OutcomeForm
 
 from core.rule import RuleFactory, RuleConverter, Rule
 from core.outcomes import FixedOutcome
+from core.user_lists import StaticUserListManager
 from core.rule_checkers import (
     RuleCheckingPipeline,
     OnlyAllowedOutcomesAreReturnedChecker,
@@ -218,6 +219,13 @@ def verified_outcomes():
         if form.validate():
             outcome_manager.add_outcome(form.outcome.data)
             return redirect(url_for("verified_outcomes"))
+
+
+@app.route("/management/lists", methods=["GET", "POST"])
+def user_lists():
+    return render_template(
+        "user_lists.html", user_lists=StaticUserListManager().get_all_entries()
+    )
 
 
 @app.route("/ping", methods=["GET"])

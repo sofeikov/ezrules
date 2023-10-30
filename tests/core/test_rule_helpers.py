@@ -1,5 +1,6 @@
 import pytest
-from core.rule_helpers import DollarNotationConverter
+from core.rule_helpers import DollarNotationConverter, AtNotationConverter
+from core.user_lists import StaticUserListManager
 
 
 @pytest.mark.parametrize(
@@ -52,4 +53,21 @@ def test_replace_dollar_notation_quotes(input_code, expected_output):
 def test_replace_dollar_notation(input_code, expected_output):
     converter = DollarNotationConverter()
     result = converter.transform_rule(input_code)
+    assert result == expected_output
+
+
+@pytest.mark.parametrize(
+    "input_code, expected_output",
+    [
+        ("@NACountries", '["CA", "US", "MX", "GL"]'),
+        (
+            "if $country in @NACountries: return True",
+            'if $country in ["CA", "US", "MX", "GL"]: return True',
+        ),
+        ('"@NACountries"', '"@NACountries"'),
+    ],
+)
+def test_at_notation_dollar_converter(input_code, expected_output):
+    anc = AtNotationConverter(list_values_provider=StaticUserListManager())
+    result = anc.transform_rule(input_code)
     assert result == expected_output
