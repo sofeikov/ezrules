@@ -6,7 +6,7 @@ from flask import Flask, render_template, Response, redirect, url_for, flash
 from flask import request
 from flask_bootstrap import Bootstrap5
 from flask_wtf import CSRFProtect
-from forms import RuleForm, OutcomeForm
+from backend.forms import RuleForm, OutcomeForm
 
 from core.rule import RuleFactory, RuleConverter, Rule
 from core.outcomes import FixedOutcome
