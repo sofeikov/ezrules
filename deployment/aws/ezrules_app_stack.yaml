@@ -299,6 +299,8 @@ Resources:
           Environment:
             - Name: DYNAMODB_RULE_MANAGER_TABLE_NAME
               Value: !Sub ezrules-rules-${Environment}
+            - Name: DYNAMODB_RULE_LOCKER_TABLE_NAME
+              Value: !Sub ezrules-lock-${Environment}
             - Name: EZRULES_BUCKET
               Value: !Sub ezrules-bucket-${Environment}
             - Name: APP_SECRET
