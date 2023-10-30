@@ -101,6 +101,21 @@ function setSampleJson(params, text_area_id) {
     })) + 10)
 }
 
+function updateTextareaSize(textareaId) {
+    var textarea = $('#' + textareaId);
+    var lines = textarea.val().split('\n');
+    var maxLineLength = 0;
+
+    for (var i = 0; i < lines.length; i++) {
+        if (lines[i].length > maxLineLength) {
+            maxLineLength = lines[i].length;
+        }
+    }
+
+    textarea.attr('rows', lines.length);
+    textarea.attr('cols', maxLineLength);
+}
+
 function fillInExampleParams(e) {
     verifyRule($("#logic").val())
         .then(function (params) {

@@ -18,6 +18,7 @@
                     testRuleWithSampleJson($("#logic").val(), $("#verify_json").val())
                 })
                 fillInExampleParams(null)
+                updateTextareaSize("{{ form.logic.id }}")
             });
         </script>
         <title>Rule {{ rule['rid'] }}</title>
