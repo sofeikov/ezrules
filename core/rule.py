@@ -1,9 +1,15 @@
 from typing import Any, Optional, List, Callable, Tuple
-from core.rule_helpers import RuleParamExtractor, DollarNotationConverter
+from core.rule_helpers import (
+    RuleParamExtractor,
+    DollarNotationConverter,
+    AtNotationConverter,
+)
+from core.user_lists import StaticUserListManager
 import ast
 import yaml
 
 dollar_converter = DollarNotationConverter()
+at_converter = AtNotationConverter(list_values_provider=StaticUserListManager())
 
 
 class Fields:
@@ -71,6 +77,7 @@ class Rule:
     def logic(self, logic):
         """Compile the code."""
         post_proc_logic = dollar_converter.transform_rule(logic)
+        post_proc_logic = at_converter.transform_rule(post_proc_logic)
         code = self._wrap_with_function_header(post_proc_logic)
         self._compiled_rule, self._rule_ast = self.compile_function(code)
         self._source = logic
