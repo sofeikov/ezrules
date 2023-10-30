@@ -1,6 +1,8 @@
 All available rules<br>
-<a href="{{ url_for('create_rule') }}">Add rule</a> | <a href="{{ url_for('verified_outcomes') }}">Outcomes</a><br>
-{% for rule in rules %}
-<a href="/rule/{{ rule.rid }}">{{rule.rid}}</a> - {{rule.description}}
+<a href="{{ url_for('create_rule') }}">Add rule</a> | <a href="{{ url_for('verified_outcomes') }}">Outcomes</a> | <a
+        href="{{ url_for('user_lists') }}">Lists</a>
 <br>
+{% for rule in rules %}
+    <a href="/rule/{{ rule.rid }}">{{ rule.rid }}</a> - {{ rule.description }}
+    <br>
 {% endfor %}
