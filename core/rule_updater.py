@@ -350,16 +350,22 @@ class DynamoDBRuleManager(RuleManager):
         return None
 
     def load_all_rules(self) -> List[Rule]:
-        response = self.table.scan(
-            ScanFilter={
-                "revision": {
-                    "AttributeValueList": [1],
-                    "ComparisonOperator": "EQ",
-                },
-            }
-        )
+        response = self.table.scan()
         items = response["Items"]
-        ret_rules = [RuleFactory.from_json(item) for item in items]
+        max_versions = {}
+        for item in items:
+            rid = item["rid"]
+            if rid not in max_versions:
+                max_versions[rid] = item["revision"]
+            else:
+                max_versions[rid] = max(max_versions[rid], item["revision"])
+        items_latest = []
+        for item in items:
+            rid = item["rid"]
+            if item["revision"] == max_versions[rid]:
+                items_latest.append(item)
+
+        ret_rules = [RuleFactory.from_json(item) for item in items_latest]
         return ret_rules
 
 
