@@ -1,0 +1,1 @@
+docker run --rm -it --name postgresql16 -p 5432:5432 -e POSTGRES_PASSWORD=root -e POSTGRES_HOST_AUTH=trust -e LC_CTYPE=en_US.UTF-8 -e PG_HOST=localhost postgres:16.0-alpine3.18
