@@ -5,6 +5,7 @@ What's new
 v0.4
 
 * At-notation is available. Constructs of type `if $send_country in @Latam...`
+* Users are now required to login to make changes to the rule set
 
 
 v0.3
