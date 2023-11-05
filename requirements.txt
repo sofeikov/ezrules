@@ -9,3 +9,8 @@ gunicorn
 sphinx
 pynamoDB
 pyparsing
+sqlalchemy
+flask-security-too[common]
+psycopg2
+pytz
+email_validator

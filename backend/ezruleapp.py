@@ -10,6 +10,15 @@ from flask_bootstrap import Bootstrap5
 from flask_wtf import CSRFProtect
 
 from backend.forms import RuleForm, OutcomeForm
+from models.database import db_session
+from models.backend_core import User, Role
+
+from flask_security import (
+    Security,
+    auth_required,
+    SQLAlchemySessionUserDatastore,
+)
+from core.rule import RuleFactory, RuleConverter, Rule
 from core.outcomes import FixedOutcome
 from core.rule import RuleFactory, RuleConverter, Rule
 from core.rule_checkers import (
@@ -36,6 +45,11 @@ rule_checker = RuleCheckingPipeline(
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
 app.secret_key = os.environ["APP_SECRET"]
+app.config["SECURITY_PASSWORD_SALT"] = os.environ.get(
+    "SECURITY_PASSWORD_SALT", "146585145368132386173505678016728509634"
+)
+app.config["SECURITY_SEND_REGISTER_EMAIL"] = False
+app.config["SECURITY_REGISTERABLE"] = True
 bootstrap = Bootstrap5(app)
 csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)
@@ -49,15 +63,21 @@ fsrm = RuleManagerFactory.get_rule_manager(
     **{"table_name": DYNAMODB_TABLE_NAME},
 )
 
+app.teardown_appcontext(lambda exc: db_session.close())
+user_datastore = SQLAlchemySessionUserDatastore(db_session, User, Role)
+app.security = Security(app, user_datastore)
+
 
 @app.route("/rules", methods=["GET"])
 @app.route("/", methods=["GET"])
+@auth_required()
 def rules():
     rules = fsrm.load_all_rules()
     return render_template("rules.html", rules=rules)
 
 
 @app.route("/create_rule", methods=["GET", "POST"])
+@auth_required()
 def create_rule():
     form = RuleForm()
     if request.method == "GET":
@@ -88,6 +108,7 @@ def get_all_rules():
 
 
 @app.route("/rule/<rule_id>/timeline", methods=["GET"])
+@auth_required()
 def timeline(rule_id):
     revision_list = fsrm.get_rule_revision_list(rule_id)
     rules = [
@@ -110,6 +131,7 @@ def timeline(rule_id):
 
 @app.route("/rule/<rule_id>", methods=["GET", "POST"])
 @app.route("/rule/<rule_id>/<revision_number>", methods=["GET"])
+@auth_required()
 def show_rule(rule_id=None, revision_number=None):
     form = RuleForm()
     if request.method == "GET":
@@ -215,6 +237,7 @@ def unlock_rule(rule_id):
 
 
 @app.route("/management/outcomes", methods=["GET", "POST"])
+@auth_required()
 def verified_outcomes():
     form = OutcomeForm()
     if request.method == "GET":
@@ -228,6 +251,7 @@ def verified_outcomes():
 
 
 @app.route("/management/lists", methods=["GET", "POST"])
+@auth_required()
 def user_lists():
     return render_template(
         "user_lists.html", user_lists=StaticUserListManager().get_all_entries()
