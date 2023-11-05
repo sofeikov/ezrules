@@ -12,7 +12,7 @@ LockRecord = namedtuple("LockRecord", ["rid", "locked_by", "expires_on"])
 
 class RuleStorageLocker(abc.ABC):
     @abc.abstractmethod
-    def lock_storage(self, rule: Rule) -> bool:
+    def lock_storage(self, rule: Rule, locked_by: str) -> bool:
         """Lock storage for a specific rule."""
 
     @abc.abstractmethod
@@ -44,11 +44,11 @@ class DynamoDBStorageLocker(RuleStorageLocker):
     def __init__(self, table_name: str):
         self.DBLockRecord.Meta.table_name = table_name
 
-    def lock_storage(self, rule: Rule) -> Tuple[bool, LockRecord]:
+    def lock_storage(self, rule: Rule, locked_by: str) -> Tuple[bool, LockRecord]:
         current_lock = self.is_record_locked(rule)
         if current_lock is None:
             db_lock_item = self.DBLockRecord(
-                rid=rule.rid, expires_on=timedelta(hours=1)
+                rid=rule.rid, expires_on=timedelta(hours=1), locked_by=locked_by
             )
             db_lock_item.save()
             return True, db_lock_item.to_lock_record()
