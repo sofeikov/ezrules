@@ -14,11 +14,11 @@ from models.database import db_session
 from models.backend_core import User, Role
 
 from flask_security import (
+    current_user,
     Security,
     auth_required,
     SQLAlchemySessionUserDatastore,
 )
-from core.rule import RuleFactory, RuleConverter, Rule
 from core.outcomes import FixedOutcome
 from core.rule import RuleFactory, RuleConverter, Rule
 from core.rule_checkers import (
@@ -145,6 +145,8 @@ def show_rule(rule_id=None, revision_number=None):
             del form.rid
             revision_list = fsrm.get_rule_revision_list(rule)
             rule_lock = rule_locker.is_record_locked(rule)
+            if rule_lock:
+                del form["submit"]
             return render_template(
                 "show_rule.html",
                 rule=rule_json,
@@ -163,7 +165,13 @@ def show_rule(rule_id=None, revision_number=None):
             return redirect(url_for("show_rule", rule_id=rule_id))
         app.logger.info(request.form)
         rule = fsrm.load_rule(rule_id)
-        # TODO reject the change is the rule is locked
+        lock_record = rule_locker.is_record_locked(rule)
+        if lock_record is not None:
+            if lock_record.locked_by != current_user.email:
+                flash(
+                    f"Changes to {rule_id} were NOT saved. Rule is locked by {lock_record.locked_by}"
+                )
+                return redirect(url_for("show_rule", rule_id=rule_id))
         app.logger.info(f"Current rule state {rule}")
         rule.description = form.description.data
         rule.logic = form.logic.data
@@ -224,7 +232,7 @@ def test_rule():
 @csrf.exempt
 def lock_rule(rule_id):
     rule = fsrm.load_rule(rule_id)
-    success, result = rule_locker.lock_storage(rule)
+    success, result = rule_locker.lock_storage(rule, locked_by=current_user.email)
     return {"success": success, **result._asdict()}
 
 
