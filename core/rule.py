@@ -50,6 +50,7 @@ class Rule:
         # AST representation of the compiled function
         self._rule_ast = None
         # Trigger the rule compilation
+        self._post_process_logic = None
         self.logic = logic
         self._source = logic
 
@@ -81,6 +82,7 @@ class Rule:
         code = self._wrap_with_function_header(post_proc_logic)
         self._compiled_rule, self._rule_ast = self.compile_function(code)
         self._source = logic
+        self._post_process_logic = code
 
     def get_rule_params(self):
         pe = RuleParamExtractor()
@@ -101,6 +103,8 @@ class Rule:
                 f"Params: {self.params}",
                 "Code:",
                 self._source,
+                "Processed code:",
+                str(self._post_process_logic),
             ]
         )
 

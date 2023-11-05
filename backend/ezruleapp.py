@@ -1,11 +1,14 @@
 import difflib
-import secrets
-import os
 import json
-from flask import Flask, render_template, Response, redirect, url_for, flash
+import logging
+import os
+import secrets
+
+from flask import Flask, render_template, Response, redirect, url_for, flash, jsonify
 from flask import request
 from flask_bootstrap import Bootstrap5
 from flask_wtf import CSRFProtect
+
 from backend.forms import RuleForm, OutcomeForm
 from models.database import db_session
 from models.backend_core import User, Role
@@ -17,17 +20,18 @@ from flask_security import (
 )
 from core.rule import RuleFactory, RuleConverter, Rule
 from core.outcomes import FixedOutcome
-from core.user_lists import StaticUserListManager
+from core.rule import RuleFactory, RuleConverter, Rule
 from core.rule_checkers import (
     RuleCheckingPipeline,
     OnlyAllowedOutcomesAreReturnedChecker,
 )
+from core.rule_locker import DynamoDBStorageLocker
 from core.rule_updater import (
     RuleManagerFactory,
     RuleDoesNotExistInTheStorage,
     RuleEngineConfigProducer,
 )
-from core.rule_locker import DynamoDBStorageLocker
+from core.user_lists import StaticUserListManager
 
 rule_locker = DynamoDBStorageLocker(
     table_name=os.environ["DYNAMODB_RULE_LOCKER_TABLE_NAME"]
@@ -36,7 +40,10 @@ outcome_manager = FixedOutcome()
 rule_checker = RuleCheckingPipeline(
     checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)]
 )
+
+
 app = Flask(__name__)
+app.logger.setLevel(logging.INFO)
 app.secret_key = os.environ["APP_SECRET"]
 app.config["SECURITY_PASSWORD_SALT"] = os.environ.get(
     "SECURITY_PASSWORD_SALT", "146585145368132386173505678016728509634"
@@ -181,9 +188,10 @@ def verify_rule():
         source_ = request.get_json()["rule_source"]
         rule = Rule(rid="", logic=source_)
     except:
-        app.logger.debug(f"Failed to compile logic: {source_}")
+        app.logger.info(f"Failed to compile logic: {source_}")
         return {}
-    return {"params": sorted(list(rule.get_rule_params()), key=str)}
+    app.logger.info(f"About to return these params: {rule.get_rule_params()}")
+    return jsonify(params=sorted(list(rule.get_rule_params()), key=str))
 
 
 @app.route("/test_rule", methods=["POST"])
