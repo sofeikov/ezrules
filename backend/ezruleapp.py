@@ -25,17 +25,16 @@ from core.rule_checkers import (
     RuleCheckingPipeline,
     OnlyAllowedOutcomesAreReturnedChecker,
 )
-from core.rule_locker import DynamoDBStorageLocker
+from core.rule_locker import RelationalDBRuleLocker
 from core.rule_updater import (
     RuleManagerFactory,
     RuleDoesNotExistInTheStorage,
     RuleEngineConfigProducer,
 )
 from core.user_lists import StaticUserListManager
+from models.database import db_session
 
-rule_locker = DynamoDBStorageLocker(
-    table_name=os.environ["DYNAMODB_RULE_LOCKER_TABLE_NAME"]
-)
+rule_locker = RelationalDBRuleLocker(db_session)
 outcome_manager = FixedOutcome()
 rule_checker = RuleCheckingPipeline(
     checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)]
@@ -232,7 +231,11 @@ def test_rule():
 @csrf.exempt
 def lock_rule(rule_id):
     rule = fsrm.load_rule(rule_id)
-    success, result = rule_locker.lock_storage(rule, locked_by=current_user.email)
+    if current_user.is_anonymous:
+        locked_by = "anonim"
+    else:
+        locked_by = current_user.email
+    success, result = rule_locker.lock_storage(rule, locked_by=locked_by)
     return {"success": success, **result._asdict()}
 
 
@@ -273,4 +276,7 @@ def ping():
 
 
 if __name__ == "__main__":
+    from models.database import init_db
+
+    init_db()
     app.run(host="0.0.0.0", port=8888, debug=True)
