@@ -3,6 +3,7 @@ from flask_security import UserMixin, RoleMixin, AsaList
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy import Boolean, DateTime, Column, Integer, String, ForeignKey
+from core.helpers import LockRecord
 
 
 class RolesUsers(Base):
@@ -37,3 +38,18 @@ class User(Base, UserMixin):
     roles = relationship(
         "Role", secondary="roles_users", backref=backref("users", lazy="dynamic")
     )
+
+
+class RuleEditLock(Base):
+    __tablename__ = "rule_locks"
+
+    rid = Column(String, unique=True, primary_key=True)
+    locked_by = Column(String(50), nullable=False)
+    expires_on = Column(DateTime())
+
+    def to_lock_record(self) -> LockRecord:
+        return LockRecord(
+            rid=self.rid,
+            locked_by=self.locked_by,
+            expires_on=self.expires_on,
+        )

@@ -1,18 +1,18 @@
 import abc
+
+from core.helpers import LockRecord
 from core.rule import Rule
 from datetime import timedelta
 from pynamodb.models import Model
 from pynamodb.attributes import UnicodeAttribute, TTLAttribute
-from collections import namedtuple
 from typing import Optional, Tuple
 from datetime import datetime, timezone
-
-LockRecord = namedtuple("LockRecord", ["rid", "locked_by", "expires_on"])
+from models.backend_core import RuleEditLock
 
 
 class RuleStorageLocker(abc.ABC):
     @abc.abstractmethod
-    def lock_storage(self, rule: Rule, locked_by: str) -> bool:
+    def lock_storage(self, rule: Rule, locked_by: str) -> Tuple[bool, LockRecord]:
         """Lock storage for a specific rule."""
 
     @abc.abstractmethod
@@ -22,6 +22,38 @@ class RuleStorageLocker(abc.ABC):
     @abc.abstractmethod
     def is_record_locked(self, rule: Rule) -> Optional[LockRecord]:
         """Check if the rule is locked."""
+
+
+class RelationalDBRuleLocker(RuleStorageLocker):
+    def __init__(self, db):
+        self.db = db
+
+    def lock_storage(self, rule: Rule, locked_by: str) -> Tuple[bool, LockRecord]:
+        lock_record = self.is_record_locked(rule)
+        if lock_record is None:
+            lock = RuleEditLock(
+                rid=rule.rid,
+                locked_by=locked_by,
+                expires_on=datetime.now(timezone.utc) + timedelta(hours=1),
+            )
+            self.db.add(lock)
+            self.db.commit()
+            return True, lock.to_lock_record()
+
+        return False, lock_record
+
+    def release_storage(self, rule: Rule) -> None:
+        self.db.delete(self.db.get(RuleEditLock, rule.rid))
+        self.db.commit()
+
+    def is_record_locked(self, rule: Rule) -> Optional[LockRecord]:
+        lock_record = self.db.get(RuleEditLock, rule.rid)
+        if lock_record is None:
+            return
+        if lock_record.expires_on < datetime.utcnow():
+            self.release_storage(rule)
+            return
+        return lock_record
 
 
 class DynamoDBStorageLocker(RuleStorageLocker):
