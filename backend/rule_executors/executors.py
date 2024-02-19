@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
-import boto3
-import json
+
+from core.rule_engine import RuleEngineFactory
+from backend.rule_executors.utils import ensure_latest_etag
+
 
 class AbstractRuleExecutor(ABC):
     @abstractmethod
@@ -8,17 +10,19 @@ class AbstractRuleExecutor(ABC):
         """Evaluate object"""
 
 
-class LambdaRuleExecutor(AbstractRuleExecutor):
-    """Execute rule using an AWS Lambda function."""
+class LocalRuleExecutor(AbstractRuleExecutor):
+    def __init__(self, rule_engine_yaml_path: str):
+        self._rule_engine_yaml_path = rule_engine_yaml_path
+        self._current_rule_version = None
+        self.rule_engine = RuleEngineFactory.from_yaml(rule_engine_yaml_path)
 
-    def __init__(self, fn_name: str) -> None:
-        self.fn_name = fn_name
-        self.client = boto3.client("lambda")
+    def _check_rule_config_is_fresh(self):
+        new_rule_engine, self._current_rule_version = ensure_latest_etag(
+            self._rule_engine_yaml_path, self._current_rule_version
+        )
+        self.rule_engine = new_rule_engine if new_rule_engine else self.rule_engine
 
     def evaluate_rules(self, eval_object):
-        response = self.client.invoke(
-            FunctionName=self.fn_name,
-            InvocationType="RequestResponse",  # Use 'RequestResponse' for synchronous invocation
-            Payload=json.dumps(eval_object),
-        )
-        return json.loads(response["Payload"].read())
+        self._check_rule_config_is_fresh()
+        eval_result = self.rule_engine(eval_object)
+        return eval_result
