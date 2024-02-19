@@ -1,14 +1,14 @@
 import os
 
 from flask import Flask, request
-from backend.rule_executors.executors import LambdaRuleExecutor
+from backend.rule_executors.executors import LocalRuleExecutor
 
 app = Flask(__name__)
 # TODO calling this needs to be parametrised, e.g. for a remote service
 # TODO this needs to be parametrised
 
-EVALUATOR_LAMBDA_NAME = os.environ["EVALUATOR_LAMBDA_NAME"]
-lre = LambdaRuleExecutor(EVALUATOR_LAMBDA_NAME)
+RULE_ENGINE_YAML_PATH = os.environ["RULE_ENGINE_YAML_PATH"]
+lre = LocalRuleExecutor(RULE_ENGINE_YAML_PATH)
 
 
 @app.route("/evaluate", methods=["POST"])
@@ -21,7 +21,7 @@ def evaluate():
 
 @app.route("/", methods=["GET"])
 def root():
-    return f"EZRule rule evaluator app; points to {EVALUATOR_LAMBDA_NAME}"
+    return f"EZRule rule evaluator app; points to {RULE_ENGINE_YAML_PATH}"
 
 
 @app.route("/ping", methods=["GET"])
