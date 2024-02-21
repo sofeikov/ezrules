@@ -29,6 +29,7 @@ from core.rule_updater import (
     RuleManagerFactory,
     RuleDoesNotExistInTheStorage,
     YAMLRuleEngineConfigProducer,
+    RDBRuleEngineConfigProducer,
 )
 from core.user_lists import StaticUserListManager
 from models.database import db_session
@@ -64,9 +65,10 @@ fsrm = RuleManagerFactory.get_rule_manager(
 app.teardown_appcontext(lambda exc: db_session.close())
 user_datastore = SQLAlchemySessionUserDatastore(db_session, User, Role)
 app.security = Security(app, user_datastore)
-rule_engine_config_producer = YAMLRuleEngineConfigProducer(
-    config_path=os.path.join(EZRULES_BUCKET_PATH, "rule-config.yaml")
-)
+# rule_engine_config_producer = YAMLRuleEngineConfigProducer(
+#     config_path=os.path.join(EZRULES_BUCKET_PATH, "rule-config.yaml")
+# )
+rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session)
 
 
 @app.route("/rules", methods=["GET"])

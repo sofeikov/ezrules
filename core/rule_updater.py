@@ -15,6 +15,7 @@ import operator
 from collections import namedtuple
 
 from core.rule_engine import RuleEngine
+from models.backend_core import RuleEngineConfig
 
 RuleRevision = namedtuple("RuleRevision", ["revision_number", "created"])
 
@@ -106,6 +107,18 @@ class AbstractRuleEngineConfigProducer(ABC):
     @abstractmethod
     def save_config(self, rule_manager: RuleManager) -> None:
         """Save config to a target location(disk, db, etc)."""
+
+
+class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
+    def __init__(self, db):
+        self.db = db
+
+    def save_config(self, rule_manager: RuleManager) -> None:
+        all_rules = rule_manager.load_all_rules()
+        rules_json = [RuleConverter.to_json(r) for r in all_rules]
+        new_config = RuleEngineConfig(label="production", config=rules_json)
+        self.db.add(new_config)
+        self.db.commit()
 
 
 class YAMLRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
