@@ -14,6 +14,8 @@ import s3fs
 import operator
 from collections import namedtuple
 
+from core.rule_engine import RuleEngine
+
 RuleRevision = namedtuple("RuleRevision", ["revision_number", "created"])
 
 
@@ -100,7 +102,19 @@ class RuleManager(ABC):
         """Storage specific mechanism to load all available rules."""
 
 
-class RuleEngineConfigProducer:
+class AbstractRuleEngineConfigProducer(ABC):
+    @abstractmethod
+    def save_config(self, rule_manager: RuleManager) -> None:
+        """Save config to a target location(disk, db, etc)."""
+
+
+class YAMLRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
+    def __init__(self, config_path: str) -> None:
+        self.config_path = config_path
+
+    def save_config(self, rule_manager: RuleManager) -> None:
+        YAMLRuleEngineConfigProducer.to_yaml(self.config_path, rule_manager)
+
     @staticmethod
     def to_yaml(file_path: str, rule_manager: RuleManager):
         open_fn = open
