@@ -2,7 +2,7 @@ from models.database import Base
 from flask_security import UserMixin, RoleMixin, AsaList
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.ext.mutable import MutableList
-from sqlalchemy import Boolean, DateTime, Column, Integer, String, ForeignKey
+from sqlalchemy import Boolean, DateTime, Column, Integer, String, ForeignKey, JSON
 from core.helpers import LockRecord
 
 
@@ -53,3 +53,11 @@ class RuleEditLock(Base):
             locked_by=self.locked_by,
             expires_on=self.expires_on,
         )
+
+
+class RuleEngineConfig(Base):
+    __tablename__ = "rule_engine_config"
+
+    id = Column(Integer, unique=True, primary_key=True)
+    label = Column(String, nullable=False)
+    config = Column(JSON, nullable=False)
