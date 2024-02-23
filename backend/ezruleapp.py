@@ -28,7 +28,6 @@ from core.rule_locker import RelationalDBRuleLocker
 from core.rule_updater import (
     RuleManagerFactory,
     RuleDoesNotExistInTheStorage,
-    YAMLRuleEngineConfigProducer,
     RDBRuleEngineConfigProducer,
 )
 from core.user_lists import StaticUserListManager
