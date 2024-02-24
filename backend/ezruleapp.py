@@ -56,17 +56,11 @@ EZRULES_BUCKET = os.environ["EZRULES_BUCKET"]
 EZRULES_BUCKET_PATH = f"s3://{EZRULES_BUCKET}"
 DYNAMODB_TABLE_NAME = os.environ["DYNAMODB_RULE_MANAGER_TABLE_NAME"]
 app.logger.info(f"DynamoDB table is {DYNAMODB_TABLE_NAME}")
-fsrm = RuleManagerFactory.get_rule_manager(
-    "DynamoDBRuleManager",
-    **{"table_name": DYNAMODB_TABLE_NAME},
-)
+fsrm = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db": db_session})
 
 app.teardown_appcontext(lambda exc: db_session.close())
 user_datastore = SQLAlchemySessionUserDatastore(db_session, User, Role)
 app.security = Security(app, user_datastore)
-# rule_engine_config_producer = YAMLRuleEngineConfigProducer(
-#     config_path=os.path.join(EZRULES_BUCKET_PATH, "rule-config.yaml")
-# )
 rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session)
 
 

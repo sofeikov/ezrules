@@ -2,6 +2,9 @@
 
 What's new
 ----------
+v0.5
+* RDBMS are now supported as a backend for rule configuration storage
+
 v0.4
 
 * At-notation is available. Constructs of type `if $send_country in @Latam...`

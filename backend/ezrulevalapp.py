@@ -1,5 +1,3 @@
-import os
-
 from flask import Flask, request
 from backend.rule_executors.executors import LocalRuleExecutorSQL
 from models.database import db_session

@@ -2,8 +2,18 @@ from models.database import Base
 from flask_security import UserMixin, RoleMixin, AsaList
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.ext.mutable import MutableList
-from sqlalchemy import Boolean, DateTime, Column, Integer, String, ForeignKey, JSON
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Column,
+    Integer,
+    String,
+    ForeignKey,
+    JSON,
+    Text,
+)
 from core.helpers import LockRecord
+import datetime
 
 
 class RolesUsers(Base):
@@ -61,3 +71,14 @@ class RuleEngineConfig(Base):
     id = Column(Integer, unique=True, primary_key=True)
     label = Column(String, nullable=False)
     config = Column(JSON, nullable=False)
+
+
+class Rule(Base):
+    __tablename__ = "rules"
+
+    id = Column(Integer, unique=True, primary_key=True)
+    revision = Column(Integer)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    rid = Column(String)
+    logic = Column(Text)
+    description = Column(Text)
