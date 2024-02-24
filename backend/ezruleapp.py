@@ -10,7 +10,6 @@ from flask_bootstrap import Bootstrap5
 from flask_wtf import CSRFProtect
 
 from backend.forms import RuleForm, OutcomeForm
-from models.database import db_session
 from models.backend_core import User, Role
 
 from flask_security import (
@@ -29,7 +28,7 @@ from core.rule_locker import RelationalDBRuleLocker
 from core.rule_updater import (
     RuleManagerFactory,
     RuleDoesNotExistInTheStorage,
-    RuleEngineConfigProducer,
+    RDBRuleEngineConfigProducer,
 )
 from core.user_lists import StaticUserListManager
 from models.database import db_session
@@ -65,6 +64,10 @@ fsrm = RuleManagerFactory.get_rule_manager(
 app.teardown_appcontext(lambda exc: db_session.close())
 user_datastore = SQLAlchemySessionUserDatastore(db_session, User, Role)
 app.security = Security(app, user_datastore)
+# rule_engine_config_producer = YAMLRuleEngineConfigProducer(
+#     config_path=os.path.join(EZRULES_BUCKET_PATH, "rule-config.yaml")
+# )
+rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session)
 
 
 @app.route("/rules", methods=["GET"])
@@ -93,9 +96,7 @@ def create_rule():
         rule = RuleFactory.from_json(rule_raw_config)
         fsrm.save_rule(rule)
         app.logger.info("Saving new version of the rules")
-        RuleEngineConfigProducer.to_yaml(
-            os.path.join(EZRULES_BUCKET_PATH, "rule-config.yaml"), fsrm
-        )
+        rule_engine_config_producer.save_config(fsrm)
         app.logger.info(rule)
         return redirect(url_for("show_rule", rule_id=rule.rid))
 
@@ -179,9 +180,7 @@ def show_rule(rule_id=None, revision_number=None):
 
         fsrm.save_rule(rule)
         app.logger.info("Saving new version of the rules")
-        RuleEngineConfigProducer.to_yaml(
-            os.path.join(EZRULES_BUCKET_PATH, "rule-config.yaml"), fsrm
-        )
+        rule_engine_config_producer.save_config(fsrm)
         app.logger.info(f"Changing {rule_id}")
         flash(f"Changes to {rule_id} were saved")
         return redirect(url_for("show_rule", rule_id=rule_id))

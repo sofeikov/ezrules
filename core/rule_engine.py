@@ -68,3 +68,9 @@ class RuleEngineFactory:
         rules = [RuleFactory.from_json(rc) for rc in config["Rules"]]
         rule_engine = RuleEngine(rules=rules)
         return rule_engine
+
+    @staticmethod
+    def from_json(config) -> RuleEngine:
+        rules = [RuleFactory.from_json(rc) for rc in config]
+        rule_engine = RuleEngine(rules=rules)
+        return rule_engine
