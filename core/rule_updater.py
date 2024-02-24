@@ -9,13 +9,12 @@ from ruamel.yaml import scalarstring
 from datetime import datetime
 import ruamel
 import yaml
-import shutil
 import s3fs
 import operator
 from collections import namedtuple
+from sqlalchemy import func, distinct
 
-from core.rule_engine import RuleEngine
-from models.backend_core import RuleEngineConfig
+from models.backend_core import RuleEngineConfig, Rule as RuleModel
 
 RuleRevision = namedtuple("RuleRevision", ["revision_number", "created"])
 
@@ -56,9 +55,9 @@ class RuleManager(ABC):
         :param rule: an instance of `core.rule.Rule`
         :return:
         """
-        # self.lock_storage()
+        self.lock_storage()
         self._save_rule(rule)
-        # self.release_storage()
+        self.release_storage()
 
     def lock_storage(self):
         """Lock storage. Override in subclasses if lock is required."""
@@ -396,9 +395,82 @@ class DynamoDBRuleManager(RuleManager):
         return ret_rules
 
 
+class RDBRuleManager(RuleManager):
+    def __init__(self, db):
+        self.db = db
+
+    def _save_rule(self, rule: Rule) -> None:
+        revisions = self.get_rule_revision_list(rule)
+        if not revisions:
+            revision = 1
+        else:
+            revision = revisions[0].revision_number + 1
+        rule_record = RuleModel(
+            rid=rule.rid,
+            revision=revision,
+            logic=rule._source,
+            description=rule.description,
+        )
+        self.db.add(rule_record)
+        self.db.commit()
+
+    def get_rule_revision_list(
+        self, rule: Rule, return_dates=False
+    ) -> List[RuleRevision]:
+        revisions = (
+            self.db.query(RuleModel.revision, RuleModel.created_at)
+            .filter(RuleModel.rid == rule.rid)
+            .order_by(RuleModel.revision.desc())
+            .all()
+        )
+        return [RuleRevision(r.revision, r.created_at) for r in revisions]
+
+    def load_rule(self, rule_id: str, revision_number: Optional[str] = None) -> Rule:
+        if revision_number is None:
+            latest_rev_sq = (
+                self.db.query(func.max(RuleModel.revision).label("max_revision"))
+                .group_by(RuleModel.rid)
+                .subquery()
+            )
+        else:
+            latest_rev_sq = (
+                self.db.query(RuleModel.rid, RuleModel.revision.label("max_revision"))
+                .filter(RuleModel.rid == rule_id)
+                .filter(RuleModel.revision == revision_number)
+                .subquery()
+            )
+        latest_records = (
+            self.db.query(RuleModel)
+            .join(
+                latest_rev_sq,
+                (RuleModel.revision == latest_rev_sq.c.max_revision),
+            )
+            .filter(RuleModel.rid == rule_id)
+            .first()
+        )
+        return RuleFactory.from_json(latest_records.__dict__)
+
+    def load_all_rules(self) -> List[Rule]:
+        latest_rev_sq = (
+            self.db.query(func.max(RuleModel.revision).label("max_revision"))
+            .group_by(RuleModel.rid)
+            .subquery()
+        )
+        latest_records = (
+            self.db.query(RuleModel)
+            .join(
+                latest_rev_sq,
+                (RuleModel.revision == latest_rev_sq.c.max_revision),
+            )
+            .all()
+        )
+        return [RuleFactory.from_json(r.__dict__) for r in latest_records]
+
+
 RULE_MANAGERS = {
     "FSRuleManager": FSRuleManager,
     "DynamoDBRuleManager": DynamoDBRuleManager,
+    "RDBRuleManager": RDBRuleManager,
 }
 
 
