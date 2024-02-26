@@ -7,17 +7,15 @@ import secrets
 from flask import Flask, render_template, Response, redirect, url_for, flash, jsonify
 from flask import request
 from flask_bootstrap import Bootstrap5
-from flask_wtf import CSRFProtect
-
-from backend.forms import RuleForm, OutcomeForm
-from models.backend_core import User, Role
-
 from flask_security import (
     current_user,
     Security,
     auth_required,
     SQLAlchemySessionUserDatastore,
 )
+from flask_wtf import CSRFProtect
+
+from backend.forms import RuleForm, OutcomeForm
 from core.outcomes import FixedOutcome
 from core.rule import RuleFactory, RuleConverter, Rule
 from core.rule_checkers import (
@@ -31,6 +29,7 @@ from core.rule_updater import (
     RDBRuleEngineConfigProducer,
 )
 from core.user_lists import StaticUserListManager
+from models.backend_core import User, Role
 from models.database import db_session
 
 rule_locker = RelationalDBRuleLocker(db_session)
@@ -52,10 +51,6 @@ bootstrap = Bootstrap5(app)
 csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)
 app.secret_key = url_safe_token
-EZRULES_BUCKET = os.environ["EZRULES_BUCKET"]
-EZRULES_BUCKET_PATH = f"s3://{EZRULES_BUCKET}"
-DYNAMODB_TABLE_NAME = os.environ["DYNAMODB_RULE_MANAGER_TABLE_NAME"]
-app.logger.info(f"DynamoDB table is {DYNAMODB_TABLE_NAME}")
 fsrm = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db": db_session})
 
 app.teardown_appcontext(lambda exc: db_session.close())

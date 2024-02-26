@@ -52,7 +52,7 @@ class RuleForm(FlaskForm):
     params = BetterTagListField("Rule params")
     submit = SubmitField("Submit")
 
-    def validate(self, rule_checker=None, extra_validators=None):
+    def validate(self, rule_checker=None, extra_validators=None) -> RuleStatusCheck:
         base_validation = super().validate(extra_validators)
         rule_ok = True
         reasons = []
