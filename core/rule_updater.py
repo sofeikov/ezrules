@@ -9,7 +9,6 @@ from ruamel.yaml import scalarstring
 from datetime import datetime
 import ruamel
 import yaml
-import s3fs
 import operator
 from collections import namedtuple
 from sqlalchemy import func, distinct
@@ -131,6 +130,7 @@ class YAMLRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
     def to_yaml(file_path: str, rule_manager: RuleManager):
         open_fn = open
         if file_path.startswith("s3://"):
+            import s3fs
             s3 = s3fs.S3FileSystem()
             open_fn = s3.open
 
