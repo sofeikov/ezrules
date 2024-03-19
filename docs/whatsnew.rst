@@ -4,6 +4,7 @@ What's new
 ----------
 v0.5
 * RDBMS are now supported as a backend for rule configuration storage
+* The application can now be deployed in a k8s cluster
 
 v0.4
 
