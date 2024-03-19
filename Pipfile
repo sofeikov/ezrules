@@ -1,0 +1,24 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+flask = "*"
+flask-wtf = "*"
+bootstrap-flask = "*"
+pyyaml = "*"
+"ruamel.yaml" = "*"
+gunicorn = "*"
+sphinx = "*"
+pyparsing = "*"
+sqlalchemy = "*"
+flask-security-too = {extras = ["common"], version = "*"}
+psycopg2-binary = "*"
+pytz = "*"
+email-validator = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.12"
