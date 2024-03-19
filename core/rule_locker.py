@@ -3,8 +3,6 @@ import abc
 from core.helpers import LockRecord
 from core.rule import Rule
 from datetime import timedelta
-from pynamodb.models import Model
-from pynamodb.attributes import UnicodeAttribute, TTLAttribute
 from typing import Optional, Tuple
 from datetime import datetime, timezone
 from models.backend_core import RuleEditLock
@@ -56,49 +54,55 @@ class RelationalDBRuleLocker(RuleStorageLocker):
         return lock_record
 
 
-class DynamoDBStorageLocker(RuleStorageLocker):
-    class DBLockRecord(Model):
-        class Meta:
-            table_name = None
-            region = "eu-west-1"
+try:
+    from pynamodb.models import Model
+    from pynamodb.attributes import UnicodeAttribute, TTLAttribute
 
-        rid = UnicodeAttribute(hash_key=True)
-        locked_by = UnicodeAttribute(default="admin")
-        expires_on = TTLAttribute()
+    class DynamoDBStorageLocker(RuleStorageLocker):
+        class DBLockRecord(Model):
+            class Meta:
+                table_name = None
+                region = "eu-west-1"
 
-        def to_lock_record(self) -> LockRecord:
-            return LockRecord(
-                rid=self.rid,
-                locked_by=self.locked_by,
-                expires_on=self.expires_on,
-            )
+            rid = UnicodeAttribute(hash_key=True)
+            locked_by = UnicodeAttribute(default="admin")
+            expires_on = TTLAttribute()
 
-    def __init__(self, table_name: str):
-        self.DBLockRecord.Meta.table_name = table_name
+            def to_lock_record(self) -> LockRecord:
+                return LockRecord(
+                    rid=self.rid,
+                    locked_by=self.locked_by,
+                    expires_on=self.expires_on,
+                )
 
-    def lock_storage(self, rule: Rule, locked_by: str) -> Tuple[bool, LockRecord]:
-        current_lock = self.is_record_locked(rule)
-        if current_lock is None:
-            db_lock_item = self.DBLockRecord(
-                rid=rule.rid, expires_on=timedelta(hours=1), locked_by=locked_by
-            )
-            db_lock_item.save()
-            return True, db_lock_item.to_lock_record()
+        def __init__(self, table_name: str):
+            self.DBLockRecord.Meta.table_name = table_name
 
-        return False, current_lock
+        def lock_storage(self, rule: Rule, locked_by: str) -> Tuple[bool, LockRecord]:
+            current_lock = self.is_record_locked(rule)
+            if current_lock is None:
+                db_lock_item = self.DBLockRecord(
+                    rid=rule.rid, expires_on=timedelta(hours=1), locked_by=locked_by
+                )
+                db_lock_item.save()
+                return True, db_lock_item.to_lock_record()
 
-    def release_storage(self, rule: Rule) -> None:
-        try:
-            self.DBLockRecord.get(rule.rid).delete()
-        except Model.DoesNotExist:
-            pass
+            return False, current_lock
 
-    def is_record_locked(self, rule: Rule) -> Optional[LockRecord]:
-        try:
-            db_lock_item = self.DBLockRecord.get(rule.rid)
-            if db_lock_item.expires_on < datetime.now(timezone.utc):
-                self.release_storage(rule)
+        def release_storage(self, rule: Rule) -> None:
+            try:
+                self.DBLockRecord.get(rule.rid).delete()
+            except Model.DoesNotExist:
+                pass
+
+        def is_record_locked(self, rule: Rule) -> Optional[LockRecord]:
+            try:
+                db_lock_item = self.DBLockRecord.get(rule.rid)
+                if db_lock_item.expires_on < datetime.now(timezone.utc):
+                    self.release_storage(rule)
+                    return
+                return db_lock_item.to_lock_record()
+            except Model.DoesNotExist:
                 return
-            return db_lock_item.to_lock_record()
-        except Model.DoesNotExist:
-            return
+except ImportError:
+    print("pynaodb is not installed. DynamoDB backends will not work.")

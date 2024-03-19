@@ -1,16 +1,13 @@
 Flask
 Flask-WTF
 bootstrap-flask
-boto3
-s3fs
 pyyaml
 ruamel.yaml
 gunicorn
 sphinx
-pynamoDB
 pyparsing
 sqlalchemy
 flask-security-too[common]
-psycopg2
+psycopg2-binary
 pytz
 email_validator
