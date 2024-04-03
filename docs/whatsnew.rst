@@ -2,6 +2,10 @@
 
 What's new
 ----------
+v0.6
+
+* The app is compatible with AWS EKS
+
 v0.5
 
 * RDBMS are now supported as a backend for rule configuration storage

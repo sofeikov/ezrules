@@ -17,7 +17,7 @@ spec:
       containers:
         - name: manager
           image: 349229516285.dkr.ecr.eu-west-1.amazonaws.com/ezrule-manager:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           env:
@@ -31,11 +31,12 @@ kind: Service
 metadata:
   name: ezrule-manager-service
 spec:
+  type: LoadBalancer
+  selector:
+    app: ezrules-rule-manager
   ports:
   - port: 8080
     targetPort: 8080
-  selector:
-    app: ezrules-rule-manager
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -58,7 +59,7 @@ spec:
           image: 349229516285.dkr.ecr.eu-west-1.amazonaws.com/ezrule-manager:latest
           command: ["gunicorn"]
           args: ["-w", "1", "--threads", "4","--bind", "0.0.0.0:9090", "backend.ezrulevalapp:app"]
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 9090
           env:
@@ -70,8 +71,9 @@ kind: Service
 metadata:
   name: ezrule-manager-evaluator
 spec:
+  type: LoadBalancer
+  selector:
+    app: ezrules-rule-evaluator              
   ports:
   - port: 9090
     targetPort: 9090
-  selector:
-    app: ezrules-rule-evaluator              
