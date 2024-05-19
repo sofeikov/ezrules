@@ -22,7 +22,6 @@ In this interface:
 * ``A unique rule ID`` - a unique rule name. Once a rule is created, the ID can not be changed and is used through the entire rule lifecycle.
 * ``Rule description`` - a human readable rule description that helps to understand what the rule is trying to achieve.
 * ``Rule logic`` - how exactly rule achieves what's stated in the description. Refer to :ref:`Rule logic definition <rule_logic>` for more info.
-* ``Rule tags`` and ``Rule params`` are currently unused.
 
 First rule
 **********

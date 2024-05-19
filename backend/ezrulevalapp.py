@@ -1,12 +1,13 @@
 from flask import Flask, request
 from backend.rule_executors.executors import LocalRuleExecutorSQL
 from models.database import db_session
+import os
 
 app = Flask(__name__)
 # TODO calling this needs to be parametrised, e.g. for a remote service
 # TODO this needs to be parametrised
-
-lre = LocalRuleExecutorSQL(db=db_session)
+o_id = int(os.getenv("O_ID", "1"))
+lre = LocalRuleExecutorSQL(db=db_session, o_id=o_id)
 
 
 @app.route("/evaluate", methods=["POST"])
