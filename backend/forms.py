@@ -48,7 +48,6 @@ class RuleForm(FlaskForm):
     rid = StringField("A Unique rule ID")
     description = StringField("Rule description")
     logic = TextAreaField("Rule logic")
-    tags = BetterTagListField("Rule tags")
     params = BetterTagListField("Rule params")
     submit = SubmitField("Submit")
 

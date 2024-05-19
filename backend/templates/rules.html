@@ -4,6 +4,6 @@ All available rules<br>
         href="{{ url_for('user_lists') }}">Lists</a>
 <br>
 {% for rule in rules %}
-    <a href="/rule/{{ rule.rid }}">{{ rule.rid }}</a> - {{ rule.description }}
+    <a href="/rule/{{ rule.r_id }}">{{ rule.r_id }}</a> - {{ rule.description }}
     <br>
 {% endfor %}

@@ -24,12 +24,14 @@ from core.rule_checkers import (
 )
 from core.rule_locker import RelationalDBRuleLocker
 from core.rule_updater import (
+    RuleRevision,
+    RuleManager,
     RuleManagerFactory,
     RuleDoesNotExistInTheStorage,
     RDBRuleEngineConfigProducer,
 )
 from core.user_lists import StaticUserListManager
-from models.backend_core import User, Role
+from models.backend_core import User, Role, Rule as RuleModel
 from models.database import db_session
 
 rule_locker = RelationalDBRuleLocker(db_session)
@@ -51,7 +53,9 @@ bootstrap = Bootstrap5(app)
 csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)
 app.secret_key = url_safe_token
-fsrm = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db": db_session})
+fsrm: RuleManager = RuleManagerFactory.get_rule_manager(
+    "RDBRuleManager", **{"db": db_session, "o_id": int(os.getenv("O_ID", "1"))}
+)
 
 app.teardown_appcontext(lambda exc: db_session.close())
 user_datastore = SQLAlchemySessionUserDatastore(db_session, User, Role)
@@ -82,28 +86,33 @@ def create_rule():
             return render_template("create_rule.html", form=form)
         rule_raw_config = form.data
         app.logger.info(rule_raw_config)
+        # Make sure we can compile the rule
         rule = RuleFactory.from_json(rule_raw_config)
-        fsrm.save_rule(rule)
+        new_rule = RuleModel(
+            rid=rule.rid, logic=rule._source, description=rule.description
+        )
+        fsrm.save_rule(new_rule)
         app.logger.info("Saving new version of the rules")
         rule_engine_config_producer.save_config(fsrm)
         app.logger.info(rule)
-        return redirect(url_for("show_rule", rule_id=rule.rid))
+        return redirect(url_for("show_rule", rule_id=new_rule.r_id))
 
 
-@app.route("/get_all_rules", methods=["GET"])
-def get_all_rules():
-    all_rules = [RuleConverter.to_json(r) for r in fsrm.load_all_rules()]
-    return all_rules
-
-
-@app.route("/rule/<rule_id>/timeline", methods=["GET"])
+@app.route("/rule/<int:rule_id>/timeline", methods=["GET"])
 @auth_required()
 def timeline(rule_id):
-    revision_list = fsrm.get_rule_revision_list(rule_id)
+    latest_version = fsrm.load_rule(rule_id)
+    revision_list = fsrm.get_rule_revision_list(latest_version)
     rules = [
         fsrm.load_rule(rule_id, revision_number=r.revision_number)
         for r in revision_list
     ]
+    # Add the current version
+    rules = [RuleFactory.from_json(r.__dict__) for r in rules]
+    revision_list.append(
+        RuleRevision(revision_number=latest_version.version, created=None)
+    )
+    rules.append(RuleFactory.from_json(latest_version.__dict__))
     logics = [r._source for r in rules]
     diff_timeline = []
     for ct, (l1, l2) in enumerate(zip(logics[:-1], logics[1:])):
@@ -118,8 +127,8 @@ def timeline(rule_id):
     return render_template("timeline.html", timeline=diff_timeline, rule=rule_id)
 
 
-@app.route("/rule/<rule_id>", methods=["GET", "POST"])
-@app.route("/rule/<rule_id>/<revision_number>", methods=["GET"])
+@app.route("/rule/<int:rule_id>", methods=["GET", "POST"])
+@app.route("/rule/<int:rule_id>/<revision_number>", methods=["GET"])
 @auth_required()
 def show_rule(rule_id=None, revision_number=None):
     form = RuleForm()
@@ -128,7 +137,9 @@ def show_rule(rule_id=None, revision_number=None):
             if revision_number is not None:
                 revision_number = int(revision_number)
             rule = fsrm.load_rule(rule_id, revision_number=revision_number)
-            rule_json = RuleConverter.to_json(rule)
+            compiled_rule = RuleFactory.from_json(rule.__dict__)
+            rule_json = RuleConverter.to_json(compiled_rule)
+            rule_json = rule.__dict__
             app.logger.info(rule_json)
             form.process(**rule_json)
             del form.rid
@@ -164,7 +175,6 @@ def show_rule(rule_id=None, revision_number=None):
         app.logger.info(f"Current rule state {rule}")
         rule.description = form.description.data
         rule.logic = form.logic.data
-        rule.tags = form.tags.data
         rule.params = form.params.data
 
         fsrm.save_rule(rule)
