@@ -59,6 +59,7 @@ class Organisation(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     rules: Mapped[List["Rule"]] = relationship()
+    re_configs: Mapped[List["RuleEngineConfig"]] = relationship()
 
     def __repr__(self):
         return f"ID:{self.o_id}, {self.name=}, {len(self.rules)=}"
@@ -79,12 +80,15 @@ class RuleEditLock(Base):
         )
 
 
-class RuleEngineConfig(Base):
+class RuleEngineConfig(Versioned, Base):
     __tablename__ = "rule_engine_config"
 
     re_id = Column(Integer, unique=True, primary_key=True)
     label = Column(String, nullable=False)
     config = Column(JSON, nullable=False)
+
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
+    org: Mapped["Organisation"] = relationship(back_populates="re_configs")
 
 
 class Rule(Versioned, Base):
@@ -101,5 +105,7 @@ class Rule(Versioned, Base):
 
     def __repr__(self) -> str:
         return f"{self.r_id=},{self.created_at=},{self.description=},{self.org=}"
-    
+
+
 RuleHistory = Rule.__history_mapper__.class_
+RuleEngineConfigHistory = RuleEngineConfig.__history_mapper__.class_

@@ -12,6 +12,7 @@ import yaml
 import operator
 from collections import namedtuple
 from sqlalchemy import func, distinct
+from sqlalchemy.exc import NoResultFound
 
 from models.backend_core import (
     RuleEngineConfig,
@@ -113,15 +114,29 @@ class AbstractRuleEngineConfigProducer(ABC):
 
 
 class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
-    def __init__(self, db):
+    def __init__(self, db, o_id):
         self.db = db
+        self.o_id = o_id
 
     def save_config(self, rule_manager: RuleManager) -> None:
         all_rules = rule_manager.load_all_rules()
         all_rules = [RuleFactory.from_json(r.__dict__) for r in all_rules]
         rules_json = [RuleConverter.to_json(r) for r in all_rules]
-        new_config = RuleEngineConfig(label="production", config=rules_json)
-        self.db.add(new_config)
+        try:
+            config_obj = (
+                self.db.query(RuleEngineConfig)
+                .where(
+                    RuleEngineConfig.label == "production",
+                    RuleEngineConfig.o_id == self.o_id,
+                )
+                .one()
+            )
+            config_obj.config = rules_json
+        except NoResultFound:
+            new_config = RuleEngineConfig(
+                label="production", config=rules_json, o_id=self.o_id
+            )
+            self.db.add(new_config)
         self.db.commit()
 
 
@@ -417,7 +432,9 @@ class RDBRuleManager(RuleManager):
         self, rule: Rule, return_dates=False
     ) -> List[RuleRevision]:
         revisions = (
-            self.db.query(RuleHistory.version, RuleHistory.changed, RuleHistory.created_at)
+            self.db.query(
+                RuleHistory.version, RuleHistory.changed, RuleHistory.created_at
+            )
             .filter(RuleHistory.r_id == rule.r_id)
             .order_by(RuleHistory.version)
             .all()
@@ -427,7 +444,7 @@ class RDBRuleManager(RuleManager):
             if ind == 0:
                 created = r.created_at
             else:
-                created = revisions[ind-1].changed
+                created = revisions[ind - 1].changed
             version_list.append(RuleRevision(r.version, created))
         return version_list
 

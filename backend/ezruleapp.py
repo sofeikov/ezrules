@@ -40,6 +40,9 @@ rule_checker = RuleCheckingPipeline(
     checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)]
 )
 
+from models.database import init_db
+
+init_db()
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
@@ -53,14 +56,15 @@ bootstrap = Bootstrap5(app)
 csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)
 app.secret_key = url_safe_token
+o_id = int(os.getenv("O_ID", "1"))
 fsrm: RuleManager = RuleManagerFactory.get_rule_manager(
-    "RDBRuleManager", **{"db": db_session, "o_id": int(os.getenv("O_ID", "1"))}
+    "RDBRuleManager", **{"db": db_session, "o_id": o_id}
 )
 
 app.teardown_appcontext(lambda exc: db_session.close())
 user_datastore = SQLAlchemySessionUserDatastore(db_session, User, Role)
 app.security = Security(app, user_datastore)
-rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session)
+rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session,o_id=o_id)
 
 
 @app.route("/rules", methods=["GET"])
@@ -274,7 +278,5 @@ def ping():
 
 
 if __name__ == "__main__":
-    from models.database import init_db
 
-    init_db()
     app.run(host="0.0.0.0", port=8888, debug=True)
