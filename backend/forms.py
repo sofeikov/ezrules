@@ -48,7 +48,6 @@ class RuleForm(FlaskForm):
     rid = StringField("A Unique rule ID")
     description = StringField("Rule description")
     logic = TextAreaField("Rule logic")
-    params = BetterTagListField("Rule params")
     submit = SubmitField("Submit")
 
     def validate(self, rule_checker=None, extra_validators=None) -> RuleStatusCheck:

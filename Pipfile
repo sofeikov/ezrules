@@ -17,10 +17,12 @@ flask-security-too = {extras = ["common"], version = "*"}
 psycopg2-binary = "*"
 pytz = "*"
 email-validator = "*"
-pytest = "*"
 sqlalchemy-utils = "*"
 
 [dev-packages]
+pytest-cov = "*"
+pytest = "*"
+coverage = "*"
 
 [requires]
 python_version = "3.10"

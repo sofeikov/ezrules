@@ -31,8 +31,9 @@ from core.rule_updater import (
     RDBRuleEngineConfigProducer,
 )
 from core.user_lists import StaticUserListManager
-from models.backend_core import User, Role, Rule as RuleModel
+from models.backend_core import User, Role, Rule as RuleModel, RuleHistory
 from models.database import db_session
+from backend.utils import conditional_auth
 
 rule_locker = RelationalDBRuleLocker(db_session)
 outcome_manager = FixedOutcome()
@@ -52,6 +53,7 @@ app.config["SECURITY_PASSWORD_SALT"] = os.environ.get(
 )
 app.config["SECURITY_SEND_REGISTER_EMAIL"] = False
 app.config["SECURITY_REGISTERABLE"] = True
+app.config["TESTING"] = os.getenv("TESTING", False) == "true"
 bootstrap = Bootstrap5(app)
 csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)
@@ -64,19 +66,19 @@ fsrm: RuleManager = RuleManagerFactory.get_rule_manager(
 app.teardown_appcontext(lambda exc: db_session.close())
 user_datastore = SQLAlchemySessionUserDatastore(db_session, User, Role)
 app.security = Security(app, user_datastore)
-rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session,o_id=o_id)
+rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=o_id)
 
 
 @app.route("/rules", methods=["GET"])
 @app.route("/", methods=["GET"])
-@auth_required()
+@conditional_auth(not app.config["TESTING"], auth_required())
 def rules():
     rules = fsrm.load_all_rules()
     return render_template("rules.html", rules=rules)
 
 
 @app.route("/create_rule", methods=["GET", "POST"])
-@auth_required()
+@conditional_auth(not app.config["TESTING"], auth_required())
 def create_rule():
     form = RuleForm()
     if request.method == "GET":
@@ -103,7 +105,7 @@ def create_rule():
 
 
 @app.route("/rule/<int:rule_id>/timeline", methods=["GET"])
-@auth_required()
+@conditional_auth(not app.config["TESTING"], auth_required())
 def timeline(rule_id):
     latest_version = fsrm.load_rule(rule_id)
     revision_list = fsrm.get_rule_revision_list(latest_version)
@@ -133,33 +135,30 @@ def timeline(rule_id):
 
 @app.route("/rule/<int:rule_id>", methods=["GET", "POST"])
 @app.route("/rule/<int:rule_id>/<revision_number>", methods=["GET"])
-@auth_required()
+@conditional_auth(not app.config["TESTING"], auth_required())
 def show_rule(rule_id=None, revision_number=None):
+    if revision_number is not None:
+        revision_number = int(revision_number)
     form = RuleForm()
     if request.method == "GET":
-        try:
-            if revision_number is not None:
-                revision_number = int(revision_number)
-            rule = fsrm.load_rule(rule_id, revision_number=revision_number)
-            compiled_rule = RuleFactory.from_json(rule.__dict__)
-            rule_json = RuleConverter.to_json(compiled_rule)
-            rule_json = rule.__dict__
-            app.logger.info(rule_json)
-            form.process(**rule_json)
-            del form.rid
-            revision_list = fsrm.get_rule_revision_list(rule)
-            rule_lock = rule_locker.is_record_locked(rule)
-            if rule_lock:
-                del form["submit"]
-            return render_template(
-                "show_rule.html",
-                rule=rule_json,
-                form=form,
-                revision_list=revision_list,
-                rule_lock=rule_lock,
-            )
-        except RuleDoesNotExistInTheStorage:
+        rule = fsrm.load_rule(rule_id, revision_number=revision_number)
+        if rule is None:
             return Response("Rule not found", 404)
+        compiled_rule = RuleFactory.from_json(rule.__dict__)
+        rule_json = RuleConverter.to_json(compiled_rule)
+        rule_json = rule.__dict__
+        app.logger.info(rule_json)
+        form.process(**rule_json)
+        del form.rid
+        revision_list = fsrm.get_rule_revision_list(rule)
+        rule_lock = rule_locker.is_record_locked(rule)
+        return render_template(
+            "show_rule.html",
+            rule=rule_json,
+            form=form,
+            revision_list=revision_list,
+            rule_lock=rule_lock,
+        )
     elif request.method == "POST":
         rule_status_check = form.validate(rule_checker=rule_checker)
         if not rule_status_check.rule_ok:
@@ -169,18 +168,9 @@ def show_rule(rule_id=None, revision_number=None):
             return redirect(url_for("show_rule", rule_id=rule_id))
         app.logger.info(request.form)
         rule = fsrm.load_rule(rule_id)
-        lock_record = rule_locker.is_record_locked(rule)
-        if lock_record is not None:
-            if lock_record.locked_by != current_user.email:
-                flash(
-                    f"Changes to {rule_id} were NOT saved. Rule is locked by {lock_record.locked_by}"
-                )
-                return redirect(url_for("show_rule", rule_id=rule_id))
         app.logger.info(f"Current rule state {rule}")
         rule.description = form.description.data
         rule.logic = form.logic.data
-        rule.params = form.params.data
-
         fsrm.save_rule(rule)
         app.logger.info("Saving new version of the rules")
         rule_engine_config_producer.save_config(fsrm)
@@ -191,7 +181,7 @@ def show_rule(rule_id=None, revision_number=None):
 
 @app.route("/verify_rule", methods=["POST"])
 @csrf.exempt
-def verify_rule():
+def verifyty_rule():
     source_ = None
     try:
         source_ = request.get_json()["rule_source"]
@@ -229,28 +219,8 @@ def test_rule():
     return {"rule_outcome": rule_outcome, "status": "ok", "reason": "ok"}
 
 
-@app.route("/lock_rule/<rule_id>", methods=["POST"])
-@csrf.exempt
-def lock_rule(rule_id):
-    rule = fsrm.load_rule(rule_id)
-    if current_user.is_anonymous:
-        locked_by = "anonim"
-    else:
-        locked_by = current_user.email
-    success, result = rule_locker.lock_storage(rule, locked_by=locked_by)
-    return {"success": success, **result._asdict()}
-
-
-@app.route("/unlock/<rule_id>", methods=["POST"])
-@csrf.exempt
-def unlock_rule(rule_id):
-    rule = fsrm.load_rule(rule_id)
-    rule_locker.release_storage(rule)
-    return {}
-
-
 @app.route("/management/outcomes", methods=["GET", "POST"])
-@auth_required()
+@conditional_auth(not app.config["TESTING"], auth_required())
 def verified_outcomes():
     form = OutcomeForm()
     if request.method == "GET":
@@ -264,7 +234,7 @@ def verified_outcomes():
 
 
 @app.route("/management/lists", methods=["GET", "POST"])
-@auth_required()
+@conditional_auth(not app.config["TESTING"], auth_required())
 def user_lists():
     return render_template(
         "user_lists.html", user_lists=StaticUserListManager().get_all_entries()
@@ -275,8 +245,3 @@ def user_lists():
 @csrf.exempt
 def ping():
     return "OK"
-
-
-if __name__ == "__main__":
-
-    app.run(host="0.0.0.0", port=8888, debug=True)
