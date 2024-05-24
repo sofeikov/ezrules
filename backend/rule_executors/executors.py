@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from sqlalchemy import desc
 from core.rule_engine import RuleEngineFactory
 
 
@@ -7,7 +6,6 @@ class AbstractRuleExecutor(ABC):
     def __init__(self):
         self.rule_engine = None
         self._current_rule_version = None
-        self._check_rule_config_is_fresh()
 
     @abstractmethod
     def _check_rule_config_is_fresh(self):
@@ -17,9 +15,6 @@ class AbstractRuleExecutor(ABC):
         self._check_rule_config_is_fresh()
         eval_result = self.rule_engine(eval_object)
         return eval_result
-
-    def __repr__(self):
-        return "Abstract rule executor"
 
 
 class LocalRuleExecutorSQL(AbstractRuleExecutor):
@@ -32,8 +27,7 @@ class LocalRuleExecutorSQL(AbstractRuleExecutor):
         from models.backend_core import RuleEngineConfig
 
         latest_record_version, latest_config = (
-            self.db.query(RuleEngineConfig.version, RuleEngineConfig.config)
-            .where(
+            self.db.query(RuleEngineConfig.version, RuleEngineConfig.config).where(
                 RuleEngineConfig.label == "production",
                 RuleEngineConfig.o_id == self.o_id,
             )
@@ -41,6 +35,3 @@ class LocalRuleExecutorSQL(AbstractRuleExecutor):
         if latest_record_version != self._current_rule_version:
             self._current_rule_version = latest_record_version
             self.rule_engine = RuleEngineFactory.from_json(latest_config)
-
-    def __repr__(self):
-        return f"{self.db.bind}"

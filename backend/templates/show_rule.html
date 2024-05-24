@@ -1,43 +1,30 @@
 {% include "user_header.html" %}
 {% extends "layout.html" %}
 {% block head %}
-    <head>
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-        <script src="{{ url_for('static', filename="scripts.js") }}"></script>
-        <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                initializeTabCapture("{{ form.logic.id }}");
 
-                $("#lock_button").click(function () {
-                    lockRuleForModification("{{ rule['rid'] }}");
-                })
-                $("#force_unlock_button").click(function () {
-                    forceUnlockRuleForModification("{{ rule['rid'] }}");
-                })
-                $("#logic").on("input", fillInExampleParams)
-                $("#submit_test").on("click", function () {
-                    testRuleWithSampleJson($("#logic").val(), $("#verify_json").val())
-                })
-                fillInExampleParams(null)
-                updateTextareaSize("{{ form.logic.id }}")
-            });
-        </script>
-        <title>Rule {{ rule['rid'] }}</title>
-    </head>
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="{{ url_for('static', filename=" scripts.js") }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            initializeTabCapture("{{ form.logic.id }}");
+            $("#logic").on("input", fillInExampleParams)
+            $("#submit_test").on("click", function () {
+                testRuleWithSampleJson($("#logic").val(), $("#verify_json").val())
+            })
+            fillInExampleParams(null)
+            updateTextareaSize("{{ form.logic.id }}")
+        });
+    </script>
+    <title>Rule {{ rule['rid'] }}</title>
+</head>
 {% endblock %}
 {% block body %}
-    <body>
+
+<body>
     {% from 'bootstrap5/form.html' import render_form %}
     <a href="/rules">Full rule list</a><br>
-    {% if rule_lock %}
-        <span style="color: red; "> This rule is locked by {{ rule_lock.locked_by }} until at least {{ rule_lock.expires_on }}</span>
-    {% endif %}<br>
     <h2 id="page_header">Rule {{ rule['rid'] }}</h2>
-    <button id="lock_button">Modify this rule</button>
-    {% if rule_lock %}
-        <button id="force_unlock_button">Force unlock the rule(NOT RECOMMENDED)</button>
-    {% endif %}
-
     {{ render_form(form) }}
     <textarea id="verify_json" style="display: none"></textarea>
     <br>
@@ -45,12 +32,12 @@
     <br>
     Other rule versions:
     <a href="/rule/{{ rule['r_id'] }}">latest</a><br>
-    {% if revision_list | length >= 2 %}
-        <a href="/rule/{{ rule['r_id'] }}/timeline">visualise changes</a><br>
+    {% if revision_list | length >= 1 %}
+    <a href="/rule/{{ rule['r_id'] }}/timeline">visualise changes</a><br>
     {% endif %}
     {% for rev in revision_list %}
-        <a href="/rule/{{ rule['r_id'] }}/{{ rev.revision_number }}">Revision {{ rev.revision_number }} created
-            at {{ rev.created.strftime('%Y-%m-%d %H:%M:%S') }}</a> <br>
+    <a href="/rule/{{ rule['r_id'] }}/{{ rev.revision_number }}">Revision {{ rev.revision_number }} created
+        at {{ rev.created.strftime('%Y-%m-%d %H:%M:%S') }}</a> <br>
     {% endfor %}
-    </body>
+</body>
 {% endblock %}

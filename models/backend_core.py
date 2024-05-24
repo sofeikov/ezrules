@@ -1,20 +1,14 @@
-from models.database import Base, engine, db_session
-from flask_security import UserMixin, RoleMixin, AsaList
-from sqlalchemy.orm import relationship, backref, mapped_column, Mapped
-from sqlalchemy.ext.mutable import MutableList
-from models.history_meta import Versioned
-from sqlalchemy import (
-    Boolean,
-    DateTime,
-    Column,
-    Integer,
-    String,
-    ForeignKey,
-    JSON,
-)
-from typing import List
-from core.helpers import LockRecord
 import datetime
+from typing import List
+
+from flask_security import AsaList, RoleMixin, UserMixin
+from sqlalchemy import (JSON, Boolean, Column, DateTime, ForeignKey, Integer,
+                        String)
+from sqlalchemy.ext.mutable import MutableList
+from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
+
+from models.database import Base
+from models.history_meta import Versioned
 
 
 class RolesUsers(Base):
@@ -63,21 +57,6 @@ class Organisation(Base):
 
     def __repr__(self):
         return f"ID:{self.o_id}, {self.name=}, {len(self.rules)=}"
-
-
-class RuleEditLock(Base):
-    __tablename__ = "rule_locks"
-
-    rid = Column(String, unique=True, primary_key=True)
-    locked_by = Column(String(50), nullable=False)
-    expires_on = Column(DateTime())
-
-    def to_lock_record(self) -> LockRecord:
-        return LockRecord(
-            rid=self.rid,
-            locked_by=self.locked_by,
-            expires_on=self.expires_on,
-        )
 
 
 class RuleEngineConfig(Versioned, Base):

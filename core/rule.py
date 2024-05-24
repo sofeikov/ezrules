@@ -125,14 +125,3 @@ class RuleConverter:
             Fields.LOGIC: rule._source,
             Fields.PARAMS: rule.params,
         }
-
-
-if __name__ == "__main__":
-    with open("rule-config.yaml", "r") as f:
-        config = yaml.safe_load(f)
-        rule_config = config["Rules"][0]
-
-        rule = RuleFactory.from_json(rule_config)
-
-        t = {"send_country": "US", "score": 950}
-        print(rule(t))
