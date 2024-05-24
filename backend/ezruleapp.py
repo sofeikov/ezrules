@@ -4,36 +4,27 @@ import logging
 import os
 import secrets
 
-from flask import Flask, render_template, Response, redirect, url_for, flash, jsonify
-from flask import request
+from flask import (Flask, Response, flash, jsonify, redirect, render_template,
+                   request, url_for)
 from flask_bootstrap import Bootstrap5
-from flask_security import (
-    current_user,
-    Security,
-    auth_required,
-    SQLAlchemySessionUserDatastore,
-)
+from flask_security import (Security, SQLAlchemySessionUserDatastore,
+                            auth_required)
 from flask_wtf import CSRFProtect
 
-from backend.forms import RuleForm, OutcomeForm
+from backend.forms import OutcomeForm, RuleForm
+from backend.utils import conditional_decorator
 from core.outcomes import FixedOutcome
-from core.rule import RuleFactory, RuleConverter, Rule
-from core.rule_checkers import (
-    RuleCheckingPipeline,
-    OnlyAllowedOutcomesAreReturnedChecker,
-)
+from core.rule import Rule, RuleConverter, RuleFactory
+from core.rule_checkers import (OnlyAllowedOutcomesAreReturnedChecker,
+                                RuleCheckingPipeline)
 from core.rule_locker import RelationalDBRuleLocker
-from core.rule_updater import (
-    RuleRevision,
-    RuleManager,
-    RuleManagerFactory,
-    RuleDoesNotExistInTheStorage,
-    RDBRuleEngineConfigProducer,
-)
+from core.rule_updater import (RDBRuleEngineConfigProducer, RuleManager,
+                               RuleManagerFactory, RuleRevision)
 from core.user_lists import StaticUserListManager
-from models.backend_core import User, Role, Rule as RuleModel, RuleHistory
+from models.backend_core import Role
+from models.backend_core import Rule as RuleModel
+from models.backend_core import User
 from models.database import db_session
-from backend.utils import conditional_auth
 
 rule_locker = RelationalDBRuleLocker(db_session)
 outcome_manager = FixedOutcome()
@@ -41,7 +32,6 @@ rule_checker = RuleCheckingPipeline(
     checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)]
 )
 
-from models.database import init_db
 
 init_db()
 
@@ -71,14 +61,14 @@ rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=o_
 
 @app.route("/rules", methods=["GET"])
 @app.route("/", methods=["GET"])
-@conditional_auth(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], auth_required())
 def rules():
     rules = fsrm.load_all_rules()
     return render_template("rules.html", rules=rules)
 
 
 @app.route("/create_rule", methods=["GET", "POST"])
-@conditional_auth(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], auth_required())
 def create_rule():
     form = RuleForm()
     if request.method == "GET":
@@ -105,7 +95,7 @@ def create_rule():
 
 
 @app.route("/rule/<int:rule_id>/timeline", methods=["GET"])
-@conditional_auth(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], auth_required())
 def timeline(rule_id):
     latest_version = fsrm.load_rule(rule_id)
     revision_list = fsrm.get_rule_revision_list(latest_version)
@@ -135,7 +125,7 @@ def timeline(rule_id):
 
 @app.route("/rule/<int:rule_id>", methods=["GET", "POST"])
 @app.route("/rule/<int:rule_id>/<revision_number>", methods=["GET"])
-@conditional_auth(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], auth_required())
 def show_rule(rule_id=None, revision_number=None):
     if revision_number is not None:
         revision_number = int(revision_number)
@@ -220,7 +210,7 @@ def test_rule():
 
 
 @app.route("/management/outcomes", methods=["GET", "POST"])
-@conditional_auth(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], auth_required())
 def verified_outcomes():
     form = OutcomeForm()
     if request.method == "GET":
@@ -234,7 +224,7 @@ def verified_outcomes():
 
 
 @app.route("/management/lists", methods=["GET", "POST"])
-@conditional_auth(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], auth_required())
 def user_lists():
     return render_template(
         "user_lists.html", user_lists=StaticUserListManager().get_all_entries()

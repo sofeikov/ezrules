@@ -1,9 +1,9 @@
 import os
-import sqlalchemy
-from sqlalchemy import select
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import scoped_session, sessionmaker
+
 from models.history_meta import versioned_session
 
 engine = create_engine(os.environ["DB_ENDPOINT"])
@@ -22,7 +22,7 @@ def init_db():
     import models
 
     Base.metadata.create_all(bind=engine)
-    from models.backend_core import User, Organisation
+    from models.backend_core import Organisation, User
 
     admin_email = f"sofeykov@gmail.com"
     admin_password = f"12345678"

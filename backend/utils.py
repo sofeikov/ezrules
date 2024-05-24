@@ -1,4 +1,4 @@
-def conditional_auth(condition, decorator):
+def conditional_decorator(condition, decorator):
     def wrapper(func):
         if condition:
             return decorator(func)
