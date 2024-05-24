@@ -2,8 +2,7 @@ import datetime
 from typing import List
 
 from flask_security import AsaList, RoleMixin, UserMixin
-from sqlalchemy import (JSON, Boolean, Column, DateTime, ForeignKey, Integer,
-                        String)
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
@@ -84,6 +83,17 @@ class Rule(Versioned, Base):
 
     def __repr__(self) -> str:
         return f"{self.r_id=},{self.created_at=},{self.description=},{self.org=}"
+
+
+class RunResult(Base):
+    __tablename__ = "run_results"
+
+    rr_id: Mapped[int] = mapped_column(unique=True, primary_key=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    rec_id: Mapped[int] = mapped_column(ForeignKey("rule_engine_config.re_id"))
+    rec_version: Mapped[int] = mapped_column(Integer)
+    event = Column(JSON, nullable=False)
+    result = Column(JSON, nullable=False)
 
 
 RuleHistory = Rule.__history_mapper__.class_

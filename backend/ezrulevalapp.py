@@ -1,6 +1,7 @@
 from flask import Flask, request
 from backend.rule_executors.executors import LocalRuleExecutorSQL
 from models.database import db_session
+from models.backend_core import RunResult
 import os
 
 app = Flask(__name__)
@@ -13,6 +14,16 @@ lre = LocalRuleExecutorSQL(db=db_session, o_id=o_id)
 def evaluate():
     request_data = request.get_json()
     response = lre.evaluate_rules(request_data)
+
+    rr = RunResult(
+        rec_id=lre.self_id,
+        rec_version=lre._current_rule_version,
+        event=request_data,
+        result=response,
+    )
+    db_session.add(rr)
+    db_session.commit()
+
     return response
 
 

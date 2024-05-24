@@ -21,13 +21,18 @@ class LocalRuleExecutorSQL(AbstractRuleExecutor):
     def __init__(self, db, o_id):
         self.db = db
         self.o_id = o_id
+        self.self_id = None
         super().__init__()
 
     def _check_rule_config_is_fresh(self):
         from models.backend_core import RuleEngineConfig
 
-        latest_record_version, latest_config = (
-            self.db.query(RuleEngineConfig.version, RuleEngineConfig.config).where(
+        self.self_id, latest_record_version, latest_config = (
+            self.db.query(
+                RuleEngineConfig.re_id,
+                RuleEngineConfig.version,
+                RuleEngineConfig.config,
+            ).where(
                 RuleEngineConfig.label == "production",
                 RuleEngineConfig.o_id == self.o_id,
             )

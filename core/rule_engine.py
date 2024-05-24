@@ -18,7 +18,7 @@ class RuleEngine:
     def __init__(
         self,
         rules: List[Rule],
-        result_aggregation: str = ResultAggregation.UNIQUE,
+        result_aggregation: str = ResultAggregation.COUNTER,
     ) -> None:
         """
 
