@@ -33,17 +33,7 @@ class RuleManager(ABC):
         :param rule: an instance of `core.rule.Rule`
         :return:
         """
-        self.lock_storage()
         self._save_rule(rule)
-        self.release_storage()
-
-    def lock_storage(self):
-        """Lock storage. Override in subclasses if lock is required."""
-        pass
-
-    def release_storage(self):
-        """Unlock storage. Override in subclasses if lock is required."""
-        pass
 
     @abstractmethod
     def _save_rule(self, rule: Rule) -> None:
@@ -65,65 +55,6 @@ class RuleManager(ABC):
     @abstractmethod
     def load_all_rules(self) -> List[Rule]:
         """Storage specific mechanism to load all available rules."""
-
-
-class AbstractRuleEngineConfigProducer(ABC):
-    @abstractmethod
-    def save_config(self, rule_manager: RuleManager) -> None:
-        """Save config to a target location(disk, db, etc)."""
-
-
-class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
-    def __init__(self, db, o_id):
-        self.db = db
-        self.o_id = o_id
-
-    def save_config(self, rule_manager: RuleManager) -> None:
-        all_rules = rule_manager.load_all_rules()
-        all_rules = [RuleFactory.from_json(r.__dict__) for r in all_rules]
-        rules_json = [RuleConverter.to_json(r) for r in all_rules]
-        try:
-            config_obj = (
-                self.db.query(RuleEngineConfig)
-                .where(
-                    RuleEngineConfig.label == "production",
-                    RuleEngineConfig.o_id == self.o_id,
-                )
-                .one()
-            )
-            config_obj.config = rules_json
-        except NoResultFound:
-            new_config = RuleEngineConfig(
-                label="production", config=rules_json, o_id=self.o_id
-            )
-            self.db.add(new_config)
-        self.db.commit()
-
-
-class YAMLRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
-    def __init__(self, config_path: str) -> None:
-        self.config_path = config_path
-
-    def save_config(self, rule_manager: RuleManager) -> None:
-        YAMLRuleEngineConfigProducer.to_yaml(self.config_path, rule_manager)
-
-    @staticmethod
-    def to_yaml(file_path: str, rule_manager: RuleManager):
-        open_fn = open
-        if file_path.startswith("s3://"):
-            import s3fs
-
-            s3 = s3fs.S3FileSystem()
-            open_fn = s3.open
-
-        all_rules = rule_manager.load_all_rules()
-        rules_json = [RuleConverter.to_json(r) for r in all_rules]
-        full_rule_config = {"Rules": rules_json}
-        yaml = ruamel.yaml.YAML()
-        yaml.indent(offset=2, sequence=4)
-        with open_fn(file_path, "w") as yaml_f:
-            scalarstring.walk_tree(full_rule_config)
-            yaml.dump(full_rule_config, yaml_f)
 
 
 class RDBRuleManager(RuleManager):
@@ -176,6 +107,39 @@ class RDBRuleManager(RuleManager):
     def load_all_rules(self) -> List[RuleModel]:
         org = self.db.get(Organisation, self.o_id)
         return org.rules
+
+
+class AbstractRuleEngineConfigProducer(ABC):
+    @abstractmethod
+    def save_config(self, rule_manager: RuleManager) -> None:
+        """Save config to a target location(disk, db, etc)."""
+
+
+class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
+    def __init__(self, db, o_id):
+        self.db = db
+        self.o_id = o_id
+
+    def save_config(self, rule_manager: RuleManager) -> None:
+        all_rules = rule_manager.load_all_rules()
+        all_rules = [RuleFactory.from_json(r.__dict__) for r in all_rules]
+        rules_json = [RuleConverter.to_json(r) for r in all_rules]
+        try:
+            config_obj = (
+                self.db.query(RuleEngineConfig)
+                .where(
+                    RuleEngineConfig.label == "production",
+                    RuleEngineConfig.o_id == self.o_id,
+                )
+                .one()
+            )
+            config_obj.config = rules_json
+        except NoResultFound:
+            new_config = RuleEngineConfig(
+                label="production", config=rules_json, o_id=self.o_id
+            )
+            self.db.add(new_config)
+        self.db.commit()
 
 
 RULE_MANAGERS = {

@@ -1,8 +1,6 @@
 from core.rule import Rule, RuleFactory
-from typing import Any, List, Dict, Union
-from pathlib import Path
+from typing import Any, List, Dict
 from collections import Counter
-import yaml
 
 
 class ResultAggregation:
@@ -41,7 +39,7 @@ class RuleEngine:
         """
         results = [r(t) for r in self.rules]
         if self.result_aggregation == ResultAggregation.UNIQUE:
-            return list(set(results))
+            return sorted(list(set(results)))
         elif self.result_aggregation == ResultAggregation.COUNTER:
             return dict(Counter(results).items())
         else:
@@ -49,26 +47,6 @@ class RuleEngine:
 
 
 class RuleEngineFactory:
-    @staticmethod
-    def from_yaml(file_path: Union[Path, str]) -> RuleEngine:
-        """
-
-        :param file_path: string or `pathlib.Path` targeting to a rule engine config file. If a string is passed and it\
-        starts with `s3://`, the `s3fs` library will be used to load the remote file. That means that if a s3 path is \
-        passed, `AWS` credentials have to be available on the host machine.
-        :return: an instance of :class:`core.rule_engine.RuleEngine`
-        """
-        if file_path.startswith("s3://"):
-            import s3fs
-            s3 = s3fs.S3FileSystem()
-            open = s3.open
-
-        with open(file_path, "r") as f:
-            config = yaml.safe_load(f)
-        rules = [RuleFactory.from_json(rc) for rc in config["Rules"]]
-        rule_engine = RuleEngine(rules=rules)
-        return rule_engine
-
     @staticmethod
     def from_json(config) -> RuleEngine:
         rules = [RuleFactory.from_json(rc) for rc in config]
