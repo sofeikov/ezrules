@@ -17,7 +17,6 @@ from core.outcomes import FixedOutcome
 from core.rule import Rule, RuleConverter, RuleFactory
 from core.rule_checkers import (OnlyAllowedOutcomesAreReturnedChecker,
                                 RuleCheckingPipeline)
-from core.rule_locker import RelationalDBRuleLocker
 from core.rule_updater import (RDBRuleEngineConfigProducer, RuleManager,
                                RuleManagerFactory, RuleRevision)
 from core.user_lists import StaticUserListManager
@@ -26,7 +25,6 @@ from models.backend_core import Rule as RuleModel
 from models.backend_core import User
 from models.database import db_session, init_db
 
-rule_locker = RelationalDBRuleLocker(db_session)
 outcome_manager = FixedOutcome()
 rule_checker = RuleCheckingPipeline(
     checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)]
@@ -141,13 +139,11 @@ def show_rule(rule_id=None, revision_number=None):
         form.process(**rule_json)
         del form.rid
         revision_list = fsrm.get_rule_revision_list(rule)
-        rule_lock = rule_locker.is_record_locked(rule)
         return render_template(
             "show_rule.html",
             rule=rule_json,
             form=form,
             revision_list=revision_list,
-            rule_lock=rule_lock,
         )
     elif request.method == "POST":
         rule_status_check = form.validate(rule_checker=rule_checker)

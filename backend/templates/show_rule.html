@@ -29,9 +29,6 @@
     <body>
     {% from 'bootstrap5/form.html' import render_form %}
     <a href="/rules">Full rule list</a><br>
-    {% if rule_lock %}
-        <span style="color: red; "> This rule is locked by {{ rule_lock.locked_by }} until at least {{ rule_lock.expires_on }}</span>
-    {% endif %}<br>
     <h2 id="page_header">Rule {{ rule['rid'] }}</h2>
     <button id="lock_button">Modify this rule</button>
     {% if rule_lock %}
