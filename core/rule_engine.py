@@ -2,7 +2,6 @@ from core.rule import Rule, RuleFactory
 from typing import Any, List, Dict, Union
 from pathlib import Path
 from collections import Counter
-import s3fs
 import yaml
 
 
@@ -60,6 +59,7 @@ class RuleEngineFactory:
         :return: an instance of :class:`core.rule_engine.RuleEngine`
         """
         if file_path.startswith("s3://"):
+            import s3fs
             s3 = s3fs.S3FileSystem()
             open = s3.open
 

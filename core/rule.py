@@ -14,7 +14,6 @@ at_converter = AtNotationConverter(list_values_provider=StaticUserListManager())
 
 class Fields:
     LOGIC = "logic"
-    TAGS = "tags"
     DESCRIPTION = "description"
     PARAMS = "params"
     RID = "rid"
@@ -28,8 +27,7 @@ class Rule:
         rid: str,
         logic: str,
         description: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        params: Optional[List[str]] = None,
+        params: Optional[List[str]] = None
     ) -> None:
         """
         Creates a rule object.
@@ -37,13 +35,11 @@ class Rule:
         :param logic: A valid python code
         :param description: Human-readable description of the rule
         :param rid: rule id, can not be changed after the rule is created
-        :param tags: rule tags, not used atm
         :param params: rule params, not used atm
         """
         # Generic params
         self.rid = rid
         self.description = description
-        self.tags = tags
         self.params = params
         # Compiled rule function
         self._compiled_rule = None
@@ -99,7 +95,6 @@ class Rule:
             [
                 f"Name: {self.rid}",
                 f"Description: {self.description}",
-                f"Tags: {self.tags}",
                 f"Params: {self.params}",
                 "Code:",
                 self._source,
@@ -116,7 +111,6 @@ class RuleFactory:
             logic=rule_config[Fields.LOGIC],
             description=rule_config.get(Fields.DESCRIPTION),
             rid=rule_config.get(Fields.RID),
-            tags=rule_config.get(Fields.TAGS, tuple()),
             params=rule_config.get(Fields.PARAMS, tuple()),
         )
         return rule
@@ -128,7 +122,6 @@ class RuleConverter:
         return {
             Fields.RID: rule.rid,
             Fields.DESCRIPTION: rule.description,
-            Fields.TAGS: rule.tags,
             Fields.LOGIC: rule._source,
             Fields.PARAMS: rule.params,
         }

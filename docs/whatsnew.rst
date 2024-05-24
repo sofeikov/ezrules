@@ -2,6 +2,17 @@
 
 What's new
 ----------
+v0.6
+
+* The app is compatible with AWS EKS
+* Basic testing introduced
+* Rule history is maintained through a history table
+
+v0.5
+
+* RDBMS are now supported as a backend for rule configuration storage
+* The application can now be deployed in a k8s cluster
+
 v0.4
 
 * At-notation is available. Constructs of type `if $send_country in @Latam...`

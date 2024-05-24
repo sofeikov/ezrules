@@ -1,0 +1,42 @@
+# Only used for local tests and development; kubectl port-forward service/postgres-endpoint 5432:5432
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgresql
+        image: postgres:16.0-alpine3.18
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_PASSWORD
+          value: root
+        - name: POSTGRES_HOST_AUTH
+          value: trust
+        - name: LC_CTYPE
+          value: en_US.UTF-8
+        - name: PG_HOST
+          value: 0.0.0.0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-endpoint
+  labels:
+    app: postgres
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: postgres

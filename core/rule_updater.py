@@ -9,13 +9,17 @@ from ruamel.yaml import scalarstring
 from datetime import datetime
 import ruamel
 import yaml
-import shutil
-import s3fs
 import operator
 from collections import namedtuple
+from sqlalchemy import func, distinct
+from sqlalchemy.exc import NoResultFound
 
-from core.rule_engine import RuleEngine
-from models.backend_core import RuleEngineConfig
+from models.backend_core import (
+    RuleEngineConfig,
+    Rule as RuleModel,
+    Organisation,
+    RuleHistory,
+)
 
 RuleRevision = namedtuple("RuleRevision", ["revision_number", "created"])
 
@@ -56,9 +60,9 @@ class RuleManager(ABC):
         :param rule: an instance of `core.rule.Rule`
         :return:
         """
-        # self.lock_storage()
+        self.lock_storage()
         self._save_rule(rule)
-        # self.release_storage()
+        self.release_storage()
 
     def lock_storage(self):
         """Lock storage. Override in subclasses if lock is required."""
@@ -110,14 +114,29 @@ class AbstractRuleEngineConfigProducer(ABC):
 
 
 class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
-    def __init__(self, db):
+    def __init__(self, db, o_id):
         self.db = db
+        self.o_id = o_id
 
     def save_config(self, rule_manager: RuleManager) -> None:
         all_rules = rule_manager.load_all_rules()
+        all_rules = [RuleFactory.from_json(r.__dict__) for r in all_rules]
         rules_json = [RuleConverter.to_json(r) for r in all_rules]
-        new_config = RuleEngineConfig(label="production", config=rules_json)
-        self.db.add(new_config)
+        try:
+            config_obj = (
+                self.db.query(RuleEngineConfig)
+                .where(
+                    RuleEngineConfig.label == "production",
+                    RuleEngineConfig.o_id == self.o_id,
+                )
+                .one()
+            )
+            config_obj.config = rules_json
+        except NoResultFound:
+            new_config = RuleEngineConfig(
+                label="production", config=rules_json, o_id=self.o_id
+            )
+            self.db.add(new_config)
         self.db.commit()
 
 
@@ -133,6 +152,8 @@ class YAMLRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
         file_path = str(file_path)
         open_fn = open
         if file_path.startswith("s3://"):
+            import s3fs
+
             s3 = s3fs.S3FileSystem()
             open_fn = s3.open
 
@@ -397,9 +418,62 @@ class DynamoDBRuleManager(RuleManager):
         return ret_rules
 
 
+class RDBRuleManager(RuleManager):
+    def __init__(self, db, o_id):
+        self.db = db
+        self.o_id = o_id
+
+    def _save_rule(self, rule: RuleModel) -> None:
+        if rule.r_id is None:
+            rule.o_id = self.o_id
+            self.db.add(rule)
+        self.db.commit()
+
+    def get_rule_revision_list(
+        self, rule: Rule, return_dates=False
+    ) -> List[RuleRevision]:
+        revisions = (
+            self.db.query(
+                RuleHistory.version, RuleHistory.changed, RuleHistory.created_at
+            )
+            .filter(RuleHistory.r_id == rule.r_id)
+            .order_by(RuleHistory.version)
+            .all()
+        )
+        version_list = []
+        for ind, r in enumerate(revisions):
+            if ind == 0:
+                created = r.created_at
+            else:
+                created = revisions[ind - 1].changed
+            version_list.append(RuleRevision(r.version, created))
+        return version_list
+
+    def load_rule(
+        self, rule_id: str, revision_number: Optional[str] = None
+    ) -> RuleModel:
+        if revision_number is None:
+            latest_records = self.db.get(RuleModel, rule_id)
+        else:
+            latest_records = (
+                self.db.query(RuleHistory)
+                .filter(
+                    RuleHistory.r_id == rule_id, RuleHistory.version == revision_number
+                )
+                .order_by(RuleHistory.version)
+                .one()
+            )
+        return latest_records
+
+    def load_all_rules(self) -> List[RuleModel]:
+        org = self.db.get(Organisation, self.o_id)
+        return org.rules
+
+
 RULE_MANAGERS = {
     "FSRuleManager": FSRuleManager,
     "DynamoDBRuleManager": DynamoDBRuleManager,
+    "RDBRuleManager": RDBRuleManager,
 }
 
 

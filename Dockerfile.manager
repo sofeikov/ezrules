@@ -1,13 +1,19 @@
-FROM python:3.9-slim
+FROM --platform=linux/amd64 python:3.10
 
-ADD requirements.txt requirements.txt
+COPY Pipfile* ./
 
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir pipenv && \
+    pipenv install --system --deploy --clear
 
 ADD backend backend
 ADD core core
+ADD models models
+
+ENV PYTHONPATH=/
+
+ADD gunicorn.conf.py gunicorn.conf.py
 
 EXPOSE 8080
 
 ENTRYPOINT ["gunicorn"]
-CMD ["-w", "1", "--threads", "4","--bind", "0.0.0.0:80", "backend.ezruleapp:app"]
+CMD ["-w", "1", "--threads", "4","--bind", "0.0.0.0:8080", "backend.ezruleapp:app"]

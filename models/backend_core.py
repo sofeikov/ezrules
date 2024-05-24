@@ -1,9 +1,20 @@
-from models.database import Base
+from models.database import Base, engine, db_session
 from flask_security import UserMixin, RoleMixin, AsaList
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship, backref, mapped_column, Mapped
 from sqlalchemy.ext.mutable import MutableList
-from sqlalchemy import Boolean, DateTime, Column, Integer, String, ForeignKey, JSON
+from models.history_meta import Versioned
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Column,
+    Integer,
+    String,
+    ForeignKey,
+    JSON,
+)
+from typing import List
 from core.helpers import LockRecord
+import datetime
 
 
 class RolesUsers(Base):
@@ -40,6 +51,20 @@ class User(Base, UserMixin):
     )
 
 
+class Organisation(Base):
+    __tablename__ = "organisation"
+
+    o_id = Column(Integer, unique=True, primary_key=True)
+    name = Column(String, unique=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    rules: Mapped[List["Rule"]] = relationship()
+    re_configs: Mapped[List["RuleEngineConfig"]] = relationship()
+
+    def __repr__(self):
+        return f"ID:{self.o_id}, {self.name=}, {len(self.rules)=}"
+
+
 class RuleEditLock(Base):
     __tablename__ = "rule_locks"
 
@@ -55,9 +80,32 @@ class RuleEditLock(Base):
         )
 
 
-class RuleEngineConfig(Base):
+class RuleEngineConfig(Versioned, Base):
     __tablename__ = "rule_engine_config"
 
-    id = Column(Integer, unique=True, primary_key=True)
+    re_id = Column(Integer, unique=True, primary_key=True)
     label = Column(String, nullable=False)
     config = Column(JSON, nullable=False)
+
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
+    org: Mapped["Organisation"] = relationship(back_populates="re_configs")
+
+
+class Rule(Versioned, Base):
+    __tablename__ = "rules"
+
+    r_id: Mapped[int] = mapped_column(unique=True, primary_key=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    rid: Mapped[str] = mapped_column()
+    logic: Mapped[str] = mapped_column()
+    description: Mapped[str] = mapped_column()
+
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
+    org: Mapped["Organisation"] = relationship(back_populates="rules")
+
+    def __repr__(self) -> str:
+        return f"{self.r_id=},{self.created_at=},{self.description=},{self.org=}"
+
+
+RuleHistory = Rule.__history_mapper__.class_
+RuleEngineConfigHistory = RuleEngineConfig.__history_mapper__.class_
