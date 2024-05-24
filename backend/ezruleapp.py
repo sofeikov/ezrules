@@ -42,6 +42,8 @@ app.config["SECURITY_PASSWORD_SALT"] = os.environ.get(
 app.config["SECURITY_SEND_REGISTER_EMAIL"] = False
 app.config["SECURITY_REGISTERABLE"] = True
 app.config["TESTING"] = os.getenv("TESTING", False) == "true"
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 bootstrap = Bootstrap5(app)
 csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)

@@ -1,5 +1,10 @@
 .form-group {
-    display: flex;
-    align-items: flex-start;
-    margin-bottom: 10px;
-  }
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.rule_info {
+  display: flex;
+  flex-direction: row;
+}
