@@ -33,7 +33,7 @@ rule_checker = RuleCheckingPipeline(
 )
 
 
-init_db()
+# init_db()
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
