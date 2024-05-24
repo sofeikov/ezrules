@@ -1,6 +1,3 @@
-import json
-
-
 from core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
 from models.backend_core import Organisation, Rule, RuleEngineConfig
 
