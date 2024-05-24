@@ -24,7 +24,7 @@ from core.user_lists import StaticUserListManager
 from models.backend_core import Role
 from models.backend_core import Rule as RuleModel
 from models.backend_core import User
-from models.database import db_session
+from models.database import db_session, init_db
 
 rule_locker = RelationalDBRuleLocker(db_session)
 outcome_manager = FixedOutcome()
