@@ -28,7 +28,7 @@
         <div class="list-group">
             {% for rule in rules %}
                 <a href="/rule/{{ rule.r_id }}" class="list-group-item list-group-item-action">
-                    <strong>{{ rule.r_id }}</strong> - {{ rule.description }}
+                    <strong>{{ rule.rid }}</strong> - {{ rule.description }}
                 </a>
             {% endfor %}
         </div>
