@@ -19,8 +19,6 @@ class AllowedOutcomeReturnVisitor(ast.NodeVisitor):
     def visit_Return(self, node) -> Any:
         if isinstance(node.value, ast.Constant):
             self.values.append(node.value.value)
-        else:
-            self.values.append(None)
 
 
 class OnlyAllowedOutcomesAreReturnedChecker(RuleChecker):
