@@ -148,7 +148,8 @@ class YAMLRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
         YAMLRuleEngineConfigProducer.to_yaml(self.config_path, rule_manager)
 
     @staticmethod
-    def to_yaml(file_path: str, rule_manager: RuleManager):
+    def to_yaml(file_path: Union[str, Path], rule_manager: RuleManager):
+        file_path = str(file_path)
         open_fn = open
         if file_path.startswith("s3://"):
             import s3fs
