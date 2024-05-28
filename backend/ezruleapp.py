@@ -44,6 +44,7 @@ app.config["SECURITY_REGISTERABLE"] = True
 app.config["TESTING"] = os.getenv("TESTING", False) == "true"
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config["EVALUATOR_ENDPOINT"] = os.getenv("EVALUATOR_ENDPOINT")
 bootstrap = Bootstrap5(app)
 csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)
@@ -64,7 +65,7 @@ rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=o_
 @conditional_decorator(not app.config["TESTING"], auth_required())
 def rules():
     rules = fsrm.load_all_rules()
-    return render_template("rules.html", rules=rules)
+    return render_template("rules.html", rules=rules, evaluator_endpoint=app.config["EVALUATOR_ENDPOINT"])
 
 
 @app.route("/create_rule", methods=["GET", "POST"])
