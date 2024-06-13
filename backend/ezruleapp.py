@@ -23,15 +23,12 @@ from core.user_lists import StaticUserListManager
 from models.backend_core import Role
 from models.backend_core import Rule as RuleModel
 from models.backend_core import User
-from models.database import db_session, init_db
+from models.database import db_session
 
 outcome_manager = FixedOutcome()
 rule_checker = RuleCheckingPipeline(
     checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)]
 )
-
-
-# init_db()
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
