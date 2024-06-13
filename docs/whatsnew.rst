@@ -7,6 +7,7 @@ v0.6
 * The app is compatible with AWS EKS
 * Basic testing introduced
 * Rule history is maintained through a history table
+* Standalone scripts to init the db and add a user
 
 v0.5
 
