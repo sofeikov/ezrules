@@ -11,19 +11,19 @@ from flask_security import (Security, SQLAlchemySessionUserDatastore,
                             auth_required)
 from flask_wtf import CSRFProtect
 
-from backend.forms import OutcomeForm, RuleForm
-from backend.utils import conditional_decorator
-from core.outcomes import FixedOutcome
-from core.rule import Rule, RuleConverter, RuleFactory
-from core.rule_checkers import (OnlyAllowedOutcomesAreReturnedChecker,
+from ezrules.backend.forms import OutcomeForm, RuleForm
+from ezrules.backend.utils import conditional_decorator
+from ezrules.core.outcomes import FixedOutcome
+from ezrules.core.rule import Rule, RuleConverter, RuleFactory
+from ezrules.core.rule_checkers import (OnlyAllowedOutcomesAreReturnedChecker,
                                 RuleCheckingPipeline)
-from core.rule_updater import (RDBRuleEngineConfigProducer, RuleManager,
+from ezrules.core.rule_updater import (RDBRuleEngineConfigProducer, RuleManager,
                                RuleManagerFactory, RuleRevision)
-from core.user_lists import StaticUserListManager
-from models.backend_core import Role
-from models.backend_core import Rule as RuleModel
-from models.backend_core import User
-from models.database import db_session
+from ezrules.core.user_lists import StaticUserListManager
+from ezrules.models.backend_core import Role
+from ezrules.models.backend_core import Rule as RuleModel
+from ezrules.models.backend_core import User
+from ezrules.models.database import db_session
 
 outcome_manager = FixedOutcome()
 rule_checker = RuleCheckingPipeline(

@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "ezrules"
+version = "0.5.0"
+description = ""
+authors = ["Konstantin Sofeikov <sofeykov@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+flask = "^3.0.3"
+flask-wtf = "*"
+bootstrap-flask = "*"
+pyyaml = "*"
+"ruamel.yaml" = "*"
+gunicorn = "*"
+sphinx = "*"
+pyparsing = "*"
+sqlalchemy = "*"
+flask-security-too = {extras = ["common"], version = "*"}
+psycopg2-binary = "*"
+pytz = "*"
+email-validator = "*"
+sqlalchemy-utils = "*"
+
+[tool.poetry.group.test.dependencies]
+pytest-cov = "*"
+pytest = "*"
+coverage = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

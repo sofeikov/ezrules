@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from core.rule_engine import RuleEngineFactory
+from ezrules.core.rule_engine import RuleEngineFactory
 
 
 class AbstractRuleExecutor(ABC):
@@ -24,7 +24,7 @@ class LocalRuleExecutorSQL(AbstractRuleExecutor):
         super().__init__()
 
     def _check_rule_config_is_fresh(self):
-        from models.backend_core import RuleEngineConfig
+        from ezrules.models.backend_core import RuleEngineConfig
 
         latest_record_version, latest_config = (
             self.db.query(RuleEngineConfig.version, RuleEngineConfig.config).where(

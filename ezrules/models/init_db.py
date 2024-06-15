@@ -3,8 +3,8 @@ import argparse
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
-from models.database import Base
-from models.history_meta import versioned_session
+from ezrules.models.database import Base
+from ezrules.models.history_meta import versioned_session
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

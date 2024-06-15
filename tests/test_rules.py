@@ -1,5 +1,5 @@
 import pytest
-from core.rule import Rule
+from ezrules.core.rule import Rule
 
 
 @pytest.mark.parametrize(

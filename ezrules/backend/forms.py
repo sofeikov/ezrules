@@ -3,7 +3,7 @@ from collections import namedtuple
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField, TextAreaField
 
-from core.rule import RuleFactory
+from ezrules.core.rule import RuleFactory
 
 RuleStatusCheck = namedtuple("RuleStatusCheck", ["rule_ok", "reasons"])
 

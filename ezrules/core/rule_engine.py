@@ -1,4 +1,4 @@
-from core.rule import Rule, RuleFactory
+from ezrules.core.rule import Rule, RuleFactory
 from typing import Any, List, Dict
 from collections import Counter
 

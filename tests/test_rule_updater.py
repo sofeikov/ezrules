@@ -1,5 +1,5 @@
-from core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
-from models.backend_core import Organisation, Rule, RuleEngineConfig
+from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
+from ezrules.models.backend_core import Organisation, Rule, RuleEngineConfig
 
 
 def test_updates_config_after_rule_update(session):

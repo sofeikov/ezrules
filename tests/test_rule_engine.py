@@ -1,5 +1,5 @@
-from core.rule_engine import RuleEngine, ResultAggregation
-from core.rule import Rule
+from ezrules.core.rule_engine import RuleEngine, ResultAggregation
+from ezrules.core.rule import Rule
 import pytest
 
 

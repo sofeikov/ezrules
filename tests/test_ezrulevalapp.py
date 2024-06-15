@@ -1,8 +1,8 @@
 import json
 
 
-from core.rule_updater import (RDBRuleEngineConfigProducer, RDBRuleManager)
-from models.backend_core import Organisation, Rule
+from ezrules.core.rule_updater import (RDBRuleEngineConfigProducer, RDBRuleManager)
+from ezrules.models.backend_core import Organisation, Rule
 
 
 def test_ping(logged_out_eval_client):

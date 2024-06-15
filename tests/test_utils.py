@@ -1,4 +1,4 @@
-from backend.utils import conditional_decorator
+from ezrules.backend.utils import conditional_decorator
 
 
 # Dummy decorator for testing

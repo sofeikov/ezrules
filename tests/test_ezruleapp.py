@@ -3,9 +3,9 @@ import json
 import pytest
 from flask import g
 
-from backend import ezruleapp
-from backend.forms import OutcomeForm, RuleForm
-from models.backend_core import Organisation, Rule, RuleHistory
+from ezrules.backend import ezruleapp
+from ezrules.backend.forms import OutcomeForm, RuleForm
+from ezrules.models.backend_core import Organisation, Rule, RuleHistory
 
 
 def test_can_load_root_page(logged_in_manager_client):
