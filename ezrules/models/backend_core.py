@@ -7,8 +7,8 @@ from sqlalchemy import (JSON, Boolean, Column, DateTime, ForeignKey, Integer,
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
-from models.database import Base
-from models.history_meta import Versioned
+from ezrules.models.database import Base
+from ezrules.models.history_meta import Versioned
 
 
 class RolesUsers(Base):

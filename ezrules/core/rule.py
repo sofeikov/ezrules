@@ -1,10 +1,10 @@
 from typing import Any, Optional, List, Callable, Tuple
-from core.rule_helpers import (
+from ezrules.core.rule_helpers import (
     RuleParamExtractor,
     DollarNotationConverter,
     AtNotationConverter,
 )
-from core.user_lists import StaticUserListManager
+from ezrules.core.user_lists import StaticUserListManager
 import ast
 import yaml
 

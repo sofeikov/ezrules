@@ -1,6 +1,6 @@
 from flask import Flask, request
-from backend.rule_executors.executors import LocalRuleExecutorSQL
-from models.database import db_session
+from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
+from ezrules.models.database import db_session
 import os
 
 app = Flask(__name__)

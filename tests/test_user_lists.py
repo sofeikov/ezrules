@@ -1,4 +1,4 @@
-from core.user_lists import StaticUserListManager
+from ezrules.core.user_lists import StaticUserListManager
 
 def test_can_add_to_static():
     m = StaticUserListManager()

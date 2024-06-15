@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from core.rule import Rule, RuleFactory, RuleConverter
+from ezrules.core.rule import Rule, RuleFactory, RuleConverter
 from typing import Optional, List, Union
 import hashlib
 from ruamel.yaml import scalarstring
@@ -10,7 +10,7 @@ import operator
 from collections import namedtuple
 from sqlalchemy.exc import NoResultFound
 
-from models.backend_core import (
+from ezrules.models.backend_core import (
     RuleEngineConfig,
     Rule as RuleModel,
     Organisation,

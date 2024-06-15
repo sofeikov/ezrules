@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
 
-from models.history_meta import versioned_session
+from ezrules.models.history_meta import versioned_session
 
 Base = declarative_base()
 

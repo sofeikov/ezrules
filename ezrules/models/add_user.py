@@ -4,8 +4,8 @@ import re
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
-from models.backend_core import Organisation, User
-from models.history_meta import versioned_session
+from ezrules.models.backend_core import Organisation, User
+from ezrules.models.history_meta import versioned_session
 
 
 def email_type(email):

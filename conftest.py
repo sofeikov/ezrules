@@ -2,10 +2,10 @@ import pytest
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
-from backend import ezruleapp, ezrulevalapp
-from models.backend_core import Organisation, User
-from models.database import Base, engine
-from models.history_meta import versioned_session
+from ezrules.backend import ezruleapp, ezrulevalapp
+from ezrules.models.backend_core import Organisation, User
+from ezrules.models.database import Base, engine
+from ezrules.models.history_meta import versioned_session
 
 
 @pytest.fixture(scope="session")

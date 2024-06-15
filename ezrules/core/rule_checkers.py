@@ -1,7 +1,7 @@
 import ast
 
-from core.rule import Rule
-from core.outcomes import Outcome
+from ezrules.core.rule import Rule
+from ezrules.core.outcomes import Outcome
 from typing import List, Any, Tuple
 import abc
 

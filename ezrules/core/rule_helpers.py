@@ -2,7 +2,7 @@ import ast
 import json
 import pyparsing as pp
 from typing import Any
-from core.user_lists import AbstractUserListManager
+from ezrules.core.user_lists import AbstractUserListManager
 
 
 class RuleParamExtractor(ast.NodeVisitor):
