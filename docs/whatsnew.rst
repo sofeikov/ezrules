@@ -8,6 +8,7 @@ v0.6
 * Basic testing introduced
 * Rule history is maintained through a history table
 * Standalone scripts to init the db and add a user
+* Internall, switch to poetry dependancy management
 
 v0.5
 

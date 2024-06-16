@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ezrules"
-version = "0.5.0"
+version = "0.5.1"
 description = ""
 authors = ["Konstantin Sofeikov <sofeykov@gmail.com>"]
 readme = "README.md"
@@ -26,6 +26,9 @@ sqlalchemy-utils = "*"
 pytest-cov = "*"
 pytest = "*"
 coverage = "*"
+
+[tool.poetry.scripts]
+ezrules = "ezrules.cli:main"
 
 [build-system]
 requires = ["poetry-core"]
