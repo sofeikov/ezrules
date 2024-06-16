@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ezrules"
-version = "0.5.1"
+version = "0.5.2"
 description = ""
 authors = ["Konstantin Sofeikov <sofeykov@gmail.com>"]
 readme = "README.md"
