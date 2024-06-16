@@ -1,7 +1,8 @@
-import click
 import logging
-import re
+import os
+import subprocess
 
+import click
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
@@ -64,6 +65,39 @@ def init_db(db_endpoint):
 
     Base.metadata.create_all(bind=engine)
     logger.info(f"Done initalising the DB at {db_endpoint}")
+
+
+@cli.command()
+@click.option("--port", default="8888")
+@click.option("--db-endpoint", required=True)
+@click.option("--o-id", required=True, default="1")
+def manager(port, db_endpoint, o_id):
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "DB_ENDPOINT": db_endpoint,
+            "APP_SECRET": os.environ["APP_SECRET"],
+            "O_ID": o_id,
+            "EVALUATOR_ENDPOINT": os.getenv(
+                "EVALUATOR_ENDPOINT", "http://localhost:9999"
+            ),
+        }
+    )
+    cmd = [
+        "gunicorn",
+        "-w",
+        "1",
+        "--threads",
+        "4",
+        "--bind",
+        f"0.0.0.0:{port}",
+        "ezrules.backend.ezruleapp:app",
+    ]
+    subprocess.run(
+        cmd,
+        env=env,
+    )
 
 
 if __name__ == "__main__":
