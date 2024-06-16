@@ -1,7 +1,8 @@
-import argparse
 import logging
-import re
+import os
+import subprocess
 
+import click
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
@@ -13,13 +14,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def email_type(email):
-    regex = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
-    if not re.match(regex, email):
-        raise argparse.ArgumentTypeError(f"Invalid email address: {email}")
-    return email
+@click.group()
+def cli():
+    pass
 
 
+@cli.command()
+@click.option("--db-endpoint")
+@click.option("--user-email")
+@click.option("--password")
 def add_user(db_endpoint, user_email, password):
     engine = create_engine(db_endpoint)
     db_session = scoped_session(
@@ -48,6 +51,8 @@ def add_user(db_endpoint, user_email, password):
         db_session.rollback()
 
 
+@cli.command()
+@click.option("--db-endpoint")
 def init_db(db_endpoint):
     logger.info(f"Initalising the DB at {db_endpoint}")
     engine = create_engine(db_endpoint)
@@ -62,35 +67,67 @@ def init_db(db_endpoint):
     logger.info(f"Done initalising the DB at {db_endpoint}")
 
 
-def main():
-    parser = argparse.ArgumentParser(description="ezrules CLI")
+@cli.command()
+@click.option("--port", default="8888")
+@click.option("--db-endpoint", required=True)
+@click.option("--o-id", required=True, default="1")
+def manager(port, db_endpoint, o_id):
 
-    subparsers = parser.add_subparsers(dest="command")
-
-    parser_add_user = subparsers.add_parser("add-user", help="Add a new user")
-    parser_add_user.add_argument(
-        "--db-endpoint", help="The DB endpoint to init the tables in", required=True
+    env = os.environ.copy()
+    env.update(
+        {
+            "DB_ENDPOINT": db_endpoint,
+            "APP_SECRET": os.environ["APP_SECRET"],
+            "O_ID": o_id,
+            "EVALUATOR_ENDPOINT": os.getenv(
+                "EVALUATOR_ENDPOINT", "http://localhost:9999"
+            ),
+        }
     )
-    parser_add_user.add_argument(
-        "--user-email", help="User email", required=True, type=email_type
+    cmd = [
+        "gunicorn",
+        "-w",
+        "1",
+        "--threads",
+        "4",
+        "--bind",
+        f"0.0.0.0:{port}",
+        "ezrules.backend.ezruleapp:app",
+    ]
+    subprocess.run(
+        cmd,
+        env=env,
     )
-    parser_add_user.add_argument("--password", help="User password", required=True)
 
-    parser_init_db = subparsers.add_parser("init-db", help="Initialize the database")
-    parser_init_db.add_argument(
-        "--db-endpoint", help="The DB endpoint to init the tables in", required=True
+
+@cli.command()
+@click.option("--port", default="9999")
+@click.option("--db-endpoint", required=True)
+@click.option("--o-id", required=True, default="1")
+def evaluator(port, db_endpoint, o_id):
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "DB_ENDPOINT": db_endpoint,
+            "O_ID": o_id,
+        }
     )
-
-    args = parser.parse_args()
-    # parser_init_db.parse_args()
-
-    if args.command == "add-user":
-        add_user(args.db_endpoint, args.user_email, args.password)
-    elif args.command == "init-db":
-        init_db(args.db_endpoint)
-    else:
-        parser.print_help()
+    cmd = [
+        "gunicorn",
+        "-w",
+        "1",
+        "--threads",
+        "4",
+        "--bind",
+        f"0.0.0.0:{port}",
+        "ezrules.backend.ezrulevalapp:app",
+    ]
+    subprocess.run(
+        cmd,
+        env=env,
+    )
 
 
 if __name__ == "__main__":
-    main()
+    cli()
