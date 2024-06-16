@@ -100,5 +100,34 @@ def manager(port, db_endpoint, o_id):
     )
 
 
+@cli.command()
+@click.option("--port", default="9999")
+@click.option("--db-endpoint", required=True)
+@click.option("--o-id", required=True, default="1")
+def evaluator(port, db_endpoint, o_id):
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "DB_ENDPOINT": db_endpoint,
+            "O_ID": o_id,
+        }
+    )
+    cmd = [
+        "gunicorn",
+        "-w",
+        "1",
+        "--threads",
+        "4",
+        "--bind",
+        f"0.0.0.0:{port}",
+        "ezrules.backend.ezrulevalapp:app",
+    ]
+    subprocess.run(
+        cmd,
+        env=env,
+    )
+
+
 if __name__ == "__main__":
     cli()
