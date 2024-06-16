@@ -9,6 +9,7 @@ v0.6
 * Rule history is maintained through a history table
 * Standalone scripts to init the db and add a user
 * Internall, switch to poetry dependancy management
+* Manager and evaluator can run as executables
 
 v0.5
 
