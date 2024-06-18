@@ -1,11 +1,12 @@
 from flask import Flask, request
+
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.models.database import db_session
-import os
+from ezrules.settings import app_settings
 
 app = Flask(__name__)
 # TODO calling this needs to be parametrised, e.g. for a remote service
-o_id = int(os.getenv("O_ID", "1"))
+o_id = app_settings.ORG_ID
 lre = LocalRuleExecutorSQL(db=db_session, o_id=o_id)
 
 
