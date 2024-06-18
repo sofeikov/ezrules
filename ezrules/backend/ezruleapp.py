@@ -4,26 +4,40 @@ import logging
 import os
 import secrets
 
-from flask import (Flask, Response, flash, jsonify, redirect, render_template,
-                   request, url_for)
+from flask import (
+    Flask,
+    Response,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_bootstrap import Bootstrap5
-from flask_security import (Security, SQLAlchemySessionUserDatastore,
-                            auth_required)
+from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required
 from flask_wtf import CSRFProtect
 
 from ezrules.backend.forms import OutcomeForm, RuleForm
 from ezrules.backend.utils import conditional_decorator
 from ezrules.core.outcomes import FixedOutcome
 from ezrules.core.rule import Rule, RuleConverter, RuleFactory
-from ezrules.core.rule_checkers import (OnlyAllowedOutcomesAreReturnedChecker,
-                                RuleCheckingPipeline)
-from ezrules.core.rule_updater import (RDBRuleEngineConfigProducer, RuleManager,
-                               RuleManagerFactory, RuleRevision)
+from ezrules.core.rule_checkers import (
+    OnlyAllowedOutcomesAreReturnedChecker,
+    RuleCheckingPipeline,
+)
+from ezrules.core.rule_updater import (
+    RDBRuleEngineConfigProducer,
+    RuleManager,
+    RuleManagerFactory,
+    RuleRevision,
+)
 from ezrules.core.user_lists import StaticUserListManager
 from ezrules.models.backend_core import Role
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.backend_core import User
 from ezrules.models.database import db_session
+from ezrules.settings import app_settings
 
 outcome_manager = FixedOutcome()
 rule_checker = RuleCheckingPipeline(
@@ -32,21 +46,21 @@ rule_checker = RuleCheckingPipeline(
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
-app.secret_key = os.environ["APP_SECRET"]
+app.secret_key = app_settings.APP_SECRET
 app.config["SECURITY_PASSWORD_SALT"] = os.environ.get(
     "SECURITY_PASSWORD_SALT", "146585145368132386173505678016728509634"
 )
 app.config["SECURITY_SEND_REGISTER_EMAIL"] = False
 app.config["SECURITY_REGISTERABLE"] = True
-app.config["TESTING"] = os.getenv("TESTING", False) == "true"
-app.config['TEMPLATES_AUTO_RELOAD'] = True
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
-app.config["EVALUATOR_ENDPOINT"] = os.getenv("EVALUATOR_ENDPOINT")
+app.config["TESTING"] = app_settings.TESTING
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
+app.config["EVALUATOR_ENDPOINT"] = app_settings.EVALUATOR_ENDPOINT
 bootstrap = Bootstrap5(app)
 csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)
 app.secret_key = url_safe_token
-o_id = int(os.getenv("O_ID", "1"))
+o_id = app_settings.ORG_ID
 fsrm: RuleManager = RuleManagerFactory.get_rule_manager(
     "RDBRuleManager", **{"db": db_session, "o_id": o_id}
 )
@@ -62,7 +76,9 @@ rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=o_
 @conditional_decorator(not app.config["TESTING"], auth_required())
 def rules():
     rules = fsrm.load_all_rules()
-    return render_template("rules.html", rules=rules, evaluator_endpoint=app.config["EVALUATOR_ENDPOINT"])
+    return render_template(
+        "rules.html", rules=rules, evaluator_endpoint=app.config["EVALUATOR_ENDPOINT"]
+    )
 
 
 @app.route("/create_rule", methods=["GET", "POST"])

@@ -2,6 +2,10 @@
 
 What's new
 ----------
+v0.7
+
+* Switch to pydentic-based settings management
+
 v0.6
 
 * The app is compatible with AWS EKS

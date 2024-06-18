@@ -9,6 +9,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from ezrules.models.backend_core import Organisation, User
 from ezrules.models.database import Base
 from ezrules.models.history_meta import versioned_session
+from ezrules.settings import app_settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,10 +21,10 @@ def cli():
 
 
 @cli.command()
-@click.option("--db-endpoint")
 @click.option("--user-email")
 @click.option("--password")
-def add_user(db_endpoint, user_email, password):
+def add_user(user_email, password):
+    db_endpoint = app_settings.DB_ENDPOINT
     engine = create_engine(db_endpoint)
     db_session = scoped_session(
         sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -52,8 +53,8 @@ def add_user(db_endpoint, user_email, password):
 
 
 @cli.command()
-@click.option("--db-endpoint")
-def init_db(db_endpoint):
+def init_db():
+    db_endpoint = app_settings.DB_ENDPOINT
     logger.info(f"Initalising the DB at {db_endpoint}")
     engine = create_engine(db_endpoint)
     db_session = scoped_session(
@@ -69,21 +70,9 @@ def init_db(db_endpoint):
 
 @cli.command()
 @click.option("--port", default="8888")
-@click.option("--db-endpoint", required=True)
-@click.option("--o-id", required=True, default="1")
-def manager(port, db_endpoint, o_id):
+def manager(port):
 
     env = os.environ.copy()
-    env.update(
-        {
-            "DB_ENDPOINT": db_endpoint,
-            "APP_SECRET": os.environ["APP_SECRET"],
-            "O_ID": o_id,
-            "EVALUATOR_ENDPOINT": os.getenv(
-                "EVALUATOR_ENDPOINT", "http://localhost:9999"
-            ),
-        }
-    )
     cmd = [
         "gunicorn",
         "-w",
@@ -102,17 +91,9 @@ def manager(port, db_endpoint, o_id):
 
 @cli.command()
 @click.option("--port", default="9999")
-@click.option("--db-endpoint", required=True)
-@click.option("--o-id", required=True, default="1")
-def evaluator(port, db_endpoint, o_id):
+def evaluator(port):
 
     env = os.environ.copy()
-    env.update(
-        {
-            "DB_ENDPOINT": db_endpoint,
-            "O_ID": o_id,
-        }
-    )
     cmd = [
         "gunicorn",
         "-w",
