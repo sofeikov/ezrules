@@ -6,6 +6,7 @@ from ezrules.backend import ezruleapp, ezrulevalapp
 from ezrules.models.backend_core import Organisation, User
 from ezrules.models.database import Base, engine
 from ezrules.models.history_meta import versioned_session
+from ezrules.settings import app_settings
 
 
 @pytest.fixture(scope="session")
@@ -57,10 +58,11 @@ def session(connection):
 
     org = Organisation(name="test_org")
     session.add(org)
+    session.commit()
 
     admin_email = f"admin@test_org.com"
     admin_password = f"12345678"
-    res = session.add(
+    session.add(
         User(
             email=admin_email,
             password=admin_password,
