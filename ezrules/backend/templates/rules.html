@@ -32,7 +32,7 @@
             <div class="card card-body">
                 Evaluator endpoint is {{ evaluator_endpoint }}<br>
                 To run a test example, use the following shell command:<br>
-                <code>curl -X POST -H "Content-Type: application/json" -d '{"age": 25, "amount": 900}' {{ evaluator_endpoint }}/evaluate</code>
+                <code>curl -X POST -H "Content-Type: application/json" -d '{"event_timestamp":23, "event_id":"123", "event_data":{"age": 25, "amount": 9000}}' {{ evaluator_endpoint }}/evaluate</code>
             </div>
         </div>
         <div class="mb-3">

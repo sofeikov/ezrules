@@ -1,9 +1,9 @@
-from flask import Flask, request, abort
+from flask import Flask, request, abort, jsonify
 from pydantic import ValidationError
 
 from ezrules.backend.data_utils import Event
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
-from ezrules.models.backend_core import TestingLog
+from ezrules.models.backend_core import TestingRecordLog, TestingResultsLog
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
@@ -21,7 +21,7 @@ def evaluate():
     except ValidationError as e:
         abort(400, description="Bad Request: Could not validate the json structure")
     db_session = lre.db
-    tl = TestingLog(
+    tl = TestingRecordLog(
         o_id=lre.o_id,
         event=event.event_data,
         event_timestamp=event.event_timestamp,
@@ -30,7 +30,11 @@ def evaluate():
     db_session.add(tl)
     db_session.commit()
     response = lre.evaluate_rules(event.event_data)
-    return response
+    for r_id, result in response["rule_results"].items():
+        trl = TestingResultsLog(tl_id=tl.tl_id, r_id=r_id, rule_result=result)
+        db_session.add(trl)
+    db_session.commit()
+    return jsonify(response)
 
 
 @app.route("/ping", methods=["GET"])

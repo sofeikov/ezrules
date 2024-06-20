@@ -85,8 +85,8 @@ class Rule(Versioned, Base):
         return f"{self.r_id=},{self.created_at=},{self.description=},{self.org=}"
 
 
-class TestingLog(Base):
-    __tablename__ = "testing_log"
+class TestingRecordLog(Base):
+    __tablename__ = "testing_record_log"
 
     tl_id = Column(Integer, unique=True, primary_key=True)
     event = Column(JSON, nullable=False)
@@ -95,6 +95,16 @@ class TestingLog(Base):
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
+
+
+class TestingResultsLog(Base):
+    __tablename__ = "testing_results_log"
+
+    tr_id = Column(Integer, unique=True, primary_key=True)
+    tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id"))
+    rule_result = Column(String, nullable=False)
+
+    r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
 
 
 RuleHistory = Rule.__history_mapper__.class_

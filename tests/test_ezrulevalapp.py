@@ -14,7 +14,7 @@ def test_can_evaluate_rule(session, logged_out_eval_client):
 
     org = session.query(Organisation).one()
 
-    rule = Rule(logic="return 'HOLD'", description="1", rid="1", o_id=org.o_id)
+    rule = Rule(logic="return 'HOLD'", description="1", rid="1", o_id=org.o_id, r_id=123)
     session.add(rule)
     session.commit()
 
@@ -30,4 +30,4 @@ def test_can_evaluate_rule(session, logged_out_eval_client):
     result = json.loads(rv.data.decode())
     assert result["outcome_counters"] == {"HOLD": 1}
     assert result["outcome_set"] == ["HOLD"]
-    assert result["rule_results"] == {"1": "HOLD"}
+    assert result["rule_results"] == {"123": "HOLD"}

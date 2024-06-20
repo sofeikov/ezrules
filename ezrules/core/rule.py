@@ -1,12 +1,15 @@
-from typing import Any, Optional, List, Callable, Tuple
+import ast
+from typing import Any, Callable, List, Optional, Tuple
+
 from ezrules.core.rule_helpers import (
-    RuleParamExtractor,
-    DollarNotationConverter,
     AtNotationConverter,
+    DollarNotationConverter,
+    RuleParamExtractor,
 )
 from ezrules.core.user_lists import StaticUserListManager
-import ast
-import yaml
+from ezrules.models.backend_core import Rule as RuleModel
+from typing import NamedTuple
+
 
 dollar_converter = DollarNotationConverter()
 at_converter = AtNotationConverter(list_values_provider=StaticUserListManager())
@@ -17,6 +20,7 @@ class Fields:
     DESCRIPTION = "description"
     PARAMS = "params"
     RID = "rid"
+    R_ID = "r_id"
 
 
 class Rule:
@@ -27,7 +31,8 @@ class Rule:
         rid: str,
         logic: str,
         description: Optional[str] = None,
-        params: Optional[List[str]] = None
+        params: Optional[List[str]] = None,
+        r_id: Optional[int] = None,
     ) -> None:
         """
         Creates a rule object.
@@ -38,6 +43,7 @@ class Rule:
         :param params: rule params, not used atm
         """
         # Generic params
+        self.r_id = r_id
         self.rid = rid
         self.description = description
         self.params = params
@@ -112,6 +118,7 @@ class RuleFactory:
             description=rule_config.get(Fields.DESCRIPTION),
             rid=rule_config.get(Fields.RID),
             params=rule_config.get(Fields.PARAMS, tuple()),
+            r_id=rule_config.get(Fields.R_ID),
         )
         return rule
 
@@ -124,4 +131,10 @@ class RuleConverter:
             Fields.DESCRIPTION: rule.description,
             Fields.LOGIC: rule._source,
             Fields.PARAMS: rule.params,
+            Fields.R_ID: rule.r_id,
         }
+
+
+class StoredRule(NamedTuple):
+    rule: Rule
+    rule_model: RuleModel

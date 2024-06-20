@@ -1,3 +1,8 @@
+import os
+
+os.environ["EZRULES_DB_ENDPOINT"] = "postgresql://postgres:root@localhost:5432/tests"
+os.environ["EZRULES_TESTING"] = "true"
+
 import pytest
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy_utils import create_database, database_exists, drop_database
@@ -6,7 +11,6 @@ from ezrules.backend import ezruleapp, ezrulevalapp
 from ezrules.models.backend_core import Organisation, User
 from ezrules.models.database import Base, engine
 from ezrules.models.history_meta import versioned_session
-from ezrules.settings import app_settings
 
 
 @pytest.fixture(scope="session")
