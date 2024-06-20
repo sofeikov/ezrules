@@ -23,6 +23,7 @@ email-validator = "*"
 sqlalchemy-utils = "*"
 click = "^8.0.0"
 pydantic-settings = "^2.3.3"
+pydantic = "^2.7.4"
 
 [tool.poetry.group.test.dependencies]
 pytest-cov = "*"
