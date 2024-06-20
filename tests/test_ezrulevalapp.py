@@ -24,4 +24,8 @@ def test_can_evaluate_rule(session, logged_out_eval_client):
     rule_engine_config_producer.save_config(rm)
 
     rv = logged_out_eval_client.post("/evaluate", json={"A": 1})
-    assert json.loads(rv.data.decode()) == ["HOLD"]
+    result = json.loads(rv.data.decode())
+    assert result["outcome_counters"] == {"HOLD": 1}
+    assert result["outcome_set"] == ["HOLD"]
+    assert result["rule_results"] == {'1': 'HOLD'}
+
