@@ -1,22 +1,11 @@
-from ezrules.core.rule_engine import RuleEngine, ResultAggregation
 from ezrules.core.rule import Rule
-import pytest
+from ezrules.core.rule_engine import RuleEngine
 
 
-@pytest.mark.parametrize(
-    ["result_aggregation", "expected_result"],
-    [
-        (ResultAggregation.UNIQUE, ["CANCEL", "HOLD"]),
-        (ResultAggregation.COUNTER, {"CANCEL": 1, "HOLD": 1}),
-    ],
-)
-def test_can_run_simple_rule(result_aggregation, expected_result):
+def test_can_run_simple_rule():
     rules = [Rule(logic='return "HOLD"', rid=1), Rule(logic='return "CANCEL"', rid=2)]
-    re = RuleEngine(rules=rules, result_aggregation=result_aggregation)
-    res = re({"A": 1})
-    assert res == expected_result
-
-def test_raises_unknown_aggregation():
-    re = RuleEngine(rules=[], result_aggregation="NOPE")
-    with pytest.raises(ValueError):
-        re({})
+    re = RuleEngine(rules=rules)
+    result = re({"A": 1})
+    assert result["outcome_counters"] == {"HOLD": 1, "CANCEL": 1}
+    assert result["outcome_set"] == ["CANCEL", "HOLD"]
+    assert result["rule_results"] == {1: "HOLD", 2: "CANCEL"}

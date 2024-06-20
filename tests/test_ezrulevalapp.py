@@ -1,7 +1,7 @@
 import json
 
 
-from ezrules.core.rule_updater import (RDBRuleEngineConfigProducer, RDBRuleManager)
+from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
 from ezrules.models.backend_core import Organisation, Rule
 
 
@@ -14,7 +14,7 @@ def test_can_evaluate_rule(session, logged_out_eval_client):
 
     org = session.query(Organisation).one()
 
-    rule = Rule(logic="return 'HOLD'", description="1", rid="1", o_id=org.o_id)
+    rule = Rule(logic="return 'HOLD'", description="1", rid="1", o_id=org.o_id, r_id=123)
     session.add(rule)
     session.commit()
 
@@ -23,5 +23,11 @@ def test_can_evaluate_rule(session, logged_out_eval_client):
 
     rule_engine_config_producer.save_config(rm)
 
-    rv = logged_out_eval_client.post("/evaluate", json={"A": 1})
-    assert json.loads(rv.data.decode()) == ["HOLD"]
+    rv = logged_out_eval_client.post(
+        "/evaluate",
+        json={"event_id": "1", "event_timestamp": 2, "event_data": {"A": 2}},
+    )
+    result = json.loads(rv.data.decode())
+    assert result["outcome_counters"] == {"HOLD": 1}
+    assert result["outcome_set"] == ["HOLD"]
+    assert result["rule_results"] == {"123": "HOLD"}

@@ -6,7 +6,6 @@ from ezrules.backend import ezruleapp, ezrulevalapp
 from ezrules.models.backend_core import Organisation, User
 from ezrules.models.database import Base, engine
 from ezrules.models.history_meta import versioned_session
-from ezrules.settings import app_settings
 
 
 @pytest.fixture(scope="session")

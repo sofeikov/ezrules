@@ -3,13 +3,6 @@ from typing import Any, List, Dict
 from collections import Counter
 
 
-class ResultAggregation:
-    """Class contains possible values for the result aggregation strategy."""
-
-    UNIQUE = "unique"
-    COUNTER = "counter"
-
-
 class RuleEngine:
     """Main class for executing a set of :class:`core.rule.Rule` objects. It
     is defined as a set of rules and the way the results are aggregated. The ways the results are
@@ -18,7 +11,6 @@ class RuleEngine:
     def __init__(
         self,
         rules: List[Rule],
-        result_aggregation: str = ResultAggregation.UNIQUE,
     ) -> None:
         """
 
@@ -26,7 +18,6 @@ class RuleEngine:
         :param result_aggregation: a member of :class:`core.rule_engine.ResultAggregation`
         """
         self.rules = rules
-        self.result_aggregation = result_aggregation
 
     def __call__(self, t: Dict) -> Any:
         """
@@ -37,13 +28,16 @@ class RuleEngine:
         checks will be in place.
         :return: aggregated results, either as a list of unique decisions, or a counter for each decision.
         """
-        results = [r(t) for r in self.rules]
-        if self.result_aggregation == ResultAggregation.UNIQUE:
-            return sorted(list(set(results)))
-        elif self.result_aggregation == ResultAggregation.COUNTER:
-            return dict(Counter(results).items())
-        else:
-            raise ValueError(f"Unknown aggregation type: {self.result_aggregation}")
+        rule_results = {r.r_id or r.rid: r(t) for r in self.rules}
+        rule_results = {r:res for r,res in rule_results.items() if res is not None}
+        outcome_counters = dict(Counter(rule_results.values()))
+        outcome_set = sorted(set(outcome_counters.keys()))
+        results = {
+            "rule_results": rule_results,
+            "outcome_counters": outcome_counters,
+            "outcome_set": outcome_set,
+        }
+        return results
 
 
 class RuleEngineFactory:

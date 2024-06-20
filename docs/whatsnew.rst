@@ -6,6 +6,7 @@ v0.7
 
 * Switch to pydentic-based settings management
 * Transaction submitted for testing are now saved in the history table
+* Rule evaluation results are now saved in the history table
 
 v0.6
 
