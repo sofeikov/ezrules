@@ -90,6 +90,9 @@ class TestingLog(Base):
 
     tl_id = Column(Integer, unique=True, primary_key=True)
     event = Column(JSON, nullable=False)
+    event_timestamp = Column(Integer, nullable=False)
+    event_id = Column(String, nullable=False)
+
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
 
