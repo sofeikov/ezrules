@@ -4,6 +4,9 @@ import logging
 import os
 import secrets
 
+import pandas as pd
+import sqlalchemy
+from celery.result import AsyncResult
 from flask import (
     Flask,
     Response,
@@ -19,6 +22,8 @@ from flask_security import Security, SQLAlchemySessionUserDatastore, auth_requir
 from flask_wtf import CSRFProtect
 
 from ezrules.backend.forms import OutcomeForm, RuleForm
+from ezrules.backend.tasks import app as celery_app
+from ezrules.backend.tasks import backtest_rule_change
 from ezrules.backend.utils import conditional_decorator
 from ezrules.core.outcomes import FixedOutcome
 from ezrules.core.rule import Rule, RuleConverter, RuleFactory
@@ -35,7 +40,7 @@ from ezrules.core.rule_updater import (
 from ezrules.core.user_lists import StaticUserListManager
 from ezrules.models.backend_core import Role
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import User
+from ezrules.models.backend_core import RuleBackTestingResult, User
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
@@ -155,11 +160,18 @@ def show_rule(rule_id=None, revision_number=None):
         form.process(**rule_json)
         del form.rid
         revision_list = fsrm.get_rule_revision_list(rule)
+        backtesting_results = (
+            db_session.query(RuleBackTestingResult)
+            .filter(RuleBackTestingResult.r_id == rule.r_id)
+            .order_by(sqlalchemy.desc(RuleBackTestingResult.created_at))
+            .limit(3)
+        )
         return render_template(
             "show_rule.html",
             rule=rule_json,
             form=form,
             revision_list=revision_list,
+            backtesting_results=backtesting_results,
         )
     elif request.method == "POST":
         rule_status_check = form.validate(rule_checker=rule_checker)
@@ -233,6 +245,51 @@ def verified_outcomes():
         if form.validate():
             outcome_manager.add_outcome(form.outcome.data)
             return redirect(url_for("verified_outcomes"))
+
+
+@app.route("/backtesting", methods=["POST"])
+@csrf.exempt
+def backtesting():
+    test_json = request.get_json()
+    new_rule_logic = test_json["new_rule_logic"]
+    r_id = test_json["r_id"]
+    res = backtest_rule_change.apply_async(args=[r_id, new_rule_logic])
+    btr = RuleBackTestingResult(r_id=r_id, task_id=res.task_id)
+    db_session.add(btr)
+    db_session.commit()
+    return {"new_rule_logic": new_rule_logic}
+
+
+@app.route("/get_task_status/<string:task_id>", methods=["GET"])
+def get_task_status(task_id: str):
+    t = AsyncResult(id=task_id, backend=celery_app.backend)
+    ready = t.ready()
+    result = t.result if ready else None
+    app.logger.info(f"Getting task status for {task_id}: {ready=} with {result=}")
+    all_outcomes = set()
+    for k,v in result.items():
+        for outcome in v:
+            all_outcomes.add(outcome)
+
+    df_data = []
+    for k in ["Deployed", "Tested"]:
+        frame = {}
+        if k == 'Deployed':
+            kk = ['stored_result','stored_result_rate']
+        else:
+            kk = ['proposed_result', 'proposed_result_rate']
+        for o in sorted(all_outcomes):
+            for kkk in kk:
+                if kkk.endswith("_rate"):
+                    c = f"{o} rate"
+                else:
+                    c = o
+                frame[c] = result[kkk].get(o, 0)
+        df_data.append(frame)
+
+    df = pd.DataFrame(df_data, index=["Deployed", "Tested"])
+
+    return jsonify(ready=ready, result=df.to_html(classes="table table-striped table-bordered text-center"))
 
 
 @app.route("/management/lists", methods=["GET", "POST"])

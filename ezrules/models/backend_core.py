@@ -107,5 +107,13 @@ class TestingResultsLog(Base):
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
 
 
+class RuleBackTestingResult(Base):
+    __tablename__ = "rule_backtesting_results"
+
+    bt_id = Column(Integer, unique=True, primary_key=True)
+    r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
+    task_id = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
 RuleHistory = Rule.__history_mapper__.class_
 RuleEngineConfigHistory = RuleEngineConfig.__history_mapper__.class_

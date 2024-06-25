@@ -1,3 +1,41 @@
+function submitBackTest(new_rule_logic, r_id) {
+    var postData = {
+        new_rule_logic: new_rule_logic, r_id: r_id
+    };
+
+    $.ajax({
+        type: 'POST',
+        url: '/backtesting',
+        data: JSON.stringify(postData),
+        contentType: "application/json",
+        success: function (response) {
+            console.log(response);
+        },
+        error: function (error) {
+            console.error(error);
+        }
+    });
+}
+
+function getTaskResults(task_id, target_div_id) {
+    $.ajax({
+        type: 'GET',
+        url: '/get_task_status/' + task_id,
+        success: function (response) {
+            console.log(response.ready)
+            console.log(response.result)
+            if (response.ready) {
+                $(target_div_id).html(response.result);
+            } else {
+                $(target_div_id).text("Backfill result is not ready");
+            }
+        },
+        error: function (error) {
+            console.error(error);
+        }
+    })
+}
+
 function initializeTabCapture(textareaId) {
     var textarea = document.getElementById(textareaId);
 
@@ -16,52 +54,6 @@ function initializeTabCapture(textareaId) {
             }
         });
     }
-}
-
-function lockRuleForModification(rule_id) {
-    var postData = {
-        rid: rule_id,
-    };
-
-    $.ajax({
-        type: 'POST', // HTTP method
-        url: `/lock_rule/${rule_id}`, // URL to which the request will be sent
-        data: postData, // Data to be sent (if needed)
-        success: function (response) {
-            // Handle the success response here
-            console.log(response);
-            if (response["success"]) {
-                alert(`Lock acquired. Lock expires on ${response["expires_on"]}`)
-                window.location.href = `/rule/${rule_id}`
-            } else {
-                alert(`Failed to acquire lock!\nCurrent lock is held by ${response["locked_by"]}\nLock expires on ${response["expires_on"]}`)
-            }
-        },
-        error: function (error) {
-            // Handle any errors here
-            console.error(error);
-        }
-    });
-}
-
-function forceUnlockRuleForModification(rule_id) {
-    var postData = {
-        rid: rule_id,
-    };
-
-    $.ajax({
-        type: 'POST', // HTTP method
-        url: `/unlock/${rule_id}`, // URL to which the request will be sent
-        data: postData, // Data to be sent (if needed)
-        success: function (response) {
-            // Handle the success response here
-            window.location.href = `/rule/${rule_id}`
-        },
-        error: function (error) {
-            // Handle any errors here
-            console.error(error);
-        }
-    });
 }
 
 function verifyRule(rule_source) {
