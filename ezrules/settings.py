@@ -10,7 +10,6 @@ class Settings(BaseSettings):
     ORG_ID: int
     EVALUATOR_ENDPOINT: Optional[str] = "localhost:9999"
     TESTING: Optional[bool] = False
-    CELERY_RESULT_BACKEND: str = "db+postgresql://postgres:root@localhost:5432/celery"
 
 
 app_settings = Settings()
