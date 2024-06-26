@@ -1,6 +1,7 @@
 from typing import Dict
 
 from pydantic import BaseModel, field_validator
+from ezrules.models.backend_core import TestingRecordLog, TestingResultsLog
 
 
 class Event(BaseModel):
@@ -23,3 +24,21 @@ class Event(BaseModel):
             raise ValueError("Timestamp out of range")
 
         return value
+
+
+def eval_and_store(lre, event: Event):
+    db_session = lre.db
+    tl = TestingRecordLog(
+        o_id=lre.o_id,
+        event=event.event_data,
+        event_timestamp=event.event_timestamp,
+        event_id=event.event_id,
+    )
+    db_session.add(tl)
+    db_session.commit()
+    response = lre.evaluate_rules(event.event_data)
+    for r_id, result in response["rule_results"].items():
+        trl = TestingResultsLog(tl_id=tl.tl_id, r_id=r_id, rule_result=result)
+        db_session.add(trl)
+    db_session.commit()
+    return response
