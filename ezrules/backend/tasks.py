@@ -10,7 +10,7 @@ from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
 app = Celery(
-    "tasks", backend=app_settings.CELERY_RESULT_BACKEND, broker="redis://localhost:6379"
+    "tasks", backend=f"db+{app_settings.DB_ENDPOINT}", broker="redis://localhost:6379"
 )
 
 
