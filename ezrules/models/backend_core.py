@@ -2,7 +2,16 @@ import datetime
 from typing import List
 
 from flask_security import AsaList, RoleMixin, UserMixin
-from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    ForeignKeyConstraint,
+)
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
@@ -88,7 +97,11 @@ class Rule(Versioned, Base):
 class TestingRecordLog(Base):
     __tablename__ = "testing_record_log"
 
-    tl_id = Column(Integer, unique=True, primary_key=True)
+    tl_id = Column(
+        Integer,
+        unique=True,
+        primary_key=True,
+    )
     event = Column(JSON, nullable=False)
     event_timestamp = Column(Integer, nullable=False)
     event_id = Column(String, nullable=False)
@@ -96,15 +109,27 @@ class TestingRecordLog(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
 
+    testing_results: Mapped[List["TestingResultsLog"]] = relationship(
+        back_populates="testing_record",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
 
 class TestingResultsLog(Base):
     __tablename__ = "testing_results_log"
 
     tr_id = Column(Integer, unique=True, primary_key=True)
-    tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id"))
+    tl_id: Mapped[int] = mapped_column(
+        ForeignKey("testing_record_log.tl_id", ondelete="CASCADE")
+    )
     rule_result = Column(String, nullable=False)
 
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
+
+    testing_record: Mapped["TestingRecordLog"] = relationship(
+        back_populates="testing_results"
+    )
 
 
 class RuleBackTestingResult(Base):
