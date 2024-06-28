@@ -4,7 +4,8 @@ What's new
 ----------
 v0.7
 
-* Switch to pydentic-based settings management
+* Ability to backtest rule changes: make change, submit for backtesing, check result
+* Switch to pydantic-based settings management
 * Transaction submitted for testing are now saved in the history table
 * Rule evaluation results are now saved in the history table
 * new cli utilities to generate test data

@@ -1,3 +1,66 @@
+function get_backtesting_results(rule_id, target_container) {
+    $.ajax({
+        type: 'GET',
+        url: '/get_backtesting_results/' + rule_id,
+        success: function (response) {
+            let htmlContent = '';
+            response.forEach(element => {
+                htmlContent += `
+                    <li class="list-group-item">
+                    <button onclick="getTaskResults('${element.task_id}' ,'#div${element.task_id}')" class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#resultscollapse${element.task_id}" aria-expanded="false" aria-controls="resultscollapse${element.task_id}">
+                        ${element.task_id} - ${element.created_at}
+                    </button>
+                    <div class="collapse" id="resultscollapse${element.task_id}">
+                        <div class="card card-body" id="div${element.task_id}"></div> 
+                    </div>             
+                    </li>
+                `
+            });
+            $(target_container).html(htmlContent);
+        },
+        error: function (error) {
+            console.error(error);
+        }
+    })
+}
+
+
+function submitBackTest(new_rule_logic, r_id) {
+    var postData = {
+        new_rule_logic: new_rule_logic, r_id: r_id
+    };
+
+    $.ajax({
+        type: 'POST',
+        url: '/backtesting',
+        data: JSON.stringify(postData),
+        contentType: "application/json",
+        success: function (response) {
+            get_backtesting_results(r_id, '#backtesting_results')
+        },
+        error: function (error) {
+            console.error(error);
+        }
+    });
+}
+
+function getTaskResults(task_id, target_div_id) {
+    $.ajax({
+        type: 'GET',
+        url: '/get_task_status/' + task_id,
+        success: function (response) {
+            if (response.ready) {
+                $(target_div_id).html(response.result);
+            } else {
+                $(target_div_id).text("Backfill result is not ready");
+            }
+        },
+        error: function (error) {
+            console.error(error);
+        }
+    })
+}
+
 function initializeTabCapture(textareaId) {
     var textarea = document.getElementById(textareaId);
 
@@ -16,52 +79,6 @@ function initializeTabCapture(textareaId) {
             }
         });
     }
-}
-
-function lockRuleForModification(rule_id) {
-    var postData = {
-        rid: rule_id,
-    };
-
-    $.ajax({
-        type: 'POST', // HTTP method
-        url: `/lock_rule/${rule_id}`, // URL to which the request will be sent
-        data: postData, // Data to be sent (if needed)
-        success: function (response) {
-            // Handle the success response here
-            console.log(response);
-            if (response["success"]) {
-                alert(`Lock acquired. Lock expires on ${response["expires_on"]}`)
-                window.location.href = `/rule/${rule_id}`
-            } else {
-                alert(`Failed to acquire lock!\nCurrent lock is held by ${response["locked_by"]}\nLock expires on ${response["expires_on"]}`)
-            }
-        },
-        error: function (error) {
-            // Handle any errors here
-            console.error(error);
-        }
-    });
-}
-
-function forceUnlockRuleForModification(rule_id) {
-    var postData = {
-        rid: rule_id,
-    };
-
-    $.ajax({
-        type: 'POST', // HTTP method
-        url: `/unlock/${rule_id}`, // URL to which the request will be sent
-        data: postData, // Data to be sent (if needed)
-        success: function (response) {
-            // Handle the success response here
-            window.location.href = `/rule/${rule_id}`
-        },
-        error: function (error) {
-            // Handle any errors here
-            console.error(error);
-        }
-    });
 }
 
 function verifyRule(rule_source) {
@@ -86,14 +103,12 @@ function verifyRule(rule_source) {
 }
 
 function setSampleJson(params, text_area_id) {
-    console.log(params)
     $(text_area_id).show();
     let json = ["{"]
     json.push(...params.map(function (s) {
         return `\t"${s}": ,`;
     }))
     json.push("}")
-    console.log(json)
     $(text_area_id).val(json.join("\n"))
     $(text_area_id).attr("rows", json.length)
     $(text_area_id).attr("cols", Math.max(...json.map(function (s) {

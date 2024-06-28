@@ -90,6 +90,12 @@ class Rule(Versioned, Base):
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
     org: Mapped["Organisation"] = relationship(back_populates="rules")
 
+    backtesting_results: Mapped[List["RuleBackTestingResult"]] = relationship(
+        back_populates="rule",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
     def __repr__(self) -> str:
         return f"{self.r_id=},{self.created_at=},{self.description=},{self.org=}"
 
@@ -130,6 +136,17 @@ class TestingResultsLog(Base):
     testing_record: Mapped["TestingRecordLog"] = relationship(
         back_populates="testing_results"
     )
+
+
+class RuleBackTestingResult(Base):
+    __tablename__ = "rule_backtesting_results"
+
+    bt_id = Column(Integer, unique=True, primary_key=True)
+    r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id", ondelete="CASCADE"))
+    task_id = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    rule: Mapped["Rule"] = relationship(back_populates="backtesting_results")
 
 
 RuleHistory = Rule.__history_mapper__.class_

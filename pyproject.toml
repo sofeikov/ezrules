@@ -24,6 +24,8 @@ sqlalchemy-utils = "*"
 click = "^8.0.0"
 pydantic-settings = "^2.3.3"
 pydantic = "^2.7.4"
+celery = "^5.4.0"
+pandas = "^2.2.2"
 
 [tool.poetry.group.test.dependencies]
 pytest-cov = "*"
