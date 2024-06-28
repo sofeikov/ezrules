@@ -1,3 +1,30 @@
+function get_backtesting_results(rule_id, target_container) {
+    $.ajax({
+        type: 'GET',
+        url: '/get_backtesting_results/' + rule_id,
+        success: function (response) {
+            let htmlContent = '';
+            response.forEach(element => {
+                htmlContent += `
+                    <li class="list-group-item">
+                    <button onclick="getTaskResults('${element.task_id}' ,'#div${element.task_id}')" class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#resultscollapse${element.task_id}" aria-expanded="false" aria-controls="resultscollapse${element.task_id}">
+                        ${element.task_id} - ${element.created_at}
+                    </button>
+                    <div class="collapse" id="resultscollapse${element.task_id}">
+                        <div class="card card-body" id="div${element.task_id}"></div> 
+                    </div>             
+                    </li>
+                `
+            });
+            $(target_container).html(htmlContent);
+        },
+        error: function (error) {
+            console.error(error);
+        }
+    })
+}
+
+
 function submitBackTest(new_rule_logic, r_id) {
     var postData = {
         new_rule_logic: new_rule_logic, r_id: r_id
@@ -9,7 +36,7 @@ function submitBackTest(new_rule_logic, r_id) {
         data: JSON.stringify(postData),
         contentType: "application/json",
         success: function (response) {
-            console.log(response);
+            get_backtesting_results(r_id, '#backtesting_results')
         },
         error: function (error) {
             console.error(error);
@@ -22,8 +49,6 @@ function getTaskResults(task_id, target_div_id) {
         type: 'GET',
         url: '/get_task_status/' + task_id,
         success: function (response) {
-            console.log(response.ready)
-            console.log(response.result)
             if (response.ready) {
                 $(target_div_id).html(response.result);
             } else {
@@ -78,14 +103,12 @@ function verifyRule(rule_source) {
 }
 
 function setSampleJson(params, text_area_id) {
-    console.log(params)
     $(text_area_id).show();
     let json = ["{"]
     json.push(...params.map(function (s) {
         return `\t"${s}": ,`;
     }))
     json.push("}")
-    console.log(json)
     $(text_area_id).val(json.join("\n"))
     $(text_area_id).attr("rows", json.length)
     $(text_area_id).attr("cols", Math.max(...json.map(function (s) {

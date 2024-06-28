@@ -160,18 +160,11 @@ def show_rule(rule_id=None, revision_number=None):
         form.process(**rule_json)
         del form.rid
         revision_list = fsrm.get_rule_revision_list(rule)
-        backtesting_results = (
-            db_session.query(RuleBackTestingResult)
-            .filter(RuleBackTestingResult.r_id == rule.r_id)
-            .order_by(sqlalchemy.desc(RuleBackTestingResult.created_at))
-            .limit(3)
-        )
         return render_template(
             "show_rule.html",
             rule=rule_json,
             form=form,
             revision_list=revision_list,
-            backtesting_results=backtesting_results,
         )
     elif request.method == "POST":
         rule_status_check = form.validate(rule_checker=rule_checker)
@@ -191,6 +184,19 @@ def show_rule(rule_id=None, revision_number=None):
         app.logger.info(f"Changing {rule_id}")
         flash(f"Changes to {rule_id} were saved")
         return redirect(url_for("show_rule", rule_id=rule_id))
+
+
+@app.route("/get_backtesting_results/<int:rule_id>", methods=["GET"])
+def get_backtesting_results(rule_id):
+    backtesting_results = (
+        db_session.query(RuleBackTestingResult)
+        .filter(RuleBackTestingResult.r_id == rule_id)
+        .order_by(sqlalchemy.desc(RuleBackTestingResult.created_at))
+        .limit(3)
+    )
+    dslice = lambda d: {k:d[k] for k in d if k in ('task_id', 'created_at')}
+
+    return jsonify([dslice(br.__dict__) for br in backtesting_results])
 
 
 @app.route("/verify_rule", methods=["POST"])

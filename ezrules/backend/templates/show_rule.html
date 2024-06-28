@@ -19,12 +19,13 @@
             })
             fillInExampleParams(null)
             updateTextareaSize("{{ form.logic.id }}")
+            const url = new URL(window.location.href);
+            const pathParts = url.pathname.split('/');
+            const lastPart = parseInt(pathParts[pathParts.length - 1]);
             $("#submit_backtest").on("click", function () {
-                const url = new URL(window.location.href);
-                const pathParts = url.pathname.split('/');
-                const lastPart = parseInt(pathParts[pathParts.length - 1]);
                 submitBackTest($("#logic").val(), lastPart)
             })
+            get_backtesting_results(lastPart, '#backtesting_results')
         });
     </script>
     <title>Rule {{ rule['rid'] }}</title>
@@ -34,8 +35,8 @@
         }
 
         .table th {
-            text-align: center;   
-          }
+            text-align: center;
+        }
     </style>
 </head>
 {% endblock %}
@@ -93,22 +94,8 @@
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">Backtesting history with most recent at the top</h5>
-                        <ul class="list-group list-group-flush">
-                            {% for btr in backtesting_results %}
-                            <li class="list-group-item"><button class="btn btn-primary" type="button"
-                                    data-bs-toggle="collapse" data-bs-target="#resultscollapse{{ btr.task_id }}"
-                                    aria-expanded="false" aria-controls="resultscollapse{{ btr.task_id }}"
-                                    onclick="getTaskResults('{{ btr.task_id }}' ,'#div{{ btr.task_id }}')">
-                                    {{btr.task_id}} -
-                                    {{btr.created_at}}</button>
-                                <div class="collapse" id="resultscollapse{{ btr.task_id }}">
-                                    <div class="card card-body" id="div{{ btr.task_id }}">
-                                    </div>
-                                </div>
-                            </li>
-                            {% endfor %}
+                        <ul class="list-group list-group-flush" id="backtesting_results">
                         </ul>
-
                     </div>
                 </div>
             </div>
