@@ -267,29 +267,32 @@ def get_task_status(task_id: str):
     result = t.result if ready else None
     app.logger.info(f"Getting task status for {task_id}: {ready=} with {result=}")
     all_outcomes = set()
-    for k,v in result.items():
+    for k, v in result.items():
         for outcome in v:
             all_outcomes.add(outcome)
 
     df_data = []
     for k in ["Deployed", "Tested"]:
         frame = {}
-        if k == 'Deployed':
-            kk = ['stored_result','stored_result_rate']
+        if k == "Deployed":
+            kk = ["stored_result", "stored_result_rate"]
         else:
-            kk = ['proposed_result', 'proposed_result_rate']
+            kk = ["proposed_result", "proposed_result_rate"]
         for o in sorted(all_outcomes):
             for kkk in kk:
                 if kkk.endswith("_rate"):
-                    c = f"{o} rate"
+                    c = f"{o} rate, %"
                 else:
                     c = o
-                frame[c] = result[kkk].get(o, 0)
+                frame[c] = round(result[kkk].get(o, 0), 3)
         df_data.append(frame)
 
     df = pd.DataFrame(df_data, index=["Deployed", "Tested"])
 
-    return jsonify(ready=ready, result=df.to_html(classes="table table-striped table-bordered text-center"))
+    return jsonify(
+        ready=ready,
+        result=df.to_html(classes="table table-striped table-bordered text-center"),
+    )
 
 
 @app.route("/management/lists", methods=["GET", "POST"])
