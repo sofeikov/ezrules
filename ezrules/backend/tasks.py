@@ -27,14 +27,18 @@ def backtest_rule_change(r_id: int, new_rule_logic: str):
     )
     records = query.all()
 
-    stored_result = dict(Counter([stored_rule(r.__dict__) for r in records]))
-    proposed_result = dict(Counter([proposed_rule(r.__dict__) for r in records]))
+    stored_result = dict(Counter([stored_rule(r.event) for r in records]))
+    if None in stored_result:
+        del stored_result[None]
+    proposed_result = dict(Counter([proposed_rule(r.event) for r in records]))
+    if None in proposed_result:
+        del proposed_result[None]    
 
     stored_result_rate = {
-        outcome: ct / len(records) for outcome, ct in stored_result.items()
+        outcome: 100 * ct / len(records) for outcome, ct in stored_result.items()
     }
     proposed_result_rate = {
-        outcome: ct / len(records) for outcome, ct in proposed_result.items()
+        outcome: 100 * ct / len(records) for outcome, ct in proposed_result.items()
     }
     full_ret = {
         "stored_result": stored_result,
