@@ -2,6 +2,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 
 from celery import Celery
+from typing import List
 
 from ezrules.core.rule import Rule, RuleFactory
 from ezrules.models.backend_core import Rule as RuleModel
@@ -12,6 +13,15 @@ from ezrules.settings import app_settings
 app = Celery(
     "tasks", backend=f"db+{app_settings.DB_ENDPOINT}", broker="redis://localhost:6379"
 )
+
+
+def count_rule_outcomes(
+    rule: Rule, test_records: List[TestingRecordLog]
+) -> dict[str, int]:
+    stored_result = dict(Counter([rule(r.event) for r in test_records]))
+    if None in stored_result:
+        del stored_result[None]
+    return stored_result
 
 
 @app.task
@@ -27,12 +37,8 @@ def backtest_rule_change(r_id: int, new_rule_logic: str):
     )
     records = query.all()
 
-    stored_result = dict(Counter([stored_rule(r.event) for r in records]))
-    if None in stored_result:
-        del stored_result[None]
-    proposed_result = dict(Counter([proposed_rule(r.event) for r in records]))
-    if None in proposed_result:
-        del proposed_result[None]    
+    stored_result = count_rule_outcomes(stored_rule, records)
+    proposed_result = count_rule_outcomes(proposed_rule, records)
 
     stored_result_rate = {
         outcome: 100 * ct / len(records) for outcome, ct in stored_result.items()
@@ -48,8 +54,3 @@ def backtest_rule_change(r_id: int, new_rule_logic: str):
     }
 
     return full_ret
-
-
-if __name__ == "__main__":
-    res = backtest_rule_change.apply_async(args=[1, 'return "HOLD"'])
-    print()
