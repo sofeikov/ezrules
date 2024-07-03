@@ -20,6 +20,7 @@ from flask import (
 from flask_bootstrap import Bootstrap5
 from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required
 from flask_wtf import CSRFProtect
+import sqlalchemy.exc
 
 from ezrules.backend.forms import OutcomeForm, RuleForm
 from ezrules.backend.tasks import app as celery_app
@@ -38,7 +39,7 @@ from ezrules.core.rule_updater import (
     RuleRevision,
 )
 from ezrules.core.user_lists import StaticUserListManager
-from ezrules.models.backend_core import Role
+from ezrules.models.backend_core import Label, Role
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.backend_core import RuleBackTestingResult, User
 from ezrules.models.database import db_session
@@ -194,7 +195,7 @@ def get_backtesting_results(rule_id):
         .order_by(sqlalchemy.desc(RuleBackTestingResult.created_at))
         .limit(3)
     )
-    dslice = lambda d: {k:d[k] for k in d if k in ('task_id', 'created_at')}
+    dslice = lambda d: {k: d[k] for k in d if k in ("task_id", "created_at")}
 
     return jsonify([dslice(br.__dict__) for br in backtesting_results])
 
@@ -264,6 +265,28 @@ def backtesting():
     db_session.add(btr)
     db_session.commit()
     return {"new_rule_logic": new_rule_logic}
+
+
+@app.route("/labels", methods=["GET", "POST"])
+@csrf.exempt
+def label():
+    if request.method == "GET":
+        labels = db_session.query(Label).all()
+        return jsonify([l.label for l in labels])
+    elif request.method == "POST":
+        label_names = request.get_json()["label_name"]
+        if isinstance(label_names, str):
+            label_names = [label_names]
+        failed_to_add = []
+        for ln in label_names:
+            label = Label(label=ln)
+            try:
+                db_session.add(label)
+                db_session.commit()
+            except sqlalchemy.exc.IntegrityError:
+                db_session.rollback()
+                failed_to_add.append(ln)
+        return jsonify(response="OK", failed_to_add=failed_to_add)
 
 
 @app.route("/get_task_status/<string:task_id>", methods=["GET"])
