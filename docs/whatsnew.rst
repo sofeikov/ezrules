@@ -4,13 +4,17 @@ What's new
 ----------
 v0.7
 
+* Migrated from Poetry to UV for faster dependency management
+
+v0.6
+
 * Ability to backtest rule changes: make change, submit for backtesing, check result
 * Switch to pydantic-based settings management
 * Transaction submitted for testing are now saved in the history table
 * Rule evaluation results are now saved in the history table
 * new cli utilities to generate test data
 
-v0.6
+v0.5
 
 * The app is compatible with AWS EKS
 * Basic testing introduced
