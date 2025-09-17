@@ -36,8 +36,8 @@ dependencies = [
     "pandas>=2.2.2",
 ]
 
-[project.optional-dependencies]
-test = [
+[tool.uv]
+dev-dependencies = [
     "pytest-cov",
     "pytest",
     "coverage",

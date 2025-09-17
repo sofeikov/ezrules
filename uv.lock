@@ -563,7 +563,7 @@ wheels = [
 
 [[package]]
 name = "ezrules"
-version = "0.6.0"
+version = "0.7.0"
 source = { editable = "." }
 dependencies = [
     { name = "bootstrap-flask" },
@@ -587,8 +587,8 @@ dependencies = [
     { name = "sqlalchemy-utils" },
 ]
 
-[package.optional-dependencies]
-test = [
+[package.dev-dependencies]
+dev = [
     { name = "coverage" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -599,7 +599,6 @@ requires-dist = [
     { name = "bootstrap-flask" },
     { name = "celery", specifier = ">=5.4.0" },
     { name = "click", specifier = ">=8.0.0" },
-    { name = "coverage", marker = "extra == 'test'" },
     { name = "email-validator" },
     { name = "flask", specifier = ">=3.0.3" },
     { name = "flask-security-too", extras = ["common"] },
@@ -610,14 +609,19 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.7.4" },
     { name = "pydantic-settings", specifier = ">=2.3.3" },
     { name = "pyparsing" },
-    { name = "pytest", marker = "extra == 'test'" },
-    { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "pytz" },
     { name = "pyyaml" },
     { name = "ruamel-yaml" },
     { name = "sphinx" },
     { name = "sqlalchemy" },
     { name = "sqlalchemy-utils" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "coverage" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
 ]
 
 [[package]]
