@@ -4,6 +4,7 @@ import logging
 import os
 import secrets
 from json.decoder import JSONDecodeError
+from typing import cast
 
 import pandas as pd
 import sqlalchemy
@@ -43,6 +44,7 @@ from ezrules.models.backend_core import Role, RuleBackTestingResult, User
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
+
 
 outcome_manager = FixedOutcome()
 rule_checker = RuleCheckingPipeline(checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)])
@@ -108,7 +110,7 @@ def create_rule():
 @app.route("/rule/<int:rule_id>/timeline", methods=["GET"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
 def timeline(rule_id):
-    latest_version = fsrm.load_rule(rule_id)
+    latest_version = cast(RuleModel, fsrm.load_rule(rule_id))
     revision_list = fsrm.get_rule_revision_list(latest_version)
     rules = [fsrm.load_rule(rule_id, revision_number=r.revision_number) for r in revision_list]
     # Add the current version
