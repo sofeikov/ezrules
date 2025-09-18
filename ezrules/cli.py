@@ -134,7 +134,7 @@ def generate_random_data(n_rules: int, n_events: int):
     }
     fsrm: RuleManager = RuleManagerFactory.get_rule_manager(
         "RDBRuleManager", **{"db": db_session, "o_id": 1}
-    )    
+    )
     rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=1)
     all_attrs = list(test_attributes)
     for r_ind in range(n_rules):
@@ -170,13 +170,11 @@ def generate_random_data(n_rules: int, n_events: int):
         db_session.add(r)
         db_session.commit()
 
-        
-
         print(f"Generated Rule {r_ind}: {logic}")
 
         lre = LocalRuleExecutorSQL(db=db_session, o_id=1)
         from datetime import datetime, timedelta
-    
+
     rule_engine_config_producer.save_config(fsrm)
     # Generate and evaluate events
     for e_ind in range(n_events):
@@ -205,6 +203,13 @@ def generate_random_data(n_rules: int, n_events: int):
         # Evaluate the event against the rules and store the results
         response = eval_and_store(lre, event)
         print(f"Evaluated Event {e_ind}: {response}")
+
+    cb = db_session.query(Label).where(Label.label == "CHARGEBACK").one()
+    for trl in db_session.query(TestingRecordLog).all():
+        if uniform(0, 100) < 10:
+            print(f"Marking {trl.event_id} as CHARGEBACK")
+            trl.el_id = cb.el_id
+    db_session.commit()
 
 
 @cli.command()

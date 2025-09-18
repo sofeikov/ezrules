@@ -84,20 +84,43 @@
             </div>
 
             <div class="col-md-6">
-                <div class="card">
+                <div class="card" id="testing-card" style="margin-bottom: 20;">
                     <div class="card-body">
                         <h5 class="card-title">Test Rule</h5>
                         <textarea class="form-control mb-3" id="verify_json" style="width: 100%;"></textarea>
                         <button id="submit_test" class="btn btn-primary w-100">Test rule</button>
                     </div>
                 </div>
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Backtesting history with most recent at the top</h5>
-                        <ul class="list-group list-group-flush" id="backtesting_results">
-                        </ul>
+                <ul class="nav nav-tabs" id="myTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="backtesting-tab" data-bs-toggle="tab" data-bs-target="#backtesting"
+                            type="button" role="tab" aria-controls="backtesting" aria-selected="true">Backtesting</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="performance-tab" data-bs-toggle="tab" data-bs-target="#performance"
+                            type="button" role="tab" aria-controls="performance" aria-selected="false">Performance</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="myTabContent">
+                    <div class="tab-pane fade show active" id="backtesting" role="tabpanel" aria-labelledby="backtesting-tab">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Action rates</h5>
+                                <ul class="list-group list-group-flush" id="backtesting_results">
+                                </ul>
+                            </div>
+                        </div>
                     </div>
+                    <div class="tab-pane fade" id="performance" role="tabpanel" aria-labelledby="performance-tab">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Precision and recall</h5>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>                    
                 </div>
+
             </div>
         </div>
     </div>
