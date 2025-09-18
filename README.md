@@ -4,7 +4,7 @@ Open-source transaction monitoring engine for business rules.
 
 ezrules provides a Python-based framework for defining, managing, and executing business rules with a web-based management interface and scalable infrastructure for rule execution and backtesting.
 
-## Features
+## ✨ Features
 
 - **Rule Engine**: Flexible Python-based rule execution with custom logic support
 - **Web Management Interface**: Flask-based UI for creating and managing rules
@@ -14,7 +14,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **CLI Tools**: Command-line interface for database management and data generation
 - **Frontend Dashboard**: Next.js-based user interface for rule monitoring and analytics
 
-## Architecture
+## 🏗️ Architecture
 
 ezrules consists of several core components:
 
@@ -30,7 +30,7 @@ ezrules consists of several core components:
 3. Outcomes are aggregated and stored
 4. Results are available via API and web interface
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Installation
 
@@ -70,14 +70,14 @@ uv run ezrules evaluator --port 9999
 uv run ezrules generate-random-data --n-rules 10 --n-events 100
 ```
 
-## Use Cases
+## 💼 Use Cases
 
 - **Financial Transaction Monitoring**: Real-time fraud detection and compliance checking
 - **Business Rule Automation**: Automated decision making based on configurable business logic
 - **Event-Driven Processing**: Rule-based responses to system events and data changes
 - **Compliance Management**: Ensure transactions meet regulatory requirements
 
-## Development
+## 🛠️ Development
 
 ### Tech Stack
 
@@ -109,6 +109,6 @@ uv run ezrules generate-random-data
 uv run ezrules delete-test-data
 ```
 
-## License
+## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
