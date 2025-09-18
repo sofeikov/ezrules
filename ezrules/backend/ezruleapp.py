@@ -45,7 +45,6 @@ from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
-
 outcome_manager = FixedOutcome()
 rule_checker = RuleCheckingPipeline(checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)])
 
