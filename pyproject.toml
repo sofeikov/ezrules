@@ -1,40 +1,51 @@
-[tool.poetry]
+[project]
 name = "ezrules"
-version = "0.6.0"
-description = ""
-authors = ["Konstantin Sofeikov <sofeykov@gmail.com>"]
+version = "0.7.0"
+description = "Open-source transaction monitoring engine for business rules"
+authors = [{name = "Konstantin Sofeikov", email = "sofeykov@gmail.com"}]
 readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "flask>=3.0.3",
+    "flask-wtf",
+    "bootstrap-flask",
+    "pyyaml",
+    "ruamel.yaml",
+    "gunicorn",
+    "sphinx",
+    "pyparsing",
+    "sqlalchemy",
+    "flask-security-too[common]",
+    "psycopg2-binary",
+    "pytz",
+    "email-validator",
+    "sqlalchemy-utils",
+    "click>=8.0.0",
+    "pydantic-settings>=2.3.3",
+    "pydantic>=2.7.4",
+    "celery>=5.4.0",
+    "pandas>=2.2.2",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-flask = "^3.0.3"
-flask-wtf = "*"
-bootstrap-flask = "*"
-pyyaml = "*"
-"ruamel.yaml" = "*"
-gunicorn = "*"
-sphinx = "*"
-pyparsing = "*"
-sqlalchemy = "*"
-flask-security-too = {extras = ["common"], version = "*"}
-psycopg2-binary = "*"
-pytz = "*"
-email-validator = "*"
-sqlalchemy-utils = "*"
-click = "^8.0.0"
-pydantic-settings = "^2.3.3"
-pydantic = "^2.7.4"
-celery = "^5.4.0"
-pandas = "^2.2.2"
+[tool.uv]
+dev-dependencies = [
+    "pytest-cov",
+    "pytest",
+    "coverage",
+]
 
-[tool.poetry.group.test.dependencies]
-pytest-cov = "*"
-pytest = "*"
-coverage = "*"
-
-[tool.poetry.scripts]
+[project.scripts]
 ezrules = "ezrules.cli:cli"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

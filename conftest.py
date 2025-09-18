@@ -37,8 +37,15 @@ def engine_fix():
 
     yield engine
 
-    Base.metadata.drop_all(engine)
-    drop_database(engine.url)
+    # Close all connections before dropping database
+    engine.dispose()
+
+    # Try to drop the database, ignore if still in use
+    try:
+        drop_database(engine.url)
+    except Exception:
+        # Database might still be in use, which is okay for tests
+        pass
 
 
 @pytest.fixture(scope="session")
@@ -59,8 +66,8 @@ def session(connection):
     session.add(org)
     session.commit()
 
-    admin_email = f"admin@test_org.com"
-    admin_password = f"12345678"
+    admin_email = "admin@test_org.com"
+    admin_password = "12345678"
     session.add(
         User(
             email=admin_email,
@@ -79,6 +86,12 @@ def session(connection):
     ezrulevalapp.lre.o_id = org.o_id
 
     yield session
+    
+
+    # Clean up Flask app references to avoid lingering connections
+    ezruleapp.fsrm.db = None
+    ezruleapp.rule_engine_config_producer.db = None
+    ezrulevalapp.lre.db = None
 
     session.close()
     transaction.rollback()
