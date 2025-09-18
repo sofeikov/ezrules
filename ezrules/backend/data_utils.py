@@ -1,13 +1,13 @@
-from typing import Dict
 
 from pydantic import BaseModel, field_validator
+
 from ezrules.models.backend_core import TestingRecordLog, TestingResultsLog
 
 
 class Event(BaseModel):
     event_id: str
     event_timestamp: int  # Assuming Unix timestamp as input
-    event_data: Dict
+    event_data: dict
 
     @field_validator("event_timestamp", mode="before")
     def validate_unix_timestamp(cls, value):

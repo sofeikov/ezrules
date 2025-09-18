@@ -1,5 +1,4 @@
 import datetime
-from typing import List
 
 from flask_security import AsaList, RoleMixin, UserMixin
 from sqlalchemy import (
@@ -10,7 +9,6 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
-    ForeignKeyConstraint,
 )
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
@@ -60,8 +58,8 @@ class Organisation(Base):
     name = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    rules: Mapped[List["Rule"]] = relationship()
-    re_configs: Mapped[List["RuleEngineConfig"]] = relationship()
+    rules: Mapped[list["Rule"]] = relationship()
+    re_configs: Mapped[list["RuleEngineConfig"]] = relationship()
 
     def __repr__(self):
         return f"ID:{self.o_id}, {self.name=}, {len(self.rules)=}"
@@ -90,7 +88,7 @@ class Rule(Versioned, Base):
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
     org: Mapped["Organisation"] = relationship(back_populates="rules")
 
-    backtesting_results: Mapped[List["RuleBackTestingResult"]] = relationship(
+    backtesting_results: Mapped[list["RuleBackTestingResult"]] = relationship(
         back_populates="rule",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -115,7 +113,7 @@ class TestingRecordLog(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
 
-    testing_results: Mapped[List["TestingResultsLog"]] = relationship(
+    testing_results: Mapped[list["TestingResultsLog"]] = relationship(
         back_populates="testing_record",
         cascade="all, delete-orphan",
         passive_deletes=True,

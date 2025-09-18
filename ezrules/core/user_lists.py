@@ -6,9 +6,11 @@ class AbstractUserListManager(abc.ABC):
     def add_entry(self, list_name, new_entry):
         """Add new entry to the list"""
 
+    @abc.abstractmethod
     def get_entries(self, list_name):
         """Return all entries for the list"""
 
+    @abc.abstractmethod
     def get_all_entries(self):
         """Get all lists and their entries"""
 

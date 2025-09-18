@@ -1,4 +1,5 @@
 import pytest
+
 from ezrules.core.rule import Rule
 
 

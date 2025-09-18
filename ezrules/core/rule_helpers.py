@@ -1,7 +1,9 @@
 import ast
 import json
-import pyparsing as pp
 from typing import Any
+
+import pyparsing as pp
+
 from ezrules.core.user_lists import AbstractUserListManager
 
 

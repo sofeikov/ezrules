@@ -12,7 +12,7 @@ def test_updates_config_after_rule_update(session):
     rm = RDBRuleManager(db=session, o_id=org.o_id)
     rule_engine_config_producer = RDBRuleEngineConfigProducer(db=session, o_id=org.o_id)
     rule_engine_config_producer.save_config(rm)
-    
+
     db_config = session.query(RuleEngineConfig).one()
     assert db_config.config[0]["logic"] == "return 'HOLD'"
 

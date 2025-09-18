@@ -2,16 +2,17 @@
 
 import datetime
 
-from sqlalchemy import Column
-from sqlalchemy import DateTime
-from sqlalchemy import event
-from sqlalchemy import ForeignKeyConstraint
-from sqlalchemy import inspect
-from sqlalchemy import Integer
-from sqlalchemy import PrimaryKeyConstraint
-from sqlalchemy import util
-from sqlalchemy.orm import attributes
-from sqlalchemy.orm import object_mapper
+from sqlalchemy import (
+    Column,
+    DateTime,
+    ForeignKeyConstraint,
+    Integer,
+    PrimaryKeyConstraint,
+    event,
+    inspect,
+    util,
+)
+from sqlalchemy.orm import attributes, object_mapper
 from sqlalchemy.orm.exc import UnmappedColumnError
 from sqlalchemy.orm.relationships import RelationshipProperty
 
@@ -62,7 +63,7 @@ def _history_mapper(local_mapper):
             idx.unique = False
 
         for orig_c, history_c in zip(
-            local_mapper.local_table.c, history_table.c
+            local_mapper.local_table.c, history_table.c, strict=False
         ):
             orig_c.info["history_copy"] = history_c
             history_c.unique = False
@@ -117,7 +118,7 @@ def _history_mapper(local_mapper):
             Column(
                 "changed",
                 DateTime,
-                default=lambda: datetime.datetime.now(datetime.timezone.utc),
+                default=lambda: datetime.datetime.now(datetime.UTC),
                 info=version_meta,
             )
         )
@@ -129,7 +130,7 @@ def _history_mapper(local_mapper):
 
         if super_fks:
             history_table.append_constraint(
-                ForeignKeyConstraint(*zip(*super_fks))
+                ForeignKeyConstraint(*zip(*super_fks, strict=False))
             )
 
     else:
@@ -179,17 +180,17 @@ def _history_mapper(local_mapper):
         bases = local_mapper.base_mapper.class_.__bases__
 
     versioned_cls = type(
-        "%sHistory" % cls.__name__,
+        f"{cls.__name__}History",
         bases,
         {
             "_history_mapper_configured": True,
             "__table__": history_table,
-            "__mapper_args__": dict(
-                inherits=super_history_mapper,
-                polymorphic_identity=local_mapper.polymorphic_identity,
-                polymorphic_on=polymorphic_on,
-                properties=properties,
-            ),
+            "__mapper_args__": {
+                "inherits": super_history_mapper,
+                "polymorphic_identity": local_mapper.polymorphic_identity,
+                "polymorphic_on": polymorphic_on,
+                "properties": properties,
+            },
         },
     )
 
@@ -236,7 +237,7 @@ def create_version(obj, session, deleted=False):
     obj_changed = False
 
     for om, hm in zip(
-        obj_mapper.iterate_to_root(), history_mapper.iterate_to_root()
+        obj_mapper.iterate_to_root(), history_mapper.iterate_to_root(), strict=False
     ):
         if hm.single:
             continue

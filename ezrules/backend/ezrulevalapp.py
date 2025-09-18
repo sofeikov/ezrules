@@ -1,4 +1,4 @@
-from flask import Flask, request, abort, jsonify
+from flask import Flask, abort, jsonify, request
 from pydantic import ValidationError
 
 from ezrules.backend.data_utils import Event, eval_and_store
@@ -17,7 +17,7 @@ def evaluate():
     request_data = request.get_json()
     try:
         event = Event(**request_data)
-    except ValidationError as e:
+    except ValidationError:
         abort(400, description="Bad Request: Could not validate the json structure")
     response = eval_and_store(lre, event)
     return jsonify(response)
@@ -25,4 +25,4 @@ def evaluate():
 
 @app.route("/ping", methods=["GET"])
 def ping():
-    return f"OK"
+    return "OK"

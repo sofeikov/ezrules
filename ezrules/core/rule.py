@@ -1,5 +1,6 @@
 import ast
-from typing import Any, Callable, List, Optional, Tuple
+from collections.abc import Callable
+from typing import Any, NamedTuple
 
 from ezrules.core.rule_helpers import (
     AtNotationConverter,
@@ -8,8 +9,6 @@ from ezrules.core.rule_helpers import (
 )
 from ezrules.core.user_lists import StaticUserListManager
 from ezrules.models.backend_core import Rule as RuleModel
-from typing import NamedTuple
-
 
 dollar_converter = DollarNotationConverter()
 at_converter = AtNotationConverter(list_values_provider=StaticUserListManager())
@@ -30,9 +29,9 @@ class Rule:
         self,
         rid: str,
         logic: str,
-        description: Optional[str] = None,
-        params: Optional[List[str]] = None,
-        r_id: Optional[int] = None,
+        description: str | None = None,
+        params: list[str] | None = None,
+        r_id: int | None = None,
     ) -> None:
         """
         Creates a rule object.
@@ -69,7 +68,7 @@ class Rule:
         return code
 
     @staticmethod
-    def compile_function(code: str) -> Tuple[Callable, ast.Module]:
+    def compile_function(code: str) -> tuple[Callable, ast.Module]:
         rule_ast = ast.parse(code)
         compiled_code = compile(rule_ast, filename="<string>", mode="exec")
         namespace = {}
@@ -117,7 +116,7 @@ class RuleFactory:
             logic=rule_config[Fields.LOGIC],
             description=rule_config.get(Fields.DESCRIPTION),
             rid=rule_config.get(Fields.RID),
-            params=rule_config.get(Fields.PARAMS, tuple()),
+            params=rule_config.get(Fields.PARAMS, ()),
             r_id=rule_config.get(Fields.R_ID),
         )
         return rule

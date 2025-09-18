@@ -38,9 +38,8 @@ from ezrules.core.rule_updater import (
     RuleRevision,
 )
 from ezrules.core.user_lists import StaticUserListManager
-from ezrules.models.backend_core import Role
+from ezrules.models.backend_core import Role, RuleBackTestingResult, User
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import RuleBackTestingResult, User
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
@@ -130,7 +129,7 @@ def timeline(rule_id):
     rules.append(RuleFactory.from_json(latest_version.__dict__))
     logics = [r._source for r in rules]
     diff_timeline = []
-    for ct, (l1, l2) in enumerate(zip(logics[:-1], logics[1:])):
+    for ct, (l1, l2) in enumerate(zip(logics[:-1], logics[1:], strict=False)):
         diff = difflib.HtmlDiff().make_file(
             fromlines=l1.split("\n"),
             tolines=l2.split("\n"),
@@ -194,7 +193,8 @@ def get_backtesting_results(rule_id):
         .order_by(sqlalchemy.desc(RuleBackTestingResult.created_at))
         .limit(3)
     )
-    dslice = lambda d: {k:d[k] for k in d if k in ('task_id', 'created_at')}
+    def dslice(d):
+        return {k:d[k] for k in d if k in ('task_id', 'created_at')}
 
     return jsonify([dslice(br.__dict__) for br in backtesting_results])
 
@@ -206,11 +206,11 @@ def verifyty_rule():
     try:
         source_ = request.get_json()["rule_source"]
         rule = Rule(rid="", logic=source_)
-    except:
+    except Exception:
         app.logger.info(f"Failed to compile logic: {source_}")
         return {}
     app.logger.info(f"About to return these params: {rule.get_rule_params()}")
-    return jsonify(params=sorted(list(rule.get_rule_params()), key=str))
+    return jsonify(params=sorted(rule.get_rule_params(), key=str))
 
 
 @app.route("/test_rule", methods=["POST"])
@@ -273,7 +273,7 @@ def get_task_status(task_id: str):
     result = t.result if ready else None
     app.logger.info(f"Getting task status for {task_id}: {ready=} with {result=}")
     all_outcomes = set()
-    for k, v in result.items():
+    for v in result.values():
         for outcome in v:
             all_outcomes.add(outcome)
 

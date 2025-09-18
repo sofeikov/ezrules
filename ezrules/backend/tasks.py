@@ -2,7 +2,6 @@ from collections import Counter
 from datetime import datetime, timedelta
 
 from celery import Celery
-from typing import List
 
 from ezrules.core.rule import Rule, RuleFactory
 from ezrules.models.backend_core import Rule as RuleModel
@@ -16,7 +15,7 @@ app = Celery(
 
 
 def count_rule_outcomes(
-    rule: Rule, test_records: List[TestingRecordLog]
+    rule: Rule, test_records: list[TestingRecordLog]
 ) -> dict[str, int]:
     stored_result = dict(Counter([rule(r.event) for r in test_records]))
     if None in stored_result:

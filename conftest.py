@@ -86,7 +86,7 @@ def session(connection):
     ezrulevalapp.lre.o_id = org.o_id
 
     yield session
-    
+
 
     # Clean up Flask app references to avoid lingering connections
     ezruleapp.fsrm.db = None

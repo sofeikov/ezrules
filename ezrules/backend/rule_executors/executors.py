@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+
 from ezrules.core.rule_engine import RuleEngineFactory
 
 

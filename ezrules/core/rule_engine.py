@@ -1,6 +1,7 @@
-from ezrules.core.rule import Rule, RuleFactory
-from typing import Any, List, Dict
 from collections import Counter
+from typing import Any
+
+from ezrules.core.rule import Rule, RuleFactory
 
 
 class RuleEngine:
@@ -10,7 +11,7 @@ class RuleEngine:
 
     def __init__(
         self,
-        rules: List[Rule],
+        rules: list[Rule],
     ) -> None:
         """
 
@@ -19,7 +20,7 @@ class RuleEngine:
         """
         self.rules = rules
 
-    def __call__(self, t: Dict) -> Any:
+    def __call__(self, t: dict) -> Any:
         """
         Execute the rules and aggregated the results.
 

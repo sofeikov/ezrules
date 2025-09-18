@@ -1,6 +1,7 @@
+
 import pytest
 from pydantic import ValidationError
-from typing import Dict
+
 from ezrules.backend.data_utils import Event
 
 
@@ -36,7 +37,7 @@ from ezrules.backend.data_utils import Event
         ),
     ],
 )
-def test_event(event_id: str, event_timestamp: int, event_data: Dict, expected: bool):
+def test_event(event_id: str, event_timestamp: int, event_data: dict, expected: bool):
     if expected:
         # If expected is True, we expect the Event to be created successfully
         event = Event(
