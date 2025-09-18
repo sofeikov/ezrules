@@ -11,4 +11,4 @@ class Settings(BaseSettings):
     TESTING: bool | None = False
 
 
-app_settings = Settings()
+app_settings = Settings() # type: ignore[missing-argument]

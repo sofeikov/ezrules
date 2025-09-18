@@ -40,6 +40,7 @@ dev-dependencies = [
     "pytest",
     "coverage",
     "ruff>=0.13.0",
+    "ty>=0.0.1a20",
 ]
 
 [project.scripts]
@@ -66,6 +67,14 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["ezrules"]
+
+[tool.ty.src]
+exclude = [
+    "ezrules/models/history_meta.py"
+]
+
+[tool.ty.terminal]
+output-format = "concise"
 
 [build-system]
 requires = ["hatchling"]
