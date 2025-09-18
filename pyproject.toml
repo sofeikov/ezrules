@@ -41,6 +41,7 @@ dev-dependencies = [
     "coverage",
     "ruff>=0.13.0",
     "ty>=0.0.1a20",
+    "poethepoet>=0.37.0",
 ]
 
 [project.scripts]
@@ -75,6 +76,16 @@ exclude = [
 
 [tool.ty.terminal]
 output-format = "concise"
+
+[tool.ty.rules]
+deprecated = "ignore"
+
+[tool.poe.tasks]
+check = [
+    {cmd = "ruff format --check ."},
+    {cmd = "ty check ezrules"},
+    {cmd = "ruff check ezrules"}
+]
 
 [build-system]
 requires = ["hatchling"]

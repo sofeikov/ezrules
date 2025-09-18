@@ -43,7 +43,7 @@ class RuleManager(ABC):
         """
 
     @abstractmethod
-    def load_rule(self, rule_id: str, revision_number: str | None = None) -> Rule:
+    def load_rule(self, rule_id: str, revision_number: int | None = None) -> Rule:
         """Storage specific way to load a specific rule, possibly specific revision."""
 
     @abstractmethod
@@ -78,7 +78,7 @@ class RDBRuleManager(RuleManager):
             version_list.append(RuleRevision(r.version, created))
         return version_list
 
-    def load_rule(self, rule_id: str, revision_number: str | None = None) -> RuleModel:
+    def load_rule(self, rule_id: str, revision_number: int | None = None) -> RuleModel:
         if revision_number is None:
             latest_records = self.db.get(RuleModel, rule_id)
         else:
