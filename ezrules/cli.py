@@ -13,11 +13,9 @@ from ezrules.core.rule_updater import (
     RDBRuleEngineConfigProducer,
     RuleManager,
     RuleManagerFactory,
-    RuleRevision,
 )
-from ezrules.models.backend_core import Organisation
+from ezrules.models.backend_core import Organisation, TestingRecordLog, User
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import TestingRecordLog, User
 from ezrules.models.database import Base, db_session
 from ezrules.models.history_meta import versioned_session
 from ezrules.settings import app_settings
@@ -37,9 +35,7 @@ def cli():
 def add_user(user_email, password):
     db_endpoint = app_settings.DB_ENDPOINT
     engine = create_engine(db_endpoint)
-    db_session = scoped_session(
-        sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    )
+    db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
     versioned_session(db_session)
 
     try:
@@ -53,13 +49,13 @@ def add_user(user_email, password):
         )
         db_session.commit()
         logger.info(f"Done adding {user_email} to {db_endpoint}")
-    except:
+    except Exception:
         db_session.rollback()
         logger.info("User already exists")
     try:
         db_session.add(Organisation(name="base"))
         db_session.commit()
-    except:
+    except Exception:
         db_session.rollback()
 
 
@@ -68,12 +64,9 @@ def init_db():
     db_endpoint = app_settings.DB_ENDPOINT
     logger.info(f"Initalising the DB at {db_endpoint}")
     engine = create_engine(db_endpoint)
-    db_session = scoped_session(
-        sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    )
+    db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
     versioned_session(db_session)
     Base.query = db_session.query_property()
-    import ezrules.models.backend_core
 
     Base.metadata.create_all(bind=engine)
     logger.info(f"Done initalising the DB at {db_endpoint}")
@@ -82,7 +75,6 @@ def init_db():
 @cli.command()
 @click.option("--port", default="8888")
 def manager(port):
-
     env = os.environ.copy()
     cmd = [
         "gunicorn",
@@ -103,7 +95,6 @@ def manager(port):
 @cli.command()
 @click.option("--port", default="9999")
 def evaluator(port):
-
     env = os.environ.copy()
     cmd = [
         "gunicorn",
@@ -132,9 +123,7 @@ def generate_random_data(n_rules: int, n_events: int):
         "score": float,
         "is_verified": int,
     }
-    fsrm: RuleManager = RuleManagerFactory.get_rule_manager(
-        "RDBRuleManager", **{"db": db_session, "o_id": 1}
-    )    
+    fsrm: RuleManager = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db": db_session, "o_id": 1})
     rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=1)
     all_attrs = list(test_attributes)
     for r_ind in range(n_rules):
@@ -144,13 +133,13 @@ def generate_random_data(n_rules: int, n_events: int):
         # Logic is a simple "if" statement randomly combining the attributes above with some thresholds
         conditions = []
         for attr in selected_attrs:
-            if test_attributes[attr] == float:
+            if isinstance(test_attributes[attr], float):
                 threshold = round(uniform(0, 1000), 2)
                 conditions.append(f"${attr} > {threshold}")
-            elif test_attributes[attr] == str:
+            elif isinstance(test_attributes[attr], str):
                 value = f"'{attr}_value_{randint(1, 10)}'"
                 conditions.append(f"${attr} == {value}")
-            elif test_attributes[attr] == int:
+            elif isinstance(test_attributes[attr], int):
                 threshold = randint(0, 1)
                 conditions.append(f"${attr} == {threshold}")
 
@@ -162,39 +151,33 @@ def generate_random_data(n_rules: int, n_events: int):
         description = f"This rule applies when: {', '.join(conditions)}."
 
         # Create the RuleModel instance
-        r = RuleModel(
-            rid=f"TestRule_Rule_{r_ind}", logic=logic, description=description, o_id=1
-        )
+        r = RuleModel(rid=f"TestRule_Rule_{r_ind}", logic=logic, description=description, o_id=1)
 
         # Add the rule to the database session and commit it
         db_session.add(r)
         db_session.commit()
 
-        
-
         print(f"Generated Rule {r_ind}: {logic}")
 
         lre = LocalRuleExecutorSQL(db=db_session, o_id=1)
         from datetime import datetime, timedelta
-    
+
     rule_engine_config_producer.save_config(fsrm)
     # Generate and evaluate events
     for e_ind in range(n_events):
         event_data = {}
         for attr, attr_type in test_attributes.items():
-            if attr_type == float:
+            if isinstance(attr_type, float):
                 event_data[attr] = round(uniform(0, 1000), 2)
-            elif attr_type == str:
+            elif isinstance(attr_type, str):
                 event_data[attr] = f"{attr}_value_{randint(1, 10)}"
-            elif attr_type == int:
+            elif isinstance(attr_type, int):
                 event_data[attr] = randint(0, 1)
 
         # Calculate a timestamp within the last month
         current_time = datetime.now()
         start_time = current_time - timedelta(days=30)
-        event_timestamp = randint(
-            int(start_time.timestamp()), int(current_time.timestamp())
-        )
+        event_timestamp = randint(int(start_time.timestamp()), int(current_time.timestamp()))
 
         event = Event(
             event_id=f"TestEvent_Event_{e_ind}",
@@ -209,12 +192,10 @@ def generate_random_data(n_rules: int, n_events: int):
 
 @cli.command()
 def delete_test_data():
-    db_session.query(TestingRecordLog).filter(
-        TestingRecordLog.event_id.ilike("TestEvent_%")
-    ).delete(synchronize_session=False)
-    db_session.query(RuleModel).filter(RuleModel.rid.ilike("TestRule_%")).delete(
+    db_session.query(TestingRecordLog).filter(TestingRecordLog.event_id.ilike("TestEvent_%")).delete(
         synchronize_session=False
     )
+    db_session.query(RuleModel).filter(RuleModel.rid.ilike("TestRule_%")).delete(synchronize_session=False)
     db_session.commit()
 
 

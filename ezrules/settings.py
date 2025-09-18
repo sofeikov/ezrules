@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -8,8 +7,8 @@ class Settings(BaseSettings):
     DB_ENDPOINT: str
     APP_SECRET: str
     ORG_ID: int
-    EVALUATOR_ENDPOINT: Optional[str] = "localhost:9999"
-    TESTING: Optional[bool] = False
+    EVALUATOR_ENDPOINT: str | None = "localhost:9999"
+    TESTING: bool | None = False
 
 
 app_settings = Settings()

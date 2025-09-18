@@ -1,20 +1,16 @@
 from abc import ABC, abstractmethod
-from ezrules.core.rule import Rule, RuleFactory, RuleConverter
-from typing import Optional, List, Union
-import hashlib
-from ruamel.yaml import scalarstring
-from datetime import datetime
-import ruamel
-import yaml
-import operator
 from collections import namedtuple
+
 from sqlalchemy.exc import NoResultFound
 
+from ezrules.core.rule import Rule, RuleConverter, RuleFactory
 from ezrules.models.backend_core import (
-    RuleEngineConfig,
-    Rule as RuleModel,
     Organisation,
+    RuleEngineConfig,
     RuleHistory,
+)
+from ezrules.models.backend_core import (
+    Rule as RuleModel,
 )
 
 RuleRevision = namedtuple("RuleRevision", ["revision_number", "created"])
@@ -40,20 +36,18 @@ class RuleManager(ABC):
         """Storage specific saving mechanism."""
 
     @abstractmethod
-    def get_rule_revision_list(
-        self, rule: Rule, return_dates=False
-    ) -> List[RuleRevision]:
+    def get_rule_revision_list(self, rule: Rule, return_dates=False) -> list[RuleRevision]:
         """Storage specific way to get a list of rule revisions.
         :param rule:
         :param return_dates:
         """
 
     @abstractmethod
-    def load_rule(self, rule_id: str, revision_number: Optional[str] = None) -> Rule:
+    def load_rule(self, rule_id: str, revision_number: str | None = None) -> Rule:
         """Storage specific way to load a specific rule, possibly specific revision."""
 
     @abstractmethod
-    def load_all_rules(self) -> List[Rule]:
+    def load_all_rules(self) -> list[Rule]:
         """Storage specific mechanism to load all available rules."""
 
 
@@ -68,13 +62,9 @@ class RDBRuleManager(RuleManager):
             self.db.add(rule)
         self.db.commit()
 
-    def get_rule_revision_list(
-        self, rule: Rule, return_dates=False
-    ) -> List[RuleRevision]:
+    def get_rule_revision_list(self, rule: Rule, return_dates=False) -> list[RuleRevision]:
         revisions = (
-            self.db.query(
-                RuleHistory.version, RuleHistory.changed, RuleHistory.created_at
-            )
+            self.db.query(RuleHistory.version, RuleHistory.changed, RuleHistory.created_at)
             .filter(RuleHistory.r_id == rule.r_id)
             .order_by(RuleHistory.version)
             .all()
@@ -88,23 +78,19 @@ class RDBRuleManager(RuleManager):
             version_list.append(RuleRevision(r.version, created))
         return version_list
 
-    def load_rule(
-        self, rule_id: str, revision_number: Optional[str] = None
-    ) -> RuleModel:
+    def load_rule(self, rule_id: str, revision_number: str | None = None) -> RuleModel:
         if revision_number is None:
             latest_records = self.db.get(RuleModel, rule_id)
         else:
             latest_records = (
                 self.db.query(RuleHistory)
-                .filter(
-                    RuleHistory.r_id == rule_id, RuleHistory.version == revision_number
-                )
+                .filter(RuleHistory.r_id == rule_id, RuleHistory.version == revision_number)
                 .order_by(RuleHistory.version)
                 .one()
             )
         return latest_records
 
-    def load_all_rules(self) -> List[RuleModel]:
+    def load_all_rules(self) -> list[RuleModel]:
         org = self.db.get(Organisation, self.o_id)
         return org.rules
 
@@ -135,9 +121,7 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
             )
             config_obj.config = rules_json
         except NoResultFound:
-            new_config = RuleEngineConfig(
-                label="production", config=rules_json, o_id=self.o_id
-            )
+            new_config = RuleEngineConfig(label="production", config=rules_json, o_id=self.o_id)
             self.db.add(new_config)
         self.db.commit()
 

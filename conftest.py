@@ -31,9 +31,7 @@ def engine_fix():
         drop_database(engine.url)
     create_database(engine.url)
 
-    Base.metadata.create_all(
-        engine
-    )  # Assuming Base is the declarative base from your models
+    Base.metadata.create_all(engine)  # Assuming Base is the declarative base from your models
 
     yield engine
 
@@ -86,7 +84,6 @@ def session(connection):
     ezrulevalapp.lre.o_id = org.o_id
 
     yield session
-    
 
     # Clean up Flask app references to avoid lingering connections
     ezruleapp.fsrm.db = None

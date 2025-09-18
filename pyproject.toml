@@ -39,10 +39,33 @@ dev-dependencies = [
     "pytest-cov",
     "pytest",
     "coverage",
+    "ruff>=0.13.0",
 ]
 
 [project.scripts]
 ezrules = "ezrules.cli:cli"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+output-format = "concise" # Works better for CI
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501", # line too long, handled by line-length
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ezrules"]
 
 [build-system]
 requires = ["hatchling"]

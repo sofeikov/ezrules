@@ -1,14 +1,14 @@
-import ast
-
-from ezrules.core.rule import Rule
-from ezrules.core.outcomes import Outcome
-from typing import List, Any, Tuple
 import abc
+import ast
+from typing import Any
+
+from ezrules.core.outcomes import Outcome
+from ezrules.core.rule import Rule
 
 
 class RuleChecker:
     @abc.abstractmethod
-    def check_rule(self, rule: Rule) -> Tuple[bool, str]:
+    def check_rule(self, rule: Rule) -> tuple[bool, str]:
         """Check if a rule is valid."""
 
 
@@ -27,7 +27,7 @@ class OnlyAllowedOutcomesAreReturnedChecker(RuleChecker):
     def __init__(self, outcome_manager: Outcome) -> None:
         self.outcome_manager = outcome_manager
 
-    def check_rule(self, rule: Rule) -> Tuple[bool, List[str]]:
+    def check_rule(self, rule: Rule) -> tuple[bool, list[str]]:
         v = AllowedOutcomeReturnVisitor()
         v.visit(rule._rule_ast)
         returned_values = v.values
@@ -35,15 +35,13 @@ class OnlyAllowedOutcomesAreReturnedChecker(RuleChecker):
         for v in returned_values:
             if self.outcome_manager.is_allowed_outcome(v) is False:
                 reasons.append(f"Value {v} is not allowed in rule outcome;")
-        are_allowed = [
-            self.outcome_manager.is_allowed_outcome(v) for v in returned_values
-        ]
+        are_allowed = [self.outcome_manager.is_allowed_outcome(v) for v in returned_values]
 
         return all(are_allowed), reasons
 
 
 class RuleCheckingPipeline:
-    def __init__(self, checkers: List[RuleChecker]):
+    def __init__(self, checkers: list[RuleChecker]):
         self.checkers = checkers
 
     def is_rule_valid(self, rule: Rule):

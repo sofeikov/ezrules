@@ -107,15 +107,13 @@ def test_cant_update_rule_with_invalid_config(session, logged_in_manager_client)
     form.logic.data = "return 'NO SUCH OUTCOME'"
     form.csrf_token.data = g.csrf_token
 
-    rv = logged_in_manager_client.post(
-        f"/rule/{rule.r_id}", data=form.data, follow_redirects=True
-    )
+    rv = logged_in_manager_client.post(f"/rule/{rule.r_id}", data=form.data, follow_redirects=True)
     assert "The rule changes have not been saved, because:" in rv.data.decode()
 
 
 def test_can_verify_rule_and_extract_params(logged_in_manager_client):
     rv = logged_in_manager_client.post(
-        f"/verify_rule",
+        "/verify_rule",
         json={"rule_source": "if $amount>100:\n\treturn 'HOLD'"},
         follow_redirects=True,
     )
@@ -124,7 +122,7 @@ def test_can_verify_rule_and_extract_params(logged_in_manager_client):
 
 def test_cant_verify_rule_and_extract_params(logged_in_manager_client):
     rv = logged_in_manager_client.post(
-        f"/verify_rule",
+        "/verify_rule",
         json={"rule_source": "if$amount>100:\n\treturn 'HOLD'"},
         follow_redirects=True,
     )
@@ -132,30 +130,28 @@ def test_cant_verify_rule_and_extract_params(logged_in_manager_client):
 
 
 def test_ping(logged_in_manager_client):
-    rv = logged_in_manager_client.get(f"/ping")
+    rv = logged_in_manager_client.get("/ping")
     assert rv.data.decode() == "OK"
 
 
 def test_can_load_user_lists(logged_in_manager_client):
-    rv = logged_in_manager_client.get(f"/management/lists")
+    rv = logged_in_manager_client.get("/management/lists")
     assert rv.status_code == 200
 
 
 def test_can_load_outcomes_page(logged_in_manager_client):
-    rv = logged_in_manager_client.get(f"/management/outcomes")
+    rv = logged_in_manager_client.get("/management/outcomes")
     assert rv.status_code == 200
 
 
 def test_can_add_outcomes(logged_in_manager_client):
-    logged_in_manager_client.get(f"/management/outcomes")
+    logged_in_manager_client.get("/management/outcomes")
 
     form = OutcomeForm()
     form.outcome.data = "NEW_TEST_OUTCOME"
     form.csrf_token.data = g.csrf_token
 
-    rv = logged_in_manager_client.post(
-        f"/management/outcomes", data=form.data, follow_redirects=True
-    )
+    rv = logged_in_manager_client.post("/management/outcomes", data=form.data, follow_redirects=True)
     assert "NEW_TEST_OUTCOME" in ezruleapp.outcome_manager.get_allowed_outcomes()
     assert rv.status_code == 200
 
@@ -175,7 +171,7 @@ def test_can_add_outcomes(logged_in_manager_client):
                 "reason": "Example is malformed",
                 "rule_outcome": None,
             },
-            f"\INCORRECT JSON",
+            r"\INCORRECT JSON",
         ),
         (
             "if $amount > 100\n\treturn 'HOLD'",
@@ -190,7 +186,7 @@ def test_can_add_outcomes(logged_in_manager_client):
 )
 def test_can_test_rule(logged_in_manager_client, rule_source, expected_response, test_json):
     rv = logged_in_manager_client.post(
-        f"/test_rule",
+        "/test_rule",
         json={
             "rule_source": rule_source,
             "test_json": test_json,

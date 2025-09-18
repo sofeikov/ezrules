@@ -38,16 +38,13 @@ from ezrules.core.rule_updater import (
     RuleRevision,
 )
 from ezrules.core.user_lists import StaticUserListManager
-from ezrules.models.backend_core import Role
+from ezrules.models.backend_core import Role, RuleBackTestingResult, User
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import RuleBackTestingResult, User
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
 outcome_manager = FixedOutcome()
-rule_checker = RuleCheckingPipeline(
-    checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)]
-)
+rule_checker = RuleCheckingPipeline(checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)])
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
@@ -66,9 +63,7 @@ csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)
 app.secret_key = url_safe_token
 o_id = app_settings.ORG_ID
-fsrm: RuleManager = RuleManagerFactory.get_rule_manager(
-    "RDBRuleManager", **{"db": db_session, "o_id": o_id}
-)
+fsrm: RuleManager = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db": db_session, "o_id": o_id})
 
 app.teardown_appcontext(lambda exc: db_session.close())
 user_datastore = SQLAlchemySessionUserDatastore(db_session, User, Role)
@@ -81,9 +76,7 @@ rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=o_
 @conditional_decorator(not app.config["TESTING"], auth_required())
 def rules():
     rules = fsrm.load_all_rules()
-    return render_template(
-        "rules.html", rules=rules, evaluator_endpoint=app.config["EVALUATOR_ENDPOINT"]
-    )
+    return render_template("rules.html", rules=rules, evaluator_endpoint=app.config["EVALUATOR_ENDPOINT"])
 
 
 @app.route("/create_rule", methods=["GET", "POST"])
@@ -103,9 +96,7 @@ def create_rule():
         app.logger.info(rule_raw_config)
         # Make sure we can compile the rule
         rule = RuleFactory.from_json(rule_raw_config)
-        new_rule = RuleModel(
-            rid=rule.rid, logic=rule._source, description=rule.description
-        )
+        new_rule = RuleModel(rid=rule.rid, logic=rule._source, description=rule.description)
         fsrm.save_rule(new_rule)
         app.logger.info("Saving new version of the rules")
         rule_engine_config_producer.save_config(fsrm)
@@ -118,24 +109,19 @@ def create_rule():
 def timeline(rule_id):
     latest_version = fsrm.load_rule(rule_id)
     revision_list = fsrm.get_rule_revision_list(latest_version)
-    rules = [
-        fsrm.load_rule(rule_id, revision_number=r.revision_number)
-        for r in revision_list
-    ]
+    rules = [fsrm.load_rule(rule_id, revision_number=r.revision_number) for r in revision_list]
     # Add the current version
     rules = [RuleFactory.from_json(r.__dict__) for r in rules]
-    revision_list.append(
-        RuleRevision(revision_number=latest_version.version, created=None)
-    )
+    revision_list.append(RuleRevision(revision_number=latest_version.version, created=None))
     rules.append(RuleFactory.from_json(latest_version.__dict__))
     logics = [r._source for r in rules]
     diff_timeline = []
-    for ct, (l1, l2) in enumerate(zip(logics[:-1], logics[1:])):
+    for ct, (l1, l2) in enumerate(zip(logics[:-1], logics[1:], strict=False)):
         diff = difflib.HtmlDiff().make_file(
             fromlines=l1.split("\n"),
             tolines=l2.split("\n"),
             fromdesc=f"Revision {revision_list[ct].revision_number}",
-            todesc=f"Revision {revision_list[ct+1].revision_number}",
+            todesc=f"Revision {revision_list[ct + 1].revision_number}",
         )
         diff_timeline.append(diff)
 
@@ -194,7 +180,9 @@ def get_backtesting_results(rule_id):
         .order_by(sqlalchemy.desc(RuleBackTestingResult.created_at))
         .limit(3)
     )
-    dslice = lambda d: {k:d[k] for k in d if k in ('task_id', 'created_at')}
+
+    def dslice(d):
+        return {k: d[k] for k in d if k in ("task_id", "created_at")}
 
     return jsonify([dslice(br.__dict__) for br in backtesting_results])
 
@@ -206,11 +194,11 @@ def verifyty_rule():
     try:
         source_ = request.get_json()["rule_source"]
         rule = Rule(rid="", logic=source_)
-    except:
+    except Exception:
         app.logger.info(f"Failed to compile logic: {source_}")
         return {}
     app.logger.info(f"About to return these params: {rule.get_rule_params()}")
-    return jsonify(params=sorted(list(rule.get_rule_params()), key=str))
+    return jsonify(params=sorted(rule.get_rule_params(), key=str))
 
 
 @app.route("/test_rule", methods=["POST"])
@@ -244,9 +232,7 @@ def test_rule():
 def verified_outcomes():
     form = OutcomeForm()
     if request.method == "GET":
-        return render_template(
-            "outcomes.html", form=form, outcomes=outcome_manager.get_allowed_outcomes()
-        )
+        return render_template("outcomes.html", form=form, outcomes=outcome_manager.get_allowed_outcomes())
     else:
         if form.validate():
             outcome_manager.add_outcome(form.outcome.data)
@@ -273,7 +259,7 @@ def get_task_status(task_id: str):
     result = t.result if ready else None
     app.logger.info(f"Getting task status for {task_id}: {ready=} with {result=}")
     all_outcomes = set()
-    for k, v in result.items():
+    for v in result.values():
         for outcome in v:
             all_outcomes.add(outcome)
 
@@ -304,9 +290,7 @@ def get_task_status(task_id: str):
 @app.route("/management/lists", methods=["GET", "POST"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
 def user_lists():
-    return render_template(
-        "user_lists.html", user_lists=StaticUserListManager().get_all_entries()
-    )
+    return render_template("user_lists.html", user_lists=StaticUserListManager().get_all_entries())
 
 
 @app.route("/ping", methods=["GET"])

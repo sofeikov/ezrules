@@ -1,17 +1,15 @@
 import json
 
-
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
 from ezrules.models.backend_core import Organisation, Rule
 
 
 def test_ping(logged_out_eval_client):
-    rv = logged_out_eval_client.get(f"/ping")
+    rv = logged_out_eval_client.get("/ping")
     assert rv.data.decode() == "OK"
 
 
 def test_can_evaluate_rule(session, logged_out_eval_client):
-
     org = session.query(Organisation).one()
 
     rule = Rule(logic="return 'HOLD'", description="1", rid="1", o_id=org.o_id, r_id=123)

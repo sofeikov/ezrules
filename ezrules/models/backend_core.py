@@ -1,5 +1,4 @@
 import datetime
-from typing import List
 
 from flask_security import AsaList, RoleMixin, UserMixin
 from sqlalchemy import (
@@ -10,7 +9,6 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
-    ForeignKeyConstraint,
 )
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
@@ -48,9 +46,7 @@ class User(Base, UserMixin):
     active = Column(Boolean())
     fs_uniquifier = Column(String(64), unique=True, nullable=False)
     confirmed_at = Column(DateTime())
-    roles = relationship(
-        "Role", secondary="roles_users", backref=backref("users", lazy="dynamic")
-    )
+    roles = relationship("Role", secondary="roles_users", backref=backref("users", lazy="dynamic"))
 
 
 class Organisation(Base):
@@ -60,8 +56,8 @@ class Organisation(Base):
     name = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    rules: Mapped[List["Rule"]] = relationship()
-    re_configs: Mapped[List["RuleEngineConfig"]] = relationship()
+    rules: Mapped[list["Rule"]] = relationship()
+    re_configs: Mapped[list["RuleEngineConfig"]] = relationship()
 
     def __repr__(self):
         return f"ID:{self.o_id}, {self.name=}, {len(self.rules)=}"
@@ -90,7 +86,7 @@ class Rule(Versioned, Base):
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
     org: Mapped["Organisation"] = relationship(back_populates="rules")
 
-    backtesting_results: Mapped[List["RuleBackTestingResult"]] = relationship(
+    backtesting_results: Mapped[list["RuleBackTestingResult"]] = relationship(
         back_populates="rule",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -115,7 +111,7 @@ class TestingRecordLog(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
 
-    testing_results: Mapped[List["TestingResultsLog"]] = relationship(
+    testing_results: Mapped[list["TestingResultsLog"]] = relationship(
         back_populates="testing_record",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -126,16 +122,12 @@ class TestingResultsLog(Base):
     __tablename__ = "testing_results_log"
 
     tr_id = Column(Integer, unique=True, primary_key=True)
-    tl_id: Mapped[int] = mapped_column(
-        ForeignKey("testing_record_log.tl_id", ondelete="CASCADE")
-    )
+    tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id", ondelete="CASCADE"))
     rule_result = Column(String, nullable=False)
 
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
 
-    testing_record: Mapped["TestingRecordLog"] = relationship(
-        back_populates="testing_results"
-    )
+    testing_record: Mapped["TestingRecordLog"] = relationship(back_populates="testing_results")
 
 
 class RuleBackTestingResult(Base):
