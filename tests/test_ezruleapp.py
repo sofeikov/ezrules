@@ -30,7 +30,9 @@ def test_can_create_new_rule(session, logged_in_manager_client):
     form.csrf_token.data = g.csrf_token
 
     # Post rule and validate it was created
-    rv = logged_in_manager_client.post("/create_rule", data=form.data, follow_redirects=True)
+    rv = logged_in_manager_client.post(
+        "/create_rule", data=form.data, follow_redirects=True
+    )
     added_rule = session.query(Rule).one()
     assert added_rule.r_id == 1
     assert added_rule.description == "test"
@@ -49,7 +51,9 @@ def test_can_not_create_new_invalid_rule(session, logged_in_manager_client):
     form.logic.data = "return 'NO SUCH OUTCOME'"
 
     # Post rule and validate it was created
-    rv = logged_in_manager_client.post("/create_rule", data=form.data, follow_redirects=True)
+    rv = logged_in_manager_client.post(
+        "/create_rule", data=form.data, follow_redirects=True
+    )
     # Still good response as we redirect to the same page
     assert rv.status_code == 200
     assert "Value NO SUCH OUTCOME is not allowed in rule outcome;" in rv.data.decode()
@@ -81,7 +85,9 @@ def test_can_post_rule_update(session, logged_in_manager_client):
     form.logic.data = "return 'CANCEL'"
     form.csrf_token.data = g.csrf_token
 
-    logged_in_manager_client.post(f"/rule/{rule.r_id}", data=form.data, follow_redirects=True)
+    logged_in_manager_client.post(
+        f"/rule/{rule.r_id}", data=form.data, follow_redirects=True
+    )
     logged_in_manager_client.get(f"/rule/{rule.r_id}/1")
 
     # Make sure history object is created
@@ -188,7 +194,9 @@ def test_can_add_outcomes(logged_in_manager_client):
         ),
     ],
 )
-def test_can_test_rule(logged_in_manager_client, rule_source, expected_response, test_json):
+def test_can_test_rule(
+    logged_in_manager_client, rule_source, expected_response, test_json
+):
     rv = logged_in_manager_client.post(
         "/test_rule",
         json={

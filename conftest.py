@@ -87,7 +87,6 @@ def session(connection):
 
     yield session
 
-
     # Clean up Flask app references to avoid lingering connections
     ezruleapp.fsrm.db = None
     ezruleapp.rule_engine_config_producer.db = None

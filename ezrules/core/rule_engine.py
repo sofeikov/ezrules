@@ -30,7 +30,7 @@ class RuleEngine:
         :return: aggregated results, either as a list of unique decisions, or a counter for each decision.
         """
         rule_results = {r.r_id or r.rid: r(t) for r in self.rules}
-        rule_results = {r:res for r,res in rule_results.items() if res is not None}
+        rule_results = {r: res for r, res in rule_results.items() if res is not None}
         outcome_counters = dict(Counter(rule_results.values()))
         outcome_set = sorted(set(outcome_counters.keys()))
         results = {

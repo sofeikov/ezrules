@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel, field_validator
 
 from ezrules.models.backend_core import TestingRecordLog, TestingResultsLog

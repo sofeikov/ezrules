@@ -46,10 +46,7 @@ def _history_mapper(local_mapper):
     else:
         super_history_mapper = None
 
-    if (
-        not super_mapper
-        or local_mapper.local_table is not super_mapper.local_table
-    ):
+    if not super_mapper or local_mapper.local_table is not super_mapper.local_table:
         version_meta = {"version_meta": True}  # add column.info to identify
         # columns specific to versioning
 
@@ -70,9 +67,7 @@ def _history_mapper(local_mapper):
             history_c.default = history_c.server_default = None
             history_c.autoincrement = False
 
-            if super_mapper and col_references_table(
-                orig_c, super_mapper.local_table
-            ):
+            if super_mapper and col_references_table(orig_c, super_mapper.local_table):
                 assert super_history_mapper is not None
                 super_fks.append(
                     (
@@ -85,18 +80,13 @@ def _history_mapper(local_mapper):
 
             orig_prop = local_mapper.get_property_by_column(orig_c)
             # carry over column re-mappings
-            if (
-                len(orig_prop.columns) > 1
-                or orig_prop.columns[0].key != orig_prop.key
-            ):
+            if len(orig_prop.columns) > 1 or orig_prop.columns[0].key != orig_prop.key:
                 properties[orig_prop.key] = tuple(
                     col.info["history_copy"] for col in orig_prop.columns
                 )
 
         for const in list(history_table.constraints):
-            if not isinstance(
-                const, (PrimaryKeyConstraint, ForeignKeyConstraint)
-            ):
+            if not isinstance(const, (PrimaryKeyConstraint, ForeignKeyConstraint)):
                 history_table.constraints.discard(const)
 
         # "version" stores the integer version id.  This column is
@@ -124,9 +114,7 @@ def _history_mapper(local_mapper):
         )
 
         if super_mapper:
-            super_fks.append(
-                ("version", super_history_mapper.local_table.c.version)
-            )
+            super_fks.append(("version", super_history_mapper.local_table.c.version))
 
         if super_fks:
             history_table.append_constraint(
@@ -143,9 +131,7 @@ def _history_mapper(local_mapper):
         # been added and add them to the history table.
         for column in local_mapper.local_table.c:
             if column.key not in super_history_table.c:
-                col = Column(
-                    column.name, column.type, nullable=column.nullable
-                )
+                col = Column(column.name, column.type, nullable=column.nullable)
                 super_history_table.append_column(col)
 
     if not super_mapper:
@@ -153,9 +139,7 @@ def _history_mapper(local_mapper):
             Column("version", Integer, default=1, nullable=False),
             replace_existing=True,
         )
-        local_mapper.add_property(
-            "version", local_mapper.local_table.c.version
-        )
+        local_mapper.add_property("version", local_mapper.local_table.c.version)
 
         if cls.use_mapper_versioning:
             local_mapper.version_id_col = local_mapper.local_table.c.version

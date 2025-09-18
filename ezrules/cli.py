@@ -79,7 +79,6 @@ def init_db():
 @cli.command()
 @click.option("--port", default="8888")
 def manager(port):
-
     env = os.environ.copy()
     cmd = [
         "gunicorn",
@@ -100,7 +99,6 @@ def manager(port):
 @cli.command()
 @click.option("--port", default="9999")
 def evaluator(port):
-
     env = os.environ.copy()
     cmd = [
         "gunicorn",
@@ -166,8 +164,6 @@ def generate_random_data(n_rules: int, n_events: int):
         # Add the rule to the database session and commit it
         db_session.add(r)
         db_session.commit()
-
-
 
         print(f"Generated Rule {r_ind}: {logic}")
 

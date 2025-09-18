@@ -10,10 +10,11 @@ def test_ping(logged_out_eval_client):
 
 
 def test_can_evaluate_rule(session, logged_out_eval_client):
-
     org = session.query(Organisation).one()
 
-    rule = Rule(logic="return 'HOLD'", description="1", rid="1", o_id=org.o_id, r_id=123)
+    rule = Rule(
+        logic="return 'HOLD'", description="1", rid="1", o_id=org.o_id, r_id=123
+    )
     session.add(rule)
     session.commit()
 

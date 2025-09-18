@@ -16,13 +16,13 @@ def sample_function():
 
 def test_with_true_condition():
     decorated_func = conditional_decorator(True, dummy_decorator)(sample_function)
-    assert (
-        decorated_func() == "Decorated: Original function"
-    ), "The function should be decorated when the condition is True."
+    assert decorated_func() == "Decorated: Original function", (
+        "The function should be decorated when the condition is True."
+    )
 
 
 def test_with_false_condition():
     undecorated_func = conditional_decorator(False, dummy_decorator)(sample_function)
-    assert (
-        undecorated_func() == "Original function"
-    ), "The function should not be decorated when the condition is False."
+    assert undecorated_func() == "Original function", (
+        "The function should not be decorated when the condition is False."
+    )

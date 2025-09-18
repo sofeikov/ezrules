@@ -134,7 +134,7 @@ def timeline(rule_id):
             fromlines=l1.split("\n"),
             tolines=l2.split("\n"),
             fromdesc=f"Revision {revision_list[ct].revision_number}",
-            todesc=f"Revision {revision_list[ct+1].revision_number}",
+            todesc=f"Revision {revision_list[ct + 1].revision_number}",
         )
         diff_timeline.append(diff)
 
@@ -193,8 +193,9 @@ def get_backtesting_results(rule_id):
         .order_by(sqlalchemy.desc(RuleBackTestingResult.created_at))
         .limit(3)
     )
+
     def dslice(d):
-        return {k:d[k] for k in d if k in ('task_id', 'created_at')}
+        return {k: d[k] for k in d if k in ("task_id", "created_at")}
 
     return jsonify([dslice(br.__dict__) for br in backtesting_results])
 
