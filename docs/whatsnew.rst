@@ -5,6 +5,7 @@ What's new
 v0.7
 
 * Migrated from Poetry to UV for faster dependency management
+* Upgraded to Python 3.12 minimum requirement
 
 v0.6
 
