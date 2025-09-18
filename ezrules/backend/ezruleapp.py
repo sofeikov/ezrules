@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import secrets
+from json.decoder import JSONDecodeError
 
 import pandas as pd
 import sqlalchemy
@@ -67,7 +68,7 @@ fsrm: RuleManager = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db
 
 app.teardown_appcontext(lambda exc: db_session.close())
 user_datastore = SQLAlchemySessionUserDatastore(db_session, User, Role)
-app.security = Security(app, user_datastore)
+app.security = Security(app, user_datastore)  # type: ignore[unresolved-attribute]
 rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=o_id)
 
 
@@ -131,7 +132,7 @@ def timeline(rule_id):
 @app.route("/rule/<int:rule_id>", methods=["GET", "POST"])
 @app.route("/rule/<int:rule_id>/<revision_number>", methods=["GET"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
-def show_rule(rule_id=None, revision_number=None):
+def show_rule(rule_id: str, revision_number: int | None = None):
     if revision_number is not None:
         revision_number = int(revision_number)
     form = RuleForm()
@@ -209,7 +210,7 @@ def test_rule():
     print(rule_source)
     try:
         test_object = json.loads(test_json["test_json"])
-    except json.decoder.JSONDecodeError:
+    except JSONDecodeError:
         return {
             "status": "error",
             "reason": "Example is malformed",
@@ -259,6 +260,8 @@ def get_task_status(task_id: str):
     result = t.result if ready else None
     app.logger.info(f"Getting task status for {task_id}: {ready=} with {result=}")
     all_outcomes = set()
+    if not ready or result is None:
+        return jsonify(ready=ready, result=None)
     for v in result.values():
         for outcome in v:
             all_outcomes.add(outcome)
