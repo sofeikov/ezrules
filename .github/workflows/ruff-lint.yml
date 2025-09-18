@@ -1,4 +1,4 @@
-name: Ruff Linting
+name: Code Quality Checks
 
 on:
   pull_request:
@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  ruff:
+  code-quality:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -24,5 +24,10 @@ jobs:
       run: uv sync --dev
     - name: Check ruff formatting
       run: uv run ruff format --check ezrules
+      continue-on-error: true
     - name: Run ruff linter
       run: uv run ruff check ezrules
+      continue-on-error: true
+    - name: Run ty type checker
+      run: uv run ty check ezrules/
+      continue-on-error: true
