@@ -31,9 +31,7 @@ def engine_fix():
         drop_database(engine.url)
     create_database(engine.url)
 
-    Base.metadata.create_all(
-        engine
-    )  # Assuming Base is the declarative base from your models
+    Base.metadata.create_all(engine)  # Assuming Base is the declarative base from your models
 
     yield engine
 

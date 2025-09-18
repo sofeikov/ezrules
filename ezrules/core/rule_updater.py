@@ -36,9 +36,7 @@ class RuleManager(ABC):
         """Storage specific saving mechanism."""
 
     @abstractmethod
-    def get_rule_revision_list(
-        self, rule: Rule, return_dates=False
-    ) -> list[RuleRevision]:
+    def get_rule_revision_list(self, rule: Rule, return_dates=False) -> list[RuleRevision]:
         """Storage specific way to get a list of rule revisions.
         :param rule:
         :param return_dates:
@@ -64,13 +62,9 @@ class RDBRuleManager(RuleManager):
             self.db.add(rule)
         self.db.commit()
 
-    def get_rule_revision_list(
-        self, rule: Rule, return_dates=False
-    ) -> list[RuleRevision]:
+    def get_rule_revision_list(self, rule: Rule, return_dates=False) -> list[RuleRevision]:
         revisions = (
-            self.db.query(
-                RuleHistory.version, RuleHistory.changed, RuleHistory.created_at
-            )
+            self.db.query(RuleHistory.version, RuleHistory.changed, RuleHistory.created_at)
             .filter(RuleHistory.r_id == rule.r_id)
             .order_by(RuleHistory.version)
             .all()
@@ -90,9 +84,7 @@ class RDBRuleManager(RuleManager):
         else:
             latest_records = (
                 self.db.query(RuleHistory)
-                .filter(
-                    RuleHistory.r_id == rule_id, RuleHistory.version == revision_number
-                )
+                .filter(RuleHistory.r_id == rule_id, RuleHistory.version == revision_number)
                 .order_by(RuleHistory.version)
                 .one()
             )
@@ -129,9 +121,7 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
             )
             config_obj.config = rules_json
         except NoResultFound:
-            new_config = RuleEngineConfig(
-                label="production", config=rules_json, o_id=self.o_id
-            )
+            new_config = RuleEngineConfig(label="production", config=rules_json, o_id=self.o_id)
             self.db.add(new_config)
         self.db.commit()
 

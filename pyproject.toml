@@ -46,8 +46,9 @@ dev-dependencies = [
 ezrules = "ezrules.cli:cli"
 
 [tool.ruff]
+line-length = 120
 target-version = "py312"
-line-length = 88
+output-format = "concise" # Works better for CI
 
 [tool.ruff.lint]
 select = [

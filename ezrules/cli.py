@@ -35,9 +35,7 @@ def cli():
 def add_user(user_email, password):
     db_endpoint = app_settings.DB_ENDPOINT
     engine = create_engine(db_endpoint)
-    db_session = scoped_session(
-        sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    )
+    db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
     versioned_session(db_session)
 
     try:
@@ -66,9 +64,7 @@ def init_db():
     db_endpoint = app_settings.DB_ENDPOINT
     logger.info(f"Initalising the DB at {db_endpoint}")
     engine = create_engine(db_endpoint)
-    db_session = scoped_session(
-        sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    )
+    db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
     versioned_session(db_session)
     Base.query = db_session.query_property()
 
@@ -127,9 +123,7 @@ def generate_random_data(n_rules: int, n_events: int):
         "score": float,
         "is_verified": int,
     }
-    fsrm: RuleManager = RuleManagerFactory.get_rule_manager(
-        "RDBRuleManager", **{"db": db_session, "o_id": 1}
-    )
+    fsrm: RuleManager = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db": db_session, "o_id": 1})
     rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=1)
     all_attrs = list(test_attributes)
     for r_ind in range(n_rules):
@@ -157,9 +151,7 @@ def generate_random_data(n_rules: int, n_events: int):
         description = f"This rule applies when: {', '.join(conditions)}."
 
         # Create the RuleModel instance
-        r = RuleModel(
-            rid=f"TestRule_Rule_{r_ind}", logic=logic, description=description, o_id=1
-        )
+        r = RuleModel(rid=f"TestRule_Rule_{r_ind}", logic=logic, description=description, o_id=1)
 
         # Add the rule to the database session and commit it
         db_session.add(r)
@@ -185,9 +177,7 @@ def generate_random_data(n_rules: int, n_events: int):
         # Calculate a timestamp within the last month
         current_time = datetime.now()
         start_time = current_time - timedelta(days=30)
-        event_timestamp = randint(
-            int(start_time.timestamp()), int(current_time.timestamp())
-        )
+        event_timestamp = randint(int(start_time.timestamp()), int(current_time.timestamp()))
 
         event = Event(
             event_id=f"TestEvent_Event_{e_ind}",
@@ -202,12 +192,10 @@ def generate_random_data(n_rules: int, n_events: int):
 
 @cli.command()
 def delete_test_data():
-    db_session.query(TestingRecordLog).filter(
-        TestingRecordLog.event_id.ilike("TestEvent_%")
-    ).delete(synchronize_session=False)
-    db_session.query(RuleModel).filter(RuleModel.rid.ilike("TestRule_%")).delete(
+    db_session.query(TestingRecordLog).filter(TestingRecordLog.event_id.ilike("TestEvent_%")).delete(
         synchronize_session=False
     )
+    db_session.query(RuleModel).filter(RuleModel.rid.ilike("TestRule_%")).delete(synchronize_session=False)
     db_session.commit()
 
 

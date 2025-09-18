@@ -8,8 +8,6 @@ from ezrules.settings import app_settings
 Base = declarative_base()
 
 engine = create_engine(app_settings.DB_ENDPOINT)
-db_session = scoped_session(
-    sessionmaker(autocommit=False, autoflush=False, bind=engine)
-)
+db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 versioned_session(db_session)
 Base.query = db_session.query_property()

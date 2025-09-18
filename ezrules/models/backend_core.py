@@ -46,9 +46,7 @@ class User(Base, UserMixin):
     active = Column(Boolean())
     fs_uniquifier = Column(String(64), unique=True, nullable=False)
     confirmed_at = Column(DateTime())
-    roles = relationship(
-        "Role", secondary="roles_users", backref=backref("users", lazy="dynamic")
-    )
+    roles = relationship("Role", secondary="roles_users", backref=backref("users", lazy="dynamic"))
 
 
 class Organisation(Base):
@@ -124,16 +122,12 @@ class TestingResultsLog(Base):
     __tablename__ = "testing_results_log"
 
     tr_id = Column(Integer, unique=True, primary_key=True)
-    tl_id: Mapped[int] = mapped_column(
-        ForeignKey("testing_record_log.tl_id", ondelete="CASCADE")
-    )
+    tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id", ondelete="CASCADE"))
     rule_result = Column(String, nullable=False)
 
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
 
-    testing_record: Mapped["TestingRecordLog"] = relationship(
-        back_populates="testing_results"
-    )
+    testing_record: Mapped["TestingRecordLog"] = relationship(back_populates="testing_results")
 
 
 class RuleBackTestingResult(Base):

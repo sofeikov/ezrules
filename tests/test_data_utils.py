@@ -39,9 +39,7 @@ from ezrules.backend.data_utils import Event
 def test_event(event_id: str, event_timestamp: int, event_data: dict, expected: bool):
     if expected:
         # If expected is True, we expect the Event to be created successfully
-        event = Event(
-            event_id=event_id, event_timestamp=event_timestamp, event_data=event_data
-        )
+        event = Event(event_id=event_id, event_timestamp=event_timestamp, event_data=event_data)
         assert event.event_id == event_id
         assert event.event_timestamp == event_timestamp
         assert event.event_data == event_data

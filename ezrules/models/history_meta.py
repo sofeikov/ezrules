@@ -59,9 +59,7 @@ def _history_mapper(local_mapper):
                 idx.name += "_history"
             idx.unique = False
 
-        for orig_c, history_c in zip(
-            local_mapper.local_table.c, history_table.c, strict=False
-        ):
+        for orig_c, history_c in zip(local_mapper.local_table.c, history_table.c, strict=False):
             orig_c.info["history_copy"] = history_c
             history_c.unique = False
             history_c.default = history_c.server_default = None
@@ -81,9 +79,7 @@ def _history_mapper(local_mapper):
             orig_prop = local_mapper.get_property_by_column(orig_c)
             # carry over column re-mappings
             if len(orig_prop.columns) > 1 or orig_prop.columns[0].key != orig_prop.key:
-                properties[orig_prop.key] = tuple(
-                    col.info["history_copy"] for col in orig_prop.columns
-                )
+                properties[orig_prop.key] = tuple(col.info["history_copy"] for col in orig_prop.columns)
 
         for const in list(history_table.constraints):
             if not isinstance(const, (PrimaryKeyConstraint, ForeignKeyConstraint)):
@@ -117,15 +113,11 @@ def _history_mapper(local_mapper):
             super_fks.append(("version", super_history_mapper.local_table.c.version))
 
         if super_fks:
-            history_table.append_constraint(
-                ForeignKeyConstraint(*zip(*super_fks, strict=False))
-            )
+            history_table.append_constraint(ForeignKeyConstraint(*zip(*super_fks, strict=False)))
 
     else:
         history_table = None
-        super_history_table = super_mapper.local_table.metadata.tables[
-            super_mapper.local_table.name + "_history"
-        ]
+        super_history_table = super_mapper.local_table.metadata.tables[super_mapper.local_table.name + "_history"]
 
         # single table inheritance.  take any additional columns that may have
         # been added and add them to the history table.
@@ -156,9 +148,7 @@ def _history_mapper(local_mapper):
         bases = (super_history_mapper.class_,)
 
         if history_table is not None:
-            properties["changed"] = (history_table.c.changed,) + tuple(
-                super_history_mapper.attrs.changed.columns
-            )
+            properties["changed"] = (history_table.c.changed,) + tuple(super_history_mapper.attrs.changed.columns)
 
     else:
         bases = local_mapper.base_mapper.class_.__bases__
@@ -220,9 +210,7 @@ def create_version(obj, session, deleted=False):
 
     obj_changed = False
 
-    for om, hm in zip(
-        obj_mapper.iterate_to_root(), history_mapper.iterate_to_root(), strict=False
-    ):
+    for om, hm in zip(obj_mapper.iterate_to_root(), history_mapper.iterate_to_root(), strict=False):
         if hm.single:
             continue
 
@@ -269,9 +257,7 @@ def create_version(obj, session, deleted=False):
         for prop in obj_mapper.iterate_properties:
             if (
                 isinstance(prop, RelationshipProperty)
-                and attributes.get_history(
-                    obj, prop.key, passive=attributes.PASSIVE_NO_INITIALIZE
-                ).has_changes()
+                and attributes.get_history(obj, prop.key, passive=attributes.PASSIVE_NO_INITIALIZE).has_changes()
             ):
                 for p in prop.local_columns:
                     if p.foreign_keys:

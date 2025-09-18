@@ -35,9 +35,7 @@ class OnlyAllowedOutcomesAreReturnedChecker(RuleChecker):
         for v in returned_values:
             if self.outcome_manager.is_allowed_outcome(v) is False:
                 reasons.append(f"Value {v} is not allowed in rule outcome;")
-        are_allowed = [
-            self.outcome_manager.is_allowed_outcome(v) for v in returned_values
-        ]
+        are_allowed = [self.outcome_manager.is_allowed_outcome(v) for v in returned_values]
 
         return all(are_allowed), reasons
 

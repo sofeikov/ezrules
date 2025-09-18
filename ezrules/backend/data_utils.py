@@ -16,9 +16,7 @@ class Event(BaseModel):
 
         # Ensure the timestamp is in a reasonable range (e.g., 1970-01-01 to 3000-01-01)
         min_timestamp = 0  # Unix timestamp for 1970-01-01T00:00:00Z
-        max_timestamp = (
-            32503680000  # Approximate Unix timestamp for 3000-01-01T00:00:00Z
-        )
+        max_timestamp = 32503680000  # Approximate Unix timestamp for 3000-01-01T00:00:00Z
         if not (min_timestamp <= value <= max_timestamp):
             raise ValueError("Timestamp out of range")
 

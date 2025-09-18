@@ -26,9 +26,7 @@ class DollarNotationConverter:
         return f't["{tokens[0][1:]}"]'
 
     def __init__(self):
-        search_for_word = pp.Combine(
-            self.TRIGGER_CHAR + pp.Word(pp.alphas + "_", pp.alphanums + "_")
-        )
+        search_for_word = pp.Combine(self.TRIGGER_CHAR + pp.Word(pp.alphas + "_", pp.alphanums + "_"))
 
         line_parser = search_for_word
         line_parser.ignore(pp.QuotedString('"'))
