@@ -36,7 +36,7 @@ class DatabaseOutcome(Outcome):
         self.db_session = db_session
         self.o_id = o_id
         self._cached_outcomes = None
-        self._ensure_default_outcomes()
+        self._initialized = False
 
     def _ensure_default_outcomes(self):
         """Ensure default outcomes exist in the database"""
@@ -50,10 +50,17 @@ class DatabaseOutcome(Outcome):
                 self.db_session.add(outcome)
             self.db_session.commit()
 
+    def _ensure_initialized(self):
+        """Ensure the database has been initialized with default outcomes"""
+        if not self._initialized:
+            self._ensure_default_outcomes()
+            self._initialized = True
+
     def _load_outcomes_from_db(self):
         """Load outcomes from database and cache them"""
         from ezrules.models.backend_core import AllowedOutcome
 
+        self._ensure_initialized()
         outcomes = self.db_session.query(AllowedOutcome).filter_by(o_id=self.o_id).all()
         self._cached_outcomes = [outcome.outcome_name for outcome in outcomes]
         return self._cached_outcomes
@@ -66,6 +73,7 @@ class DatabaseOutcome(Outcome):
     def add_outcome(self, new_outcome: str):
         from ezrules.models.backend_core import AllowedOutcome
 
+        self._ensure_initialized()
         new_outcome = new_outcome.upper()
 
         # Check if outcome already exists
