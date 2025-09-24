@@ -5,7 +5,7 @@ from flask import g
 
 from ezrules.backend import ezruleapp
 from ezrules.backend.forms import OutcomeForm, RuleForm
-from ezrules.models.backend_core import Organisation, Rule, RuleHistory
+from ezrules.models.backend_core import AllowedOutcome, Organisation, Rule, RuleHistory
 
 
 def test_can_load_root_page(logged_in_manager_client):
@@ -213,3 +213,80 @@ def test_can_load_timeline(session, logged_in_manager_client):
 
     rv = logged_in_manager_client.get(f"/rule/{rule.r_id}/timeline")
     rv.status_code == 200
+
+
+def test_app_uses_database_outcome_manager(session):
+    """Test that the app is configured to use DatabaseOutcome manager"""
+    from ezrules.core.outcomes import DatabaseOutcome
+
+    assert isinstance(ezruleapp.outcome_manager, DatabaseOutcome)
+    assert ezruleapp.outcome_manager.o_id == session.query(Organisation).first().o_id
+
+
+def test_database_outcome_manager_creates_default_outcomes_on_app_start(session):
+    """Test that default outcomes are created when DatabaseOutcome is initialized"""
+    # Trigger lazy initialization by accessing outcomes
+    ezruleapp.outcome_manager.get_allowed_outcomes()
+
+    org = session.query(Organisation).first()
+    outcomes = session.query(AllowedOutcome).filter_by(o_id=org.o_id).all()
+    outcome_names = [o.outcome_name for o in outcomes]
+
+    # Should have the three default outcomes
+    assert "RELEASE" in outcome_names
+    assert "HOLD" in outcome_names
+    assert "CANCEL" in outcome_names
+
+
+def test_outcome_form_adds_to_database(session, logged_in_manager_client):
+    """Test that adding outcomes through the web form persists to database"""
+    org = session.query(Organisation).first()
+
+    # Get CSRF token
+    logged_in_manager_client.get("/management/outcomes")
+
+    # Add outcome through form
+    form = OutcomeForm()
+    form.outcome.data = "APPROVE"
+    form.csrf_token.data = g.csrf_token
+
+    rv = logged_in_manager_client.post("/management/outcomes", data=form.data, follow_redirects=True)
+
+    # Check that outcome was persisted to database
+    outcomes = session.query(AllowedOutcome).filter_by(o_id=org.o_id, outcome_name="APPROVE").all()
+    assert len(outcomes) == 1
+
+    # Check that outcome is available through manager
+    assert "APPROVE" in ezruleapp.outcome_manager.get_allowed_outcomes()
+    assert rv.status_code == 200
+
+
+def test_rule_validation_uses_database_outcomes(session, logged_in_manager_client):
+    """Test that rule validation checks against database outcomes"""
+    org = session.query(Organisation).first()
+
+    # Add a custom outcome to the database
+    new_outcome = AllowedOutcome(outcome_name="CUSTOM_OUTCOME", o_id=org.o_id)
+    session.add(new_outcome)
+    session.commit()
+
+    # Invalidate cache to ensure fresh load
+    ezruleapp.outcome_manager._cached_outcomes = None
+
+    # Get CSRF token
+    logged_in_manager_client.get("/create_rule")
+
+    # Create rule that uses the custom outcome
+    form = RuleForm()
+    form.rid.data = "TEST:CUSTOM"
+    form.description.data = "test custom outcome"
+    form.logic.data = "return 'CUSTOM_OUTCOME'"
+    form.csrf_token.data = g.csrf_token
+
+    rv = logged_in_manager_client.post("/create_rule", data=form.data, follow_redirects=True)
+
+    # Rule should be created successfully since CUSTOM_OUTCOME is in database
+    rule = session.query(Rule).filter_by(rid="TEST:CUSTOM").first()
+    assert rule is not None
+    assert rule.logic == "return 'CUSTOM_OUTCOME'"
+    assert rv.status_code == 200

@@ -80,6 +80,10 @@ def session(connection):
     ezruleapp.fsrm.o_id = org.o_id
     ezruleapp.rule_engine_config_producer.db = session
     ezruleapp.rule_engine_config_producer.o_id = org.o_id
+    ezruleapp.outcome_manager.db_session = session
+    ezruleapp.outcome_manager.o_id = org.o_id
+    ezruleapp.outcome_manager._initialized = False
+    ezruleapp.outcome_manager._cached_outcomes = None
     ezrulevalapp.lre.db = session
     ezrulevalapp.lre.o_id = org.o_id
 
@@ -88,6 +92,9 @@ def session(connection):
     # Clean up Flask app references to avoid lingering connections
     ezruleapp.fsrm.db = None
     ezruleapp.rule_engine_config_producer.db = None
+    ezruleapp.outcome_manager.db_session = None
+    ezruleapp.outcome_manager._initialized = False
+    ezruleapp.outcome_manager._cached_outcomes = None
     ezrulevalapp.lre.db = None
 
     session.close()

@@ -27,7 +27,7 @@ from ezrules.backend.forms import OutcomeForm, RuleForm
 from ezrules.backend.tasks import app as celery_app
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.backend.utils import conditional_decorator
-from ezrules.core.outcomes import FixedOutcome
+from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.rule import Rule, RuleConverter, RuleFactory
 from ezrules.core.rule_checkers import (
     OnlyAllowedOutcomesAreReturnedChecker,
@@ -45,7 +45,7 @@ from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
-outcome_manager = FixedOutcome()
+outcome_manager = DatabaseOutcome(db_session=db_session, o_id=app_settings.ORG_ID)
 rule_checker = RuleCheckingPipeline(checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)])
 
 app = Flask(__name__)
