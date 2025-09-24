@@ -130,6 +130,20 @@ class TestingResultsLog(Base):
     testing_record: Mapped["TestingRecordLog"] = relationship(back_populates="testing_results")
 
 
+class AllowedOutcome(Base):
+    __tablename__ = "allowed_outcomes"
+
+    ao_id = Column(Integer, unique=True, primary_key=True)
+    outcome_name = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
+    org: Mapped["Organisation"] = relationship()
+
+    def __repr__(self) -> str:
+        return f"{self.ao_id=},{self.outcome_name=},{self.o_id=}"
+
+
 class RuleBackTestingResult(Base):
     __tablename__ = "rule_backtesting_results"
 
