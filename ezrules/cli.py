@@ -133,13 +133,13 @@ def generate_random_data(n_rules: int, n_events: int):
         # Logic is a simple "if" statement randomly combining the attributes above with some thresholds
         conditions = []
         for attr in selected_attrs:
-            if isinstance(test_attributes[attr], float):
+            if test_attributes[attr] is float:
                 threshold = round(uniform(0, 1000), 2)
                 conditions.append(f"${attr} > {threshold}")
-            elif isinstance(test_attributes[attr], str):
+            elif test_attributes[attr] is str:
                 value = f"'{attr}_value_{randint(1, 10)}'"
                 conditions.append(f"${attr} == {value}")
-            elif isinstance(test_attributes[attr], int):
+            elif test_attributes[attr] is int:
                 threshold = randint(0, 1)
                 conditions.append(f"${attr} == {threshold}")
 
@@ -167,11 +167,11 @@ def generate_random_data(n_rules: int, n_events: int):
     for e_ind in range(n_events):
         event_data = {}
         for attr, attr_type in test_attributes.items():
-            if isinstance(attr_type, float):
+            if attr_type is float:
                 event_data[attr] = round(uniform(0, 1000), 2)
-            elif isinstance(attr_type, str):
+            elif attr_type is str:
                 event_data[attr] = f"{attr}_value_{randint(1, 10)}"
-            elif isinstance(attr_type, int):
+            elif attr_type is int:
                 event_data[attr] = randint(0, 1)
 
         # Calculate a timestamp within the last month
