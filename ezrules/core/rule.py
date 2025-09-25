@@ -2,16 +2,15 @@ import ast
 from collections.abc import Callable
 from typing import Any, NamedTuple
 
+from ezrules.core.application_context import get_user_list_manager
 from ezrules.core.rule_helpers import (
     AtNotationConverter,
     DollarNotationConverter,
     RuleParamExtractor,
 )
-from ezrules.core.user_lists import StaticUserListManager
 from ezrules.models.backend_core import Rule as RuleModel
 
 dollar_converter = DollarNotationConverter()
-at_converter = AtNotationConverter(list_values_provider=StaticUserListManager())
 
 
 class Fields:
@@ -79,6 +78,9 @@ class Rule:
     def logic(self, logic):
         """Compile the code."""
         post_proc_logic = dollar_converter.transform_rule(logic)
+        # Get the list provider from application context
+        list_provider = get_user_list_manager()
+        at_converter = AtNotationConverter(list_values_provider=list_provider)
         post_proc_logic = at_converter.transform_rule(post_proc_logic)
         code = self._wrap_with_function_header(post_proc_logic)
         self._compiled_rule, self._rule_ast = self.compile_function(code)

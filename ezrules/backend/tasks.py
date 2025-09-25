@@ -22,6 +22,14 @@ def count_rule_outcomes(rule: Rule, test_records: list[TestingRecordLog]) -> dic
 @app.task
 def backtest_rule_change(r_id: int, new_rule_logic: str):
     rule_obj = db_session.get(RuleModel, r_id)
+    # Set up application context for background task
+    from ezrules.core.application_context import set_organization_id, set_user_list_manager
+    from ezrules.core.user_lists import PersistentUserListManager
+
+    list_provider = PersistentUserListManager(db_session=db_session, o_id=app_settings.ORG_ID)
+    set_organization_id(app_settings.ORG_ID)
+    set_user_list_manager(list_provider)
+
     stored_rule = RuleFactory.from_json(rule_obj.__dict__)
     proposed_rule = Rule(rid="", logic=new_rule_logic)
 

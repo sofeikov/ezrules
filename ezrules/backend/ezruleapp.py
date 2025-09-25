@@ -27,6 +27,7 @@ from ezrules.backend.forms import OutcomeForm, RuleForm
 from ezrules.backend.tasks import app as celery_app
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.backend.utils import conditional_decorator
+from ezrules.core.application_context import set_organization_id, set_user_list_manager
 from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.rule import Rule, RuleConverter, RuleFactory
 from ezrules.core.rule_checkers import (
@@ -39,13 +40,19 @@ from ezrules.core.rule_updater import (
     RuleManagerFactory,
     RuleRevision,
 )
-from ezrules.core.user_lists import StaticUserListManager
+from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import Role, RuleBackTestingResult, User
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
 outcome_manager = DatabaseOutcome(db_session=db_session, o_id=app_settings.ORG_ID)
+user_list_manager = PersistentUserListManager(db_session=db_session, o_id=app_settings.ORG_ID)
+
+# Initialize application context
+set_organization_id(app_settings.ORG_ID)
+set_user_list_manager(user_list_manager)
+
 rule_checker = RuleCheckingPipeline(checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)])
 
 app = Flask(__name__)
@@ -294,7 +301,7 @@ def get_task_status(task_id: str):
 @app.route("/management/lists", methods=["GET", "POST"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
 def user_lists():
-    return render_template("user_lists.html", user_lists=StaticUserListManager().get_all_entries())
+    return render_template("user_lists.html", user_lists=user_list_manager.get_all_entries())
 
 
 @app.route("/ping", methods=["GET"])

@@ -84,6 +84,19 @@ def session(connection):
     ezruleapp.outcome_manager.o_id = org.o_id
     ezruleapp.outcome_manager._initialized = False
     ezruleapp.outcome_manager._cached_outcomes = None
+    ezruleapp.user_list_manager.db_session = session
+    ezruleapp.user_list_manager.o_id = org.o_id
+    ezruleapp.user_list_manager._initialized = False
+    ezruleapp.user_list_manager._cached_lists = None
+
+    # Set up application context for tests
+    from ezrules.core.application_context import reset_context, set_organization_id, set_user_list_manager
+    from ezrules.core.user_lists import PersistentUserListManager
+
+    reset_context()  # Reset context between tests
+    test_list_provider = PersistentUserListManager(db_session=session, o_id=org.o_id)
+    set_organization_id(org.o_id)
+    set_user_list_manager(test_list_provider)
     ezrulevalapp.lre.db = session
     ezrulevalapp.lre.o_id = org.o_id
 
@@ -95,6 +108,12 @@ def session(connection):
     ezruleapp.outcome_manager.db_session = None
     ezruleapp.outcome_manager._initialized = False
     ezruleapp.outcome_manager._cached_outcomes = None
+    ezruleapp.user_list_manager.db_session = None
+    ezruleapp.user_list_manager._initialized = False
+    ezruleapp.user_list_manager._cached_lists = None
+
+    # Clean up application context
+    reset_context()
     ezrulevalapp.lre.db = None
 
     session.close()
