@@ -144,6 +144,40 @@ class AllowedOutcome(Base):
         return f"{self.ao_id=},{self.outcome_name=},{self.o_id=}"
 
 
+class UserList(Base):
+    __tablename__ = "user_lists"
+
+    ul_id = Column(Integer, unique=True, primary_key=True)
+    list_name = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
+    org: Mapped["Organisation"] = relationship()
+
+    entries: Mapped[list["UserListEntry"]] = relationship(
+        back_populates="user_list",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    def __repr__(self) -> str:
+        return f"{self.ul_id=},{self.list_name=},{self.o_id=}"
+
+
+class UserListEntry(Base):
+    __tablename__ = "user_list_entries"
+
+    ule_id = Column(Integer, unique=True, primary_key=True)
+    entry_value = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    ul_id: Mapped[int] = mapped_column(ForeignKey("user_lists.ul_id", ondelete="CASCADE"))
+    user_list: Mapped["UserList"] = relationship(back_populates="entries")
+
+    def __repr__(self) -> str:
+        return f"{self.ule_id=},{self.entry_value=},{self.ul_id=}"
+
+
 class RuleBackTestingResult(Base):
     __tablename__ = "rule_backtesting_results"
 
