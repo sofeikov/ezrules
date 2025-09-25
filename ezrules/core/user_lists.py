@@ -14,6 +14,18 @@ class AbstractUserListManager(abc.ABC):
     def get_all_entries(self):
         """Get all lists and their entries"""
 
+    @abc.abstractmethod
+    def remove_entry(self, list_name, entry_value):
+        """Remove entry from the list"""
+
+    @abc.abstractmethod
+    def create_list(self, list_name):
+        """Create a new empty list"""
+
+    @abc.abstractmethod
+    def delete_list(self, list_name):
+        """Delete a list and all its entries"""
+
 
 class StaticUserListManager(AbstractUserListManager):
     def __init__(self):
@@ -52,6 +64,15 @@ class StaticUserListManager(AbstractUserListManager):
 
     def get_all_entries(self):
         return self.lists
+
+    def remove_entry(self, list_name, entry_value):
+        pass
+
+    def create_list(self, list_name):
+        pass
+
+    def delete_list(self, list_name):
+        pass
 
 
 class PersistentUserListManager(AbstractUserListManager):
@@ -168,3 +189,56 @@ class PersistentUserListManager(AbstractUserListManager):
             self.db_session.commit()
             # Invalidate cache to force reload
             self._cached_lists = None
+
+    def remove_entry(self, list_name, entry_value):
+        """Remove entry from the list"""
+        from ezrules.models.backend_core import UserList, UserListEntry
+
+        self._ensure_initialized()
+
+        # Find the list
+        user_list = self.db_session.query(UserList).filter_by(list_name=list_name, o_id=self.o_id).first()
+        if not user_list:
+            raise KeyError(f"List '{list_name}' not found")
+
+        # Find and remove the entry
+        entry = self.db_session.query(UserListEntry).filter_by(ul_id=user_list.ul_id, entry_value=entry_value).first()
+
+        if entry:
+            self.db_session.delete(entry)
+            self.db_session.commit()
+            # Invalidate cache to force reload
+            self._cached_lists = None
+
+    def create_list(self, list_name):
+        """Create a new empty list"""
+        from ezrules.models.backend_core import UserList
+
+        self._ensure_initialized()
+
+        # Check if list already exists
+        existing_list = self.db_session.query(UserList).filter_by(list_name=list_name, o_id=self.o_id).first()
+        if existing_list:
+            raise ValueError(f"List '{list_name}' already exists")
+
+        user_list = UserList(list_name=list_name, o_id=self.o_id)
+        self.db_session.add(user_list)
+        self.db_session.commit()
+        # Invalidate cache to force reload
+        self._cached_lists = None
+
+    def delete_list(self, list_name):
+        """Delete a list and all its entries"""
+        from ezrules.models.backend_core import UserList
+
+        self._ensure_initialized()
+
+        user_list = self.db_session.query(UserList).filter_by(list_name=list_name, o_id=self.o_id).first()
+        if not user_list:
+            raise KeyError(f"List '{list_name}' not found")
+
+        # Due to cascade delete, entries will be automatically deleted
+        self.db_session.delete(user_list)
+        self.db_session.commit()
+        # Invalidate cache to force reload
+        self._cached_lists = None

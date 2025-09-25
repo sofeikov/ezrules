@@ -301,6 +301,52 @@ def get_task_status(task_id: str):
 @app.route("/management/lists", methods=["GET", "POST"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
 def user_lists():
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        if action == "create_list":
+            list_name = request.form.get("list_name", "").strip()
+            if list_name:
+                try:
+                    user_list_manager.create_list(list_name)
+                    flash(f"List '{list_name}' created successfully.", "success")
+                except ValueError as e:
+                    flash(str(e), "error")
+            else:
+                flash("List name cannot be empty.", "error")
+
+        elif action == "delete_list":
+            list_name = request.form.get("list_name", "").strip()
+            if list_name:
+                try:
+                    user_list_manager.delete_list(list_name)
+                    flash(f"List '{list_name}' deleted successfully.", "success")
+                except KeyError as e:
+                    flash(str(e), "error")
+
+        elif action == "add_entry":
+            list_name = request.form.get("list_name", "").strip()
+            entry_value = request.form.get("entry_value", "").strip()
+            if list_name and entry_value:
+                user_list_manager.add_entry(list_name, entry_value)
+                flash(f"Added '{entry_value}' to '{list_name}'.", "success")
+            else:
+                flash("Both list name and entry value are required.", "error")
+
+        elif action == "remove_entry":
+            list_name = request.form.get("list_name", "").strip()
+            entry_value = request.form.get("entry_value", "").strip()
+            if list_name and entry_value:
+                try:
+                    user_list_manager.remove_entry(list_name, entry_value)
+                    flash(f"Removed '{entry_value}' from '{list_name}'.", "success")
+                except KeyError as e:
+                    flash(str(e), "error")
+            else:
+                flash("Both list name and entry value are required.", "error")
+
+        return redirect(url_for("user_lists"))
+
     return render_template("user_lists.html", user_lists=user_list_manager.get_all_entries())
 
 
