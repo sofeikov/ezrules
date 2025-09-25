@@ -13,6 +13,21 @@
             padding-left: 15px;
             padding-right: 15px;
         }
+        .list-entry {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .entry-tag {
+            background-color: #e9ecef;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+        }
+        .list-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
     </style>
 </head>
 {% endblock %}
@@ -21,17 +36,89 @@
     <div class="container-fluid mt-3">
         <a href="/rules" class="btn btn-secondary mb-3">Back to rule list</a>
         <h1>User Lists</h1>
-        <div class="card mb-3">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Create New List Form -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Create New List</h5>
+            </div>
             <div class="card-body">
-                <ul class="list-group">
-                    {% for k, v in user_lists.items() %}
-                        <li class="list-group-item">
-                            <strong>{{ k }}</strong>: {{ v }}
-                        </li>
-                    {% endfor %}
-                </ul>
+                <form method="post" class="d-flex gap-2 align-items-center">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="action" value="create_list">
+                    <input type="text" class="form-control" name="list_name" placeholder="List name" required>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </form>
             </div>
         </div>
+
+        <!-- Existing Lists -->
+        {% for list_name, entries in user_lists.items() %}
+        <div class="card mb-4">
+            <div class="card-header list-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <strong>@{{ list_name }}</strong>
+                    <span class="badge bg-secondary ms-2">{{ entries|length }} items</span>
+                </h5>
+                <form method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this list?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="action" value="delete_list">
+                    <input type="hidden" name="list_name" value="{{ list_name }}">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete List</button>
+                </form>
+            </div>
+            <div class="card-body">
+                <!-- Add Entry Form -->
+                <form method="post" class="d-flex gap-2 align-items-center mb-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="action" value="add_entry">
+                    <input type="hidden" name="list_name" value="{{ list_name }}">
+                    <input type="text" class="form-control" name="entry_value" placeholder="Add new entry" required>
+                    <button type="submit" class="btn btn-success btn-sm">Add</button>
+                </form>
+
+                <!-- List Entries -->
+                {% if entries %}
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for entry in entries %}
+                        <div class="entry-tag d-flex align-items-center gap-2">
+                            <span>{{ entry }}</span>
+                            <form method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <input type="hidden" name="action" value="remove_entry">
+                                <input type="hidden" name="list_name" value="{{ list_name }}">
+                                <input type="hidden" name="entry_value" value="{{ entry }}">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary" style="border: none; background: none; padding: 0; margin: 0;" title="Remove entry">×</button>
+                            </form>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">This list is empty.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not user_lists %}
+        <div class="card">
+            <div class="card-body text-center">
+                <p class="text-muted">No lists available. Create a new list to get started.</p>
+            </div>
+        </div>
+        {% endif %}
+
         <a href="/rules" class="btn btn-secondary mt-3">Back to rule list</a>
     </div>
 </body>
