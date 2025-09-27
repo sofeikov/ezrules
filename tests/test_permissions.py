@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 
 from ezrules.core.permissions import PermissionManager, requires_permission
 from ezrules.core.permissions_constants import PermissionAction, RoleType
