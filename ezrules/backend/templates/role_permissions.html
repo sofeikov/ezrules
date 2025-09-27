@@ -1,0 +1,115 @@
+{% include "user_header.html" %}
+{% extends "layout.html" %}
+{% block head %}
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous">
+    </script>
+    <title>Manage Permissions - {{ role.name }}</title>
+    <style>
+        .container-fluid {
+            padding-left: 15px;
+            padding-right: 15px;
+        }
+        .permission-card {
+            margin-bottom: 10px;
+        }
+        .permission-category {
+            border-left: 4px solid #007bff;
+            padding-left: 15px;
+            margin-bottom: 20px;
+        }
+        .form-check {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+{% endblock %}
+{% block body %}
+<body>
+    <div class="container-fluid mt-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <a href="{{ url_for('role_management') }}" class="btn btn-secondary">Back to Role Management</a>
+            </div>
+        </div>
+
+        <h1>Manage Permissions for Role: <span class="text-primary">{{ role.name }}</span></h1>
+        {% if role.description %}
+            <p class="text-muted">{{ role.description }}</p>
+        {% endif %}
+
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="card">
+                <div class="card-header">
+                    <h5>Permissions</h5>
+                    <small class="text-muted">Select the permissions this role should have:</small>
+                </div>
+                <div class="card-body">
+                    {% set resource_types = {} %}
+                    {% for action in actions %}
+                        {% if action.resource_type not in resource_types %}
+                            {% set _ = resource_types.update({action.resource_type: []}) %}
+                        {% endif %}
+                        {% set _ = resource_types[action.resource_type].append(action) %}
+                    {% endfor %}
+
+                    {% for resource_type, type_actions in resource_types.items() %}
+                        <div class="permission-category">
+                            <h6 class="text-capitalize fw-bold">{{ resource_type|title }} Management</h6>
+                            <div class="row">
+                                {% for action in type_actions %}
+                                    <div class="col-md-6 col-lg-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox"
+                                                   name="action_{{ action.id }}"
+                                                   id="action_{{ action.id }}"
+                                                   {% if action.id in current_action_ids %}checked{% endif %}>
+                                            <label class="form-check-label" for="action_{{ action.id }}">
+                                                <strong>{{ action.name.replace('_', ' ').title() }}</strong>
+                                                {% if action.description %}
+                                                    <br><small class="text-muted">{{ action.description }}</small>
+                                                {% endif %}
+                                            </label>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary">Update Permissions</button>
+                    <a href="{{ url_for('role_management') }}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </div>
+        </form>
+
+        <!-- Current Permissions Summary -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6>Current Permissions Summary</h6>
+            </div>
+            <div class="card-body">
+                {% if current_action_ids %}
+                    <p>This role currently has <strong>{{ current_action_ids|length }}</strong> permission(s):</p>
+                    <div class="d-flex flex-wrap">
+                        {% for action in actions %}
+                            {% if action.id in current_action_ids %}
+                                <span class="badge bg-success me-1 mb-1">{{ action.name.replace('_', ' ').title() }}</span>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning">
+                        This role currently has no permissions assigned.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+{% endblock %}

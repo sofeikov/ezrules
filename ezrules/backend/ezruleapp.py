@@ -24,7 +24,7 @@ from flask_bootstrap import Bootstrap5
 from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required, current_user
 from flask_wtf import CSRFProtect
 
-from ezrules.backend.forms import OutcomeForm, RuleForm
+from ezrules.backend.forms import OutcomeForm, RoleForm, RuleForm, UserForm, UserRoleForm
 from ezrules.backend.tasks import app as celery_app
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.backend.utils import conditional_decorator
@@ -44,7 +44,15 @@ from ezrules.core.rule_updater import (
     RuleRevision,
 )
 from ezrules.core.user_lists import PersistentUserListManager
-from ezrules.models.backend_core import Role, RuleBackTestingResult, RuleEngineConfigHistory, RuleHistory, User
+from ezrules.models.backend_core import (
+    Action,
+    Role,
+    RoleActions,
+    RuleBackTestingResult,
+    RuleEngineConfigHistory,
+    RuleHistory,
+    User,
+)
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
@@ -393,6 +401,247 @@ def audit_trail():
     )
 
     return render_template("audit_trail.html", rule_history=rule_history, config_history=config_history)
+
+
+@app.route("/management/users", methods=["GET", "POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_USERS))
+def user_management():
+    form = UserForm()
+
+    # Populate role choices
+    roles = db_session.query(Role).all()
+    role_choices = [("", "No role assigned")] + [(role.name, f"{role.name} - {role.description}") for role in roles]
+    form.role_name.choices = role_choices
+
+    if request.method == "POST":
+        if not app.config.get("TESTING", False):
+            if not PermissionManager.user_has_permission(current_user, PermissionAction.CREATE_USER):
+                abort(403)
+
+        if form.validate_on_submit():
+            user_email = form.user_email.data.strip()
+            password = form.password.data.strip()
+            role_name = form.role_name.data.strip() if form.role_name.data else None
+
+            try:
+                # Check if user already exists
+                existing_user = db_session.query(User).filter_by(email=user_email).first()
+                if existing_user:
+                    flash(f"User with email {user_email} already exists.", "error")
+                    return redirect(url_for("user_management"))
+
+                # Create new user
+                new_user = User(
+                    email=user_email,
+                    password=password,
+                    active=True,
+                    fs_uniquifier=user_email,
+                )
+                db_session.add(new_user)
+
+                # Add role if specified
+                if role_name:
+                    role = db_session.query(Role).filter_by(name=role_name).first()
+                    if role:
+                        new_user.roles.append(role)
+                    else:
+                        flash(f"Role '{role_name}' not found.", "warning")
+
+                db_session.commit()
+                flash(f"User {user_email} created successfully.", "success")
+            except Exception as e:
+                db_session.rollback()
+                flash(f"Error creating user: {str(e)}", "error")
+
+            return redirect(url_for("user_management"))
+
+    # GET request - show user management page
+    users = db_session.query(User).all()
+    return render_template("user_management.html", users=users, form=form)
+
+
+@app.route("/role_management", methods=["GET", "POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_ROLES))
+def role_management():
+    role_form = RoleForm()
+    user_role_form = UserRoleForm()
+
+    # Populate choices for user-role assignment
+    users = db_session.query(User).all()
+    roles = db_session.query(Role).all()
+    user_role_form.user_id.choices = [(user.id, user.email) for user in users]
+    user_role_form.role_id.choices = [(role.id, role.name) for role in roles]
+
+    if request.method == "POST":
+        # Handle role creation
+        if "create_role" in request.form:
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.CREATE_ROLE):
+                    abort(403)
+
+            if role_form.validate_on_submit():
+                role_name = role_form.name.data.strip()
+                description = role_form.description.data.strip() if role_form.description.data else ""
+
+                try:
+                    # Check if role already exists
+                    existing_role = db_session.query(Role).filter_by(name=role_name).first()
+                    if existing_role:
+                        flash(f"Role '{role_name}' already exists.", "error")
+                        return redirect(url_for("role_management"))
+
+                    # Create new role
+                    new_role = Role(name=role_name, description=description)
+                    db_session.add(new_role)
+                    db_session.commit()
+                    flash(f"Role '{role_name}' created successfully.", "success")
+                except Exception as e:
+                    db_session.rollback()
+                    flash(f"Error creating role: {str(e)}", "error")
+
+                return redirect(url_for("role_management"))
+
+        # Handle user-role assignment
+        elif "assign_role" in request.form:
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.MODIFY_ROLE):
+                    abort(403)
+
+            if user_role_form.validate_on_submit():
+                user_id = user_role_form.user_id.data
+                role_id = user_role_form.role_id.data
+
+                try:
+                    user = db_session.query(User).get(user_id)
+                    role = db_session.query(Role).get(role_id)
+
+                    if not user or not role:
+                        flash("User or role not found.", "error")
+                        return redirect(url_for("role_management"))
+
+                    # Check if user already has this role
+                    if role in user.roles:
+                        flash(f"User '{user.email}' already has role '{role.name}'.", "warning")
+                        return redirect(url_for("role_management"))
+
+                    # Assign role to user
+                    user.roles.append(role)
+                    db_session.commit()
+                    flash(f"Role '{role.name}' assigned to user '{user.email}' successfully.", "success")
+                except Exception as e:
+                    db_session.rollback()
+                    flash(f"Error assigning role: {str(e)}", "error")
+
+                return redirect(url_for("role_management"))
+
+    # GET request - show role management page
+    all_roles = db_session.query(Role).all()
+    all_users = db_session.query(User).all()
+    return render_template(
+        "role_management.html", roles=all_roles, users=all_users, role_form=role_form, user_role_form=user_role_form
+    )
+
+
+@app.route("/role_permissions/<int:role_id>", methods=["GET", "POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.MANAGE_PERMISSIONS))
+def manage_role_permissions(role_id):
+    role = db_session.query(Role).get(role_id)
+    if not role:
+        abort(404)
+    all_actions = db_session.query(Action).all()
+
+    # Get current permissions for this role
+    current_permissions = db_session.query(RoleActions).filter_by(role_id=role_id).all()
+    current_action_ids = {rp.action_id for rp in current_permissions}
+
+    if request.method == "POST":
+        if not app.config.get("TESTING", False):
+            if not PermissionManager.user_has_permission(current_user, PermissionAction.MANAGE_PERMISSIONS):
+                abort(403)
+
+        try:
+            # Get selected permissions from form
+            selected_action_ids = set()
+            for action in all_actions:
+                if request.form.get(f"action_{action.id}"):
+                    selected_action_ids.add(action.id)
+
+            # Remove permissions that are no longer selected
+            for permission in current_permissions:
+                if permission.action_id not in selected_action_ids:
+                    db_session.delete(permission)
+
+            # Add new permissions
+            for action_id in selected_action_ids:
+                if action_id not in current_action_ids:
+                    new_permission = RoleActions(role_id=role_id, action_id=action_id)
+                    db_session.add(new_permission)
+
+            db_session.commit()
+            flash(f"Permissions updated for role '{role.name}'.", "success")
+        except Exception as e:
+            db_session.rollback()
+            flash(f"Error updating permissions: {str(e)}", "error")
+
+        return redirect(url_for("manage_role_permissions", role_id=role_id))
+
+    return render_template(
+        "role_permissions.html", role=role, actions=all_actions, current_action_ids=current_action_ids
+    )
+
+
+@app.route("/delete_role/<int:role_id>", methods=["POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.DELETE_ROLE))
+def delete_role(role_id):
+    try:
+        role = db_session.query(Role).get(role_id)
+        if not role:
+            abort(404)
+
+        # Check if role is assigned to any users
+        if role.users.count() > 0:
+            flash(f"Cannot delete role '{role.name}' - it is assigned to {role.users.count()} user(s).", "error")
+            return redirect(url_for("role_management"))
+
+        # Delete role permissions first
+        db_session.query(RoleActions).filter_by(role_id=role_id).delete()
+
+        # Delete the role
+        db_session.delete(role)
+        db_session.commit()
+        flash(f"Role '{role.name}' deleted successfully.", "success")
+    except Exception as e:
+        db_session.rollback()
+        flash(f"Error deleting role: {str(e)}", "error")
+
+    return redirect(url_for("role_management"))
+
+
+@app.route("/remove_user_role/<int:user_id>/<int:role_id>", methods=["POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.MODIFY_ROLE))
+def remove_user_role(user_id, role_id):
+    try:
+        user = db_session.query(User).get(user_id)
+        role = db_session.query(Role).get(role_id)
+        if not user or not role:
+            abort(404)
+
+        if role in user.roles:
+            user.roles.remove(role)
+            db_session.commit()
+            flash(f"Role '{role.name}' removed from user '{user.email}' successfully.", "success")
+        else:
+            flash(f"User '{user.email}' does not have role '{role.name}'.", "warning")
+    except Exception as e:
+        db_session.rollback()
+        flash(f"Error removing role: {str(e)}", "error")
+
+    return redirect(url_for("role_management"))
 
 
 @app.route("/ping", methods=["GET"])
