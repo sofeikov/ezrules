@@ -12,6 +12,7 @@ from celery.result import AsyncResult
 from flask import (
     Flask,
     Response,
+    abort,
     flash,
     jsonify,
     redirect,
@@ -20,7 +21,7 @@ from flask import (
     url_for,
 )
 from flask_bootstrap import Bootstrap5
-from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required
+from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required, current_user
 from flask_wtf import CSRFProtect
 
 from ezrules.backend.forms import OutcomeForm, RuleForm
@@ -29,6 +30,8 @@ from ezrules.backend.tasks import backtest_rule_change
 from ezrules.backend.utils import conditional_decorator
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
 from ezrules.core.outcomes import DatabaseOutcome
+from ezrules.core.permissions import PermissionManager, requires_permission
+from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import Rule, RuleConverter, RuleFactory
 from ezrules.core.rule_checkers import (
     OnlyAllowedOutcomesAreReturnedChecker,
@@ -41,7 +44,7 @@ from ezrules.core.rule_updater import (
     RuleRevision,
 )
 from ezrules.core.user_lists import PersistentUserListManager
-from ezrules.models.backend_core import Role, RuleBackTestingResult, User
+from ezrules.models.backend_core import Role, RuleBackTestingResult, RuleEngineConfigHistory, RuleHistory, User
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
@@ -83,6 +86,7 @@ rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=o_
 @app.route("/rules", methods=["GET"])
 @app.route("/", methods=["GET"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_RULES))
 def rules():
     rules = fsrm.load_all_rules()
     return render_template("rules.html", rules=rules, evaluator_endpoint=app.config["EVALUATOR_ENDPOINT"])
@@ -90,6 +94,7 @@ def rules():
 
 @app.route("/create_rule", methods=["GET", "POST"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.CREATE_RULE))
 def create_rule():
     form = RuleForm()
     if request.method == "GET":
@@ -115,6 +120,7 @@ def create_rule():
 
 @app.route("/rule/<int:rule_id>/timeline", methods=["GET"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_RULES))
 def timeline(rule_id):
     latest_version = cast(RuleModel, fsrm.load_rule(rule_id))
     revision_list = fsrm.get_rule_revision_list(latest_version)
@@ -140,6 +146,7 @@ def timeline(rule_id):
 @app.route("/rule/<int:rule_id>", methods=["GET", "POST"])
 @app.route("/rule/<int:rule_id>/<revision_number>", methods=["GET"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_RULES))
 def show_rule(rule_id: str, revision_number: int | None = None):
     if revision_number is not None:
         revision_number = int(revision_number)
@@ -162,6 +169,10 @@ def show_rule(rule_id: str, revision_number: int | None = None):
             revision_list=revision_list,
         )
     elif request.method == "POST":
+        if not app.config.get("TESTING", False):
+            if not PermissionManager.user_has_permission(current_user, PermissionAction.MODIFY_RULE, int(rule_id)):
+                abort(403)
+
         rule_status_check = form.validate(rule_checker=rule_checker)
         if not rule_status_check.rule_ok:
             flash("The rule changes have not been saved, because:")
@@ -238,11 +249,16 @@ def test_rule():
 
 @app.route("/management/outcomes", methods=["GET", "POST"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_OUTCOMES))
 def verified_outcomes():
     form = OutcomeForm()
     if request.method == "GET":
         return render_template("outcomes.html", form=form, outcomes=outcome_manager.get_allowed_outcomes())
     else:
+        if not app.config.get("TESTING", False):
+            if not PermissionManager.user_has_permission(current_user, PermissionAction.CREATE_OUTCOME):
+                abort(403)
+
         if form.validate():
             outcome_manager.add_outcome(form.outcome.data)
             return redirect(url_for("verified_outcomes"))
@@ -300,11 +316,16 @@ def get_task_status(task_id: str):
 
 @app.route("/management/lists", methods=["GET", "POST"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_LISTS))
 def user_lists():
     if request.method == "POST":
         action = request.form.get("action")
 
         if action == "create_list":
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.CREATE_LIST):
+                    abort(403)
+
             list_name = request.form.get("list_name", "").strip()
             if list_name:
                 try:
@@ -316,6 +337,10 @@ def user_lists():
                 flash("List name cannot be empty.", "error")
 
         elif action == "delete_list":
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.DELETE_LIST):
+                    abort(403)
+
             list_name = request.form.get("list_name", "").strip()
             if list_name:
                 try:
@@ -325,6 +350,10 @@ def user_lists():
                     flash(str(e), "error")
 
         elif action == "add_entry":
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.MODIFY_LIST):
+                    abort(403)
+
             list_name = request.form.get("list_name", "").strip()
             entry_value = request.form.get("entry_value", "").strip()
             if list_name and entry_value:
@@ -334,6 +363,10 @@ def user_lists():
                 flash("Both list name and entry value are required.", "error")
 
         elif action == "remove_entry":
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.MODIFY_LIST):
+                    abort(403)
+
             list_name = request.form.get("list_name", "").strip()
             entry_value = request.form.get("entry_value", "").strip()
             if list_name and entry_value:
@@ -348,6 +381,18 @@ def user_lists():
         return redirect(url_for("user_lists"))
 
     return render_template("user_lists.html", user_lists=user_list_manager.get_all_entries())
+
+
+@app.route("/audit", methods=["GET"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.ACCESS_AUDIT_TRAIL))
+def audit_trail():
+    rule_history = db_session.query(RuleHistory).order_by(RuleHistory.changed.desc()).limit(100).all()
+    config_history = (
+        db_session.query(RuleEngineConfigHistory).order_by(RuleEngineConfigHistory.changed.desc()).limit(100).all()
+    )
+
+    return render_template("audit_trail.html", rule_history=rule_history, config_history=config_history)
 
 
 @app.route("/ping", methods=["GET"])

@@ -2,6 +2,10 @@
 
 What's new
 ----------
+v0.9
+* Implementation of RBAC: per-resource access control, audit trail
+* List and outcomes are now editable
+
 v0.7
 
 * Migrated from Poetry to UV for faster dependency management

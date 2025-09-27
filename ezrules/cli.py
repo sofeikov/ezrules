@@ -1,6 +1,7 @@
 import logging
 import os
 import subprocess
+from datetime import datetime, timedelta
 from random import choice, choices, randint, uniform
 
 import click
@@ -9,12 +10,14 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 
 from ezrules.backend.data_utils import Event, eval_and_store
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
+from ezrules.core.permissions import PermissionManager
+from ezrules.core.permissions_constants import RoleType
 from ezrules.core.rule_updater import (
     RDBRuleEngineConfigProducer,
     RuleManager,
     RuleManagerFactory,
 )
-from ezrules.models.backend_core import Organisation, TestingRecordLog, User
+from ezrules.models.backend_core import Organisation, Role, TestingRecordLog, User
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import Base, db_session
 from ezrules.models.history_meta import versioned_session
@@ -70,6 +73,61 @@ def init_db():
 
     Base.metadata.create_all(bind=engine)
     logger.info(f"Done initalising the DB at {db_endpoint}")
+
+
+@cli.command()
+def init_permissions():
+    db_endpoint = app_settings.DB_ENDPOINT
+    logger.info(f"Initializing permissions at {db_endpoint}")
+    engine = create_engine(db_endpoint)
+    db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
+    versioned_session(db_session)
+    Base.query = db_session.query_property()
+
+    PermissionManager.init_default_actions()
+
+    admin_role = db_session.query(Role).filter_by(name="admin").first()
+    if not admin_role:
+        admin_role = Role(name="admin", description="Full system administrator")
+        db_session.add(admin_role)
+        db_session.commit()
+
+    readonly_role = db_session.query(Role).filter_by(name="readonly").first()
+    if not readonly_role:
+        readonly_role = Role(name="readonly", description="Read-only access")
+        db_session.add(readonly_role)
+        db_session.commit()
+
+    rule_editor_role = db_session.query(Role).filter_by(name="rule_editor").first()
+    if not rule_editor_role:
+        rule_editor_role = Role(name="rule_editor", description="Can create and modify rules")
+        db_session.add(rule_editor_role)
+        db_session.commit()
+
+    # Get permissions for each role type using the enum
+    admin_permissions = RoleType.get_role_permissions(RoleType.ADMIN)
+    readonly_permissions = RoleType.get_role_permissions(RoleType.READONLY)
+    rule_editor_permissions = RoleType.get_role_permissions(RoleType.RULE_EDITOR)
+
+    for permission in admin_permissions:
+        try:
+            PermissionManager.grant_permission(int(admin_role.id), permission)
+        except ValueError:
+            logger.warning(f"Permission {permission.value} not found, skipping")
+
+    for permission in readonly_permissions:
+        try:
+            PermissionManager.grant_permission(int(readonly_role.id), permission)
+        except ValueError:
+            logger.warning(f"Permission {permission.value} not found, skipping")
+
+    for permission in rule_editor_permissions:
+        try:
+            PermissionManager.grant_permission(int(rule_editor_role.id), permission)
+        except ValueError:
+            logger.warning(f"Permission {permission.value} not found, skipping")
+
+    logger.info("Permissions initialized successfully")
 
 
 @cli.command()
@@ -160,7 +218,6 @@ def generate_random_data(n_rules: int, n_events: int):
         print(f"Generated Rule {r_ind}: {logic}")
 
         lre = LocalRuleExecutorSQL(db=db_session, o_id=1)
-        from datetime import datetime, timedelta
 
     rule_engine_config_producer.save_config(fsrm)
     # Generate and evaluate events

@@ -8,8 +8,10 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 
 - **Rule Engine**: Flexible Python-based rule execution with custom logic support
 - **Web Management Interface**: Flask-based UI for creating and managing rules
+- **Enterprise Security**: Granular role-based access control with 13 permission types
 - **Scalable Architecture**: Multi-service deployment with dedicated manager and evaluator services
 - **Database Integration**: PostgreSQL backend with SQLAlchemy ORM and full audit history
+- **Audit Trail**: Complete access control and change tracking for compliance
 - **Backtesting**: Test rule changes against historical data before deployment
 - **CLI Tools**: Command-line interface for database management and data generation
 - **Frontend Dashboard**: Next.js-based user interface for rule monitoring and analytics
@@ -49,6 +51,9 @@ uv sync
 # Initialize the database
 uv run ezrules init-db
 
+# Set up permissions and default roles
+uv run ezrules init-permissions
+
 # Add a user
 uv run ezrules add-user --user-email admin@example.com --password admin
 ```
@@ -70,12 +75,59 @@ uv run ezrules evaluator --port 9999
 uv run ezrules generate-random-data --n-rules 10 --n-events 100
 ```
 
+## 🔐 Enterprise Security
+
+ezrules includes a comprehensive role-based access control system designed for enterprise compliance requirements.
+
+### Permission Types
+
+The system supports 13 granular permission types:
+
+**Rule Management:**
+- `create_rule` - Create new business rules
+- `modify_rule` - Edit existing rules
+- `delete_rule` - Delete rules
+- `view_rules` - View rules and rule history
+
+**Outcome Management:**
+- `create_outcome` - Add new outcome types
+- `modify_outcome` - Edit outcome definitions
+- `delete_outcome` - Remove outcome types
+- `view_outcomes` - View outcome configurations
+
+**List Management:**
+- `create_list` - Create new user lists
+- `modify_list` - Add/remove list entries
+- `delete_list` - Delete entire lists
+- `view_lists` - View user lists
+
+**Audit Access:**
+- `access_audit_trail` - View system audit logs and change history
+
+### Default Roles
+
+Three pre-configured roles are available:
+
+- **Admin**: Full system access with all permissions
+- **Rule Editor**: Can create and modify rules, view outcomes and lists
+- **Read-only**: View-only access to rules, outcomes, and lists
+
+### Role Assignment
+
+Users can be assigned to roles through the database or programmatically. The permission system supports:
+
+- Multiple roles per user
+- Resource-level permissions (coming soon)
+- Department isolation capabilities
+- Complete audit trail of permission changes
+
 ## 💼 Use Cases
 
 - **Financial Transaction Monitoring**: Real-time fraud detection and compliance checking
+- **Enterprise Compliance**: Role-based access control with audit trails for regulatory requirements
 - **Business Rule Automation**: Automated decision making based on configurable business logic
 - **Event-Driven Processing**: Rule-based responses to system events and data changes
-- **Compliance Management**: Ensure transactions meet regulatory requirements
+- **Multi-Department Organizations**: Isolated rule management with granular permissions
 
 ## 🛠️ Development
 

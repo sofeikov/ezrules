@@ -49,6 +49,35 @@ class User(Base, UserMixin):
     roles = relationship("Role", secondary="roles_users", backref=backref("users", lazy="dynamic"))
 
 
+class Action(Base):
+    __tablename__ = "actions"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), unique=True, nullable=False)
+    description = Column(String(255))
+    resource_type = Column(String(50))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Action {self.name}>"
+
+
+class RoleActions(Base):
+    __tablename__ = "role_actions"
+
+    id = Column(Integer, primary_key=True)
+    role_id = Column(Integer, ForeignKey("role.id"), nullable=False)
+    action_id = Column(Integer, ForeignKey("actions.id"), nullable=False)
+    resource_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    role = relationship("Role", backref="role_actions")
+    action = relationship("Action", backref="role_actions")
+
+    def __repr__(self):
+        return f"<RoleAction role_id={self.role_id} action_id={self.action_id}>"
+
+
 class Organisation(Base):
     __tablename__ = "organisation"
 
