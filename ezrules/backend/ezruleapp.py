@@ -24,7 +24,7 @@ from flask_bootstrap import Bootstrap5
 from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required, current_user
 from flask_wtf import CSRFProtect
 
-from ezrules.backend.forms import OutcomeForm, RuleForm
+from ezrules.backend.forms import OutcomeForm, RuleForm, UserForm
 from ezrules.backend.tasks import app as celery_app
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.backend.utils import conditional_decorator
@@ -393,6 +393,64 @@ def audit_trail():
     )
 
     return render_template("audit_trail.html", rule_history=rule_history, config_history=config_history)
+
+
+@app.route("/management/users", methods=["GET", "POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_USERS))
+def user_management():
+    form = UserForm()
+
+    # Populate role choices
+    roles = db_session.query(Role).all()
+    role_choices = [("", "No role assigned")] + [(role.name, f"{role.name} - {role.description}") for role in roles]
+    form.role_name.choices = role_choices
+
+    if request.method == "POST":
+        if not app.config.get("TESTING", False):
+            if not PermissionManager.user_has_permission(current_user, PermissionAction.CREATE_USER):
+                abort(403)
+
+        if form.validate_on_submit():
+            user_email = form.user_email.data.strip()
+            password = form.password.data.strip()
+            role_name = form.role_name.data.strip() if form.role_name.data else None
+
+            try:
+                # Check if user already exists
+                existing_user = db_session.query(User).filter_by(email=user_email).first()
+                if existing_user:
+                    flash(f"User with email {user_email} already exists.", "error")
+                    return redirect(url_for("user_management"))
+
+                # Create new user
+                new_user = User(
+                    email=user_email,
+                    password=password,
+                    active=True,
+                    fs_uniquifier=user_email,
+                )
+                db_session.add(new_user)
+
+                # Add role if specified
+                if role_name:
+                    role = db_session.query(Role).filter_by(name=role_name).first()
+                    if role:
+                        new_user.roles.append(role)
+                    else:
+                        flash(f"Role '{role_name}' not found.", "warning")
+
+                db_session.commit()
+                flash(f"User {user_email} created successfully.", "success")
+            except Exception as e:
+                db_session.rollback()
+                flash(f"Error creating user: {str(e)}", "error")
+
+            return redirect(url_for("user_management"))
+
+    # GET request - show user management page
+    users = db_session.query(User).all()
+    return render_template("user_management.html", users=users, form=form)
 
 
 @app.route("/ping", methods=["GET"])

@@ -295,3 +295,8 @@ def test_rule_validation_uses_database_outcomes(session, logged_in_manager_clien
 def test_can_load_audit_trail(logged_in_manager_client):
     rv = logged_in_manager_client.get("/audit")
     assert rv.status_code == 200
+
+
+def test_can_load_user_management_page(logged_in_manager_client):
+    rv = logged_in_manager_client.get("/management/users")
+    assert rv.status_code == 200
