@@ -27,7 +27,10 @@
 {% from 'bootstrap5/form.html' import render_form %}
 <body>
     <div class="container-fluid mt-3">
-        <a href="/rules" class="btn btn-secondary mb-3">Back to rule list</a>
+        <div class="mb-3">
+            <a href="/rules" class="btn btn-secondary">Back to rule list</a>
+            <a href="{{ url_for('role_management') }}" class="btn btn-info">Manage Roles</a>
+        </div>
         <h1>User Management</h1>
         <p>Manage system users and their roles:</p>
 

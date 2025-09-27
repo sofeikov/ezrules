@@ -5,7 +5,8 @@ from flask import g
 
 from ezrules.backend import ezruleapp
 from ezrules.backend.forms import OutcomeForm, RuleForm
-from ezrules.models.backend_core import AllowedOutcome, Organisation, Rule, RuleHistory
+from ezrules.core.permissions import PermissionManager
+from ezrules.models.backend_core import AllowedOutcome, Organisation, Role, Rule, RuleHistory
 
 
 def test_can_load_root_page(logged_in_manager_client):
@@ -300,3 +301,30 @@ def test_can_load_audit_trail(logged_in_manager_client):
 def test_can_load_user_management_page(logged_in_manager_client):
     rv = logged_in_manager_client.get("/management/users")
     assert rv.status_code == 200
+
+
+def test_can_load_role_management_page(logged_in_manager_client):
+    rv = logged_in_manager_client.get("/role_management")
+    assert rv.status_code == 200
+
+
+def test_can_load_role_permissions_page(session, logged_in_manager_client):
+    # Set up the permission manager to use the test session
+    original_db_session = PermissionManager.db_session
+    PermissionManager.db_session = session
+    ezruleapp.db_session = session
+
+    try:
+        # Initialize default actions in the database for this test
+        PermissionManager.init_default_actions()
+
+        # Create a test role
+        test_role = Role(name="test_role", description="Test role for permissions")
+        session.add(test_role)
+        session.commit()
+
+        rv = logged_in_manager_client.get(f"/role_permissions/{test_role.id}")
+        assert rv.status_code == 200
+    finally:
+        # Restore original db_session
+        PermissionManager.db_session = original_db_session

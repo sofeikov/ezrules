@@ -1,0 +1,195 @@
+{% include "user_header.html" %}
+{% extends "layout.html" %}
+{% block head %}
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous">
+    </script>
+    <title>Role Management</title>
+    <style>
+        .container-fluid {
+            padding-left: 15px;
+            padding-right: 15px;
+        }
+        .table th, .table td {
+            text-align: left;
+            vertical-align: middle;
+        }
+        .badge {
+            margin-right: 5px;
+        }
+        .permission-badge {
+            display: inline-block;
+            margin: 2px;
+        }
+    </style>
+</head>
+{% endblock %}
+{% block body %}
+{% from 'bootstrap5/form.html' import render_form %}
+<body>
+    <div class="container-fluid mt-3">
+        <a href="/rules" class="btn btn-secondary mb-3">Back to rule list</a>
+        <h1>Role Management</h1>
+        <p>Manage system roles and user role assignments:</p>
+
+        <!-- Create New Role Form -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Create New Role</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ role_form.hidden_tag() }}
+                    <div class="row">
+                        <div class="col-md-4">
+                            {{ role_form.name.label(class="form-label") }}
+                            {{ role_form.name(class="form-control") }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ role_form.description.label(class="form-label") }}
+                            {{ role_form.description(class="form-control") }}
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" name="create_role" class="btn btn-primary">Create Role</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Assign Role to User Form -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Assign Role to User</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ user_role_form.hidden_tag() }}
+                    <div class="row">
+                        <div class="col-md-4">
+                            {{ user_role_form.user_id.label(class="form-label") }}
+                            {{ user_role_form.user_id(class="form-select") }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ user_role_form.role_id.label(class="form-label") }}
+                            {{ user_role_form.role_id(class="form-select") }}
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" name="assign_role" class="btn btn-success">Assign Role</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Existing Roles -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Existing Roles</h5>
+            </div>
+            <div class="card-body">
+                {% if roles %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Users Assigned</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for role in roles %}
+                                    <tr>
+                                        <td>{{ role.id }}</td>
+                                        <td><strong>{{ role.name }}</strong></td>
+                                        <td>{{ role.description or 'No description' }}</td>
+                                        <td>
+                                            {% if role.users.count() > 0 %}
+                                                <span class="badge bg-info">{{ role.users.count() }} user(s)</span>
+                                            {% else %}
+                                                <span class="text-muted">No users</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('manage_role_permissions', role_id=role.id) }}"
+                                               class="btn btn-sm btn-primary">Manage Permissions</a>
+                                            {% if role.users.count() == 0 %}
+                                                <form method="POST" action="{{ url_for('delete_role', role_id=role.id) }}"
+                                                      class="d-inline" onsubmit="return confirm('Are you sure you want to delete this role?');">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                                </form>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        No roles found in the system.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Users and Their Roles -->
+        <div class="card">
+            <div class="card-header">
+                <h5>Users and Role Assignments</h5>
+            </div>
+            <div class="card-body">
+                {% if users %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>User Email</th>
+                                    <th>Assigned Roles</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                    <tr>
+                                        <td>{{ user.email }}</td>
+                                        <td>
+                                            {% if user.roles %}
+                                                {% for role in user.roles %}
+                                                    <span class="badge bg-primary permission-badge">{{ role.name }}</span>
+                                                {% endfor %}
+                                            {% else %}
+                                                <span class="text-muted">No roles assigned</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% for role in user.roles %}
+                                                <form method="POST" action="{{ url_for('remove_user_role', user_id=user.id, role_id=role.id) }}"
+                                                      class="d-inline me-1" onsubmit="return confirm('Remove role {{ role.name }} from {{ user.email }}?');">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Remove {{ role.name }}</button>
+                                                </form>
+                                            {% endfor %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        No users found in the system.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+{% endblock %}

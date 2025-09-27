@@ -29,6 +29,13 @@ class PermissionAction(Enum):
     VIEW_USERS = "view_users"
     CREATE_USER = "create_user"
 
+    # Role Management (Admin only)
+    VIEW_ROLES = "view_roles"
+    CREATE_ROLE = "create_role"
+    MODIFY_ROLE = "modify_role"
+    DELETE_ROLE = "delete_role"
+    MANAGE_PERMISSIONS = "manage_permissions"
+
     @classmethod
     def get_default_actions(cls):
         """Get list of (action_name, description, resource_type) tuples for initialization."""
@@ -48,6 +55,11 @@ class PermissionAction(Enum):
             (cls.ACCESS_AUDIT_TRAIL.value, "Access audit trail and history", "audit"),
             (cls.VIEW_USERS.value, "View system users", "user"),
             (cls.CREATE_USER.value, "Create new users", "user"),
+            (cls.VIEW_ROLES.value, "View system roles", "role"),
+            (cls.CREATE_ROLE.value, "Create new roles", "role"),
+            (cls.MODIFY_ROLE.value, "Modify existing roles", "role"),
+            (cls.DELETE_ROLE.value, "Delete roles", "role"),
+            (cls.MANAGE_PERMISSIONS.value, "Manage role permissions", "permission"),
         ]
 
 

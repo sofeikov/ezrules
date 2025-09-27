@@ -37,3 +37,15 @@ class UserForm(FlaskForm):
     password = PasswordField("Password", validators=[DataRequired()])
     role_name = SelectField("Role (Optional)", choices=[])
     submit = SubmitField("Create User")
+
+
+class RoleForm(FlaskForm):
+    name = StringField("Role Name", validators=[DataRequired()])
+    description = StringField("Description")
+    submit = SubmitField("Create Role")
+
+
+class UserRoleForm(FlaskForm):
+    user_id = SelectField("User", choices=[], coerce=int)
+    role_id = SelectField("Role", choices=[], coerce=int)
+    submit = SubmitField("Assign Role")

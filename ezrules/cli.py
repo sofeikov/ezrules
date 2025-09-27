@@ -72,6 +72,13 @@ def init_db():
     Base.query = db_session.query_property()
 
     Base.metadata.create_all(bind=engine)
+
+    # Initialize default permissions
+    logger.info("Initializing default permissions...")
+    PermissionManager.db_session = db_session
+    PermissionManager.init_default_actions()
+    logger.info("Default permissions initialized")
+
     logger.info(f"Done initalising the DB at {db_endpoint}")
 
 
