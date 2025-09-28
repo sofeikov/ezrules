@@ -8,7 +8,7 @@ from ezrules.models.database import Base, engine
 from ezrules.models.history_meta import versioned_session
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def logged_out_manager_client():
     ezruleapp.app.config["TESTING"] = True
     ezruleapp.app.config["WTF_CSRF_METHODS"] = []
@@ -17,7 +17,7 @@ def logged_out_manager_client():
         yield client
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def logged_out_eval_client():
     ezrulevalapp.app.config["TESTING"] = True
 
@@ -120,7 +120,7 @@ def session(connection):
     transaction.rollback()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def logged_in_manager_client(session, logged_out_manager_client):
     # Log in the test user
     logged_out_manager_client.post(
