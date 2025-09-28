@@ -51,12 +51,21 @@ uv sync
 # Initialize the database
 uv run ezrules init-db
 
+# Initialize database with automatic deletion of existing database (non-interactive)
+uv run ezrules init-db --auto-delete
+
 # Set up permissions and default roles
 uv run ezrules init-permissions
 
 # Add a user
 uv run ezrules add-user --user-email admin@example.com --password admin
 ```
+
+The `init-db` command automatically handles database creation and provides options for managing existing databases:
+
+- **Interactive mode** (default): Prompts if you want to delete and recreate existing databases
+- **Auto-delete mode** (`--auto-delete`): Automatically deletes existing databases without prompting
+- **Smart creation**: Only creates the database if it doesn't already exist
 
 ### Start Services
 

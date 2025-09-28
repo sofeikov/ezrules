@@ -1,11 +1,14 @@
 import logging
 import os
 import subprocess
+import sys
 from datetime import datetime, timedelta
 from random import choice, choices, randint, uniform
+from urllib.parse import urlparse
 
 import click
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 from ezrules.backend.data_utils import Event, eval_and_store
@@ -25,6 +28,38 @@ from ezrules.settings import app_settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _drop_database(engine, db_name):
+    """Drop the specified database."""
+    logger.info(f"Dropping database '{db_name}'...")
+    with engine.connect() as conn:
+        conn.execute(text("COMMIT"))  # End any transaction
+        # Terminate all connections to the database before dropping
+        conn.execute(
+            text("""
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE datname = :db_name AND pid <> pg_backend_pid()
+        """),
+            {"db_name": db_name},
+        )
+        conn.execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
+    logger.info(f"Database '{db_name}' dropped successfully")
+
+
+def _create_database(engine, db_name):
+    """Create the specified database if it doesn't exist."""
+    logger.info(f"Creating database '{db_name}'...")
+    with engine.connect() as conn:
+        conn.execute(text("COMMIT"))  # End any transaction
+        # Check if database exists before creating
+        result = conn.execute(text("SELECT 1 FROM pg_database WHERE datname = :db_name"), {"db_name": db_name})
+        if result.fetchone() is None:
+            conn.execute(text(f"CREATE DATABASE {db_name}"))
+            logger.info(f"Database '{db_name}' created successfully")
+        else:
+            logger.info(f"Database '{db_name}' already exists")
 
 
 @click.group()
@@ -63,23 +98,75 @@ def add_user(user_email, password):
 
 
 @cli.command()
-def init_db():
+@click.option("--auto-delete", is_flag=True, help="Automatically delete existing database without prompting")
+def init_db(auto_delete):
     db_endpoint = app_settings.DB_ENDPOINT
-    logger.info(f"Initalising the DB at {db_endpoint}")
-    engine = create_engine(db_endpoint)
-    db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-    versioned_session(db_session)
-    Base.query = db_session.query_property()
+    logger.info(f"Initializing the DB at {db_endpoint}")
 
-    Base.metadata.create_all(bind=engine)
+    # Parse the database URL to get database name
+    parsed_url = urlparse(db_endpoint)
+    db_name = parsed_url.path.lstrip("/")
 
-    # Initialize default permissions
-    logger.info("Initializing default permissions...")
-    PermissionManager.db_session = db_session
-    PermissionManager.init_default_actions()
-    logger.info("Default permissions initialized")
+    # Create connection URL without database name for checking existence
+    if parsed_url.username and parsed_url.password:
+        base_url = (
+            f"{parsed_url.scheme}://{parsed_url.username}:{parsed_url.password}@{parsed_url.hostname}:{parsed_url.port}"
+        )
+    else:
+        base_url = f"{parsed_url.scheme}://{parsed_url.hostname}:{parsed_url.port}"
 
-    logger.info(f"Done initalising the DB at {db_endpoint}")
+    # Check if database exists
+    try:
+        base_engine = create_engine(base_url + "/postgres")  # Connect to default postgres db
+        with base_engine.connect() as conn:
+            conn.execute(text("COMMIT"))  # End any transaction
+            result = conn.execute(text("SELECT 1 FROM pg_database WHERE datname = :db_name"), {"db_name": db_name})
+            db_exists = result.fetchone() is not None
+
+        if db_exists:
+            if auto_delete:
+                logger.info(f"Database '{db_name}' exists. Auto-deleting...")
+                _drop_database(base_engine, db_name)
+            else:
+                response = click.prompt(
+                    f"Database '{db_name}' already exists. Do you want to delete it and recreate? (y/N)",
+                    default="N",
+                    type=str,
+                )
+                if response.lower() in ["y", "yes"]:
+                    _drop_database(base_engine, db_name)
+                else:
+                    logger.info("Database initialization cancelled.")
+                    sys.exit(0)
+
+        # Create database if it doesn't exist
+        _create_database(base_engine, db_name)
+        base_engine.dispose()
+
+    except OperationalError as e:
+        logger.error(f"Failed to connect to database server: {e}")
+        sys.exit(1)
+
+    # Now initialize the database schema and permissions
+    try:
+        engine = create_engine(db_endpoint)
+        db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
+        versioned_session(db_session)
+        Base.query = db_session.query_property()
+
+        Base.metadata.create_all(bind=engine)
+
+        # Initialize default permissions
+        logger.info("Initializing default permissions...")
+        PermissionManager.db_session = db_session
+        PermissionManager.init_default_actions()
+        logger.info("Default permissions initialized")
+
+        logger.info(f"Done initializing the DB at {db_endpoint}")
+
+    except Exception as e:
+        logger.error(f"Failed to initialize database schema: {e}")
+        sys.exit(1)
 
 
 @cli.command()

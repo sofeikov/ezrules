@@ -7,6 +7,7 @@ v0.9
 * List and outcomes are now editable
 * User managemetn UI
 * Role and permissions managemnt UI
+* Enhanced init-db script with interactive database management and --auto-delete option
 
 v0.7
 
