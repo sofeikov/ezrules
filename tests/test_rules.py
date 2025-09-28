@@ -1,4 +1,5 @@
 import pytest
+
 from ezrules.core.rule import Rule
 
 
@@ -30,7 +31,8 @@ def test_can_use_dollar_sign_notation(logic, input, expected_result):
         ("if $country in @NACountries:\n\treturn 'HOLD'", {"country": "US"}, "HOLD"),
     ],
 )
-def test_can_use_custom_lists(logic, input, expected_result):
+def test_can_use_custom_lists(session, logic, input, expected_result):
+    # Application context is set up by the session fixture
     rule = Rule(rid="1", logic=logic)
     outcome = rule(input)
     assert outcome == expected_result

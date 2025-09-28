@@ -1,5 +1,4 @@
 import datetime
-from typing import List
 
 from flask_security import AsaList, RoleMixin, UserMixin
 from sqlalchemy import (
@@ -10,7 +9,6 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
-    ForeignKeyConstraint,
 )
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
@@ -48,9 +46,36 @@ class User(Base, UserMixin):
     active = Column(Boolean())
     fs_uniquifier = Column(String(64), unique=True, nullable=False)
     confirmed_at = Column(DateTime())
-    roles = relationship(
-        "Role", secondary="roles_users", backref=backref("users", lazy="dynamic")
-    )
+    roles = relationship("Role", secondary="roles_users", backref=backref("users", lazy="dynamic"))
+
+
+class Action(Base):
+    __tablename__ = "actions"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), unique=True, nullable=False)
+    description = Column(String(255))
+    resource_type = Column(String(50))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Action {self.name}>"
+
+
+class RoleActions(Base):
+    __tablename__ = "role_actions"
+
+    id = Column(Integer, primary_key=True)
+    role_id = Column(Integer, ForeignKey("role.id"), nullable=False)
+    action_id = Column(Integer, ForeignKey("actions.id"), nullable=False)
+    resource_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    role = relationship("Role", backref="role_actions")
+    action = relationship("Action", backref="role_actions")
+
+    def __repr__(self):
+        return f"<RoleAction role_id={self.role_id} action_id={self.action_id}>"
 
 
 class Organisation(Base):
@@ -60,8 +85,8 @@ class Organisation(Base):
     name = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    rules: Mapped[List["Rule"]] = relationship()
-    re_configs: Mapped[List["RuleEngineConfig"]] = relationship()
+    rules: Mapped[list["Rule"]] = relationship()
+    re_configs: Mapped[list["RuleEngineConfig"]] = relationship()
 
     def __repr__(self):
         return f"ID:{self.o_id}, {self.name=}, {len(self.rules)=}"
@@ -90,7 +115,7 @@ class Rule(Versioned, Base):
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
     org: Mapped["Organisation"] = relationship(back_populates="rules")
 
-    backtesting_results: Mapped[List["RuleBackTestingResult"]] = relationship(
+    backtesting_results: Mapped[list["RuleBackTestingResult"]] = relationship(
         back_populates="rule",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -125,7 +150,7 @@ class TestingRecordLog(Base):
         ForeignKey("event_labels.el_id"), nullable=True
     )
 
-    testing_results: Mapped[List["TestingResultsLog"]] = relationship(
+    testing_results: Mapped[list["TestingResultsLog"]] = relationship(
         back_populates="testing_record",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -136,16 +161,60 @@ class TestingResultsLog(Base):
     __tablename__ = "testing_results_log"
 
     tr_id = Column(Integer, unique=True, primary_key=True)
-    tl_id: Mapped[int] = mapped_column(
-        ForeignKey("testing_record_log.tl_id", ondelete="CASCADE")
-    )
+    tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id", ondelete="CASCADE"))
     rule_result = Column(String, nullable=False)
 
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
 
-    testing_record: Mapped["TestingRecordLog"] = relationship(
-        back_populates="testing_results"
+    testing_record: Mapped["TestingRecordLog"] = relationship(back_populates="testing_results")
+
+
+class AllowedOutcome(Base):
+    __tablename__ = "allowed_outcomes"
+
+    ao_id = Column(Integer, unique=True, primary_key=True)
+    outcome_name = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
+    org: Mapped["Organisation"] = relationship()
+
+    def __repr__(self) -> str:
+        return f"{self.ao_id=},{self.outcome_name=},{self.o_id=}"
+
+
+class UserList(Base):
+    __tablename__ = "user_lists"
+
+    ul_id = Column(Integer, unique=True, primary_key=True)
+    list_name = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
+    org: Mapped["Organisation"] = relationship()
+
+    entries: Mapped[list["UserListEntry"]] = relationship(
+        back_populates="user_list",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
+
+    def __repr__(self) -> str:
+        return f"{self.ul_id=},{self.list_name=},{self.o_id=}"
+
+
+class UserListEntry(Base):
+    __tablename__ = "user_list_entries"
+
+    ule_id = Column(Integer, unique=True, primary_key=True)
+    entry_value = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    ul_id: Mapped[int] = mapped_column(ForeignKey("user_lists.ul_id", ondelete="CASCADE"))
+    user_list: Mapped["UserList"] = relationship(back_populates="entries")
+
+    def __repr__(self) -> str:
+        return f"{self.ule_id=},{self.entry_value=},{self.ul_id=}"
 
 
 class RuleBackTestingResult(Base):

@@ -2,7 +2,19 @@
 
 What's new
 ----------
+v0.9
+* Implementation of RBAC: per-resource access control, audit trail
+* List and outcomes are now editable
+* User managemetn UI
+* Role and permissions managemnt UI
+* Enhanced init-db script with interactive database management and --auto-delete option
+
 v0.7
+
+* Migrated from Poetry to UV for faster dependency management
+* Upgraded to Python 3.12 minimum requirement
+
+v0.6
 
 * Ability to backtest rule changes: make change, submit for backtesing, check result
 * Switch to pydantic-based settings management
@@ -10,7 +22,7 @@ v0.7
 * Rule evaluation results are now saved in the history table
 * new cli utilities to generate test data
 
-v0.6
+v0.5
 
 * The app is compatible with AWS EKS
 * Basic testing introduced

@@ -1,7 +1,8 @@
 from collections import namedtuple
 
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, TextAreaField
+from wtforms import PasswordField, SelectField, StringField, SubmitField, TextAreaField
+from wtforms.validators import DataRequired, Email
 
 from ezrules.core.rule import RuleFactory
 
@@ -29,3 +30,22 @@ class RuleForm(FlaskForm):
 class OutcomeForm(FlaskForm):
     outcome = StringField("Outcome name(e.g. CANCEL)")
     submit = SubmitField("Add")
+
+
+class UserForm(FlaskForm):
+    user_email = StringField("Email Address", validators=[DataRequired(), Email()])
+    password = PasswordField("Password", validators=[DataRequired()])
+    role_name = SelectField("Role (Optional)", choices=[])
+    submit = SubmitField("Create User")
+
+
+class RoleForm(FlaskForm):
+    name = StringField("Role Name", validators=[DataRequired()])
+    description = StringField("Description")
+    submit = SubmitField("Create Role")
+
+
+class UserRoleForm(FlaskForm):
+    user_id = SelectField("User", choices=[], coerce=int)
+    role_id = SelectField("Role", choices=[], coerce=int)
+    submit = SubmitField("Assign Role")

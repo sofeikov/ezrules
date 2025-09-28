@@ -1,40 +1,92 @@
-[tool.poetry]
+[project]
 name = "ezrules"
-version = "0.6.0"
-description = ""
-authors = ["Konstantin Sofeikov <sofeykov@gmail.com>"]
+version = "0.7.0"
+description = "Open-source transaction monitoring engine for business rules"
+authors = [{name = "Konstantin Sofeikov", email = "sofeykov@gmail.com"}]
 readme = "README.md"
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "flask>=3.0.3",
+    "flask-wtf",
+    "bootstrap-flask",
+    "pyyaml",
+    "ruamel.yaml",
+    "gunicorn",
+    "sphinx",
+    "pyparsing",
+    "sqlalchemy",
+    "flask-security-too[common]",
+    "psycopg2-binary",
+    "pytz",
+    "email-validator",
+    "sqlalchemy-utils",
+    "click>=8.0.0",
+    "pydantic-settings>=2.3.3",
+    "pydantic>=2.7.4",
+    "celery>=5.4.0",
+    "pandas>=2.2.2",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-flask = "^3.0.3"
-flask-wtf = "*"
-bootstrap-flask = "*"
-pyyaml = "*"
-"ruamel.yaml" = "*"
-gunicorn = "*"
-sphinx = "*"
-pyparsing = "*"
-sqlalchemy = "*"
-flask-security-too = {extras = ["common"], version = "*"}
-psycopg2-binary = "*"
-pytz = "*"
-email-validator = "*"
-sqlalchemy-utils = "*"
-click = "^8.0.0"
-pydantic-settings = "^2.3.3"
-pydantic = "^2.7.4"
-celery = "^5.4.0"
-pandas = "^2.2.2"
+[tool.uv]
+dev-dependencies = [
+    "pytest-cov",
+    "pytest",
+    "coverage",
+    "ruff>=0.13.0",
+    "ty>=0.0.1a20",
+    "poethepoet>=0.37.0",
+]
 
-[tool.poetry.group.test.dependencies]
-pytest-cov = "*"
-pytest = "*"
-coverage = "*"
-
-[tool.poetry.scripts]
+[project.scripts]
 ezrules = "ezrules.cli:cli"
 
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+output-format = "concise" # Works better for CI
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501", # line too long, handled by line-length
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ezrules"]
+
+[tool.ty.src]
+exclude = [
+    "ezrules/models/history_meta.py"
+]
+
+[tool.ty.terminal]
+output-format = "concise"
+
+[tool.ty.rules]
+deprecated = "ignore"
+
+[tool.poe.tasks]
+check = [
+    {cmd = "ruff format --check ."},
+    {cmd = "ty check ezrules"},
+    {cmd = "ruff check ezrules"}
+]
+
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

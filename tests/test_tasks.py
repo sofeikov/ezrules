@@ -1,6 +1,6 @@
 from ezrules.backend.tasks import count_rule_outcomes
-from ezrules.models.backend_core import TestingRecordLog
 from ezrules.core.rule import Rule
+from ezrules.models.backend_core import TestingRecordLog
 
 
 def test_collect_trivial_outcome():

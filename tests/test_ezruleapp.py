@@ -5,7 +5,8 @@ from flask import g
 
 from ezrules.backend import ezruleapp
 from ezrules.backend.forms import OutcomeForm, RuleForm
-from ezrules.models.backend_core import Organisation, Rule, RuleHistory
+from ezrules.core.permissions import PermissionManager
+from ezrules.models.backend_core import AllowedOutcome, Organisation, Role, Rule, RuleHistory
 
 
 def test_can_load_root_page(logged_in_manager_client):
@@ -107,15 +108,13 @@ def test_cant_update_rule_with_invalid_config(session, logged_in_manager_client)
     form.logic.data = "return 'NO SUCH OUTCOME'"
     form.csrf_token.data = g.csrf_token
 
-    rv = logged_in_manager_client.post(
-        f"/rule/{rule.r_id}", data=form.data, follow_redirects=True
-    )
+    rv = logged_in_manager_client.post(f"/rule/{rule.r_id}", data=form.data, follow_redirects=True)
     assert "The rule changes have not been saved, because:" in rv.data.decode()
 
 
 def test_can_verify_rule_and_extract_params(logged_in_manager_client):
     rv = logged_in_manager_client.post(
-        f"/verify_rule",
+        "/verify_rule",
         json={"rule_source": "if $amount>100:\n\treturn 'HOLD'"},
         follow_redirects=True,
     )
@@ -124,7 +123,7 @@ def test_can_verify_rule_and_extract_params(logged_in_manager_client):
 
 def test_cant_verify_rule_and_extract_params(logged_in_manager_client):
     rv = logged_in_manager_client.post(
-        f"/verify_rule",
+        "/verify_rule",
         json={"rule_source": "if$amount>100:\n\treturn 'HOLD'"},
         follow_redirects=True,
     )
@@ -132,30 +131,28 @@ def test_cant_verify_rule_and_extract_params(logged_in_manager_client):
 
 
 def test_ping(logged_in_manager_client):
-    rv = logged_in_manager_client.get(f"/ping")
+    rv = logged_in_manager_client.get("/ping")
     assert rv.data.decode() == "OK"
 
 
 def test_can_load_user_lists(logged_in_manager_client):
-    rv = logged_in_manager_client.get(f"/management/lists")
+    rv = logged_in_manager_client.get("/management/lists")
     assert rv.status_code == 200
 
 
 def test_can_load_outcomes_page(logged_in_manager_client):
-    rv = logged_in_manager_client.get(f"/management/outcomes")
+    rv = logged_in_manager_client.get("/management/outcomes")
     assert rv.status_code == 200
 
 
 def test_can_add_outcomes(logged_in_manager_client):
-    logged_in_manager_client.get(f"/management/outcomes")
+    logged_in_manager_client.get("/management/outcomes")
 
     form = OutcomeForm()
     form.outcome.data = "NEW_TEST_OUTCOME"
     form.csrf_token.data = g.csrf_token
 
-    rv = logged_in_manager_client.post(
-        f"/management/outcomes", data=form.data, follow_redirects=True
-    )
+    rv = logged_in_manager_client.post("/management/outcomes", data=form.data, follow_redirects=True)
     assert "NEW_TEST_OUTCOME" in ezruleapp.outcome_manager.get_allowed_outcomes()
     assert rv.status_code == 200
 
@@ -175,7 +172,7 @@ def test_can_add_outcomes(logged_in_manager_client):
                 "reason": "Example is malformed",
                 "rule_outcome": None,
             },
-            f"\INCORRECT JSON",
+            r"\INCORRECT JSON",
         ),
         (
             "if $amount > 100\n\treturn 'HOLD'",
@@ -190,7 +187,7 @@ def test_can_add_outcomes(logged_in_manager_client):
 )
 def test_can_test_rule(logged_in_manager_client, rule_source, expected_response, test_json):
     rv = logged_in_manager_client.post(
-        f"/test_rule",
+        "/test_rule",
         json={
             "rule_source": rule_source,
             "test_json": test_json,
@@ -217,3 +214,117 @@ def test_can_load_timeline(session, logged_in_manager_client):
 
     rv = logged_in_manager_client.get(f"/rule/{rule.r_id}/timeline")
     rv.status_code == 200
+
+
+def test_app_uses_database_outcome_manager(session):
+    """Test that the app is configured to use DatabaseOutcome manager"""
+    from ezrules.core.outcomes import DatabaseOutcome
+
+    assert isinstance(ezruleapp.outcome_manager, DatabaseOutcome)
+    assert ezruleapp.outcome_manager.o_id == session.query(Organisation).first().o_id
+
+
+def test_database_outcome_manager_creates_default_outcomes_on_app_start(session):
+    """Test that default outcomes are created when DatabaseOutcome is initialized"""
+    # Trigger lazy initialization by accessing outcomes
+    ezruleapp.outcome_manager.get_allowed_outcomes()
+
+    org = session.query(Organisation).first()
+    outcomes = session.query(AllowedOutcome).filter_by(o_id=org.o_id).all()
+    outcome_names = [o.outcome_name for o in outcomes]
+
+    # Should have the three default outcomes
+    assert "RELEASE" in outcome_names
+    assert "HOLD" in outcome_names
+    assert "CANCEL" in outcome_names
+
+
+def test_outcome_form_adds_to_database(session, logged_in_manager_client):
+    """Test that adding outcomes through the web form persists to database"""
+    org = session.query(Organisation).first()
+
+    # Get CSRF token
+    logged_in_manager_client.get("/management/outcomes")
+
+    # Add outcome through form
+    form = OutcomeForm()
+    form.outcome.data = "APPROVE"
+    form.csrf_token.data = g.csrf_token
+
+    rv = logged_in_manager_client.post("/management/outcomes", data=form.data, follow_redirects=True)
+
+    # Check that outcome was persisted to database
+    outcomes = session.query(AllowedOutcome).filter_by(o_id=org.o_id, outcome_name="APPROVE").all()
+    assert len(outcomes) == 1
+
+    # Check that outcome is available through manager
+    assert "APPROVE" in ezruleapp.outcome_manager.get_allowed_outcomes()
+    assert rv.status_code == 200
+
+
+def test_rule_validation_uses_database_outcomes(session, logged_in_manager_client):
+    """Test that rule validation checks against database outcomes"""
+    org = session.query(Organisation).first()
+
+    # Add a custom outcome to the database
+    new_outcome = AllowedOutcome(outcome_name="CUSTOM_OUTCOME", o_id=org.o_id)
+    session.add(new_outcome)
+    session.commit()
+
+    # Invalidate cache to ensure fresh load
+    ezruleapp.outcome_manager._cached_outcomes = None
+
+    # Get CSRF token
+    logged_in_manager_client.get("/create_rule")
+
+    # Create rule that uses the custom outcome
+    form = RuleForm()
+    form.rid.data = "TEST:CUSTOM"
+    form.description.data = "test custom outcome"
+    form.logic.data = "return 'CUSTOM_OUTCOME'"
+    form.csrf_token.data = g.csrf_token
+
+    rv = logged_in_manager_client.post("/create_rule", data=form.data, follow_redirects=True)
+
+    # Rule should be created successfully since CUSTOM_OUTCOME is in database
+    rule = session.query(Rule).filter_by(rid="TEST:CUSTOM").first()
+    assert rule is not None
+    assert rule.logic == "return 'CUSTOM_OUTCOME'"
+    assert rv.status_code == 200
+
+
+def test_can_load_audit_trail(logged_in_manager_client):
+    rv = logged_in_manager_client.get("/audit")
+    assert rv.status_code == 200
+
+
+def test_can_load_user_management_page(logged_in_manager_client):
+    rv = logged_in_manager_client.get("/management/users")
+    assert rv.status_code == 200
+
+
+def test_can_load_role_management_page(logged_in_manager_client):
+    rv = logged_in_manager_client.get("/role_management")
+    assert rv.status_code == 200
+
+
+def test_can_load_role_permissions_page(session, logged_in_manager_client):
+    # Set up the permission manager to use the test session
+    original_db_session = PermissionManager.db_session
+    PermissionManager.db_session = session
+    ezruleapp.db_session = session
+
+    try:
+        # Initialize default actions in the database for this test
+        PermissionManager.init_default_actions()
+
+        # Create a test role
+        test_role = Role(name="test_role", description="Test role for permissions")
+        session.add(test_role)
+        session.commit()
+
+        rv = logged_in_manager_client.get(f"/role_permissions/{test_role.id}")
+        assert rv.status_code == 200
+    finally:
+        # Restore original db_session
+        PermissionManager.db_session = original_db_session

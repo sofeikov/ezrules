@@ -1,19 +1,19 @@
-FROM --platform=linux/amd64 python:3.10
+FROM --platform=linux/amd64 python:3.12
 
-COPY Pipfile* ./
+# Install UV
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-RUN pip install --no-cache-dir pipenv && \
-    pipenv install --system --deploy --clear
+# Copy all project files
+COPY pyproject.toml uv.lock README.md ./
+COPY ezrules ezrules
+COPY gunicorn.conf.py gunicorn.conf.py
 
-ADD backend backend
-ADD core core
-ADD models models
+# Install dependencies
+RUN uv sync --frozen --no-dev
 
 ENV PYTHONPATH=/
 
-ADD gunicorn.conf.py gunicorn.conf.py
-
 EXPOSE 8080
 
-ENTRYPOINT ["gunicorn"]
-CMD ["-w", "1", "--threads", "4","--bind", "0.0.0.0:8080", "backend.ezruleapp:app"]
+ENTRYPOINT ["uv", "run", "gunicorn"]
+CMD ["-w", "1", "--threads", "4","--bind", "0.0.0.0:8080", "ezrules.backend.ezruleapp:app"]

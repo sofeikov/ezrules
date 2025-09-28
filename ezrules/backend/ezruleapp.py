@@ -3,6 +3,8 @@ import json
 import logging
 import os
 import secrets
+from json.decoder import JSONDecodeError
+from typing import cast
 
 import pandas as pd
 import sqlalchemy
@@ -10,6 +12,7 @@ from celery.result import AsyncResult
 from flask import (
     Flask,
     Response,
+    abort,
     flash,
     jsonify,
     redirect,
@@ -18,15 +21,18 @@ from flask import (
     url_for,
 )
 from flask_bootstrap import Bootstrap5
-from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required
+from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required, current_user
 from flask_wtf import CSRFProtect
 import sqlalchemy.exc
 
-from ezrules.backend.forms import OutcomeForm, RuleForm
+from ezrules.backend.forms import OutcomeForm, RoleForm, RuleForm, UserForm, UserRoleForm
 from ezrules.backend.tasks import app as celery_app
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.backend.utils import conditional_decorator
-from ezrules.core.outcomes import FixedOutcome
+from ezrules.core.application_context import set_organization_id, set_user_list_manager
+from ezrules.core.outcomes import DatabaseOutcome
+from ezrules.core.permissions import PermissionManager, requires_permission
+from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import Rule, RuleConverter, RuleFactory
 from ezrules.core.rule_checkers import (
     OnlyAllowedOutcomesAreReturnedChecker,
@@ -38,17 +44,28 @@ from ezrules.core.rule_updater import (
     RuleManagerFactory,
     RuleRevision,
 )
-from ezrules.core.user_lists import StaticUserListManager
-from ezrules.models.backend_core import Label, Role
+from ezrules.core.user_lists import PersistentUserListManager
+from ezrules.models.backend_core import (Label,
+                                             Action,
+    Role,
+    RoleActions,
+    RuleBackTestingResult,
+    RuleEngineConfigHistory,
+    RuleHistory,
+    User,
+)
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import RuleBackTestingResult, User
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
-outcome_manager = FixedOutcome()
-rule_checker = RuleCheckingPipeline(
-    checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)]
-)
+outcome_manager = DatabaseOutcome(db_session=db_session, o_id=app_settings.ORG_ID)
+user_list_manager = PersistentUserListManager(db_session=db_session, o_id=app_settings.ORG_ID)
+
+# Initialize application context
+set_organization_id(app_settings.ORG_ID)
+set_user_list_manager(user_list_manager)
+
+rule_checker = RuleCheckingPipeline(checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)])
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
@@ -67,28 +84,26 @@ csrf = CSRFProtect(app)
 url_safe_token = secrets.token_urlsafe(16)
 app.secret_key = url_safe_token
 o_id = app_settings.ORG_ID
-fsrm: RuleManager = RuleManagerFactory.get_rule_manager(
-    "RDBRuleManager", **{"db": db_session, "o_id": o_id}
-)
+fsrm: RuleManager = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db": db_session, "o_id": o_id})
 
 app.teardown_appcontext(lambda exc: db_session.close())
 user_datastore = SQLAlchemySessionUserDatastore(db_session, User, Role)
-app.security = Security(app, user_datastore)
+app.security = Security(app, user_datastore)  # type: ignore[unresolved-attribute]
 rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=o_id)
 
 
 @app.route("/rules", methods=["GET"])
 @app.route("/", methods=["GET"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_RULES))
 def rules():
     rules = fsrm.load_all_rules()
-    return render_template(
-        "rules.html", rules=rules, evaluator_endpoint=app.config["EVALUATOR_ENDPOINT"]
-    )
+    return render_template("rules.html", rules=rules, evaluator_endpoint=app.config["EVALUATOR_ENDPOINT"])
 
 
 @app.route("/create_rule", methods=["GET", "POST"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.CREATE_RULE))
 def create_rule():
     form = RuleForm()
     if request.method == "GET":
@@ -104,9 +119,7 @@ def create_rule():
         app.logger.info(rule_raw_config)
         # Make sure we can compile the rule
         rule = RuleFactory.from_json(rule_raw_config)
-        new_rule = RuleModel(
-            rid=rule.rid, logic=rule._source, description=rule.description
-        )
+        new_rule = RuleModel(rid=rule.rid, logic=rule._source, description=rule.description)
         fsrm.save_rule(new_rule)
         app.logger.info("Saving new version of the rules")
         rule_engine_config_producer.save_config(fsrm)
@@ -116,27 +129,23 @@ def create_rule():
 
 @app.route("/rule/<int:rule_id>/timeline", methods=["GET"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_RULES))
 def timeline(rule_id):
-    latest_version = fsrm.load_rule(rule_id)
+    latest_version = cast(RuleModel, fsrm.load_rule(rule_id))
     revision_list = fsrm.get_rule_revision_list(latest_version)
-    rules = [
-        fsrm.load_rule(rule_id, revision_number=r.revision_number)
-        for r in revision_list
-    ]
+    rules = [fsrm.load_rule(rule_id, revision_number=r.revision_number) for r in revision_list]
     # Add the current version
     rules = [RuleFactory.from_json(r.__dict__) for r in rules]
-    revision_list.append(
-        RuleRevision(revision_number=latest_version.version, created=None)
-    )
+    revision_list.append(RuleRevision(revision_number=latest_version.version, created=None))
     rules.append(RuleFactory.from_json(latest_version.__dict__))
     logics = [r._source for r in rules]
     diff_timeline = []
-    for ct, (l1, l2) in enumerate(zip(logics[:-1], logics[1:])):
+    for ct, (l1, l2) in enumerate(zip(logics[:-1], logics[1:], strict=False)):
         diff = difflib.HtmlDiff().make_file(
             fromlines=l1.split("\n"),
             tolines=l2.split("\n"),
             fromdesc=f"Revision {revision_list[ct].revision_number}",
-            todesc=f"Revision {revision_list[ct+1].revision_number}",
+            todesc=f"Revision {revision_list[ct + 1].revision_number}",
         )
         diff_timeline.append(diff)
 
@@ -146,7 +155,8 @@ def timeline(rule_id):
 @app.route("/rule/<int:rule_id>", methods=["GET", "POST"])
 @app.route("/rule/<int:rule_id>/<revision_number>", methods=["GET"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
-def show_rule(rule_id=None, revision_number=None):
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_RULES))
+def show_rule(rule_id: str, revision_number: int | None = None):
     if revision_number is not None:
         revision_number = int(revision_number)
     form = RuleForm()
@@ -168,6 +178,10 @@ def show_rule(rule_id=None, revision_number=None):
             revision_list=revision_list,
         )
     elif request.method == "POST":
+        if not app.config.get("TESTING", False):
+            if not PermissionManager.user_has_permission(current_user, PermissionAction.MODIFY_RULE, int(rule_id)):
+                abort(403)
+
         rule_status_check = form.validate(rule_checker=rule_checker)
         if not rule_status_check.rule_ok:
             flash("The rule changes have not been saved, because:")
@@ -195,7 +209,9 @@ def get_backtesting_results(rule_id):
         .order_by(sqlalchemy.desc(RuleBackTestingResult.created_at))
         .limit(3)
     )
-    dslice = lambda d: {k: d[k] for k in d if k in ("task_id", "created_at")}
+
+    def dslice(d):
+        return {k: d[k] for k in d if k in ("task_id", "created_at")}
 
     return jsonify([dslice(br.__dict__) for br in backtesting_results])
 
@@ -207,11 +223,11 @@ def verifyty_rule():
     try:
         source_ = request.get_json()["rule_source"]
         rule = Rule(rid="", logic=source_)
-    except:
+    except Exception:
         app.logger.info(f"Failed to compile logic: {source_}")
         return {}
     app.logger.info(f"About to return these params: {rule.get_rule_params()}")
-    return jsonify(params=sorted(list(rule.get_rule_params()), key=str))
+    return jsonify(params=sorted(rule.get_rule_params(), key=str))
 
 
 @app.route("/test_rule", methods=["POST"])
@@ -222,7 +238,7 @@ def test_rule():
     print(rule_source)
     try:
         test_object = json.loads(test_json["test_json"])
-    except json.decoder.JSONDecodeError:
+    except JSONDecodeError:
         return {
             "status": "error",
             "reason": "Example is malformed",
@@ -242,13 +258,16 @@ def test_rule():
 
 @app.route("/management/outcomes", methods=["GET", "POST"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_OUTCOMES))
 def verified_outcomes():
     form = OutcomeForm()
     if request.method == "GET":
-        return render_template(
-            "outcomes.html", form=form, outcomes=outcome_manager.get_allowed_outcomes()
-        )
+        return render_template("outcomes.html", form=form, outcomes=outcome_manager.get_allowed_outcomes())
     else:
+        if not app.config.get("TESTING", False):
+            if not PermissionManager.user_has_permission(current_user, PermissionAction.CREATE_OUTCOME):
+                abort(403)
+
         if form.validate():
             outcome_manager.add_outcome(form.outcome.data)
             return redirect(url_for("verified_outcomes"))
@@ -296,7 +315,9 @@ def get_task_status(task_id: str):
     result = t.result if ready else None
     app.logger.info(f"Getting task status for {task_id}: {ready=} with {result=}")
     all_outcomes = set()
-    for k, v in result.items():
+    if not ready or result is None:
+        return jsonify(ready=ready, result=None)
+    for v in result.values():
         for outcome in v:
             all_outcomes.add(outcome)
 
@@ -326,10 +347,324 @@ def get_task_status(task_id: str):
 
 @app.route("/management/lists", methods=["GET", "POST"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_LISTS))
 def user_lists():
-    return render_template(
-        "user_lists.html", user_lists=StaticUserListManager().get_all_entries()
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        if action == "create_list":
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.CREATE_LIST):
+                    abort(403)
+
+            list_name = request.form.get("list_name", "").strip()
+            if list_name:
+                try:
+                    user_list_manager.create_list(list_name)
+                    flash(f"List '{list_name}' created successfully.", "success")
+                except ValueError as e:
+                    flash(str(e), "error")
+            else:
+                flash("List name cannot be empty.", "error")
+
+        elif action == "delete_list":
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.DELETE_LIST):
+                    abort(403)
+
+            list_name = request.form.get("list_name", "").strip()
+            if list_name:
+                try:
+                    user_list_manager.delete_list(list_name)
+                    flash(f"List '{list_name}' deleted successfully.", "success")
+                except KeyError as e:
+                    flash(str(e), "error")
+
+        elif action == "add_entry":
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.MODIFY_LIST):
+                    abort(403)
+
+            list_name = request.form.get("list_name", "").strip()
+            entry_value = request.form.get("entry_value", "").strip()
+            if list_name and entry_value:
+                user_list_manager.add_entry(list_name, entry_value)
+                flash(f"Added '{entry_value}' to '{list_name}'.", "success")
+            else:
+                flash("Both list name and entry value are required.", "error")
+
+        elif action == "remove_entry":
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.MODIFY_LIST):
+                    abort(403)
+
+            list_name = request.form.get("list_name", "").strip()
+            entry_value = request.form.get("entry_value", "").strip()
+            if list_name and entry_value:
+                try:
+                    user_list_manager.remove_entry(list_name, entry_value)
+                    flash(f"Removed '{entry_value}' from '{list_name}'.", "success")
+                except KeyError as e:
+                    flash(str(e), "error")
+            else:
+                flash("Both list name and entry value are required.", "error")
+
+        return redirect(url_for("user_lists"))
+
+    return render_template("user_lists.html", user_lists=user_list_manager.get_all_entries())
+
+
+@app.route("/audit", methods=["GET"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.ACCESS_AUDIT_TRAIL))
+def audit_trail():
+    rule_history = db_session.query(RuleHistory).order_by(RuleHistory.changed.desc()).limit(100).all()
+    config_history = (
+        db_session.query(RuleEngineConfigHistory).order_by(RuleEngineConfigHistory.changed.desc()).limit(100).all()
     )
+
+    return render_template("audit_trail.html", rule_history=rule_history, config_history=config_history)
+
+
+@app.route("/management/users", methods=["GET", "POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_USERS))
+def user_management():
+    form = UserForm()
+
+    # Populate role choices
+    roles = db_session.query(Role).all()
+    role_choices = [("", "No role assigned")] + [(role.name, f"{role.name} - {role.description}") for role in roles]
+    form.role_name.choices = role_choices
+
+    if request.method == "POST":
+        if not app.config.get("TESTING", False):
+            if not PermissionManager.user_has_permission(current_user, PermissionAction.CREATE_USER):
+                abort(403)
+
+        if form.validate_on_submit():
+            user_email = form.user_email.data.strip()
+            password = form.password.data.strip()
+            role_name = form.role_name.data.strip() if form.role_name.data else None
+
+            try:
+                # Check if user already exists
+                existing_user = db_session.query(User).filter_by(email=user_email).first()
+                if existing_user:
+                    flash(f"User with email {user_email} already exists.", "error")
+                    return redirect(url_for("user_management"))
+
+                # Create new user
+                new_user = User(
+                    email=user_email,
+                    password=password,
+                    active=True,
+                    fs_uniquifier=user_email,
+                )
+                db_session.add(new_user)
+
+                # Add role if specified
+                if role_name:
+                    role = db_session.query(Role).filter_by(name=role_name).first()
+                    if role:
+                        new_user.roles.append(role)
+                    else:
+                        flash(f"Role '{role_name}' not found.", "warning")
+
+                db_session.commit()
+                flash(f"User {user_email} created successfully.", "success")
+            except Exception as e:
+                db_session.rollback()
+                flash(f"Error creating user: {str(e)}", "error")
+
+            return redirect(url_for("user_management"))
+
+    # GET request - show user management page
+    users = db_session.query(User).all()
+    return render_template("user_management.html", users=users, form=form)
+
+
+@app.route("/role_management", methods=["GET", "POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_ROLES))
+def role_management():
+    role_form = RoleForm()
+    user_role_form = UserRoleForm()
+
+    # Populate choices for user-role assignment
+    users = db_session.query(User).all()
+    roles = db_session.query(Role).all()
+    user_role_form.user_id.choices = [(user.id, user.email) for user in users]
+    user_role_form.role_id.choices = [(role.id, role.name) for role in roles]
+
+    if request.method == "POST":
+        # Handle role creation
+        if "create_role" in request.form:
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.CREATE_ROLE):
+                    abort(403)
+
+            if role_form.validate_on_submit():
+                role_name = role_form.name.data.strip()
+                description = role_form.description.data.strip() if role_form.description.data else ""
+
+                try:
+                    # Check if role already exists
+                    existing_role = db_session.query(Role).filter_by(name=role_name).first()
+                    if existing_role:
+                        flash(f"Role '{role_name}' already exists.", "error")
+                        return redirect(url_for("role_management"))
+
+                    # Create new role
+                    new_role = Role(name=role_name, description=description)
+                    db_session.add(new_role)
+                    db_session.commit()
+                    flash(f"Role '{role_name}' created successfully.", "success")
+                except Exception as e:
+                    db_session.rollback()
+                    flash(f"Error creating role: {str(e)}", "error")
+
+                return redirect(url_for("role_management"))
+
+        # Handle user-role assignment
+        elif "assign_role" in request.form:
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.MODIFY_ROLE):
+                    abort(403)
+
+            if user_role_form.validate_on_submit():
+                user_id = user_role_form.user_id.data
+                role_id = user_role_form.role_id.data
+
+                try:
+                    user = db_session.query(User).get(user_id)
+                    role = db_session.query(Role).get(role_id)
+
+                    if not user or not role:
+                        flash("User or role not found.", "error")
+                        return redirect(url_for("role_management"))
+
+                    # Check if user already has this role
+                    if role in user.roles:
+                        flash(f"User '{user.email}' already has role '{role.name}'.", "warning")
+                        return redirect(url_for("role_management"))
+
+                    # Assign role to user
+                    user.roles.append(role)
+                    db_session.commit()
+                    flash(f"Role '{role.name}' assigned to user '{user.email}' successfully.", "success")
+                except Exception as e:
+                    db_session.rollback()
+                    flash(f"Error assigning role: {str(e)}", "error")
+
+                return redirect(url_for("role_management"))
+
+    # GET request - show role management page
+    all_roles = db_session.query(Role).all()
+    all_users = db_session.query(User).all()
+    return render_template(
+        "role_management.html", roles=all_roles, users=all_users, role_form=role_form, user_role_form=user_role_form
+    )
+
+
+@app.route("/role_permissions/<int:role_id>", methods=["GET", "POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.MANAGE_PERMISSIONS))
+def manage_role_permissions(role_id):
+    role = db_session.query(Role).get(role_id)
+    if not role:
+        abort(404)
+    all_actions = db_session.query(Action).all()
+
+    # Get current permissions for this role
+    current_permissions = db_session.query(RoleActions).filter_by(role_id=role_id).all()
+    current_action_ids = {rp.action_id for rp in current_permissions}
+
+    if request.method == "POST":
+        if not app.config.get("TESTING", False):
+            if not PermissionManager.user_has_permission(current_user, PermissionAction.MANAGE_PERMISSIONS):
+                abort(403)
+
+        try:
+            # Get selected permissions from form
+            selected_action_ids = set()
+            for action in all_actions:
+                if request.form.get(f"action_{action.id}"):
+                    selected_action_ids.add(action.id)
+
+            # Remove permissions that are no longer selected
+            for permission in current_permissions:
+                if permission.action_id not in selected_action_ids:
+                    db_session.delete(permission)
+
+            # Add new permissions
+            for action_id in selected_action_ids:
+                if action_id not in current_action_ids:
+                    new_permission = RoleActions(role_id=role_id, action_id=action_id)
+                    db_session.add(new_permission)
+
+            db_session.commit()
+            flash(f"Permissions updated for role '{role.name}'.", "success")
+        except Exception as e:
+            db_session.rollback()
+            flash(f"Error updating permissions: {str(e)}", "error")
+
+        return redirect(url_for("manage_role_permissions", role_id=role_id))
+
+    return render_template(
+        "role_permissions.html", role=role, actions=all_actions, current_action_ids=current_action_ids
+    )
+
+
+@app.route("/delete_role/<int:role_id>", methods=["POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.DELETE_ROLE))
+def delete_role(role_id):
+    try:
+        role = db_session.query(Role).get(role_id)
+        if not role:
+            abort(404)
+
+        # Check if role is assigned to any users
+        if role.users.count() > 0:
+            flash(f"Cannot delete role '{role.name}' - it is assigned to {role.users.count()} user(s).", "error")
+            return redirect(url_for("role_management"))
+
+        # Delete role permissions first
+        db_session.query(RoleActions).filter_by(role_id=role_id).delete()
+
+        # Delete the role
+        db_session.delete(role)
+        db_session.commit()
+        flash(f"Role '{role.name}' deleted successfully.", "success")
+    except Exception as e:
+        db_session.rollback()
+        flash(f"Error deleting role: {str(e)}", "error")
+
+    return redirect(url_for("role_management"))
+
+
+@app.route("/remove_user_role/<int:user_id>/<int:role_id>", methods=["POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.MODIFY_ROLE))
+def remove_user_role(user_id, role_id):
+    try:
+        user = db_session.query(User).get(user_id)
+        role = db_session.query(Role).get(role_id)
+        if not user or not role:
+            abort(404)
+
+        if role in user.roles:
+            user.roles.remove(role)
+            db_session.commit()
+            flash(f"Role '{role.name}' removed from user '{user.email}' successfully.", "success")
+        else:
+            flash(f"User '{user.email}' does not have role '{role.name}'.", "warning")
+    except Exception as e:
+        db_session.rollback()
+        flash(f"Error removing role: {str(e)}", "error")
+
+    return redirect(url_for("role_management"))
 
 
 @app.route("/ping", methods=["GET"])

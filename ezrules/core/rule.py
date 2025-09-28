@@ -1,18 +1,16 @@
 import ast
-from typing import Any, Callable, List, Optional, Tuple
+from collections.abc import Callable
+from typing import Any, NamedTuple
 
+from ezrules.core.application_context import get_user_list_manager
 from ezrules.core.rule_helpers import (
     AtNotationConverter,
     DollarNotationConverter,
     RuleParamExtractor,
 )
-from ezrules.core.user_lists import StaticUserListManager
 from ezrules.models.backend_core import Rule as RuleModel
-from typing import NamedTuple
-
 
 dollar_converter = DollarNotationConverter()
-at_converter = AtNotationConverter(list_values_provider=StaticUserListManager())
 
 
 class Fields:
@@ -30,9 +28,9 @@ class Rule:
         self,
         rid: str,
         logic: str,
-        description: Optional[str] = None,
-        params: Optional[List[str]] = None,
-        r_id: Optional[int] = None,
+        description: str | None = None,
+        params: list[str] | None = None,
+        r_id: int | None = None,
     ) -> None:
         """
         Creates a rule object.
@@ -69,7 +67,7 @@ class Rule:
         return code
 
     @staticmethod
-    def compile_function(code: str) -> Tuple[Callable, ast.Module]:
+    def compile_function(code: str) -> tuple[Callable, ast.Module]:
         rule_ast = ast.parse(code)
         compiled_code = compile(rule_ast, filename="<string>", mode="exec")
         namespace = {}
@@ -80,6 +78,9 @@ class Rule:
     def logic(self, logic):
         """Compile the code."""
         post_proc_logic = dollar_converter.transform_rule(logic)
+        # Get the list provider from application context
+        list_provider = get_user_list_manager()
+        at_converter = AtNotationConverter(list_values_provider=list_provider)
         post_proc_logic = at_converter.transform_rule(post_proc_logic)
         code = self._wrap_with_function_header(post_proc_logic)
         self._compiled_rule, self._rule_ast = self.compile_function(code)
@@ -117,7 +118,7 @@ class RuleFactory:
             logic=rule_config[Fields.LOGIC],
             description=rule_config.get(Fields.DESCRIPTION),
             rid=rule_config.get(Fields.RID),
-            params=rule_config.get(Fields.PARAMS, tuple()),
+            params=rule_config.get(Fields.PARAMS, ()),
             r_id=rule_config.get(Fields.R_ID),
         )
         return rule
