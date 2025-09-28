@@ -8,6 +8,7 @@ from typing import cast
 
 import pandas as pd
 import sqlalchemy
+import sqlalchemy.exc
 from celery.result import AsyncResult
 from flask import (
     Flask,
@@ -23,7 +24,6 @@ from flask import (
 from flask_bootstrap import Bootstrap5
 from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required, current_user
 from flask_wtf import CSRFProtect
-import sqlalchemy.exc
 
 from ezrules.backend.forms import OutcomeForm, RoleForm, RuleForm, UserForm, UserRoleForm
 from ezrules.backend.tasks import app as celery_app
@@ -45,8 +45,9 @@ from ezrules.core.rule_updater import (
     RuleRevision,
 )
 from ezrules.core.user_lists import PersistentUserListManager
-from ezrules.models.backend_core import (Label,
-                                             Action,
+from ezrules.models.backend_core import (
+    Action,
+    Label,
     Role,
     RoleActions,
     RuleBackTestingResult,
@@ -291,7 +292,7 @@ def backtesting():
 def label():
     if request.method == "GET":
         labels = db_session.query(Label).all()
-        return jsonify([l.label for l in labels])
+        return jsonify([label.label for label in labels])
     elif request.method == "POST":
         label_names = request.get_json()["label_name"]
         if isinstance(label_names, str):

@@ -20,7 +20,7 @@ from ezrules.core.rule_updater import (
     RuleManager,
     RuleManagerFactory,
 )
-from ezrules.models.backend_core import Organisation, Role, TestingRecordLog, User
+from ezrules.models.backend_core import Label, Organisation, Role, TestingRecordLog, User
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import Base, db_session
 from ezrules.models.history_meta import versioned_session

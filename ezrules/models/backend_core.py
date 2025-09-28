@@ -146,9 +146,7 @@ class TestingRecordLog(Base):
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
-    el_id: Mapped["Label"] = mapped_column(
-        ForeignKey("event_labels.el_id"), nullable=True
-    )
+    el_id: Mapped["Label"] = mapped_column(ForeignKey("event_labels.el_id"), nullable=True)
 
     testing_results: Mapped[list["TestingResultsLog"]] = relationship(
         back_populates="testing_record",
