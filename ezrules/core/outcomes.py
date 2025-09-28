@@ -16,6 +16,10 @@ class Outcome(abc.ABC):
     def is_allowed_outcome(self, outcome: str):
         """Return if outcome is in the list"""
 
+    @abc.abstractmethod
+    def remove_outcome(self, outcome: str):
+        """Remove an outcome from the list"""
+
 
 class FixedOutcome(Outcome):
     def __init__(self):
@@ -29,6 +33,10 @@ class FixedOutcome(Outcome):
 
     def is_allowed_outcome(self, outcome: str):
         return outcome in self.outcomes
+
+    def remove_outcome(self, outcome: str):
+        if outcome in self.outcomes:
+            self.outcomes.remove(outcome)
 
 
 class DatabaseOutcome(Outcome):
@@ -88,3 +96,18 @@ class DatabaseOutcome(Outcome):
 
     def is_allowed_outcome(self, outcome: str):
         return outcome in self.get_allowed_outcomes()
+
+    def remove_outcome(self, outcome: str):
+        from ezrules.models.backend_core import AllowedOutcome
+
+        self._ensure_initialized()
+        outcome = outcome.upper()
+
+        # Find and remove the outcome
+        existing = self.db_session.query(AllowedOutcome).filter_by(outcome_name=outcome, o_id=self.o_id).first()
+
+        if existing:
+            self.db_session.delete(existing)
+            self.db_session.commit()
+            # Invalidate cache to force reload
+            self._cached_outcomes = None

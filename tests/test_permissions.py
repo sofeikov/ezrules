@@ -50,6 +50,7 @@ class TestRoleType:
             PermissionAction.VIEW_RULES,
             PermissionAction.VIEW_OUTCOMES,
             PermissionAction.VIEW_LISTS,
+            PermissionAction.VIEW_LABELS,
         ]
         assert permissions == expected
 
@@ -61,6 +62,8 @@ class TestRoleType:
             PermissionAction.VIEW_RULES,
             PermissionAction.VIEW_OUTCOMES,
             PermissionAction.VIEW_LISTS,
+            PermissionAction.CREATE_LABEL,
+            PermissionAction.VIEW_LABELS,
         ]
         assert permissions == expected
 

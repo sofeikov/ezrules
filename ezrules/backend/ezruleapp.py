@@ -25,11 +25,12 @@ from flask_bootstrap import Bootstrap5
 from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required, current_user
 from flask_wtf import CSRFProtect
 
-from ezrules.backend.forms import OutcomeForm, RoleForm, RuleForm, UserForm, UserRoleForm
+from ezrules.backend.forms import LabelForm, OutcomeForm, RoleForm, RuleForm, UserForm, UserRoleForm
 from ezrules.backend.tasks import app as celery_app
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.backend.utils import conditional_decorator
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
+from ezrules.core.labels import DatabaseLabelManager
 from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.permissions import PermissionManager, requires_permission
 from ezrules.core.permissions_constants import PermissionAction
@@ -60,6 +61,7 @@ from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
 outcome_manager = DatabaseOutcome(db_session=db_session, o_id=app_settings.ORG_ID)
+label_manager = DatabaseLabelManager(db_session=db_session, o_id=app_settings.ORG_ID)
 user_list_manager = PersistentUserListManager(db_session=db_session, o_id=app_settings.ORG_ID)
 
 # Initialize application context
@@ -265,6 +267,18 @@ def verified_outcomes():
     if request.method == "GET":
         return render_template("outcomes.html", form=form, outcomes=outcome_manager.get_allowed_outcomes())
     else:
+        # Check if this is a delete action
+        if request.form.get("action") == "delete":
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.DELETE_OUTCOME):
+                    abort(403)
+
+            outcome_to_delete = request.form.get("outcome")
+            if outcome_to_delete:
+                outcome_manager.remove_outcome(outcome_to_delete)
+            return redirect(url_for("verified_outcomes"))
+
+        # Otherwise, it's an add action
         if not app.config.get("TESTING", False):
             if not PermissionManager.user_has_permission(current_user, PermissionAction.CREATE_OUTCOME):
                 abort(403)
@@ -272,6 +286,8 @@ def verified_outcomes():
         if form.validate():
             outcome_manager.add_outcome(form.outcome.data)
             return redirect(url_for("verified_outcomes"))
+        else:
+            return render_template("outcomes.html", form=form, outcomes=outcome_manager.get_allowed_outcomes())
 
 
 @app.route("/backtesting", methods=["POST"])
@@ -285,6 +301,37 @@ def backtesting():
     db_session.add(btr)
     db_session.commit()
     return {"new_rule_logic": new_rule_logic}
+
+
+@app.route("/management/labels", methods=["GET", "POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_LABELS))
+def label_management():
+    form = LabelForm()
+    if request.method == "GET":
+        return render_template("labels.html", form=form, labels=label_manager.get_all_labels())
+    else:
+        # Check if this is a delete action
+        if request.form.get("action") == "delete":
+            if not app.config.get("TESTING", False):
+                if not PermissionManager.user_has_permission(current_user, PermissionAction.DELETE_LABEL):
+                    abort(403)
+
+            label_to_delete = request.form.get("label")
+            if label_to_delete:
+                label_manager.remove_label(label_to_delete)
+            return redirect(url_for("label_management"))
+
+        # Otherwise, it's an add action
+        if not app.config.get("TESTING", False):
+            if not PermissionManager.user_has_permission(current_user, PermissionAction.CREATE_LABEL):
+                abort(403)
+
+        if form.validate():
+            label_manager.add_label(form.label.data)
+            return redirect(url_for("label_management"))
+        else:
+            return render_template("labels.html", form=form, labels=label_manager.get_all_labels())
 
 
 @app.route("/labels", methods=["GET", "POST"])
