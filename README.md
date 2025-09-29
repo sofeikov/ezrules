@@ -138,6 +138,48 @@ Users can be assigned to roles through the database or programmatically. The per
 - **Event-Driven Processing**: Rule-based responses to system events and data changes
 - **Multi-Department Organizations**: Isolated rule management with granular permissions
 
+## 📖 Documentation
+
+### Building Documentation
+
+The project uses Sphinx for documentation generation:
+
+```bash
+# Build HTML documentation
+uv run make html
+
+# View all available documentation formats
+uv run make help
+
+# Build other formats
+uv run make singlehtml    # Single HTML page
+uv run make pdf           # PDF (requires LaTeX)
+uv run make epub          # eBook format
+
+# Clean build directory
+uv run make clean
+```
+
+### Previewing Documentation
+
+After building, preview the documentation locally:
+
+```bash
+# Method 1: Using Python's built-in server
+cd _build/html
+python3 -m http.server 8080
+# Then open http://localhost:8080/ in your browser
+
+# Method 2: Direct file access
+open _build/html/index.html    # macOS/Linux
+# or open _build/html/index.html in your browser
+
+# One-command build and serve
+uv run make html && cd _build/html && python3 -m http.server 8080
+```
+
+The documentation is also available online at [ReadTheDocs](https://ezrules.readthedocs.io/).
+
 ## 🛠️ Development
 
 ### Tech Stack
