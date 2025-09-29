@@ -20,7 +20,7 @@ from ezrules.core.rule_updater import (
     RuleManager,
     RuleManagerFactory,
 )
-from ezrules.models.backend_core import Organisation, Role, TestingRecordLog, User
+from ezrules.models.backend_core import Label, Organisation, Role, TestingRecordLog, User
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import Base, db_session
 from ezrules.models.history_meta import versioned_session
@@ -339,6 +339,13 @@ def generate_random_data(n_rules: int, n_events: int):
         # Evaluate the event against the rules and store the results
         response = eval_and_store(lre, event)
         print(f"Evaluated Event {e_ind}: {response}")
+
+    cb = db_session.query(Label).where(Label.label == "CHARGEBACK").one()
+    for trl in db_session.query(TestingRecordLog).all():
+        if uniform(0, 100) < 10:
+            print(f"Marking {trl.event_id} as CHARGEBACK")
+            trl.el_id = cb.el_id
+    db_session.commit()
 
 
 @cli.command()

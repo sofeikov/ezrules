@@ -22,6 +22,12 @@ class PermissionAction(Enum):
     DELETE_LIST = "delete_list"
     VIEW_LISTS = "view_lists"
 
+    # Label Management (for transaction categorization)
+    CREATE_LABEL = "create_label"
+    MODIFY_LABEL = "modify_label"
+    DELETE_LABEL = "delete_label"
+    VIEW_LABELS = "view_labels"
+
     # Audit Access
     ACCESS_AUDIT_TRAIL = "access_audit_trail"
 
@@ -52,6 +58,10 @@ class PermissionAction(Enum):
             (cls.MODIFY_LIST.value, "Modify existing user lists", "list"),
             (cls.DELETE_LIST.value, "Delete user lists", "list"),
             (cls.VIEW_LISTS.value, "View user lists", "list"),
+            (cls.CREATE_LABEL.value, "Create new transaction labels", "label"),
+            (cls.MODIFY_LABEL.value, "Modify existing transaction labels", "label"),
+            (cls.DELETE_LABEL.value, "Delete transaction labels", "label"),
+            (cls.VIEW_LABELS.value, "View transaction labels", "label"),
             (cls.ACCESS_AUDIT_TRAIL.value, "Access audit trail and history", "audit"),
             (cls.VIEW_USERS.value, "View system users", "user"),
             (cls.CREATE_USER.value, "Create new users", "user"),
@@ -80,6 +90,7 @@ class RoleType(Enum):
                 PermissionAction.VIEW_RULES,
                 PermissionAction.VIEW_OUTCOMES,
                 PermissionAction.VIEW_LISTS,
+                PermissionAction.VIEW_LABELS,
             ]
         elif role_type == cls.RULE_EDITOR:
             return [
@@ -88,6 +99,8 @@ class RoleType(Enum):
                 PermissionAction.VIEW_RULES,
                 PermissionAction.VIEW_OUTCOMES,
                 PermissionAction.VIEW_LISTS,
+                PermissionAction.CREATE_LABEL,
+                PermissionAction.VIEW_LABELS,
             ]
         else:
             return []

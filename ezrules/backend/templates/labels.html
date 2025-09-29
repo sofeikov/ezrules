@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous">
     </script>
-    <title>Outcomes List</title>
+    <title>Labels List</title>
     <style>
         .container-fluid {
             padding-left: 15px;
@@ -24,20 +24,20 @@
 <body>
     <div class="container-fluid mt-3">
         <a href="/rules" class="btn btn-secondary mb-3">Back to rule list</a>
-        <h1>Outcomes List</h1>
-        <p>This is a list of outcomes allowed to be used by business rules:</p>
+        <h1>Transaction Labels</h1>
+        <p>This is a list of labels available for transaction categorization and analysis (e.g., fraud, chargeback, normal):</p>
         <div class="card mb-3">
             <div class="card-body">
                 {{ render_form(form) }}
             </div>
         </div>
         <ul class="list-group">
-            {% for outcome in outcomes %}
+            {% for label in labels %}
                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                    {{ outcome }}
-                    <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete {{ outcome }}?');">
+                    {{ label }}
+                    <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete {{ label }}?');">
                         <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="outcome" value="{{ outcome }}">
+                        <input type="hidden" name="label" value="{{ label }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                     </form>

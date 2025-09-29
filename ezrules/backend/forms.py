@@ -32,6 +32,11 @@ class OutcomeForm(FlaskForm):
     submit = SubmitField("Add")
 
 
+class LabelForm(FlaskForm):
+    label = StringField("Label name (e.g. FRAUD, CHARGEBACK, NORMAL)")
+    submit = SubmitField("Add")
+
+
 class UserForm(FlaskForm):
     user_email = StringField("Email Address", validators=[DataRequired(), Email()])
     password = PasswordField("Password", validators=[DataRequired()])

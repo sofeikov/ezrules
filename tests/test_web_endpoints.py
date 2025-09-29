@@ -31,6 +31,11 @@ class TestCriticalUIEndpointsSimple:
         rv = logged_in_manager_client.get("/management/outcomes")
         assert rv.status_code == 200
 
+    def test_labels_page_loads_successfully(self, logged_in_manager_client):
+        """Test that the /management/labels page loads successfully."""
+        rv = logged_in_manager_client.get("/management/labels")
+        assert rv.status_code == 200
+
     def test_user_management_page_loads_successfully(self, logged_in_manager_client):
         """Test that the /management/users page loads successfully."""
         rv = logged_in_manager_client.get("/management/users")

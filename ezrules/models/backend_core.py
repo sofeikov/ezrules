@@ -125,6 +125,13 @@ class Rule(Versioned, Base):
         return f"{self.r_id=},{self.created_at=},{self.description=},{self.org=}"
 
 
+class Label(Base):
+    __tablename__ = "event_labels"
+
+    el_id = Column(Integer, unique=True, primary_key=True)
+    label = Column(String, unique=True, nullable=False)
+
+
 class TestingRecordLog(Base):
     __tablename__ = "testing_record_log"
 
@@ -139,6 +146,7 @@ class TestingRecordLog(Base):
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
+    el_id: Mapped["Label"] = mapped_column(ForeignKey("event_labels.el_id"), nullable=True)
 
     testing_results: Mapped[list["TestingResultsLog"]] = relationship(
         back_populates="testing_record",
