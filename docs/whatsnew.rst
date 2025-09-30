@@ -9,6 +9,11 @@ v0.9
 * User managemetn UI
 * Role and permissions managemnt UI
 * Enhanced init-db script with interactive database management and --auto-delete option
+* Transaction marking for analytics: mark transactions with true labels for fraud detection analysis
+* Single event marking API endpoint (/mark-event) for programmatic labeling
+* Bulk CSV upload interface for efficient batch labeling of events
+* Enhanced CLI test data generation with realistic fraud patterns and label assignment
+* Automatic default label creation (FRAUD, CHARGEBACK, NORMAL) for immediate testing
 
 v0.7
 

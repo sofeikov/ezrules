@@ -9,11 +9,12 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Rule Engine**: Flexible Python-based rule execution with custom logic support
 - **Web Management Interface**: Flask-based UI for creating and managing rules
 - **Enterprise Security**: Granular role-based access control with 13 permission types
+- **Transaction Labeling**: Comprehensive fraud analytics with API and bulk CSV upload capabilities
 - **Scalable Architecture**: Multi-service deployment with dedicated manager and evaluator services
 - **Database Integration**: PostgreSQL backend with SQLAlchemy ORM and full audit history
 - **Audit Trail**: Complete access control and change tracking for compliance
 - **Backtesting**: Test rule changes against historical data before deployment
-- **CLI Tools**: Command-line interface for database management and data generation
+- **CLI Tools**: Command-line interface for database management and realistic test data generation
 - **Frontend Dashboard**: Next.js-based user interface for rule monitoring and analytics
 
 ## 🏗️ Architecture
@@ -82,6 +83,9 @@ uv run ezrules evaluator --port 9999
 ```bash
 # Create sample rules and events for testing
 uv run ezrules generate-random-data --n-rules 10 --n-events 100
+
+# Generate events with realistic fraud labeling
+uv run ezrules generate-random-data --n-events 100 --label-ratio 0.3 --export-csv test_labels.csv
 ```
 
 ## 🔐 Enterprise Security
@@ -130,6 +134,51 @@ Users can be assigned to roles through the database or programmatically. The per
 - Department isolation capabilities
 - Complete audit trail of permission changes
 
+## 🏷️ Transaction Labeling & Analytics
+
+ezrules includes comprehensive transaction labeling capabilities for fraud detection analytics and model validation.
+
+### Labeling Methods
+
+**Single Event API**: Programmatically mark individual transactions
+```bash
+curl -X POST http://localhost:9999/mark-event \
+  -H "Content-Type: application/json" \
+  -d '{"event_id": "txn_123", "label_name": "FRAUD"}'
+```
+
+**Bulk CSV Upload**: Upload CSV files through the web interface for batch labeling
+```csv
+event_id,label_name
+txn_456,NORMAL
+txn_789,CHARGEBACK
+```
+
+### Test Data Generation
+
+Generate realistic test data with fraud patterns:
+
+```bash
+# Generate 200 events, label 40% with realistic patterns, export to CSV
+uv run ezrules generate-random-data --n-events 200 --label-ratio 0.4 --export-csv fraud_test.csv
+
+# Export existing events to CSV for testing uploads
+uv run ezrules export-test-csv --n-events 50 --unlabeled-only --output-file test_upload.csv
+```
+
+### Built-in Labels
+
+- **FRAUD**: Suspicious or confirmed fraudulent transactions
+- **CHARGEBACK**: Disputed transactions resulting in chargebacks
+- **NORMAL**: Legitimate transactions
+
+### Analytics Benefits
+
+- **False Positive Analysis**: Measure how often legitimate transactions are flagged
+- **False Negative Analysis**: Identify missed fraud cases for rule improvement
+- **Model Validation**: Test machine learning models against known outcomes
+- **Performance Metrics**: Track rule effectiveness over time
+
 ## 💼 Use Cases
 
 - **Financial Transaction Monitoring**: Real-time fraud detection and compliance checking
@@ -137,6 +186,7 @@ Users can be assigned to roles through the database or programmatically. The per
 - **Business Rule Automation**: Automated decision making based on configurable business logic
 - **Event-Driven Processing**: Rule-based responses to system events and data changes
 - **Multi-Department Organizations**: Isolated rule management with granular permissions
+- **Fraud Analytics**: Comprehensive transaction labeling for performance analysis and model improvement
 
 ## 📖 Documentation
 
