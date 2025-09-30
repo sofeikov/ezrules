@@ -54,6 +54,7 @@ from ezrules.models.backend_core import (
     RuleBackTestingResult,
     RuleEngineConfigHistory,
     RuleHistory,
+    TestingRecordLog,
     User,
 )
 from ezrules.models.backend_core import Rule as RuleModel
@@ -713,6 +714,49 @@ def remove_user_role(user_id, role_id):
         flash(f"Error removing role: {str(e)}", "error")
 
     return redirect(url_for("role_management"))
+
+
+@app.route("/mark-event", methods=["POST"])
+@csrf.exempt
+def mark_event():
+    """Mark an event with a label for analytics purposes."""
+    request_data = request.get_json(silent=True)
+
+    if request_data is None:
+        return jsonify({"error": "JSON data required"}), 400
+
+    event_id = request_data.get("event_id")
+    label_name = request_data.get("label_name")
+
+    if not event_id or not label_name:
+        return jsonify({"error": "event_id and label_name are required"}), 400
+
+    try:
+        # Find the event by event_id
+        event_record = db_session.query(TestingRecordLog).filter_by(event_id=event_id).first()
+        if not event_record:
+            return jsonify({"error": f"Event with id '{event_id}' not found"}), 404
+
+        # Find the label by name
+        label = db_session.query(Label).filter_by(label=label_name.strip().upper()).first()
+        if not label:
+            return jsonify({"error": f"Label '{label_name}' not found"}), 404
+
+        # Update the event record with the label
+        event_record.el_id = label.el_id
+        db_session.commit()
+
+        return jsonify(
+            {
+                "message": f"Event '{event_id}' successfully marked with label '{label_name}'",
+                "event_id": event_id,
+                "label_name": label_name,
+            }
+        ), 200
+
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
 
 
 @app.route("/ping", methods=["GET"])

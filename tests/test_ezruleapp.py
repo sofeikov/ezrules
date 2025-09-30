@@ -328,3 +328,90 @@ def test_can_load_role_permissions_page(session, logged_in_manager_client):
     finally:
         # Restore original db_session
         PermissionManager.db_session = original_db_session
+
+
+def test_mark_event_endpoint_exists(logged_in_manager_client):
+    """Test that the mark-event endpoint exists and handles missing data"""
+    rv = logged_in_manager_client.post("/mark-event", json={})
+    assert rv.status_code == 400
+    assert "event_id and label_name are required" in rv.get_json()["error"]
+
+
+def test_mark_event_success(session, logged_in_manager_client):
+    """Test successfully marking an event with a label"""
+    from ezrules.models.backend_core import Label, TestingRecordLog, Organisation
+
+    # Create test data in the session
+    org = session.query(Organisation).first()
+    test_event = TestingRecordLog(
+        event_id="test_event_123", event_timestamp=1234567890, event={"test": "data"}, o_id=org.o_id
+    )
+    session.add(test_event)
+
+    # Create a test label
+    test_label = Label(label="FRAUD")
+    session.add(test_label)
+    session.commit()
+
+    # Mark the event with the label
+    rv = logged_in_manager_client.post("/mark-event", json={"event_id": "test_event_123", "label_name": "FRAUD"})
+
+    assert rv.status_code == 200
+    response_data = rv.get_json()
+    assert response_data["event_id"] == "test_event_123"
+    assert response_data["label_name"] == "FRAUD"
+    assert "successfully marked" in response_data["message"]
+
+    # Verify the database was updated
+    session.refresh(test_event)
+    assert test_event.el_id == test_label.el_id
+
+
+def test_mark_event_event_not_found(logged_in_manager_client):
+    """Test marking a non-existent event"""
+    rv = logged_in_manager_client.post("/mark-event", json={"event_id": "nonexistent_event", "label_name": "FRAUD"})
+
+    assert rv.status_code == 404
+    assert "Event with id 'nonexistent_event' not found" in rv.get_json()["error"]
+
+
+def test_mark_event_label_not_found(session, logged_in_manager_client):
+    """Test marking an event with a non-existent label"""
+    from ezrules.models.backend_core import TestingRecordLog, Organisation
+
+    # Create a test event
+    org = session.query(Organisation).first()
+    test_event = TestingRecordLog(
+        event_id="test_event_456", event_timestamp=1234567890, event={"test": "data"}, o_id=org.o_id
+    )
+    session.add(test_event)
+    session.commit()
+
+    # Try to mark with non-existent label
+    rv = logged_in_manager_client.post(
+        "/mark-event", json={"event_id": "test_event_456", "label_name": "NONEXISTENT_LABEL"}
+    )
+
+    assert rv.status_code == 404
+    assert "Label 'NONEXISTENT_LABEL' not found" in rv.get_json()["error"]
+
+
+def test_mark_event_missing_json_data(logged_in_manager_client):
+    """Test the endpoint with no JSON data"""
+    rv = logged_in_manager_client.post("/mark-event", data="", headers={"Content-Type": "application/json"})
+    assert rv.status_code == 400
+    assert "JSON data required" in rv.get_json()["error"]
+
+
+def test_mark_event_missing_event_id(logged_in_manager_client):
+    """Test the endpoint with missing event_id"""
+    rv = logged_in_manager_client.post("/mark-event", json={"label_name": "FRAUD"})
+    assert rv.status_code == 400
+    assert "event_id and label_name are required" in rv.get_json()["error"]
+
+
+def test_mark_event_missing_label_name(logged_in_manager_client):
+    """Test the endpoint with missing label_name"""
+    rv = logged_in_manager_client.post("/mark-event", json={"event_id": "test_event"})
+    assert rv.status_code == 400
+    assert "event_id and label_name are required" in rv.get_json()["error"]
