@@ -357,6 +357,10 @@ def upload_labels():
                 error_count = 0
                 errors = []
 
+                # Cache all labels upfront for efficiency
+                all_labels = db_session.query(Label).all()
+                label_cache = {label.label: label for label in all_labels}
+
                 for row_num, row in enumerate(csv_reader, 1):
                     if len(row) != 2:
                         error_count += 1
@@ -380,8 +384,8 @@ def upload_labels():
                             errors.append(f"Row {row_num}: Event with id '{event_id}' not found")
                             continue
 
-                        # Find the label by name
-                        label = db_session.query(Label).filter_by(label=label_name).first()
+                        # Find the label by name from cache
+                        label = label_cache.get(label_name)
                         if not label:
                             error_count += 1
                             errors.append(f"Row {row_num}: Label '{label_name}' not found")
