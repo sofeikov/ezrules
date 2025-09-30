@@ -76,6 +76,9 @@ uv run ezrules manager --port 8888
 
 # Start the evaluator service (API)
 uv run ezrules evaluator --port 9999
+
+# Run the Celery workers
+uv run celery -A ezrules.backend.tasks worker -l INFO
 ```
 
 ### Generate Test Data
