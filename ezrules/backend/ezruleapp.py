@@ -25,7 +25,8 @@ from flask_bootstrap import Bootstrap5
 from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required, current_user
 from flask_wtf import CSRFProtect
 
-from ezrules.backend.forms import LabelForm, OutcomeForm, RoleForm, RuleForm, UserForm, UserRoleForm
+from ezrules.backend.forms import CSVUploadForm, LabelForm, OutcomeForm, RoleForm, RuleForm, UserForm, UserRoleForm
+from ezrules.backend.label_upload_service import LabelUploadService
 from ezrules.backend.tasks import app as celery_app
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.backend.utils import conditional_decorator
@@ -54,6 +55,7 @@ from ezrules.models.backend_core import (
     RuleBackTestingResult,
     RuleEngineConfigHistory,
     RuleHistory,
+    TestingRecordLog,
     User,
 )
 from ezrules.models.backend_core import Rule as RuleModel
@@ -332,6 +334,49 @@ def label_management():
             return redirect(url_for("label_management"))
         else:
             return render_template("labels.html", form=form, labels=label_manager.get_all_labels())
+
+
+@app.route("/upload_labels", methods=["GET", "POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.CREATE_LABEL))
+def upload_labels():
+    form = CSVUploadForm()
+    if request.method == "GET":
+        return render_template("upload_labels.html", form=form)
+    elif request.method == "POST":
+        if form.validate():
+            csv_file = form.csv_file.data
+
+            try:
+                # Read CSV content
+                csv_content = csv_file.read().decode("utf-8")
+
+                # Use the service to process the upload
+                upload_service = LabelUploadService(db_session)
+                result = upload_service.upload_labels_from_csv(csv_content)
+
+                # Commit all changes if any were successful
+                if result.success_count > 0:
+                    db_session.commit()
+                    flash(f"Successfully processed {result.success_count} labels.", "success")
+
+                if result.error_count > 0:
+                    flash(f"Failed to process {result.error_count} rows. Check the errors below.", "warning")
+                    for error in result.errors[:10]:  # Show first 10 errors
+                        flash(error, "error")
+                    if len(result.errors) > 10:
+                        flash(f"... and {len(result.errors) - 10} more errors", "error")
+
+                if result.success_count == 0 and result.error_count == 0:
+                    flash("CSV file was empty or contained no valid data.", "warning")
+
+            except Exception as e:
+                db_session.rollback()
+                flash(f"Error processing CSV file: {str(e)}", "error")
+
+            return redirect(url_for("upload_labels"))
+        else:
+            return render_template("upload_labels.html", form=form)
 
 
 @app.route("/labels", methods=["GET", "POST"])
@@ -713,6 +758,49 @@ def remove_user_role(user_id, role_id):
         flash(f"Error removing role: {str(e)}", "error")
 
     return redirect(url_for("role_management"))
+
+
+@app.route("/mark-event", methods=["POST"])
+@csrf.exempt
+def mark_event():
+    """Mark an event with a label for analytics purposes."""
+    request_data = request.get_json(silent=True)
+
+    if request_data is None:
+        return jsonify({"error": "JSON data required"}), 400
+
+    event_id = request_data.get("event_id")
+    label_name = request_data.get("label_name")
+
+    if not event_id or not label_name:
+        return jsonify({"error": "event_id and label_name are required"}), 400
+
+    try:
+        # Find the event by event_id
+        event_record = db_session.query(TestingRecordLog).filter_by(event_id=event_id).first()
+        if not event_record:
+            return jsonify({"error": f"Event with id '{event_id}' not found"}), 404
+
+        # Find the label by name
+        label = db_session.query(Label).filter_by(label=label_name.strip().upper()).first()
+        if not label:
+            return jsonify({"error": f"Label '{label_name}' not found"}), 404
+
+        # Update the event record with the label
+        event_record.el_id = label.el_id
+        db_session.commit()
+
+        return jsonify(
+            {
+                "message": f"Event '{event_id}' successfully marked with label '{label_name}'",
+                "event_id": event_id,
+                "label_name": label_name,
+            }
+        ), 200
+
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
 
 
 @app.route("/ping", methods=["GET"])

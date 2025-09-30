@@ -17,10 +17,11 @@ def test_label_management_page_loads_successfully(logged_in_manager_client):
 
 def test_can_add_labels_via_ui(logged_in_manager_client, session):
     """Test that we can add labels via the UI"""
-    initial_count = session.query(Label).count()
-
-    # First get the page to establish CSRF token
+    # First get the page to establish CSRF token (this may initialize default labels)
     logged_in_manager_client.get("/management/labels")
+
+    # Get the count after label manager initialization
+    initial_count = session.query(Label).count()
 
     form = LabelForm()
     form.label.data = "TEST_LABEL"

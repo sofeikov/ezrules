@@ -267,7 +267,9 @@ def evaluator(port):
 @cli.command()
 @click.option("--n-rules", default=30)
 @click.option("--n-events", default=200)
-def generate_random_data(n_rules: int, n_events: int):
+@click.option("--label-ratio", default=0.3, help="Ratio of events to label (0.0-1.0)")
+@click.option("--export-csv", help="Export labeled events to CSV file for testing uploads")
+def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export_csv: str):
     test_attributes = {
         "amount": float,
         "send_country": str,
@@ -340,12 +342,167 @@ def generate_random_data(n_rules: int, n_events: int):
         response = eval_and_store(lre, event)
         print(f"Evaluated Event {e_ind}: {response}")
 
-    cb = db_session.query(Label).where(Label.label == "CHARGEBACK").one()
-    for trl in db_session.query(TestingRecordLog).all():
-        if uniform(0, 100) < 10:
-            print(f"Marking {trl.event_id} as CHARGEBACK")
-            trl.el_id = cb.el_id
-    db_session.commit()
+    # Enhanced labeling logic
+    if label_ratio > 0:
+        logger.info(f"Labeling {label_ratio * 100:.1f}% of events with realistic patterns...")
+
+        # Get all available labels, create defaults if none exist
+        available_labels = {label.label: label for label in db_session.query(Label).all()}
+        if not available_labels:
+            logger.info("No labels found in database. Creating default labels...")
+            _create_default_labels(db_session)
+            available_labels = {label.label: label for label in db_session.query(Label).all()}
+
+        if available_labels:
+            logger.info(f"Available labels: {list(available_labels.keys())}")
+
+            # Get all generated events
+            all_events = db_session.query(TestingRecordLog).filter(TestingRecordLog.event_id.like("TestEvent_%")).all()
+
+            # Determine how many events to label
+            n_to_label = int(len(all_events) * label_ratio)
+            events_to_label = choices(all_events, k=n_to_label)
+
+            labeled_events = []
+
+            for event_record in events_to_label:
+                event_data = event_record.event
+                label_name = _determine_realistic_label(event_data, list(available_labels.keys()))
+
+                if label_name and label_name in available_labels:
+                    event_record.el_id = available_labels[label_name].el_id
+                    labeled_events.append((event_record.event_id, label_name))
+                    logger.info(f"Marked {event_record.event_id} as {label_name}")
+
+            db_session.commit()
+            logger.info(f"Successfully labeled {len(labeled_events)} events")
+
+            # Export to CSV if requested
+            if export_csv and labeled_events:
+                _export_labels_to_csv(labeled_events, export_csv)
+
+
+def _create_default_labels(session):
+    """Create default labels in the database"""
+    default_labels = ["FRAUD", "CHARGEBACK", "NORMAL"]
+
+    for label_name in default_labels:
+        # Check if label already exists to avoid duplicates
+        existing = session.query(Label).filter_by(label=label_name).first()
+        if not existing:
+            label = Label(label=label_name)
+            session.add(label)
+
+    session.commit()
+    logger.info(f"Created default labels: {default_labels}")
+
+
+def _determine_realistic_label(event_data: dict, available_labels) -> str | None:
+    """Determine a realistic label based on event characteristics"""
+    amount = event_data.get("amount", 0)
+    score = event_data.get("score", 0)
+    is_verified = event_data.get("is_verified", 1)
+
+    # Define realistic labeling patterns
+    fraud_probability = 0
+    chargeback_probability = 0
+
+    # High amounts are more likely to be scrutinized
+    if amount > 800:
+        fraud_probability += 0.15
+        chargeback_probability += 0.10
+    elif amount > 500:
+        fraud_probability += 0.08
+        chargeback_probability += 0.05
+
+    # High scores indicate suspicion
+    if score > 800:
+        fraud_probability += 0.25
+        chargeback_probability += 0.15
+    elif score > 600:
+        fraud_probability += 0.12
+        chargeback_probability += 0.08
+
+    # Unverified users are riskier
+    if is_verified == 0:
+        fraud_probability += 0.20
+        chargeback_probability += 0.10
+
+    # Determine label based on probabilities
+    random_val = uniform(0, 1)
+
+    if "FRAUD" in available_labels and random_val < fraud_probability:
+        return "FRAUD"
+    elif "CHARGEBACK" in available_labels and random_val < fraud_probability + chargeback_probability:
+        return "CHARGEBACK"
+    elif "NORMAL" in available_labels and uniform(0, 1) < 0.7:  # 70% of remaining labeled as normal
+        return "NORMAL"
+
+    # Default fallback
+    return choice(list(available_labels)) if available_labels else None
+
+
+def _export_labels_to_csv(labeled_events: list, filename: str):
+    """Export labeled events to CSV for testing uploads"""
+    import csv
+
+    try:
+        with open(filename, "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            for event_id, label_name in labeled_events:
+                writer.writerow([event_id, label_name])
+
+        logger.info(f"Exported {len(labeled_events)} labeled events to {filename}")
+        logger.info(f"You can now test CSV upload with: Upload Labels -> {filename}")
+
+    except Exception as e:
+        logger.error(f"Failed to export CSV: {e}")
+
+
+@cli.command()
+@click.option("--output-file", default="test_labels.csv", help="Output CSV filename")
+@click.option("--n-events", default=50, help="Number of events to include in CSV")
+@click.option("--unlabeled-only", is_flag=True, help="Only include events that don't have labels yet")
+def export_test_csv(output_file: str, n_events: int, unlabeled_only: bool):
+    """Export existing events to CSV for testing label uploads"""
+    logger.info("Exporting events to CSV for testing...")
+
+    # Get available labels for realistic assignment, create defaults if none exist
+    available_labels = [label.label for label in db_session.query(Label).all()]
+    if not available_labels:
+        logger.info("No labels found in database. Creating default labels...")
+        _create_default_labels(db_session)
+        available_labels = [label.label for label in db_session.query(Label).all()]
+
+    if not available_labels:
+        logger.error("Failed to create labels in database.")
+        return
+
+    # Query events based on filter
+    query = db_session.query(TestingRecordLog)
+    if unlabeled_only:
+        query = query.filter(TestingRecordLog.el_id.is_(None))
+
+    events = query.limit(n_events).all()
+
+    if not events:
+        logger.warning("No events found matching criteria.")
+        return
+
+    # Generate test CSV with realistic labels
+    test_labels = []
+    for event in events:
+        event_data = event.event
+        label_name = _determine_realistic_label(event_data, available_labels)
+        if label_name:
+            test_labels.append((event.event_id, label_name))
+
+    if test_labels:
+        _export_labels_to_csv(test_labels, output_file)
+        logger.info(f"Generated test CSV with {len(test_labels)} events")
+        logger.info("Use this file to test the CSV upload functionality in the web interface")
+    else:
+        logger.warning("No valid labels could be generated")
 
 
 @cli.command()
