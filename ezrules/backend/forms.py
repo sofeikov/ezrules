@@ -1,6 +1,7 @@
 from collections import namedtuple
 
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileRequired
 from wtforms import PasswordField, SelectField, StringField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, Email
 
@@ -54,3 +55,8 @@ class UserRoleForm(FlaskForm):
     user_id = SelectField("User", choices=[], coerce=int)
     role_id = SelectField("Role", choices=[], coerce=int)
     submit = SubmitField("Assign Role")
+
+
+class CSVUploadForm(FlaskForm):
+    csv_file = FileField("CSV File", validators=[FileRequired()])
+    submit = SubmitField("Upload and Process")

@@ -415,3 +415,176 @@ def test_mark_event_missing_label_name(logged_in_manager_client):
     rv = logged_in_manager_client.post("/mark-event", json={"event_id": "test_event"})
     assert rv.status_code == 400
     assert "event_id and label_name are required" in rv.get_json()["error"]
+
+
+def test_upload_labels_page_loads(logged_in_manager_client):
+    """Test that the upload labels page loads successfully"""
+    rv = logged_in_manager_client.get("/upload_labels")
+    assert rv.status_code == 200
+    assert b"Upload Transaction Labels" in rv.data
+    assert b"CSV Format Requirements" in rv.data
+
+
+def test_upload_labels_successful_upload(session, logged_in_manager_client):
+    """Test successful CSV upload with valid data"""
+    from ezrules.models.backend_core import Label, TestingRecordLog, Organisation
+    from flask import g
+    import io
+
+    # Create test data in the session
+    org = session.query(Organisation).first()
+
+    # Create test events
+    test_event1 = TestingRecordLog(
+        event_id="csv_event_1", event_timestamp=1234567890, event={"test": "data1"}, o_id=org.o_id
+    )
+    test_event2 = TestingRecordLog(
+        event_id="csv_event_2", event_timestamp=1234567891, event={"test": "data2"}, o_id=org.o_id
+    )
+    session.add(test_event1)
+    session.add(test_event2)
+
+    # Create test labels
+    fraud_label = Label(label="FRAUD")
+    normal_label = Label(label="NORMAL")
+    session.add(fraud_label)
+    session.add(normal_label)
+    session.commit()
+
+    # Get CSRF token
+    logged_in_manager_client.get("/upload_labels")
+
+    # Create CSV content
+    csv_content = "csv_event_1,FRAUD\ncsv_event_2,NORMAL\n"
+    csv_file = io.BytesIO(csv_content.encode("utf-8"))
+
+    # Upload the CSV file
+    rv = logged_in_manager_client.post(
+        "/upload_labels",
+        data={"csv_file": (csv_file, "test_labels.csv"), "csrf_token": g.csrf_token},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert rv.status_code == 200
+    assert b"Successfully processed 2 labels" in rv.data
+
+    # Verify the database was updated
+    session.refresh(test_event1)
+    session.refresh(test_event2)
+    assert test_event1.el_id == fraud_label.el_id
+    assert test_event2.el_id == normal_label.el_id
+
+
+def test_upload_labels_event_not_found(session, logged_in_manager_client):
+    """Test CSV upload with non-existent event ID"""
+    from ezrules.models.backend_core import Label
+    from flask import g
+    import io
+
+    # Create test label
+    fraud_label = Label(label="FRAUD")
+    session.add(fraud_label)
+    session.commit()
+
+    # Get CSRF token
+    logged_in_manager_client.get("/upload_labels")
+
+    # Create CSV content with non-existent event ID
+    csv_content = "nonexistent_event,FRAUD\n"
+    csv_file = io.BytesIO(csv_content.encode("utf-8"))
+
+    # Upload the CSV file
+    rv = logged_in_manager_client.post(
+        "/upload_labels",
+        data={"csv_file": (csv_file, "test_labels.csv"), "csrf_token": g.csrf_token},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert rv.status_code == 200
+    assert b"Failed to process 1 rows" in rv.data
+    assert b"Event with id &#39;nonexistent_event&#39; not found" in rv.data
+
+
+def test_upload_labels_label_not_found(session, logged_in_manager_client):
+    """Test CSV upload with non-existent label"""
+    from ezrules.models.backend_core import TestingRecordLog, Organisation
+    from flask import g
+    import io
+
+    # Create test data
+    org = session.query(Organisation).first()
+    test_event = TestingRecordLog(
+        event_id="csv_event_test", event_timestamp=1234567890, event={"test": "data"}, o_id=org.o_id
+    )
+    session.add(test_event)
+    session.commit()
+
+    # Get CSRF token
+    logged_in_manager_client.get("/upload_labels")
+
+    # Create CSV content with non-existent label
+    csv_content = "csv_event_test,NONEXISTENT_LABEL\n"
+    csv_file = io.BytesIO(csv_content.encode("utf-8"))
+
+    # Upload the CSV file
+    rv = logged_in_manager_client.post(
+        "/upload_labels",
+        data={"csv_file": (csv_file, "test_labels.csv"), "csrf_token": g.csrf_token},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert rv.status_code == 200
+    assert b"Failed to process 1 rows" in rv.data
+    assert b"Label &#39;NONEXISTENT_LABEL&#39; not found" in rv.data
+
+
+def test_upload_labels_invalid_csv_format(logged_in_manager_client):
+    """Test CSV upload with invalid format (wrong number of columns)"""
+    from flask import g
+    import io
+
+    # Get CSRF token
+    logged_in_manager_client.get("/upload_labels")
+
+    # Create CSV content with wrong number of columns
+    csv_content = "event_id_only\nevent_id,label,extra_column\n"
+    csv_file = io.BytesIO(csv_content.encode("utf-8"))
+
+    # Upload the CSV file
+    rv = logged_in_manager_client.post(
+        "/upload_labels",
+        data={"csv_file": (csv_file, "test_labels.csv"), "csrf_token": g.csrf_token},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert rv.status_code == 200
+    assert b"Failed to process 2 rows" in rv.data
+    assert b"Expected 2 columns (event_id,label)" in rv.data
+
+
+def test_upload_labels_empty_csv(logged_in_manager_client):
+    """Test CSV upload with empty file"""
+    from flask import g
+    import io
+
+    # Get CSRF token
+    logged_in_manager_client.get("/upload_labels")
+
+    # Create empty CSV content
+    csv_content = ""
+    csv_file = io.BytesIO(csv_content.encode("utf-8"))
+
+    # Upload the CSV file
+    rv = logged_in_manager_client.post(
+        "/upload_labels",
+        data={"csv_file": (csv_file, "test_labels.csv"), "csrf_token": g.csrf_token},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert rv.status_code == 200
+    assert b"CSV file was empty or contained no valid data" in rv.data

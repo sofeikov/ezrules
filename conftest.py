@@ -88,6 +88,16 @@ def session(connection):
     ezruleapp.user_list_manager.o_id = org.o_id
     ezruleapp.user_list_manager._initialized = False
     ezruleapp.user_list_manager._cached_lists = None
+    ezruleapp.label_manager.db_session = session
+    ezruleapp.label_manager.o_id = org.o_id
+    ezruleapp.label_manager._initialized = False
+    ezruleapp.label_manager._cached_labels = None
+
+    # Set the global db_session to use the test session
+    from ezrules.models import database
+
+    database.db_session.registry.clear()
+    database.db_session.configure(bind=connection)
 
     # Set up application context for tests
     from ezrules.core.application_context import reset_context, set_organization_id, set_user_list_manager
@@ -111,6 +121,14 @@ def session(connection):
     ezruleapp.user_list_manager.db_session = None
     ezruleapp.user_list_manager._initialized = False
     ezruleapp.user_list_manager._cached_lists = None
+    ezruleapp.label_manager.db_session = None
+    ezruleapp.label_manager._initialized = False
+    ezruleapp.label_manager._cached_labels = None
+
+    # Reset the global db_session
+    from ezrules.models import database
+
+    database.db_session.registry.clear()
 
     # Clean up application context
     reset_context()

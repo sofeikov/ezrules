@@ -1,4 +1,6 @@
+import csv
 import difflib
+import io
 import json
 import logging
 import os
@@ -25,7 +27,7 @@ from flask_bootstrap import Bootstrap5
 from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required, current_user
 from flask_wtf import CSRFProtect
 
-from ezrules.backend.forms import LabelForm, OutcomeForm, RoleForm, RuleForm, UserForm, UserRoleForm
+from ezrules.backend.forms import CSVUploadForm, LabelForm, OutcomeForm, RoleForm, RuleForm, UserForm, UserRoleForm
 from ezrules.backend.tasks import app as celery_app
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.backend.utils import conditional_decorator
@@ -333,6 +335,88 @@ def label_management():
             return redirect(url_for("label_management"))
         else:
             return render_template("labels.html", form=form, labels=label_manager.get_all_labels())
+
+
+@app.route("/upload_labels", methods=["GET", "POST"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.CREATE_LABEL))
+def upload_labels():
+    form = CSVUploadForm()
+    if request.method == "GET":
+        return render_template("upload_labels.html", form=form)
+    elif request.method == "POST":
+        if form.validate():
+            csv_file = form.csv_file.data
+
+            # Read CSV content
+            try:
+                stream = io.StringIO(csv_file.read().decode("utf-8"))
+                csv_reader = csv.reader(stream)
+
+                success_count = 0
+                error_count = 0
+                errors = []
+
+                for row_num, row in enumerate(csv_reader, 1):
+                    if len(row) != 2:
+                        error_count += 1
+                        errors.append(f"Row {row_num}: Expected 2 columns (event_id,label), got {len(row)}")
+                        continue
+
+                    event_id, label_name = row
+                    event_id = event_id.strip()
+                    label_name = label_name.strip().upper()
+
+                    if not event_id or not label_name:
+                        error_count += 1
+                        errors.append(f"Row {row_num}: Empty event_id or label_name")
+                        continue
+
+                    try:
+                        # Find the event by event_id
+                        event_record = db_session.query(TestingRecordLog).filter_by(event_id=event_id).first()
+                        if not event_record:
+                            error_count += 1
+                            errors.append(f"Row {row_num}: Event with id '{event_id}' not found")
+                            continue
+
+                        # Find the label by name
+                        label = db_session.query(Label).filter_by(label=label_name).first()
+                        if not label:
+                            error_count += 1
+                            errors.append(f"Row {row_num}: Label '{label_name}' not found")
+                            continue
+
+                        # Update the event record with the label
+                        event_record.el_id = label.el_id
+                        success_count += 1
+
+                    except Exception as e:
+                        error_count += 1
+                        errors.append(f"Row {row_num}: Database error - {str(e)}")
+
+                # Commit all changes if any were successful
+                if success_count > 0:
+                    db_session.commit()
+                    flash(f"Successfully processed {success_count} labels.", "success")
+
+                if error_count > 0:
+                    flash(f"Failed to process {error_count} rows. Check the errors below.", "warning")
+                    for error in errors[:10]:  # Show first 10 errors
+                        flash(error, "error")
+                    if len(errors) > 10:
+                        flash(f"... and {len(errors) - 10} more errors", "error")
+
+                if success_count == 0 and error_count == 0:
+                    flash("CSV file was empty or contained no valid data.", "warning")
+
+            except Exception as e:
+                db_session.rollback()
+                flash(f"Error processing CSV file: {str(e)}", "error")
+
+            return redirect(url_for("upload_labels"))
+        else:
+            return render_template("upload_labels.html", form=form)
 
 
 @app.route("/labels", methods=["GET", "POST"])
