@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from random import choice, choices, randint, uniform
 from urllib.parse import urlparse
 
+import bcrypt
 import click
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
@@ -77,18 +78,20 @@ def add_user(user_email, password):
     versioned_session(db_session)
 
     try:
+        hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         db_session.add(
             User(
                 email=user_email,
-                password=password,
+                password=hashed_password,
                 active=True,
                 fs_uniquifier=user_email,
             )
         )
         db_session.commit()
         logger.info(f"Done adding {user_email} to {db_endpoint}")
-    except Exception:
+    except Exception as e:
         db_session.rollback()
+        logger.error(e)
         logger.info("User already exists")
     try:
         db_session.add(Organisation(name="base"))
