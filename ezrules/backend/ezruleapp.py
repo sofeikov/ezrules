@@ -23,6 +23,7 @@ from flask import (
 )
 from flask_bootstrap import Bootstrap5
 from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required, current_user
+from flask_security.utils import hash_password
 from flask_wtf import CSRFProtect
 
 from ezrules.backend.forms import CSVUploadForm, LabelForm, OutcomeForm, RoleForm, RuleForm, UserForm, UserRoleForm
@@ -548,9 +549,10 @@ def user_management():
                     return redirect(url_for("user_management"))
 
                 # Create new user
+                hashed_password = hash_password(password)
                 new_user = User(
                     email=user_email,
-                    password=password,
+                    password=hashed_password,
                     active=True,
                     fs_uniquifier=user_email,
                 )

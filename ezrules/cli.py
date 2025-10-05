@@ -7,6 +7,7 @@ from random import choice, choices, randint, uniform
 from urllib.parse import urlparse
 
 import click
+from flask_security.utils import hash_password
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -77,10 +78,11 @@ def add_user(user_email, password):
     versioned_session(db_session)
 
     try:
+        hashed_password = hash_password(password)
         db_session.add(
             User(
                 email=user_email,
-                password=password,
+                password=hashed_password,
                 active=True,
                 fs_uniquifier=user_email,
             )
