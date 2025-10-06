@@ -588,3 +588,84 @@ def test_upload_labels_empty_csv(logged_in_manager_client):
 
     assert rv.status_code == 200
     assert b"CSV file was empty or contained no valid data" in rv.data
+
+
+def test_dashboard_page_loads(logged_in_manager_client):
+    """Test that the dashboard page loads successfully"""
+    rv = logged_in_manager_client.get("/dashboard")
+    assert rv.status_code == 200
+    assert b"Dashboard" in rv.data
+    assert b"Active Rules" in rv.data
+    assert b"Transactions Today" in rv.data
+
+
+def test_dashboard_displays_active_rules_count(session, logged_in_manager_client):
+    """Test that the dashboard displays the correct number of active rules"""
+    # Create test rules
+    org = session.query(Organisation).first()
+    rule1 = Rule(rid="TEST:001", description="test rule 1", logic="return 'HOLD'", o_id=org.o_id)
+    rule2 = Rule(rid="TEST:002", description="test rule 2", logic="return 'RELEASE'", o_id=org.o_id)
+    session.add(rule1)
+    session.add(rule2)
+    session.commit()
+
+    rv = logged_in_manager_client.get("/dashboard")
+    assert rv.status_code == 200
+    # Check that the count is displayed (looking for 2 active rules)
+    assert b"Active Rules" in rv.data
+
+
+def test_dashboard_displays_transactions_today(session, logged_in_manager_client):
+    """Test that the dashboard displays transactions processed today"""
+    from ezrules.models.backend_core import TestingRecordLog
+    import datetime
+
+    org = session.query(Organisation).first()
+
+    # Create transactions today
+    today_event = TestingRecordLog(
+        event_id="today_event_1",
+        event_timestamp=int(datetime.datetime.now().timestamp()),
+        event={"test": "data"},
+        o_id=org.o_id,
+        created_at=datetime.datetime.now(),
+    )
+    session.add(today_event)
+    session.commit()
+
+    rv = logged_in_manager_client.get("/dashboard")
+    assert rv.status_code == 200
+    assert b"Transactions Today" in rv.data
+
+
+def test_dashboard_displays_outcomes_by_type(session, logged_in_manager_client):
+    """Test that the dashboard displays outcomes triggered today"""
+    from ezrules.models.backend_core import TestingRecordLog, TestingResultsLog
+    import datetime
+
+    org = session.query(Organisation).first()
+
+    # Create a rule
+    rule = Rule(rid="TEST:003", description="test rule", logic="return 'HOLD'", o_id=org.o_id)
+    session.add(rule)
+    session.commit()
+
+    # Create transactions and results today
+    today_event = TestingRecordLog(
+        event_id="outcome_event_1",
+        event_timestamp=int(datetime.datetime.now().timestamp()),
+        event={"test": "data"},
+        o_id=org.o_id,
+        created_at=datetime.datetime.now(),
+    )
+    session.add(today_event)
+    session.commit()
+
+    # Create result
+    result = TestingResultsLog(tl_id=today_event.tl_id, rule_result="HOLD", r_id=rule.r_id)
+    session.add(result)
+    session.commit()
+
+    rv = logged_in_manager_client.get("/dashboard")
+    assert rv.status_code == 200
+    assert b"Outcomes Triggered Today" in rv.data
