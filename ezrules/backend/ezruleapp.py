@@ -821,30 +821,9 @@ def dashboard():
     # Count active rules
     active_rules_count = db_session.query(RuleModel).count()
 
-    # Get today's start (midnight)
-    today_start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-
-    # Count transactions processed today
-    transactions_today = db_session.query(TestingRecordLog).filter(TestingRecordLog.created_at >= today_start).count()
-
-    # Count outcomes triggered by type (today)
-    outcomes_by_type = {}
-    outcomes_today = (
-        db_session.query(TestingResultsLog.rule_result, sqlalchemy.func.count(TestingResultsLog.rule_result))
-        .join(TestingRecordLog, TestingRecordLog.tl_id == TestingResultsLog.tl_id)
-        .filter(TestingRecordLog.created_at >= today_start)
-        .group_by(TestingResultsLog.rule_result)
-        .all()
-    )
-
-    for outcome, count in outcomes_today:
-        outcomes_by_type[outcome] = count
-
     return render_template(
         "dashboard.html",
         active_rules_count=active_rules_count,
-        transactions_today=transactions_today,
-        outcomes_by_type=outcomes_by_type,
     )
 
 
