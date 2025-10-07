@@ -14,6 +14,9 @@ v0.9
 * Bulk CSV upload interface for efficient batch labeling of events
 * Enhanced CLI test data generation with realistic fraud patterns and label assignment
 * Automatic default label creation (FRAUD, CHARGEBACK, NORMAL) for immediate testing
+* Dashboard transaction volume chart with Chart.js: visualize transaction patterns over configurable time ranges
+* Time aggregation options: 1 hour, 6 hours, 12 hours, 24 hours, and 30 days
+* Real-time API endpoint for transaction volume data (/api/transaction_volume)
 
 v0.7
 

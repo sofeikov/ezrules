@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous">
         </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <title>Dashboard</title>
     <style>
         .container-fluid {
@@ -25,6 +26,9 @@
         .metric-label {
             font-size: 1.2rem;
             color: #6c757d;
+        }
+        #transactionVolumeChart {
+            max-height: 400px;
         }
     </style>
 </head>
@@ -68,6 +72,29 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
+                        <h5>Transaction Volume Over Time</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="aggregationSelect" class="form-label">Time Range:</label>
+                            <select id="aggregationSelect" class="form-select" style="width: auto; display: inline-block;">
+                                <option value="1h">Last 1 Hour</option>
+                                <option value="6h" selected>Last 6 Hours</option>
+                                <option value="12h">Last 12 Hours</option>
+                                <option value="24h">Last 24 Hours</option>
+                                <option value="30d">Last 30 Days</option>
+                            </select>
+                        </div>
+                        <canvas id="transactionVolumeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
                         <h5>Outcomes Triggered Today</h5>
                     </div>
                     <div class="card-body">
@@ -96,5 +123,78 @@
             </div>
         </div>
     </div>
+
+    <script>
+        let transactionChart = null;
+
+        function loadTransactionData(aggregation) {
+            fetch(`/api/transaction_volume?aggregation=${aggregation}`)
+                .then(response => response.json())
+                .then(data => {
+                    const ctx = document.getElementById('transactionVolumeChart').getContext('2d');
+
+                    // Destroy existing chart if it exists
+                    if (transactionChart) {
+                        transactionChart.destroy();
+                    }
+
+                    // Create new chart
+                    transactionChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label: 'Transactions',
+                                data: data.data,
+                                borderColor: 'rgb(13, 110, 253)',
+                                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                                tension: 0.3,
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                title: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        precision: 0
+                                    }
+                                },
+                                x: {
+                                    ticks: {
+                                        maxRotation: 45,
+                                        minRotation: 45
+                                    }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading transaction data:', error);
+                });
+        }
+
+        // Load initial data
+        document.addEventListener('DOMContentLoaded', function() {
+            const aggregationSelect = document.getElementById('aggregationSelect');
+            loadTransactionData(aggregationSelect.value);
+
+            // Add change event listener
+            aggregationSelect.addEventListener('change', function() {
+                loadTransactionData(this.value);
+            });
+        });
+    </script>
 </body>
 {% endblock %}

@@ -846,3 +846,86 @@ def dashboard():
         transactions_today=transactions_today,
         outcomes_by_type=outcomes_by_type,
     )
+
+
+@app.route("/api/transaction_volume", methods=["GET"])
+@csrf.exempt
+def transaction_volume():
+    """API endpoint to get transaction volume data for various time aggregations."""
+    aggregation = request.args.get("aggregation", "1h")
+
+    # Map aggregation to time delta and bucket interval
+    aggregation_config = {
+        "1h": {"delta": datetime.timedelta(hours=1), "interval": "5 minutes"},
+        "6h": {"delta": datetime.timedelta(hours=6), "interval": "30 minutes"},
+        "12h": {"delta": datetime.timedelta(hours=12), "interval": "1 hour"},
+        "24h": {"delta": datetime.timedelta(hours=24), "interval": "2 hours"},
+        "30d": {"delta": datetime.timedelta(days=30), "interval": "1 day"},
+    }
+
+    if aggregation not in aggregation_config:
+        return jsonify({"error": "Invalid aggregation"}), 400
+
+    config = aggregation_config[aggregation]
+    start_time = datetime.datetime.now() - config["delta"]
+
+    # Query transactions grouped by time buckets using date_trunc
+    bucket_expr = sqlalchemy.func.date_trunc("hour", TestingRecordLog.created_at)
+
+    # For smaller intervals, use more granular bucketing
+    if aggregation == "1h":
+        # Group by 5-minute intervals
+        bucket_expr = sqlalchemy.cast(
+            sqlalchemy.func.floor(sqlalchemy.func.extract("epoch", TestingRecordLog.created_at) / 300) * 300,
+            sqlalchemy.Integer,
+        )
+    elif aggregation == "6h":
+        # Group by 30-minute intervals
+        bucket_expr = sqlalchemy.cast(
+            sqlalchemy.func.floor(sqlalchemy.func.extract("epoch", TestingRecordLog.created_at) / 1800) * 1800,
+            sqlalchemy.Integer,
+        )
+    elif aggregation == "12h":
+        # Group by 1-hour intervals
+        bucket_expr = sqlalchemy.cast(
+            sqlalchemy.func.floor(sqlalchemy.func.extract("epoch", TestingRecordLog.created_at) / 3600) * 3600,
+            sqlalchemy.Integer,
+        )
+    elif aggregation == "24h":
+        # Group by 2-hour intervals
+        bucket_expr = sqlalchemy.cast(
+            sqlalchemy.func.floor(sqlalchemy.func.extract("epoch", TestingRecordLog.created_at) / 7200) * 7200,
+            sqlalchemy.Integer,
+        )
+    else:  # 30d
+        # Group by day
+        bucket_expr = sqlalchemy.func.date_trunc("day", TestingRecordLog.created_at)
+
+    transactions = (
+        db_session.query(bucket_expr.label("bucket"), sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
+        .filter(TestingRecordLog.created_at >= start_time)
+        .group_by("bucket")
+        .order_by("bucket")
+        .all()
+    )
+
+    # Format data for Chart.js
+    labels = []
+    data = []
+
+    for bucket, count in transactions:
+        if aggregation == "30d":
+            # For 30d, bucket is already a datetime
+            labels.append(bucket.strftime("%Y-%m-%d"))
+        else:
+            # For other aggregations, bucket is a Unix timestamp
+            dt = datetime.datetime.fromtimestamp(bucket)
+            if aggregation == "1h":
+                labels.append(dt.strftime("%H:%M"))
+            elif aggregation in ["6h", "12h", "24h"]:
+                labels.append(dt.strftime("%m-%d %H:%M"))
+            else:
+                labels.append(dt.strftime("%Y-%m-%d %H:%M"))
+        data.append(count)
+
+    return jsonify({"labels": labels, "data": data, "aggregation": aggregation})
