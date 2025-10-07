@@ -927,3 +927,43 @@ def transaction_volume():
         data.append(count)
 
     return jsonify({"labels": labels, "data": data, "aggregation": aggregation})
+
+
+@app.route("/api/outcomes_distribution", methods=["GET"])
+@csrf.exempt
+def outcomes_distribution():
+    """API endpoint to get distribution of rule outcomes for various time aggregations."""
+    aggregation = request.args.get("aggregation", "1h")
+
+    # Configuration for each aggregation period
+    aggregation_config = {
+        "1h": datetime.timedelta(hours=1),
+        "6h": datetime.timedelta(hours=6),
+        "12h": datetime.timedelta(hours=12),
+        "24h": datetime.timedelta(hours=24),
+        "30d": datetime.timedelta(days=30),
+    }
+
+    if aggregation not in aggregation_config:
+        return jsonify({"error": "Invalid aggregation"}), 400
+
+    start_time = datetime.datetime.now() - aggregation_config[aggregation]
+
+    # Query outcomes distribution
+    outcomes = (
+        db_session.query(TestingResultsLog.rule_result, sqlalchemy.func.count(TestingResultsLog.rule_result))
+        .join(TestingRecordLog, TestingRecordLog.tl_id == TestingResultsLog.tl_id)
+        .filter(TestingRecordLog.created_at >= start_time)
+        .group_by(TestingResultsLog.rule_result)
+        .all()
+    )
+
+    # Format data for Chart.js pie chart
+    labels = []
+    data = []
+
+    for outcome, count in outcomes:
+        labels.append(outcome)
+        data.append(count)
+
+    return jsonify({"labels": labels, "data": data, "aggregation": aggregation})

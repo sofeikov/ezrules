@@ -71,12 +71,10 @@
         <div class="row mt-4">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header">
-                        <h5>Transaction Volume Over Time</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="aggregationSelect" class="form-label">Time Range:</label>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Transaction Analytics</h5>
+                        <div>
+                            <label for="aggregationSelect" class="form-label mb-0 me-2">Time Range:</label>
                             <select id="aggregationSelect" class="form-select" style="width: auto; display: inline-block;">
                                 <option value="1h">Last 1 Hour</option>
                                 <option value="6h" selected>Last 6 Hours</option>
@@ -85,7 +83,18 @@
                                 <option value="30d">Last 30 Days</option>
                             </select>
                         </div>
-                        <canvas id="transactionVolumeChart"></canvas>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h6 class="text-center mb-3">Transaction Volume</h6>
+                                <canvas id="transactionVolumeChart"></canvas>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-center mb-3">Rule Outcomes Distribution</h6>
+                                <canvas id="outcomesDistributionChart"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -126,6 +135,7 @@
 
     <script>
         let transactionChart = null;
+        let outcomesChart = null;
 
         function loadTransactionData(aggregation) {
             fetch(`/api/transaction_volume?aggregation=${aggregation}`)
@@ -185,14 +195,86 @@
                 });
         }
 
+        function loadOutcomesData(aggregation) {
+            fetch(`/api/outcomes_distribution?aggregation=${aggregation}`)
+                .then(response => response.json())
+                .then(data => {
+                    const ctx = document.getElementById('outcomesDistributionChart').getContext('2d');
+
+                    // Destroy existing chart if it exists
+                    if (outcomesChart) {
+                        outcomesChart.destroy();
+                    }
+
+                    // Generate colors for pie chart
+                    const colors = [
+                        'rgba(255, 99, 132, 0.8)',
+                        'rgba(54, 162, 235, 0.8)',
+                        'rgba(255, 206, 86, 0.8)',
+                        'rgba(75, 192, 192, 0.8)',
+                        'rgba(153, 102, 255, 0.8)',
+                        'rgba(255, 159, 64, 0.8)',
+                        'rgba(201, 203, 207, 0.8)'
+                    ];
+
+                    // Create new chart
+                    outcomesChart = new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                data: data.data,
+                                backgroundColor: colors.slice(0, data.labels.length),
+                                borderWidth: 2,
+                                borderColor: '#fff'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 15,
+                                        font: {
+                                            size: 12
+                                        }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const label = context.label || '';
+                                            const value = context.parsed || 0;
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const percentage = ((value / total) * 100).toFixed(1);
+                                            return `${label}: ${value} (${percentage}%)`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading outcomes data:', error);
+                });
+        }
+
+        function loadAllCharts(aggregation) {
+            loadTransactionData(aggregation);
+            loadOutcomesData(aggregation);
+        }
+
         // Load initial data
         document.addEventListener('DOMContentLoaded', function() {
             const aggregationSelect = document.getElementById('aggregationSelect');
-            loadTransactionData(aggregationSelect.value);
+            loadAllCharts(aggregationSelect.value);
 
             // Add change event listener
             aggregationSelect.addEventListener('change', function() {
-                loadTransactionData(this.value);
+                loadAllCharts(this.value);
             });
         });
     </script>
