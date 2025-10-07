@@ -854,13 +854,38 @@ def transaction_volume():
     """API endpoint to get transaction volume data for various time aggregations."""
     aggregation = request.args.get("aggregation", "1h")
 
-    # Map aggregation to time delta and bucket interval
+    # Configuration for each aggregation period
     aggregation_config = {
-        "1h": {"delta": datetime.timedelta(hours=1), "interval": "5 minutes"},
-        "6h": {"delta": datetime.timedelta(hours=6), "interval": "30 minutes"},
-        "12h": {"delta": datetime.timedelta(hours=12), "interval": "1 hour"},
-        "24h": {"delta": datetime.timedelta(hours=24), "interval": "2 hours"},
-        "30d": {"delta": datetime.timedelta(days=30), "interval": "1 day"},
+        "1h": {
+            "delta": datetime.timedelta(hours=1),
+            "bucket_seconds": 300,  # 5 minutes
+            "label_format": "%H:%M",
+            "use_date_trunc": False,
+        },
+        "6h": {
+            "delta": datetime.timedelta(hours=6),
+            "bucket_seconds": 1800,  # 30 minutes
+            "label_format": "%m-%d %H:%M",
+            "use_date_trunc": False,
+        },
+        "12h": {
+            "delta": datetime.timedelta(hours=12),
+            "bucket_seconds": 3600,  # 1 hour
+            "label_format": "%m-%d %H:%M",
+            "use_date_trunc": False,
+        },
+        "24h": {
+            "delta": datetime.timedelta(hours=24),
+            "bucket_seconds": 7200,  # 2 hours
+            "label_format": "%m-%d %H:%M",
+            "use_date_trunc": False,
+        },
+        "30d": {
+            "delta": datetime.timedelta(days=30),
+            "bucket_seconds": None,  # Uses date_trunc instead
+            "label_format": "%Y-%m-%d",
+            "use_date_trunc": True,
+        },
     }
 
     if aggregation not in aggregation_config:
@@ -869,37 +894,17 @@ def transaction_volume():
     config = aggregation_config[aggregation]
     start_time = datetime.datetime.now() - config["delta"]
 
-    # Query transactions grouped by time buckets using date_trunc
-    bucket_expr = sqlalchemy.func.date_trunc("hour", TestingRecordLog.created_at)
-
-    # For smaller intervals, use more granular bucketing
-    if aggregation == "1h":
-        # Group by 5-minute intervals
-        bucket_expr = sqlalchemy.cast(
-            sqlalchemy.func.floor(sqlalchemy.func.extract("epoch", TestingRecordLog.created_at) / 300) * 300,
-            sqlalchemy.Integer,
-        )
-    elif aggregation == "6h":
-        # Group by 30-minute intervals
-        bucket_expr = sqlalchemy.cast(
-            sqlalchemy.func.floor(sqlalchemy.func.extract("epoch", TestingRecordLog.created_at) / 1800) * 1800,
-            sqlalchemy.Integer,
-        )
-    elif aggregation == "12h":
-        # Group by 1-hour intervals
-        bucket_expr = sqlalchemy.cast(
-            sqlalchemy.func.floor(sqlalchemy.func.extract("epoch", TestingRecordLog.created_at) / 3600) * 3600,
-            sqlalchemy.Integer,
-        )
-    elif aggregation == "24h":
-        # Group by 2-hour intervals
-        bucket_expr = sqlalchemy.cast(
-            sqlalchemy.func.floor(sqlalchemy.func.extract("epoch", TestingRecordLog.created_at) / 7200) * 7200,
-            sqlalchemy.Integer,
-        )
-    else:  # 30d
-        # Group by day
+    # Build bucket expression based on configuration
+    if config["use_date_trunc"]:
         bucket_expr = sqlalchemy.func.date_trunc("day", TestingRecordLog.created_at)
+    else:
+        bucket_expr = sqlalchemy.cast(
+            sqlalchemy.func.floor(
+                sqlalchemy.func.extract("epoch", TestingRecordLog.created_at) / config["bucket_seconds"]
+            )
+            * config["bucket_seconds"],
+            sqlalchemy.Integer,
+        )
 
     transactions = (
         db_session.query(bucket_expr.label("bucket"), sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
@@ -914,18 +919,11 @@ def transaction_volume():
     data = []
 
     for bucket, count in transactions:
-        if aggregation == "30d":
-            # For 30d, bucket is already a datetime
-            labels.append(bucket.strftime("%Y-%m-%d"))
+        if config["use_date_trunc"]:
+            labels.append(bucket.strftime(config["label_format"]))
         else:
-            # For other aggregations, bucket is a Unix timestamp
             dt = datetime.datetime.fromtimestamp(bucket)
-            if aggregation == "1h":
-                labels.append(dt.strftime("%H:%M"))
-            elif aggregation in ["6h", "12h", "24h"]:
-                labels.append(dt.strftime("%m-%d %H:%M"))
-            else:
-                labels.append(dt.strftime("%Y-%m-%d %H:%M"))
+            labels.append(dt.strftime(config["label_format"]))
         data.append(count)
 
     return jsonify({"labels": labels, "data": data, "aggregation": aggregation})
