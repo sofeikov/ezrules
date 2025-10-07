@@ -821,28 +821,128 @@ def dashboard():
     # Count active rules
     active_rules_count = db_session.query(RuleModel).count()
 
-    # Get today's start (midnight)
-    today_start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    return render_template(
+        "dashboard.html",
+        active_rules_count=active_rules_count,
+    )
 
-    # Count transactions processed today
-    transactions_today = db_session.query(TestingRecordLog).filter(TestingRecordLog.created_at >= today_start).count()
 
-    # Count outcomes triggered by type (today)
-    outcomes_by_type = {}
-    outcomes_today = (
+@app.route("/api/transaction_volume", methods=["GET"])
+@csrf.exempt
+def transaction_volume():
+    """API endpoint to get transaction volume data for various time aggregations."""
+    aggregation = request.args.get("aggregation", "1h")
+
+    # Configuration for each aggregation period
+    aggregation_config = {
+        "1h": {
+            "delta": datetime.timedelta(hours=1),
+            "bucket_seconds": 300,  # 5 minutes
+            "label_format": "%H:%M",
+            "use_date_trunc": False,
+        },
+        "6h": {
+            "delta": datetime.timedelta(hours=6),
+            "bucket_seconds": 1800,  # 30 minutes
+            "label_format": "%m-%d %H:%M",
+            "use_date_trunc": False,
+        },
+        "12h": {
+            "delta": datetime.timedelta(hours=12),
+            "bucket_seconds": 3600,  # 1 hour
+            "label_format": "%m-%d %H:%M",
+            "use_date_trunc": False,
+        },
+        "24h": {
+            "delta": datetime.timedelta(hours=24),
+            "bucket_seconds": 7200,  # 2 hours
+            "label_format": "%m-%d %H:%M",
+            "use_date_trunc": False,
+        },
+        "30d": {
+            "delta": datetime.timedelta(days=30),
+            "bucket_seconds": None,  # Uses date_trunc instead
+            "label_format": "%Y-%m-%d",
+            "use_date_trunc": True,
+        },
+    }
+
+    if aggregation not in aggregation_config:
+        return jsonify({"error": "Invalid aggregation"}), 400
+
+    config = aggregation_config[aggregation]
+    start_time = datetime.datetime.now() - config["delta"]
+
+    # Build bucket expression based on configuration
+    if config["use_date_trunc"]:
+        bucket_expr = sqlalchemy.func.date_trunc("day", TestingRecordLog.created_at)
+    else:
+        bucket_expr = sqlalchemy.cast(
+            sqlalchemy.func.floor(
+                sqlalchemy.func.extract("epoch", TestingRecordLog.created_at) / config["bucket_seconds"]
+            )
+            * config["bucket_seconds"],
+            sqlalchemy.Integer,
+        )
+
+    transactions = (
+        db_session.query(bucket_expr.label("bucket"), sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
+        .filter(TestingRecordLog.created_at >= start_time)
+        .group_by("bucket")
+        .order_by("bucket")
+        .all()
+    )
+
+    # Format data for Chart.js
+    labels = []
+    data = []
+
+    for bucket, count in transactions:
+        if config["use_date_trunc"]:
+            labels.append(bucket.strftime(config["label_format"]))
+        else:
+            dt = datetime.datetime.fromtimestamp(bucket)
+            labels.append(dt.strftime(config["label_format"]))
+        data.append(count)
+
+    return jsonify({"labels": labels, "data": data, "aggregation": aggregation})
+
+
+@app.route("/api/outcomes_distribution", methods=["GET"])
+@csrf.exempt
+def outcomes_distribution():
+    """API endpoint to get distribution of rule outcomes for various time aggregations."""
+    aggregation = request.args.get("aggregation", "1h")
+
+    # Configuration for each aggregation period
+    aggregation_config = {
+        "1h": datetime.timedelta(hours=1),
+        "6h": datetime.timedelta(hours=6),
+        "12h": datetime.timedelta(hours=12),
+        "24h": datetime.timedelta(hours=24),
+        "30d": datetime.timedelta(days=30),
+    }
+
+    if aggregation not in aggregation_config:
+        return jsonify({"error": "Invalid aggregation"}), 400
+
+    start_time = datetime.datetime.now() - aggregation_config[aggregation]
+
+    # Query outcomes distribution
+    outcomes = (
         db_session.query(TestingResultsLog.rule_result, sqlalchemy.func.count(TestingResultsLog.rule_result))
         .join(TestingRecordLog, TestingRecordLog.tl_id == TestingResultsLog.tl_id)
-        .filter(TestingRecordLog.created_at >= today_start)
+        .filter(TestingRecordLog.created_at >= start_time)
         .group_by(TestingResultsLog.rule_result)
         .all()
     )
 
-    for outcome, count in outcomes_today:
-        outcomes_by_type[outcome] = count
+    # Format data for Chart.js pie chart
+    labels = []
+    data = []
 
-    return render_template(
-        "dashboard.html",
-        active_rules_count=active_rules_count,
-        transactions_today=transactions_today,
-        outcomes_by_type=outcomes_by_type,
-    )
+    for outcome, count in outcomes:
+        labels.append(outcome)
+        data.append(count)
+
+    return jsonify({"labels": labels, "data": data, "aggregation": aggregation})

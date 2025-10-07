@@ -10,6 +10,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Web Management Interface**: Flask-based UI for creating and managing rules
 - **Enterprise Security**: Granular role-based access control with 13 permission types
 - **Transaction Labeling**: Comprehensive fraud analytics with API and bulk CSV upload capabilities
+- **Analytics Dashboard**: Real-time transaction volume charts with configurable time ranges (1h, 6h, 12h, 24h, 30d)
 - **Scalable Architecture**: Multi-service deployment with dedicated manager and evaluator services
 - **Database Integration**: PostgreSQL backend with SQLAlchemy ORM and full audit history
 - **Audit Trail**: Complete access control and change tracking for compliance

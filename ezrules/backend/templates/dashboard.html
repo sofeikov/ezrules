@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous">
         </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <title>Dashboard</title>
     <style>
         .container-fluid {
@@ -25,6 +26,9 @@
         .metric-label {
             font-size: 1.2rem;
             color: #6c757d;
+        }
+        #transactionVolumeChart {
+            max-height: 400px;
         }
     </style>
 </head>
@@ -53,48 +57,185 @@
                     </div>
                 </div>
             </div>
-
-            <div class="col-md-4">
-                <div class="card metric-card">
-                    <div class="card-body text-center">
-                        <div class="metric-value">{{ transactions_today }}</div>
-                        <div class="metric-label">Transactions Today</div>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <div class="row mt-4">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header">
-                        <h5>Outcomes Triggered Today</h5>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Transaction Analytics</h5>
+                        <div>
+                            <label for="aggregationSelect" class="form-label mb-0 me-2">Time Range:</label>
+                            <select id="aggregationSelect" class="form-select" style="width: auto; display: inline-block;">
+                                <option value="1h">Last 1 Hour</option>
+                                <option value="6h" selected>Last 6 Hours</option>
+                                <option value="12h">Last 12 Hours</option>
+                                <option value="24h">Last 24 Hours</option>
+                                <option value="30d">Last 30 Days</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="card-body">
-                        {% if outcomes_by_type %}
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Outcome Type</th>
-                                    <th>Count</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for outcome, count in outcomes_by_type.items() %}
-                                <tr>
-                                    <td>{{ outcome }}</td>
-                                    <td>{{ count }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        {% else %}
-                        <p class="text-muted">No outcomes triggered today.</p>
-                        {% endif %}
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h6 class="text-center mb-3">Transaction Volume</h6>
+                                <canvas id="transactionVolumeChart"></canvas>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-center mb-3">Rule Outcomes Distribution</h6>
+                                <canvas id="outcomesDistributionChart"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <script>
+        let transactionChart = null;
+        let outcomesChart = null;
+
+        function loadTransactionData(aggregation) {
+            fetch(`/api/transaction_volume?aggregation=${aggregation}`)
+                .then(response => response.json())
+                .then(data => {
+                    const ctx = document.getElementById('transactionVolumeChart').getContext('2d');
+
+                    // Destroy existing chart if it exists
+                    if (transactionChart) {
+                        transactionChart.destroy();
+                    }
+
+                    // Create new chart
+                    transactionChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label: 'Transactions',
+                                data: data.data,
+                                borderColor: 'rgb(13, 110, 253)',
+                                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                                tension: 0.3,
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                title: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        precision: 0
+                                    }
+                                },
+                                x: {
+                                    ticks: {
+                                        maxRotation: 45,
+                                        minRotation: 45
+                                    }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading transaction data:', error);
+                });
+        }
+
+        function loadOutcomesData(aggregation) {
+            fetch(`/api/outcomes_distribution?aggregation=${aggregation}`)
+                .then(response => response.json())
+                .then(data => {
+                    const ctx = document.getElementById('outcomesDistributionChart').getContext('2d');
+
+                    // Destroy existing chart if it exists
+                    if (outcomesChart) {
+                        outcomesChart.destroy();
+                    }
+
+                    // Generate colors for pie chart
+                    const colors = [
+                        'rgba(255, 99, 132, 0.8)',
+                        'rgba(54, 162, 235, 0.8)',
+                        'rgba(255, 206, 86, 0.8)',
+                        'rgba(75, 192, 192, 0.8)',
+                        'rgba(153, 102, 255, 0.8)',
+                        'rgba(255, 159, 64, 0.8)',
+                        'rgba(201, 203, 207, 0.8)'
+                    ];
+
+                    // Create new chart
+                    outcomesChart = new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                data: data.data,
+                                backgroundColor: colors.slice(0, data.labels.length),
+                                borderWidth: 2,
+                                borderColor: '#fff'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 15,
+                                        font: {
+                                            size: 12
+                                        }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const label = context.label || '';
+                                            const value = context.parsed || 0;
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const percentage = ((value / total) * 100).toFixed(1);
+                                            return `${label}: ${value} (${percentage}%)`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading outcomes data:', error);
+                });
+        }
+
+        function loadAllCharts(aggregation) {
+            loadTransactionData(aggregation);
+            loadOutcomesData(aggregation);
+        }
+
+        // Load initial data
+        document.addEventListener('DOMContentLoaded', function() {
+            const aggregationSelect = document.getElementById('aggregationSelect');
+            loadAllCharts(aggregationSelect.value);
+
+            // Add change event listener
+            aggregationSelect.addEventListener('change', function() {
+                loadAllCharts(this.value);
+            });
+        });
+    </script>
 </body>
 {% endblock %}

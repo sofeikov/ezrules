@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, field_validator
 
 from ezrules.models.backend_core import TestingRecordLog, TestingResultsLog
@@ -25,11 +27,14 @@ class Event(BaseModel):
 
 def eval_and_store(lre, event: Event):
     db_session = lre.db
+    # Convert Unix timestamp to datetime for created_at
+    created_at_datetime = datetime.fromtimestamp(event.event_timestamp)
     tl = TestingRecordLog(
         o_id=lre.o_id,
         event=event.event_data,
         event_timestamp=event.event_timestamp,
         event_id=event.event_id,
+        created_at=created_at_datetime,
     )
     db_session.add(tl)
     db_session.commit()

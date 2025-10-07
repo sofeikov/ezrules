@@ -596,7 +596,7 @@ def test_dashboard_page_loads(logged_in_manager_client):
     assert rv.status_code == 200
     assert b"Dashboard" in rv.data
     assert b"Active Rules" in rv.data
-    assert b"Transactions Today" in rv.data
+    assert b"Transaction Analytics" in rv.data
 
 
 def test_dashboard_displays_active_rules_count(session, logged_in_manager_client):
@@ -616,7 +616,7 @@ def test_dashboard_displays_active_rules_count(session, logged_in_manager_client
 
 
 def test_dashboard_displays_transactions_today(session, logged_in_manager_client):
-    """Test that the dashboard displays transactions processed today"""
+    """Test that the dashboard displays transaction analytics charts"""
     from ezrules.models.backend_core import TestingRecordLog
     import datetime
 
@@ -635,11 +635,12 @@ def test_dashboard_displays_transactions_today(session, logged_in_manager_client
 
     rv = logged_in_manager_client.get("/dashboard")
     assert rv.status_code == 200
-    assert b"Transactions Today" in rv.data
+    assert b"Transaction Analytics" in rv.data
+    assert b"transactionVolumeChart" in rv.data
 
 
 def test_dashboard_displays_outcomes_by_type(session, logged_in_manager_client):
-    """Test that the dashboard displays outcomes triggered today"""
+    """Test that the dashboard displays outcomes distribution chart"""
     from ezrules.models.backend_core import TestingRecordLog, TestingResultsLog
     import datetime
 
@@ -668,4 +669,5 @@ def test_dashboard_displays_outcomes_by_type(session, logged_in_manager_client):
 
     rv = logged_in_manager_client.get("/dashboard")
     assert rv.status_code == 200
-    assert b"Outcomes Triggered Today" in rv.data
+    assert b"Rule Outcomes Distribution" in rv.data
+    assert b"outcomesDistributionChart" in rv.data
