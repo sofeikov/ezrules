@@ -158,6 +158,20 @@ txn_456,NORMAL
 txn_789,CHARGEBACK
 ```
 
+### Label Analytics Dashboard
+
+Access comprehensive analytics for labeled transactions at `/label_analytics`:
+
+**Key Metrics:**
+- **Total Labeled Events**: Track overall labeling coverage
+- **Labels Over Time**: Individual time-series charts for each label type showing temporal trends
+
+**Time Range Options**: View analytics over 1h, 6h, 12h, 24h, or 30d periods
+
+**API Endpoints:**
+- `/api/labels_summary` - Summary statistics (total labeled events count)
+- `/api/labels_distribution` - Distribution of individual labels by time period
+
 ### Test Data Generation
 
 Generate realistic test data with fraud patterns:
@@ -182,6 +196,7 @@ uv run ezrules export-test-csv --n-events 50 --unlabeled-only --output-file test
 - **False Negative Analysis**: Identify missed fraud cases for rule improvement
 - **Model Validation**: Test machine learning models against known outcomes
 - **Performance Metrics**: Track rule effectiveness over time
+- **Temporal Analysis**: Understand fraud patterns and trends over configurable time periods
 
 ## 💼 Use Cases
 

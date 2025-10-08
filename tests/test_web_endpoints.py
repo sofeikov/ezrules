@@ -389,3 +389,195 @@ class TestErrorConditions:
         remove_data = {"action": "remove_entry", "list_name": "", "entry_value": "", "csrf_token": g.csrf_token}
         rv = logged_in_manager_client.post("/management/lists", data=remove_data, follow_redirects=True)
         assert rv.status_code == 200
+
+
+class TestLabelAnalytics:
+    """Test label analytics dashboard and API endpoints."""
+
+    def test_label_analytics_page_loads(self, logged_in_manager_client):
+        """Test that the /label_analytics page loads successfully."""
+        rv = logged_in_manager_client.get("/label_analytics")
+        assert rv.status_code == 200
+
+    def test_labels_summary_endpoint(self, session, logged_in_manager_client):
+        """Test labels summary API endpoint."""
+        from ezrules.models.backend_core import Label, TestingRecordLog, Organisation
+        import uuid
+
+        org = session.query(Organisation).first()
+
+        # Create test labels with unique names
+        unique_suffix = str(uuid.uuid4())[:8]
+        label1 = Label(label=f"FRAUD_{unique_suffix}")
+        label2 = Label(label=f"NORMAL_{unique_suffix}")
+        session.add(label1)
+        session.add(label2)
+        session.commit()
+
+        # Create test events with labels
+        event1 = TestingRecordLog(
+            event={"amount": 100},
+            event_timestamp=1234567890,
+            event_id=f"test_event_1_{unique_suffix}",
+            o_id=org.o_id,
+            el_id=label1.el_id,
+        )
+        event2 = TestingRecordLog(
+            event={"amount": 200},
+            event_timestamp=1234567891,
+            event_id=f"test_event_2_{unique_suffix}",
+            o_id=org.o_id,
+            el_id=label1.el_id,
+        )
+        event3 = TestingRecordLog(
+            event={"amount": 300},
+            event_timestamp=1234567892,
+            event_id=f"test_event_3_{unique_suffix}",
+            o_id=org.o_id,
+            el_id=label2.el_id,
+        )
+        session.add_all([event1, event2, event3])
+        session.commit()
+
+        rv = logged_in_manager_client.get("/api/labels_summary")
+        assert rv.status_code == 200
+        data = rv.get_json()
+        assert "total_labeled" in data
+        assert data["total_labeled"] >= 3
+        assert "pie_chart" in data
+        assert len(data["pie_chart"]["labels"]) >= 2
+
+    def test_labeled_transaction_volume_endpoint(self, session, logged_in_manager_client):
+        """Test labeled transaction volume API endpoint."""
+        from ezrules.models.backend_core import Label, TestingRecordLog, Organisation
+        import datetime
+        import uuid
+
+        org = session.query(Organisation).first()
+
+        # Create test label with unique name
+        unique_suffix = str(uuid.uuid4())[:8]
+        label1 = Label(label=f"TEST_LABEL_{unique_suffix}")
+        session.add(label1)
+        session.commit()
+
+        # Create test events with labels (recent)
+        now = datetime.datetime.now(datetime.UTC)
+        event1 = TestingRecordLog(
+            event={"amount": 100},
+            event_timestamp=int(now.timestamp()),
+            event_id=f"labeled_vol_1_{unique_suffix}",
+            o_id=org.o_id,
+            el_id=label1.el_id,
+            created_at=now,
+        )
+        session.add(event1)
+        session.commit()
+
+        rv = logged_in_manager_client.get("/api/labeled_transaction_volume?aggregation=1h")
+        assert rv.status_code == 200
+        data = rv.get_json()
+        assert "labels" in data
+        assert "data" in data
+        assert "aggregation" in data
+        assert data["aggregation"] == "1h"
+
+    def test_labels_distribution_endpoint(self, session, logged_in_manager_client):
+        """Test labels distribution over time API endpoint."""
+        from ezrules.models.backend_core import Label, TestingRecordLog, Organisation
+        import datetime
+        import uuid
+
+        org = session.query(Organisation).first()
+
+        # Create test labels with unique names
+        unique_suffix = str(uuid.uuid4())[:8]
+        label1 = Label(label=f"DIST_LABEL_1_{unique_suffix}")
+        label2 = Label(label=f"DIST_LABEL_2_{unique_suffix}")
+        session.add(label1)
+        session.add(label2)
+        session.commit()
+
+        # Create test events with labels (recent)
+        now = datetime.datetime.now(datetime.UTC)
+        event1 = TestingRecordLog(
+            event={"amount": 100},
+            event_timestamp=int(now.timestamp()),
+            event_id=f"dist_event_1_{unique_suffix}",
+            o_id=org.o_id,
+            el_id=label1.el_id,
+            created_at=now,
+        )
+        event2 = TestingRecordLog(
+            event={"amount": 200},
+            event_timestamp=int(now.timestamp()),
+            event_id=f"dist_event_2_{unique_suffix}",
+            o_id=org.o_id,
+            el_id=label2.el_id,
+            created_at=now,
+        )
+        session.add_all([event1, event2])
+        session.commit()
+
+        rv = logged_in_manager_client.get("/api/labels_distribution?aggregation=1h")
+        assert rv.status_code == 200
+        data = rv.get_json()
+        assert "labels" in data
+        assert "datasets" in data
+        assert "aggregation" in data
+        assert data["aggregation"] == "1h"
+
+    def test_labels_summary_with_no_labels(self, logged_in_manager_client):
+        """Test labels summary API endpoint with no labeled events."""
+        rv = logged_in_manager_client.get("/api/labels_summary")
+        assert rv.status_code == 200
+        data = rv.get_json()
+        assert "total_labeled" in data
+        assert "pie_chart" in data
+
+    def test_labeled_transaction_volume_invalid_aggregation(self, logged_in_manager_client):
+        """Test labeled transaction volume with invalid aggregation."""
+        rv = logged_in_manager_client.get("/api/labeled_transaction_volume?aggregation=invalid")
+        assert rv.status_code == 400
+        data = rv.get_json()
+        assert "error" in data
+
+    def test_labels_distribution_invalid_aggregation(self, logged_in_manager_client):
+        """Test labels distribution with invalid aggregation."""
+        rv = logged_in_manager_client.get("/api/labels_distribution?aggregation=invalid")
+        assert rv.status_code == 400
+        data = rv.get_json()
+        assert "error" in data
+
+    def test_labels_distribution_all_aggregations(self, session, logged_in_manager_client):
+        """Test labels distribution endpoint with all valid aggregations."""
+        from ezrules.models.backend_core import Label, TestingRecordLog, Organisation
+        import datetime
+        import uuid
+
+        org = session.query(Organisation).first()
+
+        # Create test label and event with unique names
+        unique_suffix = str(uuid.uuid4())[:8]
+        label1 = Label(label=f"AGG_TEST_LABEL_{unique_suffix}")
+        session.add(label1)
+        session.commit()
+
+        now = datetime.datetime.now(datetime.UTC)
+        event1 = TestingRecordLog(
+            event={"amount": 100},
+            event_timestamp=int(now.timestamp()),
+            event_id=f"agg_test_event_{unique_suffix}",
+            o_id=org.o_id,
+            el_id=label1.el_id,
+            created_at=now,
+        )
+        session.add(event1)
+        session.commit()
+
+        # Test all valid aggregations
+        for agg in ["1h", "6h", "12h", "24h", "30d"]:
+            rv = logged_in_manager_client.get(f"/api/labels_distribution?aggregation={agg}")
+            assert rv.status_code == 200
+            data = rv.get_json()
+            assert data["aggregation"] == agg

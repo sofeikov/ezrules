@@ -828,6 +828,14 @@ def dashboard():
     )
 
 
+@app.route("/label_analytics", methods=["GET"])
+@conditional_decorator(not app.config["TESTING"], auth_required())
+@conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.VIEW_LABELS))
+def label_analytics():
+    """Display label analytics dashboard with key metrics."""
+    return render_template("label_analytics.html")
+
+
 @app.route("/api/transaction_volume", methods=["GET"])
 @csrf.exempt
 def transaction_volume():
@@ -950,3 +958,180 @@ def outcomes_distribution():
         )
 
     return jsonify({"labels": labels, "datasets": chart_datasets, "aggregation": aggregation})
+
+
+@app.route("/api/labels_distribution", methods=["GET"])
+@csrf.exempt
+def labels_distribution():
+    """API endpoint to get temporal distribution of labels for various time aggregations."""
+    aggregation = request.args.get("aggregation", "1h")
+
+    if aggregation not in AGGREGATION_CONFIG:
+        return jsonify({"error": "Invalid aggregation"}), 400
+
+    config = AGGREGATION_CONFIG[aggregation]
+    start_time = datetime.datetime.now() - config["delta"]
+
+    # Build bucket expression using shared helper
+    bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
+
+    # Query labels distribution over time (only labeled events)
+    labels_data = (
+        db_session.query(
+            bucket_expr.label("bucket"),
+            Label.label,
+            sqlalchemy.func.count(Label.label).label("count"),
+        )
+        .join(TestingRecordLog, TestingRecordLog.el_id == Label.el_id)
+        .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.el_id.isnot(None))
+        .group_by("bucket", Label.label)
+        .order_by("bucket")
+        .all()
+    )
+
+    # Get unique label names
+    label_names = set()
+    for _bucket, label_name, _count in labels_data:
+        label_names.add(label_name)
+    label_names = sorted(label_names)
+
+    # Organize data by time bucket
+    time_buckets = {}
+    for bucket, label_name, count in labels_data:
+        if bucket not in time_buckets:
+            time_buckets[bucket] = {}
+        time_buckets[bucket][label_name] = count
+
+    # Format data for Chart.js line chart with multiple datasets
+    labels = []
+    datasets = {label_name: [] for label_name in label_names}
+
+    sorted_buckets = sorted(time_buckets.keys())
+    for bucket in sorted_buckets:
+        if config["use_date_trunc"]:
+            labels.append(bucket.strftime(config["label_format"]))
+        else:
+            dt = datetime.datetime.fromtimestamp(bucket)
+            labels.append(dt.strftime(config["label_format"]))
+
+        # Add count for each label (0 if not present in this bucket)
+        for label_name in label_names:
+            datasets[label_name].append(time_buckets[bucket].get(label_name, 0))
+
+    # Format datasets for Chart.js
+    chart_datasets = []
+    colors = [
+        {"border": "rgb(255, 99, 132)", "background": "rgba(255, 99, 132, 0.1)"},
+        {"border": "rgb(54, 162, 235)", "background": "rgba(54, 162, 235, 0.1)"},
+        {"border": "rgb(255, 206, 86)", "background": "rgba(255, 206, 86, 0.1)"},
+        {"border": "rgb(75, 192, 192)", "background": "rgba(75, 192, 192, 0.1)"},
+        {"border": "rgb(153, 102, 255)", "background": "rgba(153, 102, 255, 0.1)"},
+        {"border": "rgb(255, 159, 64)", "background": "rgba(255, 159, 64, 0.1)"},
+        {"border": "rgb(201, 203, 207)", "background": "rgba(201, 203, 207, 0.1)"},
+    ]
+
+    for idx, label_name in enumerate(label_names):
+        color = colors[idx % len(colors)]
+        chart_datasets.append(
+            {
+                "label": label_name,
+                "data": datasets[label_name],
+                "borderColor": color["border"],
+                "backgroundColor": color["background"],
+                "tension": 0.3,
+                "fill": True,
+            }
+        )
+
+    return jsonify({"labels": labels, "datasets": chart_datasets, "aggregation": aggregation})
+
+
+@app.route("/api/labeled_transaction_volume", methods=["GET"])
+@csrf.exempt
+def labeled_transaction_volume():
+    """API endpoint to get labeled transaction volume data for various time aggregations."""
+    aggregation = request.args.get("aggregation", "1h")
+
+    if aggregation not in AGGREGATION_CONFIG:
+        return jsonify({"error": "Invalid aggregation"}), 400
+
+    config = AGGREGATION_CONFIG[aggregation]
+    start_time = datetime.datetime.now() - config["delta"]
+
+    # Build bucket expression using shared helper
+    bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
+
+    # Query only labeled transactions
+    transactions = (
+        db_session.query(bucket_expr.label("bucket"), sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
+        .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.el_id.isnot(None))
+        .group_by("bucket")
+        .order_by("bucket")
+        .all()
+    )
+
+    # Format data for Chart.js
+    labels = []
+    data = []
+
+    for bucket, count in transactions:
+        if config["use_date_trunc"]:
+            labels.append(bucket.strftime(config["label_format"]))
+        else:
+            dt = datetime.datetime.fromtimestamp(bucket)
+            labels.append(dt.strftime(config["label_format"]))
+        data.append(count)
+
+    return jsonify({"labels": labels, "data": data, "aggregation": aggregation})
+
+
+@app.route("/api/labels_summary", methods=["GET"])
+@csrf.exempt
+def labels_summary():
+    """API endpoint to get summary statistics for labels."""
+    # Total labeled events
+    total_labeled = (
+        db_session.query(sqlalchemy.func.count(TestingRecordLog.tl_id))
+        .filter(TestingRecordLog.el_id.isnot(None))
+        .scalar()
+    )
+
+    # Label distribution (pie chart data)
+    label_counts = (
+        db_session.query(Label.label, sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
+        .join(TestingRecordLog, TestingRecordLog.el_id == Label.el_id)
+        .filter(TestingRecordLog.el_id.isnot(None))
+        .group_by(Label.label)
+        .order_by(sqlalchemy.desc("count"))
+        .all()
+    )
+
+    # Format for pie chart
+    pie_labels = []
+    pie_data = []
+    colors = [
+        "rgb(255, 99, 132)",
+        "rgb(54, 162, 235)",
+        "rgb(255, 206, 86)",
+        "rgb(75, 192, 192)",
+        "rgb(153, 102, 255)",
+        "rgb(255, 159, 64)",
+        "rgb(201, 203, 207)",
+    ]
+
+    for label_name, count in label_counts:
+        pie_labels.append(label_name)
+        pie_data.append(count)
+
+    return jsonify(
+        {
+            "total_labeled": total_labeled,
+            "pie_chart": {
+                "labels": pie_labels,
+                "data": pie_data,
+                "backgroundColor": colors[: len(pie_labels)],
+            },
+        }
+    )

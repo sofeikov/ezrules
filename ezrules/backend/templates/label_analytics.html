@@ -9,7 +9,7 @@
         integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous">
         </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <title>Dashboard</title>
+    <title>Label Analytics</title>
     <style>
         .container-fluid {
             padding-left: 15px;
@@ -27,7 +27,7 @@
             font-size: 1.2rem;
             color: #6c757d;
         }
-        #transactionVolumeChart {
+        .chart-container {
             max-height: 400px;
         }
     </style>
@@ -37,24 +37,20 @@
 
 <body>
     <div class="container-fluid mt-3">
-        <h1>Dashboard</h1>
+        <h1>Label Analytics</h1>
         <div class="mb-3">
             <a href="{{ url_for('rules') }}" class="btn btn-primary">Rules</a>
-            <a href="{{ url_for('verified_outcomes') }}" class="btn btn-secondary">Outcomes</a>
-            <a href="{{ url_for('label_management') }}" class="btn btn-secondary">Labels</a>
-            <a href="{{ url_for('label_analytics') }}" class="btn btn-info">Label Analytics</a>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-info">Dashboard</a>
+            <a href="{{ url_for('label_management') }}" class="btn btn-secondary">Manage Labels</a>
             <a href="{{ url_for('upload_labels') }}" class="btn btn-success">Upload Labels</a>
-            <a href="{{ url_for('user_lists') }}" class="btn btn-secondary">Lists</a>
-            <a href="{{ url_for('user_management') }}" class="btn btn-secondary">Users</a>
-            <a href="{{ url_for('role_management') }}" class="btn btn-secondary">Roles</a>
         </div>
 
         <div class="row mt-4">
-            <div class="col-md-4">
+            <div class="col-12">
                 <div class="card metric-card">
                     <div class="card-body text-center">
-                        <div class="metric-value">{{ active_rules_count }}</div>
-                        <div class="metric-label">Active Rules</div>
+                        <div class="metric-value" id="totalLabeled">-</div>
+                        <div class="metric-label">Total Labeled Events</div>
                     </div>
                 </div>
             </div>
@@ -64,7 +60,7 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Transaction Analytics</h5>
+                        <h5 class="mb-0">Labels Over Time</h5>
                         <div>
                             <label for="aggregationSelect" class="form-label mb-0 me-2">Time Range:</label>
                             <select id="aggregationSelect" class="form-select" style="width: auto; display: inline-block;">
@@ -77,18 +73,7 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-12">
-                                <h6 class="text-center mb-3">Transaction Volume</h6>
-                                <canvas id="transactionVolumeChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="row mt-4">
-                            <div class="col-12">
-                                <h6 class="text-center mb-3">Rule Outcomes Over Time</h6>
-                                <div id="outcomesChartsContainer" class="row"></div>
-                            </div>
-                        </div>
+                        <div id="labelsChartsContainer" class="row"></div>
                     </div>
                 </div>
             </div>
@@ -96,81 +81,34 @@
     </div>
 
     <script>
-        let transactionChart = null;
-        let outcomesCharts = {};
+        let labelsCharts = {};
 
-        function loadTransactionData(aggregation) {
-            fetch(`/api/transaction_volume?aggregation=${aggregation}`)
+        function loadSummaryData() {
+            fetch('/api/labels_summary')
                 .then(response => response.json())
                 .then(data => {
-                    const ctx = document.getElementById('transactionVolumeChart').getContext('2d');
-
-                    // Destroy existing chart if it exists
-                    if (transactionChart) {
-                        transactionChart.destroy();
-                    }
-
-                    // Create new chart
-                    transactionChart = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: data.labels,
-                            datasets: [{
-                                label: 'Transactions',
-                                data: data.data,
-                                borderColor: 'rgb(13, 110, 253)',
-                                backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                                tension: 0.3,
-                                fill: true
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: true,
-                            plugins: {
-                                legend: {
-                                    display: false
-                                },
-                                title: {
-                                    display: false
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    ticks: {
-                                        precision: 0
-                                    }
-                                },
-                                x: {
-                                    ticks: {
-                                        maxRotation: 45,
-                                        minRotation: 45
-                                    }
-                                }
-                            }
-                        }
-                    });
+                    // Update total labeled count
+                    document.getElementById('totalLabeled').textContent = data.total_labeled || 0;
                 })
                 .catch(error => {
-                    console.error('Error loading transaction data:', error);
+                    console.error('Error loading summary data:', error);
                 });
         }
 
-        function loadOutcomesData(aggregation) {
-            fetch(`/api/outcomes_distribution?aggregation=${aggregation}`)
+        function loadLabelsData(aggregation) {
+            fetch(`/api/labels_distribution?aggregation=${aggregation}`)
                 .then(response => response.json())
                 .then(data => {
-                    const container = document.getElementById('outcomesChartsContainer');
+                    const container = document.getElementById('labelsChartsContainer');
 
                     // Destroy existing charts
-                    Object.values(outcomesCharts).forEach(chart => chart.destroy());
-                    outcomesCharts = {};
+                    Object.values(labelsCharts).forEach(chart => chart.destroy());
+                    labelsCharts = {};
 
                     // Clear container
                     container.innerHTML = '';
 
-                    // Create a separate chart for each outcome
+                    // Create a separate chart for each label
                     data.datasets.forEach((dataset, idx) => {
                         // Create column div (responsive: full width on mobile, half on tablets, third on desktop)
                         const colDiv = document.createElement('div');
@@ -190,7 +128,7 @@
 
                         // Create canvas
                         const canvas = document.createElement('canvas');
-                        canvas.id = `outcomeChart_${idx}`;
+                        canvas.id = `labelChart_${idx}`;
 
                         cardBody.appendChild(title);
                         cardBody.appendChild(canvas);
@@ -200,7 +138,7 @@
 
                         // Create chart
                         const ctx = canvas.getContext('2d');
-                        outcomesCharts[dataset.label] = new Chart(ctx, {
+                        labelsCharts[dataset.label] = new Chart(ctx, {
                             type: 'line',
                             data: {
                                 labels: data.labels,
@@ -243,23 +181,23 @@
                     });
                 })
                 .catch(error => {
-                    console.error('Error loading outcomes data:', error);
+                    console.error('Error loading labels data:', error);
                 });
-        }
-
-        function loadAllCharts(aggregation) {
-            loadTransactionData(aggregation);
-            loadOutcomesData(aggregation);
         }
 
         // Load initial data
         document.addEventListener('DOMContentLoaded', function() {
             const aggregationSelect = document.getElementById('aggregationSelect');
-            loadAllCharts(aggregationSelect.value);
+
+            // Load summary data (doesn't change with aggregation)
+            loadSummaryData();
+
+            // Load individual label charts
+            loadLabelsData(aggregationSelect.value);
 
             // Add change event listener
             aggregationSelect.addEventListener('change', function() {
-                loadAllCharts(this.value);
+                loadLabelsData(this.value);
             });
         });
     </script>

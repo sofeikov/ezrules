@@ -17,6 +17,11 @@ v0.9
 * Dashboard transaction volume chart with Chart.js: visualize transaction patterns over configurable time ranges
 * Time aggregation options: 1 hour, 6 hours, 12 hours, 24 hours, and 30 days
 * Real-time API endpoint for transaction volume data (/api/transaction_volume)
+* **Label Analytics Dashboard**: Comprehensive analytics for ground truth labels with temporal analysis
+* Total labeled events metric card tracking overall labeling coverage
+* Individual time-series charts for each label type showing temporal trends over configurable time ranges
+* Label analytics API endpoints: /api/labels_summary, /api/labels_distribution
+* Configurable time ranges for label analytics (1h, 6h, 12h, 24h, 30d)
 
 v0.7
 
