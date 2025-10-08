@@ -669,5 +669,5 @@ def test_dashboard_displays_outcomes_by_type(session, logged_in_manager_client):
 
     rv = logged_in_manager_client.get("/dashboard")
     assert rv.status_code == 200
-    assert b"Rule Outcomes Distribution" in rv.data
-    assert b"outcomesDistributionChart" in rv.data
+    assert b"Rule Outcomes Over Time" in rv.data
+    assert b"outcomesChartsContainer" in rv.data
