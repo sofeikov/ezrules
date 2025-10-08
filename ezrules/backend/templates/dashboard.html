@@ -77,13 +77,15 @@
                     </div>
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-8">
+                            <div class="col-12">
                                 <h6 class="text-center mb-3">Transaction Volume</h6>
                                 <canvas id="transactionVolumeChart"></canvas>
                             </div>
-                            <div class="col-md-4">
-                                <h6 class="text-center mb-3">Rule Outcomes Distribution</h6>
-                                <canvas id="outcomesDistributionChart"></canvas>
+                        </div>
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <h6 class="text-center mb-3">Rule Outcomes Over Time</h6>
+                                <div id="outcomesChartsContainer" class="row"></div>
                             </div>
                         </div>
                     </div>
@@ -94,7 +96,7 @@
 
     <script>
         let transactionChart = null;
-        let outcomesChart = null;
+        let outcomesCharts = {};
 
         function loadTransactionData(aggregation) {
             fetch(`/api/transaction_volume?aggregation=${aggregation}`)
@@ -158,62 +160,85 @@
             fetch(`/api/outcomes_distribution?aggregation=${aggregation}`)
                 .then(response => response.json())
                 .then(data => {
-                    const ctx = document.getElementById('outcomesDistributionChart').getContext('2d');
+                    const container = document.getElementById('outcomesChartsContainer');
 
-                    // Destroy existing chart if it exists
-                    if (outcomesChart) {
-                        outcomesChart.destroy();
-                    }
+                    // Destroy existing charts
+                    Object.values(outcomesCharts).forEach(chart => chart.destroy());
+                    outcomesCharts = {};
 
-                    // Generate colors for pie chart
-                    const colors = [
-                        'rgba(255, 99, 132, 0.8)',
-                        'rgba(54, 162, 235, 0.8)',
-                        'rgba(255, 206, 86, 0.8)',
-                        'rgba(75, 192, 192, 0.8)',
-                        'rgba(153, 102, 255, 0.8)',
-                        'rgba(255, 159, 64, 0.8)',
-                        'rgba(201, 203, 207, 0.8)'
-                    ];
+                    // Clear container
+                    container.innerHTML = '';
 
-                    // Create new chart
-                    outcomesChart = new Chart(ctx, {
-                        type: 'pie',
-                        data: {
-                            labels: data.labels,
-                            datasets: [{
-                                data: data.data,
-                                backgroundColor: colors.slice(0, data.labels.length),
-                                borderWidth: 2,
-                                borderColor: '#fff'
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: true,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom',
-                                    labels: {
-                                        padding: 15,
-                                        font: {
-                                            size: 12
-                                        }
+                    // Create a separate chart for each outcome
+                    data.datasets.forEach((dataset, idx) => {
+                        // Create column div (responsive: full width on mobile, half on tablets, third on desktop)
+                        const colDiv = document.createElement('div');
+                        colDiv.className = 'col-12 col-md-6 col-lg-4 mb-4';
+
+                        // Create card for each chart
+                        const cardDiv = document.createElement('div');
+                        cardDiv.className = 'card';
+
+                        const cardBody = document.createElement('div');
+                        cardBody.className = 'card-body';
+
+                        // Add title
+                        const title = document.createElement('h6');
+                        title.className = 'text-center mb-3';
+                        title.textContent = dataset.label;
+
+                        // Create canvas
+                        const canvas = document.createElement('canvas');
+                        canvas.id = `outcomeChart_${idx}`;
+
+                        cardBody.appendChild(title);
+                        cardBody.appendChild(canvas);
+                        cardDiv.appendChild(cardBody);
+                        colDiv.appendChild(cardDiv);
+                        container.appendChild(colDiv);
+
+                        // Create chart
+                        const ctx = canvas.getContext('2d');
+                        outcomesCharts[dataset.label] = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: data.labels,
+                                datasets: [{
+                                    label: dataset.label,
+                                    data: dataset.data,
+                                    borderColor: dataset.borderColor,
+                                    backgroundColor: dataset.backgroundColor,
+                                    tension: 0.3,
+                                    fill: true
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: true,
+                                plugins: {
+                                    legend: {
+                                        display: false
+                                    },
+                                    title: {
+                                        display: false
                                     }
                                 },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(context) {
-                                            const label = context.label || '';
-                                            const value = context.parsed || 0;
-                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                            const percentage = ((value / total) * 100).toFixed(1);
-                                            return `${label}: ${value} (${percentage}%)`;
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        ticks: {
+                                            precision: 0
+                                        }
+                                    },
+                                    x: {
+                                        ticks: {
+                                            maxRotation: 45,
+                                            minRotation: 45
                                         }
                                     }
                                 }
                             }
-                        }
+                        });
                     });
                 })
                 .catch(error => {

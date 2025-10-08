@@ -27,6 +27,7 @@ from flask_security import Security, SQLAlchemySessionUserDatastore, auth_requir
 from flask_security.utils import hash_password
 from flask_wtf import CSRFProtect
 
+from ezrules.backend.analytics import AGGREGATION_CONFIG, get_bucket_expression
 from ezrules.backend.forms import CSVUploadForm, LabelForm, OutcomeForm, RoleForm, RuleForm, UserForm, UserRoleForm
 from ezrules.backend.label_upload_service import LabelUploadService
 from ezrules.backend.tasks import app as celery_app
@@ -833,57 +834,14 @@ def transaction_volume():
     """API endpoint to get transaction volume data for various time aggregations."""
     aggregation = request.args.get("aggregation", "1h")
 
-    # Configuration for each aggregation period
-    aggregation_config = {
-        "1h": {
-            "delta": datetime.timedelta(hours=1),
-            "bucket_seconds": 300,  # 5 minutes
-            "label_format": "%H:%M",
-            "use_date_trunc": False,
-        },
-        "6h": {
-            "delta": datetime.timedelta(hours=6),
-            "bucket_seconds": 1800,  # 30 minutes
-            "label_format": "%m-%d %H:%M",
-            "use_date_trunc": False,
-        },
-        "12h": {
-            "delta": datetime.timedelta(hours=12),
-            "bucket_seconds": 3600,  # 1 hour
-            "label_format": "%m-%d %H:%M",
-            "use_date_trunc": False,
-        },
-        "24h": {
-            "delta": datetime.timedelta(hours=24),
-            "bucket_seconds": 7200,  # 2 hours
-            "label_format": "%m-%d %H:%M",
-            "use_date_trunc": False,
-        },
-        "30d": {
-            "delta": datetime.timedelta(days=30),
-            "bucket_seconds": None,  # Uses date_trunc instead
-            "label_format": "%Y-%m-%d",
-            "use_date_trunc": True,
-        },
-    }
-
-    if aggregation not in aggregation_config:
+    if aggregation not in AGGREGATION_CONFIG:
         return jsonify({"error": "Invalid aggregation"}), 400
 
-    config = aggregation_config[aggregation]
+    config = AGGREGATION_CONFIG[aggregation]
     start_time = datetime.datetime.now() - config["delta"]
 
-    # Build bucket expression based on configuration
-    if config["use_date_trunc"]:
-        bucket_expr = sqlalchemy.func.date_trunc("day", TestingRecordLog.created_at)
-    else:
-        bucket_expr = sqlalchemy.cast(
-            sqlalchemy.func.floor(
-                sqlalchemy.func.extract("epoch", TestingRecordLog.created_at) / config["bucket_seconds"]
-            )
-            * config["bucket_seconds"],
-            sqlalchemy.Integer,
-        )
+    # Build bucket expression using shared helper
+    bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
 
     transactions = (
         db_session.query(bucket_expr.label("bucket"), sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
@@ -911,38 +869,84 @@ def transaction_volume():
 @app.route("/api/outcomes_distribution", methods=["GET"])
 @csrf.exempt
 def outcomes_distribution():
-    """API endpoint to get distribution of rule outcomes for various time aggregations."""
+    """API endpoint to get temporal distribution of rule outcomes for various time aggregations."""
     aggregation = request.args.get("aggregation", "1h")
 
-    # Configuration for each aggregation period
-    aggregation_config = {
-        "1h": datetime.timedelta(hours=1),
-        "6h": datetime.timedelta(hours=6),
-        "12h": datetime.timedelta(hours=12),
-        "24h": datetime.timedelta(hours=24),
-        "30d": datetime.timedelta(days=30),
-    }
-
-    if aggregation not in aggregation_config:
+    if aggregation not in AGGREGATION_CONFIG:
         return jsonify({"error": "Invalid aggregation"}), 400
 
-    start_time = datetime.datetime.now() - aggregation_config[aggregation]
+    config = AGGREGATION_CONFIG[aggregation]
+    start_time = datetime.datetime.now() - config["delta"]
 
-    # Query outcomes distribution
+    # Build bucket expression using shared helper
+    bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
+
+    # Query outcomes distribution over time
     outcomes = (
-        db_session.query(TestingResultsLog.rule_result, sqlalchemy.func.count(TestingResultsLog.rule_result))
+        db_session.query(
+            bucket_expr.label("bucket"),
+            TestingResultsLog.rule_result,
+            sqlalchemy.func.count(TestingResultsLog.rule_result).label("count"),
+        )
         .join(TestingRecordLog, TestingRecordLog.tl_id == TestingResultsLog.tl_id)
         .filter(TestingRecordLog.created_at >= start_time)
-        .group_by(TestingResultsLog.rule_result)
+        .group_by("bucket", TestingResultsLog.rule_result)
+        .order_by("bucket")
         .all()
     )
 
-    # Format data for Chart.js pie chart
+    # Get unique outcome labels
+    outcome_labels = set()
+    for _bucket, outcome, _count in outcomes:
+        outcome_labels.add(outcome)
+    outcome_labels = sorted(outcome_labels)
+
+    # Organize data by time bucket
+    time_buckets = {}
+    for bucket, outcome, count in outcomes:
+        if bucket not in time_buckets:
+            time_buckets[bucket] = {}
+        time_buckets[bucket][outcome] = count
+
+    # Format data for Chart.js line chart with multiple datasets
     labels = []
-    data = []
+    datasets = {outcome: [] for outcome in outcome_labels}
 
-    for outcome, count in outcomes:
-        labels.append(outcome)
-        data.append(count)
+    sorted_buckets = sorted(time_buckets.keys())
+    for bucket in sorted_buckets:
+        if config["use_date_trunc"]:
+            labels.append(bucket.strftime(config["label_format"]))
+        else:
+            dt = datetime.datetime.fromtimestamp(bucket)
+            labels.append(dt.strftime(config["label_format"]))
 
-    return jsonify({"labels": labels, "data": data, "aggregation": aggregation})
+        # Add count for each outcome (0 if not present in this bucket)
+        for outcome in outcome_labels:
+            datasets[outcome].append(time_buckets[bucket].get(outcome, 0))
+
+    # Format datasets for Chart.js
+    chart_datasets = []
+    colors = [
+        {"border": "rgb(255, 99, 132)", "background": "rgba(255, 99, 132, 0.1)"},
+        {"border": "rgb(54, 162, 235)", "background": "rgba(54, 162, 235, 0.1)"},
+        {"border": "rgb(255, 206, 86)", "background": "rgba(255, 206, 86, 0.1)"},
+        {"border": "rgb(75, 192, 192)", "background": "rgba(75, 192, 192, 0.1)"},
+        {"border": "rgb(153, 102, 255)", "background": "rgba(153, 102, 255, 0.1)"},
+        {"border": "rgb(255, 159, 64)", "background": "rgba(255, 159, 64, 0.1)"},
+        {"border": "rgb(201, 203, 207)", "background": "rgba(201, 203, 207, 0.1)"},
+    ]
+
+    for idx, outcome in enumerate(outcome_labels):
+        color = colors[idx % len(colors)]
+        chart_datasets.append(
+            {
+                "label": outcome,
+                "data": datasets[outcome],
+                "borderColor": color["border"],
+                "backgroundColor": color["background"],
+                "tension": 0.3,
+                "fill": True,
+            }
+        )
+
+    return jsonify({"labels": labels, "datasets": chart_datasets, "aggregation": aggregation})
