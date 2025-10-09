@@ -15,7 +15,7 @@ ezrules Documentation
 ===============
 
 🔧 **Rule Engine**
-   Flexible Python-based rule execution with custom logic support and real-time event processing.
+   Expressive Python-like language for writing business rules with intuitive syntax and real-time event processing.
 
 🌐 **Web Management Interface**
    Flask-based UI for creating, testing, and managing business rules with intuitive workflows.

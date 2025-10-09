@@ -12,8 +12,7 @@ ezrules is designed for organizations that need to monitor transactions, detect 
 
 ### Key Capabilities
 
-- **Flexible Rule Engine** - Write business rules in Python with full programmatic control
-- **Real-time Processing** - Evaluate thousands of events per second through dedicated API service
+- **Flexible Rule Engine** - Write business rules in a Python-like language with expressive syntax for transaction logic
 - **Web Management Interface** - Create and manage rules through an intuitive web UI
 - **Enterprise Security** - Granular role-based access control with 13 permission types
 - **Transaction Labeling** - Comprehensive fraud analytics with API and bulk CSV upload
