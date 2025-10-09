@@ -16,7 +16,6 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Audit Trail**: Complete access control and change tracking for compliance
 - **Backtesting**: Test rule changes against historical data before deployment
 - **CLI Tools**: Command-line interface for database management and realistic test data generation
-- **Frontend Dashboard**: Next.js-based user interface for rule monitoring and analytics
 
 ## 🏗️ Architecture
 
@@ -232,9 +231,8 @@ The documentation is also available online at [ReadTheDocs](https://ezrules.read
 ### Tech Stack
 
 - **Backend**: Python 3.12+, Flask, SQLAlchemy, Celery
-- **Frontend**: Next.js, React
 - **Database**: PostgreSQL
-- **Task Queue**: Celery with Redis/PostgreSQL backend
+- **Task Queue**: Celery with Redis/PostgreSQL backend (for backtesting)
 
 ### Code Quality
 

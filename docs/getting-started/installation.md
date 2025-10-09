@@ -170,7 +170,7 @@ Open your browser to [http://localhost:8888](http://localhost:8888) and log in w
 
 ### Celery Workers (for Background Tasks)
 
-If you need background task processing:
+If you need background task processing for rule backtesting:
 
 ```bash
 # Install Redis (for Celery broker)
@@ -180,18 +180,6 @@ sudo apt install redis-server  # Ubuntu
 # Start Celery workers
 uv run celery -A ezrules.backend.tasks worker -l INFO
 ```
-
-### Frontend Dashboard
-
-ezrules includes an optional Next.js frontend for enhanced analytics:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The frontend will be available at [http://localhost:3000](http://localhost:3000).
 
 ---
 
