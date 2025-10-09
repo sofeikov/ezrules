@@ -98,7 +98,6 @@ Outcomes represent actions taken when rules fire:
 3. Provide:
    - **Name**: Clear, descriptive name (e.g., "High Risk Alert")
    - **Description**: When this outcome should trigger
-   - **Severity**: Optional classification (High/Medium/Low)
 
 ### Linking Rules to Outcomes
 
