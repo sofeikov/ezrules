@@ -227,9 +227,8 @@ Returns outcome distribution and statistics.
 - Content-Type: `multipart/form-data`
 - Form field: `file` (CSV file)
 
-**CSV Format:**
+**CSV Format (no header row, 2 columns: event_id, label_name):**
 ```csv
-event_id,label_name
 txn_001,FRAUD
 txn_002,NORMAL
 txn_003,CHARGEBACK

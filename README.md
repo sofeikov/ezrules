@@ -150,9 +150,8 @@ curl -X POST http://localhost:9999/mark-event \
   -d '{"event_id": "txn_123", "label_name": "FRAUD"}'
 ```
 
-**Bulk CSV Upload**: Upload CSV files through the web interface for batch labeling
+**Bulk CSV Upload**: Upload CSV files through the web interface for batch labeling (no header row)
 ```csv
-event_id,label_name
 txn_456,NORMAL
 txn_789,CHARGEBACK
 ```

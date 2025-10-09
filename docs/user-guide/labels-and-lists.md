@@ -38,10 +38,9 @@ curl -X POST http://localhost:9999/mark-event \
 #### Bulk Upload via CSV
 
 1. Navigate to **Labels → Upload Labels**
-2. Upload CSV file:
+2. Upload CSV file (no header row, 2 columns: event_id, label_name):
 
 ```csv
-event_id,label_name
 txn_001,FRAUD
 txn_002,NORMAL
 txn_003,CHARGEBACK

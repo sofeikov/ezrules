@@ -345,17 +345,26 @@ CREATE INDEX idx_labels_name ON event_labels(label_name);
 
 ## Performance Characteristics
 
-### Expected Performance
+### Performance Considerations
+
+Performance varies significantly based on:
+- Rule complexity and number of active rules
+- Database query patterns and indexing
+- Hardware resources and network latency
+- Event data size and structure
 
 **Evaluator Service:**
-- Latency: 50-200ms per evaluation (depends on rule complexity)
-- Throughput: 100-500 events/second per instance
-- Scales linearly with instances
+- Latency depends heavily on rule complexity (simple rules: ~50ms, complex rules with queries: several seconds)
+- Throughput scales with number of instances (stateless design)
+- Database connection pooling is critical for performance
 
 **Manager Service:**
-- Web page load: <500ms
-- Analytics queries: 1-3 seconds
-- Label upload: 100-1000 records/second
+- Web interface performance depends on database query optimization
+- Analytics queries can be resource-intensive for large datasets
+- CSV upload performance depends on file size and validation complexity
+
+!!! note "Performance Testing"
+    These are general guidelines. Always benchmark with your specific rules and data patterns before production deployment.
 
 ### Bottlenecks
 

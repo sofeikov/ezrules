@@ -125,7 +125,7 @@ ezrules uses a multi-service architecture for scalability and flexibility:
 - **Manager Service**: Web UI for rule management and monitoring
 - **Evaluator Service**: REST API for real-time rule evaluation
 - **Database**: Central storage for rules, events, and analytics
-- **Celery Workers**: Background task processing (optional)
+- **Celery Workers**: Background task processing for rule backtesting
 
 ---
 
