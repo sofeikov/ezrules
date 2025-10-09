@@ -211,40 +211,18 @@ uv run ezrules export-test-csv --n-events 50 --unlabeled-only --output-file test
 
 ### Building Documentation
 
-The project uses Sphinx for documentation generation:
+The project uses MkDocs for documentation generation:
 
 ```bash
-# Build HTML documentation
-uv run make html
+# Build documentation
+uv run mkdocs build
 
-# View all available documentation formats
-uv run make help
+# Serve documentation locally with live reload
+uv run mkdocs serve
+# Then open http://127.0.0.1:8000/ in your browser
 
-# Build other formats
-uv run make singlehtml    # Single HTML page
-uv run make pdf           # PDF (requires LaTeX)
-uv run make epub          # eBook format
-
-# Clean build directory
-uv run make clean
-```
-
-### Previewing Documentation
-
-After building, preview the documentation locally:
-
-```bash
-# Method 1: Using Python's built-in server
-cd _build/html
-python3 -m http.server 8080
-# Then open http://localhost:8080/ in your browser
-
-# Method 2: Direct file access
-open _build/html/index.html    # macOS/Linux
-# or open _build/html/index.html in your browser
-
-# One-command build and serve
-uv run make html && cd _build/html && python3 -m http.server 8080
+# Build and serve in one command
+uv run mkdocs serve
 ```
 
 The documentation is also available online at [ReadTheDocs](https://ezrules.readthedocs.io/).
