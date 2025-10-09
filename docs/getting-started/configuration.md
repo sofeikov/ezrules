@@ -115,12 +115,10 @@ uv run ezrules manager [OPTIONS]
 **Options:**
 
 - `--port PORT` - Server port (default: 8888)
-- `--host HOST` - Bind address (default: 0.0.0.0)
-- `--debug` - Enable debug mode (development only)
 
 **Example:**
 ```bash
-uv run ezrules manager --port 8080 --host 127.0.0.1
+uv run ezrules manager --port 8080
 ```
 
 ### Evaluator Service Options
@@ -134,13 +132,14 @@ uv run ezrules evaluator [OPTIONS]
 **Options:**
 
 - `--port PORT` - Server port (default: 9999)
-- `--host HOST` - Bind address (default: 0.0.0.0)
-- `--workers N` - Number of worker processes (default: 4)
 
 **Example:**
 ```bash
-uv run ezrules evaluator --port 9000 --workers 8
+uv run ezrules evaluator --port 9000
 ```
+
+!!! note "Additional Configuration"
+    Both services use gunicorn with 1 worker and 4 threads by default. To modify these settings, you'll need to run gunicorn directly instead of using the CLI commands.
 
 ---
 
