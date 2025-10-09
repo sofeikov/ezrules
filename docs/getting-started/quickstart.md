@@ -50,7 +50,7 @@ Let's create a simple rule to detect high-value transactions.
    - **Description**: `Flag transactions over $10,000`
    - **Code**:
      ```python
-     if event.get('amount', 0) > 10000:
+     if $amount > 10000:
          return True
      return False
      ```
@@ -211,27 +211,13 @@ Congratulations! You've successfully:
 
 ## Common Patterns
 
-### Velocity Rules
-
-Detect when a user performs too many transactions in a short time:
-
-```python
-# Count transactions in the last hour
-recent_events = get_user_events(event['user_id'], hours=1)
-if len(recent_events) > 10:
-    return True
-return False
-```
 
 ### Geographic Rules
 
 Flag transactions from unusual locations:
 
 ```python
-user_country = get_user_profile(event['user_id'])['country']
-txn_country = event.get('country')
-
-if user_country != txn_country:
+if $user_country in @LatinAmericanCountries:
     return True
 return False
 ```
@@ -241,7 +227,7 @@ return False
 Check against watchlists or blocklists:
 
 ```python
-if event.get('user_id') in blocklist:
+if $user_id in @blocklist:
     return True
 return False
 ```

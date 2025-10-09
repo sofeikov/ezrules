@@ -29,7 +29,7 @@ Rules in ezrules are Python functions that evaluate transaction data. Each rule:
 
 ```python
 # Flag high-value transactions
-if event.get('amount', 0) > 10000:
+if $amount > 10000:
     return True
 return False
 ```
@@ -38,8 +38,7 @@ return False
 
 ```python
 # Flag transactions from high-risk countries
-high_risk_countries = ['XX', 'YY', 'ZZ']
-if event.get('country') in high_risk_countries:
+if $country in @high_risk_countries:
     return True
 return False
 ```
@@ -48,8 +47,7 @@ return False
 
 ```python
 # Flag users with too many transactions in short time
-user_id = event.get('user_id')
-recent_events = count_user_events(user_id, hours=1)
+recent_events = count_user_events($user_id, hours=1)
 
 if recent_events > 10:
     return True
@@ -60,17 +58,13 @@ return False
 
 ```python
 # Combine multiple risk factors
-amount = event.get('amount', 0)
-country = event.get('country')
-is_new_user = event.get('account_age_days', 0) < 30
-
 risk_score = 0
 
-if amount > 5000:
+if $amount > 5000:
     risk_score += 2
-if country in high_risk_countries:
+if $country in @high_risk_countries:
     risk_score += 3
-if is_new_user:
+if $account_age_days < 30:
     risk_score += 1
 
 # Trigger if risk score exceeds threshold
@@ -281,11 +275,11 @@ False negatives are fraud cases your rules missed.
 
 ```python
 # Tiered thresholds
-if event.get('amount', 0) > 50000:
+if $amount > 50000:
     return True  # Always flag
-elif event.get('amount', 0) > 10000:
+elif $amount > 10000:
     # Additional checks for medium amounts
-    if event.get('is_international'):
+    if $is_international:
         return True
 return False
 ```
@@ -294,11 +288,8 @@ return False
 
 ```python
 # Flag unusual transaction times
-import datetime
-hour = event.get('hour', datetime.datetime.now().hour)
-
 # Flag transactions between 2 AM and 5 AM
-if 2 <= hour <= 5:
+if 2 <= $hour <= 5:
     return True
 return False
 ```
@@ -307,11 +298,9 @@ return False
 
 ```python
 # Flag deviation from normal behavior
-user_avg_amount = get_user_average(event['user_id'])
-current_amount = event.get('amount', 0)
 
 # Flag if 5x normal spending
-if current_amount > user_avg_amount * 5:
+if $amount > $ser_avg_amount * 5:
     return True
 return False
 ```
@@ -320,13 +309,11 @@ return False
 
 ```python
 # Check against blocklists
-blocked_users = load_blocklist()
-if event.get('user_id') in blocked_users:
+if $user_id in @blocked_users:
     return True
 
 # Check against allowlists (inverse)
-trusted_users = load_allowlist()
-if event.get('user_id') not in trusted_users:
+if $user_id not in @trusted_users:
     return True  # Flag non-trusted users for review
 ```
 

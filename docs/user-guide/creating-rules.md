@@ -20,17 +20,16 @@ def evaluate_event(event):
 
 ## Accessing Event Data
 
-Events are dictionaries containing transaction data:
+Access event attributes using the `$` notation:
 
 ```python
-# Safe access with defaults
-amount = event.get('amount', 0)
-user_id = event.get('user_id')
-country = event.get('country', 'US')
+# Access transaction attributes
+if $amount > 10000:
+    return True
 
-# Check if field exists
-if 'merchant_id' in event:
-    merchant_id = event['merchant_id']
+# Use in assignments
+user_country = $country
+is_high_risk = $amount > 5000 and $country in @high_risk_countries
 ```
 
 ---
@@ -41,7 +40,7 @@ if 'merchant_id' in event:
 
 ```python
 # Simple threshold
-if event.get('amount', 0) > 10000:
+if $amount > 10000:
     return True
 ```
 
@@ -49,8 +48,7 @@ if event.get('amount', 0) > 10000:
 
 ```python
 # Check against blocklist
-blocked_users = ['user_123', 'user_456']
-if event.get('user_id') in blocked_users:
+if $user_id in @blocked_users:
     return True
 ```
 
@@ -60,11 +58,10 @@ if event.get('user_id') in blocked_users:
 # Count recent transactions
 from datetime import datetime, timedelta
 
-user_id = event['user_id']
 cutoff = datetime.now() - timedelta(hours=1)
 
 # Count events from this user in last hour
-recent_count = count_user_events(user_id, since=cutoff)
+recent_count = count_user_events($user_id, since=cutoff)
 
 if recent_count > 10:
     return True
@@ -76,13 +73,13 @@ if recent_count > 10:
 # Combine multiple signals
 risk_score = 0
 
-if event.get('amount', 0) > 5000:
+if $amount > 5000:
     risk_score += 2
 
-if event.get('is_international', False):
+if $is_international:
     risk_score += 1
 
-if event.get('account_age_days', 999) < 30:
+if $account_age_days < 30:
     risk_score += 2
 
 # Trigger if total risk is high
@@ -91,36 +88,6 @@ return risk_score >= 4
 
 ---
 
-## Working with Data
-
-### Querying Historical Events
-
-```python
-from ezrules.models import Event
-from ezrules.core.database import Session
-
-session = Session()
-
-# Get user's recent events
-user_events = session.query(Event)\
-    .filter(Event.user_id == event['user_id'])\
-    .filter(Event.created_at > cutoff_date)\
-    .all()
-```
-
-### Using User Lists
-
-```python
-from ezrules.core.lists import UserList
-
-# Load blocklist
-blocklist = UserList.get('high_risk_users')
-
-if event.get('user_id') in blocklist.members:
-    return True
-```
-
----
 
 ## Best Practices
 
@@ -136,9 +103,9 @@ def slow_rule(event):
     blocked = [u.id for u in all_users if u.is_blocked]
     return event['user_id'] in blocked
 
-# Good: Uses cached list
+# Good: Uses list notation
 def fast_rule(event):
-    return event['user_id'] in CACHED_BLOCKLIST
+    return $user_id in @CACHED_BLOCKLIST
 ```
 
 ### Error Handling
@@ -146,12 +113,12 @@ def fast_rule(event):
 ```python
 # Handle missing fields gracefully
 try:
-    amount = float(event.get('amount', 0))
+    amount = float($amount)
 except (ValueError, TypeError):
     amount = 0
 
 # Validate data types
-if not isinstance(event.get('user_id'), str):
+if not isinstance($user_id, str):
     return False  # Invalid data
 ```
 
@@ -178,13 +145,9 @@ for test_event in test_events:
 ### Time-Based Rules
 
 ```python
-from datetime import datetime
-
 # Flag unusual transaction times
-hour = datetime.now().hour
-
 # Night transactions (2 AM - 5 AM)
-if 2 <= hour <= 5 and event.get('amount', 0) > 1000:
+if 2 <= $hour <= 5 and $amount > 1000:
     return True
 ```
 
@@ -200,7 +163,7 @@ suspicious_patterns = [
     r'\b(wire|transfer)\b.*urgnet',  # Typos common in fraud
 ]
 
-description = event.get('description', '').lower()
+description = $description.lower()
 
 for pattern in suspicious_patterns:
     if re.search(pattern, description):
@@ -211,11 +174,10 @@ for pattern in suspicious_patterns:
 
 ```python
 # Flag outliers (Z-score > 3)
-user_avg = get_user_avg_amount(event['user_id'])
-user_std = get_user_std_amount(event['user_id'])
+user_avg = get_user_avg_amount($user_id)
+user_std = get_user_std_amount($user_id)
 
-amount = event.get('amount', 0)
-z_score = (amount - user_avg) / user_std if user_std > 0 else 0
+z_score = ($amount - user_avg) / user_std if user_std > 0 else 0
 
 if abs(z_score) > 3:
     return True
@@ -250,47 +212,29 @@ Before deploying rule changes:
 ### Geographic Risk
 
 ```python
-HIGH_RISK_COUNTRIES = ['XX', 'YY', 'ZZ']
-MEDIUM_RISK_COUNTRIES = ['AA', 'BB']
-
-country = event.get('country')
-amount = event.get('amount', 0)
-
 # High risk countries: always flag if > $1000
-if country in HIGH_RISK_COUNTRIES and amount > 1000:
+if $country in @HIGH_RISK_COUNTRIES and $amount > 1000:
     return True
 
 # Medium risk: flag if > $5000
-if country in MEDIUM_RISK_COUNTRIES and amount > 5000:
+if $country in @MEDIUM_RISK_COUNTRIES and $amount > 5000:
     return True
 ```
 
 ### Merchant Category Risk
 
 ```python
-HIGH_RISK_MCCS = [
-    '5816',  # Digital goods
-    '5967',  # Direct marketing
-    '5999',  # Misc retail
-]
-
-mcc = event.get('merchant_category_code')
-if mcc in HIGH_RISK_MCCS:
+if $merchant_category_code in @HIGH_RISK_MCCS:
     # Additional checks for high-risk merchants
-    if event.get('card_present', False) == False:
+    if not $card_present:
         return True  # Card-not-present in risky MCC
 ```
 
 ### First-Time User
 
 ```python
-from datetime import timedelta
-
-account_age = event.get('account_age_days', 0)
-amount = event.get('amount', 0)
-
 # New users with large first transaction
-if account_age < 7 and amount > 2000:
+if $account_age_days < 7 and $amount > 2000:
     return True
 ```
 
@@ -306,11 +250,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 def my_rule(event):
-    amount = event.get('amount', 0)
-    logger.info(f"Evaluating amount: {amount}")
+    logger.info(f"Evaluating amount: {$amount}")
 
-    if amount > 10000:
-        logger.warning(f"High amount detected: {amount}")
+    if $amount > 10000:
+        logger.warning(f"High amount detected: {$amount}")
         return True
 
     return False

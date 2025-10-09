@@ -317,7 +317,7 @@ user_003
 {
   "name": "High Value Transaction",
   "description": "Flag transactions over $10,000",
-  "code": "if event.get('amount', 0) > 10000:\n    return True\nreturn False",
+  "code": "if $amount > 10000:\n    return True\nreturn False",
   "active": true
 }
 ```

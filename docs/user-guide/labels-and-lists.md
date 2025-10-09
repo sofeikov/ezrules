@@ -138,13 +138,8 @@ Via web interface:
 ### Using Lists in Rules
 
 ```python
-from ezrules.core.lists import UserList
-
-# Load list
-blocklist = UserList.get('high_risk_users')
-
-# Check membership
-if event.get('user_id') in blocklist.members:
+# Check membership using @ notation
+if $user_id in @high_risk_users:
     return True
 ```
 
