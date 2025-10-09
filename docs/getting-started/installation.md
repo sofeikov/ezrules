@@ -187,45 +187,4 @@ Now that you have ezrules installed, proceed to the [Quick Start Guide](quicksta
 
 ## Troubleshooting
 
-### Database Connection Issues
-
-If you can't connect to PostgreSQL:
-
-1. Verify PostgreSQL is running:
-   ```bash
-   pg_isready
-   ```
-
-2. Check your connection string format:
-   ```
-   postgresql://username:password@host:port/database
-   ```
-
-3. Ensure the user has permission to create databases
-
-### uv Command Not Found
-
-If `uv` is not found after installation:
-
-1. Restart your shell or run:
-   ```bash
-   source ~/.bashrc  # or ~/.zshrc
-   ```
-
-2. Verify installation:
-   ```bash
-   uv --version
-   ```
-
-### Import Errors
-
-If you encounter import errors when running commands:
-
-1. Ensure you're in the project directory
-2. Run `uv sync` again to refresh dependencies
-3. Check that your Python version is 3.12+:
-   ```bash
-   python --version
-   ```
-
-For more issues, check our [GitHub Issues](https://github.com/sofeikov/ezrules/issues) or file a new one.
+For issues, check our [GitHub Issues](https://github.com/sofeikov/ezrules/issues) or file a new one.
