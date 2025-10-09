@@ -1,13 +1,11 @@
-.. _whatsnew-label:
+# What's New
 
-What's new
-----------
-v0.9
+## v0.9
 
 * Implementation of RBAC: per-resource access control, audit trail
 * List and outcomes are now editable
-* User managemetn UI
-* Role and permissions managemnt UI
+* User management UI
+* Role and permissions management UI
 * Enhanced init-db script with interactive database management and --auto-delete option
 * Transaction marking for analytics: mark transactions with true labels for fraud detection analysis
 * Single event marking API endpoint (/mark-event) for programmatic labeling
@@ -23,40 +21,39 @@ v0.9
 * Label analytics API endpoints: /api/labels_summary, /api/labels_distribution
 * Configurable time ranges for label analytics (1h, 6h, 12h, 24h, 30d)
 
-v0.7
+## v0.7
 
 * Migrated from Poetry to UV for faster dependency management
 * Upgraded to Python 3.12 minimum requirement
 
-v0.6
+## v0.6
 
-* Ability to backtest rule changes: make change, submit for backtesing, check result
+* Ability to backtest rule changes: make change, submit for backtesting, check result
 * Switch to pydantic-based settings management
 * Transaction submitted for testing are now saved in the history table
 * Rule evaluation results are now saved in the history table
-* new cli utilities to generate test data
+* New CLI utilities to generate test data
 
-v0.5
+## v0.5
 
 * The app is compatible with AWS EKS
 * Basic testing introduced
 * Rule history is maintained through a history table
 * Standalone scripts to init the db and add a user
-* Internall, switch to poetry dependancy management
+* Internally, switch to poetry dependency management
 * Manager and evaluator can run as executables
 
-v0.5
+## v0.4
 
 * RDBMS are now supported as a backend for rule configuration storage
 * The application can now be deployed in a k8s cluster
 
-v0.4
+## v0.3
 
 * At-notation is available. Constructs of type `if $send_country in @Latam...`
 * Users are now required to login to make changes to the rule set
 
-
-v0.3
+## v0.2
 
 * Dollar-notation can be used to refer to attributes, e.g. `if $amount>1000...`
 * When you create a rule, you can now test it right away before deploying
@@ -65,7 +62,7 @@ v0.3
 * Each rule revision now has a timestamp associated with it
 * For rules with modification history, see the changelog with highlighted diffs
 
-v0.2
+## v0.1
 
 * A better documentation on rules writing
 * Fixed a bug wherein the lambda rule executor was not properly configured with the environment variable
@@ -74,7 +71,7 @@ v0.2
 * Rule manager backend table name is now automatically configured with `DYNAMODB_RULE_MANAGER_TABLE_NAME` environment variable
 * General code cleanup
 
-v0.1
+## v0.0
 
 * A single script that deploys application to AWS
 * This is a first release, so all previous changes are squashed into it

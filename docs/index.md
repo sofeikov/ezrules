@@ -23,41 +23,21 @@ ezrules is designed for organizations that need to monitor transactions, detect 
 
 ## Quick Links
 
-<div class="grid cards" markdown>
+### Quick Start
+Get up and running in minutes with our quick start guide
+[→ Quick Start](getting-started/quickstart.md)
 
--   :material-clock-fast:{ .lg .middle } __Quick Start__
+### User Guides
+Learn how to use ezrules for your role - analyst, admin, or developer
+[→ Guides](user-guide/analyst-guide.md)
 
-    ---
+### API Reference
+Integrate ezrules with your applications using our REST APIs
+[→ API Docs](api-reference/evaluator-api.md)
 
-    Get up and running in minutes with our quick start guide
-
-    [:octicons-arrow-right-24: Quick Start](getting-started/quickstart.md)
-
--   :material-book-open-variant:{ .lg .middle } __User Guides__
-
-    ---
-
-    Learn how to use ezrules for your role - analyst, admin, or developer
-
-    [:octicons-arrow-right-24: Guides](user-guide/analyst-guide.md)
-
--   :material-api:{ .lg .middle } __API Reference__
-
-    ---
-
-    Integrate ezrules with your applications using our REST APIs
-
-    [:octicons-arrow-right-24: API Docs](api-reference/evaluator-api.md)
-
--   :material-architecture:{ .lg .middle } __Architecture__
-
-    ---
-
-    Understand how ezrules works under the hood
-
-    [:octicons-arrow-right-24: Architecture](architecture/overview.md)
-
-</div>
+### Architecture
+Understand how ezrules works under the hood
+[→ Architecture](architecture/overview.md)
 
 ---
 

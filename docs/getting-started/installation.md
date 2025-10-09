@@ -97,12 +97,6 @@ Set the database connection environment variable:
     export EZRULES_DB_ENDPOINT="postgresql://postgres:yourpassword@localhost:5432/ezrules"
     ```
 
-=== "Fish"
-
-    ```fish
-    set -x EZRULES_DB_ENDPOINT "postgresql://postgres:yourpassword@localhost:5432/ezrules"
-    ```
-
 === ".env file"
 
     Create a `.env` file in the project root:
@@ -125,6 +119,7 @@ uv run ezrules init-db --auto-delete
 ```
 
 The `init-db` command will:
+
 - Create the database if it doesn't exist
 - Set up all required tables
 - Initialize the schema
@@ -138,6 +133,7 @@ uv run ezrules init-permissions
 ```
 
 This creates the default roles:
+
 - **Admin** - Full system access
 - **Rule Editor** - Can create/modify rules
 - **Read-only** - View-only access

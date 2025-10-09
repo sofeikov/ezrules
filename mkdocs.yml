@@ -58,6 +58,7 @@ nav:
   - Architecture:
       - Overview: architecture/overview.md
       - Deployment: architecture/deployment.md
+  - What's New: whatsnew.md
   - Contributing: contributing.md
 
 markdown_extensions:
