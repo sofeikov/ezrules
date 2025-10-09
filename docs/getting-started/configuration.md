@@ -286,14 +286,11 @@ export EZRULES_DEFAULT_ORG_ID="1"
 Verify your configuration:
 
 ```bash
-# Check database connectivity
-uv run ezrules check-db
+# Test database connectivity
+psql "$EZRULES_DB_ENDPOINT" -c "SELECT 1;"
 
-# Validate environment
-uv run ezrules validate-config
-
-# Show current configuration
-uv run ezrules show-config
+# View available CLI commands
+uv run ezrules --help
 ```
 
 ---

@@ -534,9 +534,6 @@ git pull origin main
 # Update dependencies
 uv sync
 
-# Run migrations (if any)
-uv run ezrules migrate
-
 # Restart services
 systemctl restart ezrules-manager
 systemctl restart ezrules-evaluator
