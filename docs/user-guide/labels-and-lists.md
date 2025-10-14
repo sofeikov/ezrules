@@ -135,7 +135,7 @@ Via web interface:
 ```python
 # Check membership using @ notation
 if $user_id in @high_risk_users:
-    return True
+    return 'HOLD'
 ```
 
 ### Managing Lists

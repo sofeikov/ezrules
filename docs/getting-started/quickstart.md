@@ -51,8 +51,7 @@ Let's create a simple rule to detect high-value transactions.
    - **Code**:
      ```python
      if $amount > 10000:
-         return True
-     return False
+         return 'HOLD'  # Send to manual review
      ```
 4. Click **Save**
 
@@ -60,7 +59,7 @@ Let's create a simple rule to detect high-value transactions.
 
 - Takes an event (transaction) as input
 - Checks if the `amount` field is greater than $10,000
-- Returns `True` to trigger an outcome, `False` otherwise
+- Returns an allowed outcome string (here, `'HOLD'`) to signal a decision; otherwise it returns nothing (no decision)
 
 ---
 
@@ -77,12 +76,13 @@ Outcomes define what happens when a rule fires.
 
 ---
 
-## Step 5: Link Rule to Outcome
+## Step 5: Ensure Outcome Exists
 
-1. Go back to your **High Value Transaction** rule
-2. In the rule details, find the **Outcomes** section
-3. Link the `High Value Alert` outcome
-4. Save the changes
+ezrules validates that any literal returned by your rule is an allowed outcome.
+
+1. Navigate to **Outcomes** in the sidebar
+2. Ensure `'HOLD'` exists (create it if it doesn't)
+3. Save. Your rule now passes the allowed outcomes check
 
 ---
 
@@ -221,8 +221,7 @@ Flag transactions from unusual locations:
 
 ```python
 if $user_country in @LatinAmericanCountries:
-    return True
-return False
+    return 'HOLD'  # Review LATAM traffic
 ```
 
 ### List-Based Rules
@@ -231,8 +230,7 @@ Check against watchlists or blocklists:
 
 ```python
 if $user_id in @blocklist:
-    return True
-return False
+    return 'CANCEL'  # Block known bad actors
 ```
 
 ---

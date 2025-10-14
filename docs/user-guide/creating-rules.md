@@ -6,14 +6,13 @@ Learn how to write effective business rules in ezrules.
 
 ## Rule Structure
 
-Rules are Python functions that evaluate events and return boolean values:
+Rules are Python functions that evaluate events and return outcome strings. If no action is needed, do not return anything:
 
 ```python
 def evaluate_event(event):
     # Your logic here
     if condition:
-        return True  # Trigger outcome
-    return False     # No action
+        return 'HOLD'  # or 'RELEASE' / 'CANCEL' etc.
 ```
 
 ---
@@ -25,7 +24,7 @@ Access event attributes using the `$` notation:
 ```python
 # Access transaction attributes
 if $amount > 10000:
-    return True
+    return 'HOLD'
 
 # Use in assignments
 user_country = $country
@@ -41,7 +40,7 @@ is_high_risk = $amount > 5000 and $country in @high_risk_countries
 ```python
 # Simple threshold
 if $amount > 10000:
-    return True
+    return 'HOLD'
 ```
 
 ### List-Based Rules
@@ -49,7 +48,7 @@ if $amount > 10000:
 ```python
 # Check against blocklist
 if $user_id in @blocked_users:
-    return True
+    return 'CANCEL'
 ```
 
 ### Velocity Rules
@@ -64,7 +63,7 @@ cutoff = datetime.now() - timedelta(hours=1)
 recent_count = count_events_since($user_id, since=cutoff)
 
 if recent_count > 10:
-    return True
+    return 'HOLD'
 ```
 
 ### Multi-Factor Rules
@@ -83,7 +82,8 @@ if $account_age_days < 30:
     risk_score += 2
 
 # Trigger if total risk is high
-return risk_score >= 4
+if risk_score >= 4:
+    return 'HOLD'
 ```
 
 ---
@@ -101,11 +101,13 @@ return risk_score >= 4
 def slow_rule(event):
     all_users = session.query(User).all()  # Loads entire table!
     blocked = [u.id for u in all_users if u.is_blocked]
-    return event['user_id'] in blocked
+    if event['user_id'] in blocked:
+        return 'CANCEL'
 
 # Good: Uses list notation
 def fast_rule(event):
-    return $user_id in @CACHED_BLOCKLIST
+    if $user_id in @CACHED_BLOCKLIST:
+        return 'CANCEL'
 ```
 
 ### Error Handling
@@ -119,7 +121,7 @@ except (ValueError, TypeError):
 
 # Validate data types
 if not isinstance($user_id, str):
-    return False  # Invalid data
+    pass  # Invalid data → no decision
 ```
 
 ### Testing
@@ -148,7 +150,7 @@ for test_event in test_events:
 # Flag unusual transaction times
 # Night transactions (2 AM - 5 AM)
 if 2 <= $hour <= 5 and $amount > 1000:
-    return True
+    return 'HOLD'
 ```
 
 ### Pattern Matching
@@ -167,7 +169,7 @@ description = $description.lower()
 
 for pattern in suspicious_patterns:
     if re.search(pattern, description):
-        return True
+        return 'HOLD'
 ```
 
 ### Statistical Rules
@@ -181,7 +183,7 @@ user_std = get_user_std_amount($user_id)
 z_score = ($amount - user_avg) / user_std if user_std > 0 else 0
 
 if abs(z_score) > 3:
-    return True
+    return 'HOLD'
 ```
 
 ---
@@ -215,11 +217,11 @@ Before deploying rule changes:
 ```python
 # High risk countries: always flag if > $1000
 if $country in @HIGH_RISK_COUNTRIES and $amount > 1000:
-    return True
+    return 'HOLD'
 
 # Medium risk: flag if > $5000
 if $country in @MEDIUM_RISK_COUNTRIES and $amount > 5000:
-    return True
+    return 'HOLD'
 ```
 
 ### Merchant Category Risk
@@ -228,7 +230,7 @@ if $country in @MEDIUM_RISK_COUNTRIES and $amount > 5000:
 if $merchant_category_code in @HIGH_RISK_MCCS:
     # Additional checks for high-risk merchants
     if not $card_present:
-        return True  # Card-not-present in risky MCC
+        return 'HOLD'  # Card-not-present in risky MCC
 ```
 
 ### First-Time User
@@ -236,7 +238,7 @@ if $merchant_category_code in @HIGH_RISK_MCCS:
 ```python
 # New users with large first transaction
 if $account_age_days < 7 and $amount > 2000:
-    return True
+    return 'HOLD'
 ```
 
 ---
@@ -255,9 +257,7 @@ def my_rule(event):
 
     if $amount > 10000:
         logger.warning(f"High amount detected: {$amount}")
-        return True
-
-    return False
+        return 'HOLD'
 ```
 
 ### Use Test Data
@@ -274,6 +274,6 @@ uv run ezrules generate-random-data --n-events 100
 
 ## Next Steps
 
-- **[Managing Outcomes](managing-outcomes.md)** - Link rules to actions
+- **[Managing Outcomes](managing-outcomes.md)** - Configure allowed outcomes
 - **[Analyst Guide](analyst-guide.md)** - Comprehensive analyst workflows
 - **[Labels and Lists](labels-and-lists.md)** - Work with user lists

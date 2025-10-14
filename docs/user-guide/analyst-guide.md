@@ -22,16 +22,15 @@ As an analyst, you'll:
 Rules in ezrules are Python functions that evaluate transaction data. Each rule:
 
 - Receives an event (transaction) as input
-- Returns `True` to trigger an outcome
-- Returns `False` to pass without action
+- Returns an allowed outcome string (e.g., `'HOLD'`, `'RELEASE'`, `'CANCEL'`)
+- If no action is needed, simply do not return a value (no decision)
 
 ### Simple Amount-Based Rule
 
 ```python
 # Flag high-value transactions
 if $amount > 10000:
-    return True
-return False
+    return 'HOLD'
 ```
 
 ### Geographic Risk Rule
@@ -39,8 +38,7 @@ return False
 ```python
 # Flag transactions from high-risk countries
 if $country in @high_risk_countries:
-    return True
-return False
+    return 'HOLD'
 ```
 
 ### Velocity Rule
@@ -51,8 +49,7 @@ return False
 recent_events = count_events_for_user($user_id, window_hours=1)
 
 if recent_events > 10:
-    return True
-return False
+    return 'HOLD'
 ```
 
 ### Multi-Factor Rule
@@ -70,8 +67,7 @@ if $account_age_days < 30:
 
 # Trigger if risk score exceeds threshold
 if risk_score >= 4:
-    return True
-return False
+    return 'HOLD'
 ```
 
 ---
@@ -96,10 +92,11 @@ Outcomes represent actions taken when rules fire:
 
 ### Linking Rules to Outcomes
 
-1. Open your rule in the web interface
-2. Find the **Outcomes** section
-3. Select which outcomes to trigger
-4. A rule can trigger multiple outcomes
+Ensure the names you return in your rules exist in the **Outcomes** list:
+
+1. Open **Outcomes** in the sidebar and add names you plan to return (e.g., `HOLD`, `RELEASE`, `CANCEL`).
+2. In your rules, return those strings directly.
+3. Multiple rules can produce multiple outcomes for the same event; a single rule should return at most one outcome.
 
 ---
 
@@ -263,12 +260,11 @@ False negatives are fraud cases your rules missed.
 ```python
 # Tiered thresholds
 if $amount > 50000:
-    return True  # Always flag
+    return 'HOLD'  # Always flag
 elif $amount > 10000:
     # Additional checks for medium amounts
     if $is_international:
-        return True
-return False
+        return 'HOLD'
 ```
 
 ### Time-Based Rules
@@ -277,8 +273,7 @@ return False
 # Flag unusual transaction times
 # Flag transactions between 2 AM and 5 AM
 if 2 <= $hour <= 5:
-    return True
-return False
+    return 'HOLD'
 ```
 
 ### User Behavior Rules
@@ -288,8 +283,7 @@ return False
 
 # Flag if 5x normal spending
 if $amount > $ser_avg_amount * 5:
-    return True
-return False
+    return 'HOLD'
 ```
 
 ### List-Based Rules
@@ -297,11 +291,11 @@ return False
 ```python
 # Check against blocklists
 if $user_id in @blocked_users:
-    return True
+    return 'CANCEL'
 
 # Check against allowlists (inverse)
 if $user_id not in @trusted_users:
-    return True  # Flag non-trusted users for review
+    return 'HOLD'  # Send for manual review
 ```
 
 ---
