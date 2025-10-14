@@ -32,6 +32,7 @@ OK
 ```
 
 **Status Codes:**
+
 - `200 OK` - Service is reachable
 
 ---
@@ -75,6 +76,7 @@ Submit an event for rule evaluation.
 ```
 
 **Status Codes:**
+
 - `200 OK` - Event processed successfully
 - `400 Bad Request` - Invalid request format
 - `500 Internal Server Error` - Processing error
@@ -102,6 +104,7 @@ curl -X POST http://localhost:9999/evaluate \
 Flask returns standard HTTP error responses. For validation errors:
 
 **Status Codes:**
+
 - `400 Bad Request` - Malformed request body or missing required fields
 - `500 Internal Server Error` - Rule processing failed or database connectivity issue
 

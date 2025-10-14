@@ -197,6 +197,7 @@ curl -X POST http://localhost:8888/mark-event \
 ## Next Steps
 
 Congratulations! You've successfully:
+
 - ✅ Created a business rule
 - ✅ Defined an outcome
 - ✅ Submitted events

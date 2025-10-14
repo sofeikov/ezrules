@@ -7,6 +7,7 @@ This guide is for fraud analysts, compliance officers, and data analysts who use
 ## Your Role
 
 As an analyst, you'll:
+
 - Create and tune business rules to detect fraud or compliance violations
 - Monitor outcomes and review flagged transactions
 - Label transactions for performance measurement
@@ -46,9 +47,8 @@ if $country in @high_risk_countries:
 ```python
 # Flag users with too many transactions in a short time.
 # Implement `count_events_for_user` in your own helper module.
-recent_events = count_events_for_user($user_id, window_hours=1)
 
-if recent_events > 10:
+if $transactions_last_hour > 10:
     return 'HOLD'
 ```
 
@@ -77,6 +77,7 @@ if risk_score >= 4:
 ### What Are Outcomes?
 
 Outcomes represent actions taken when rules fire:
+
 - **Alerts** - Notify the fraud team
 - **Blocks** - Automatically decline transactions
 - **Reviews** - Queue for manual review
@@ -141,6 +142,7 @@ Open **Dashboard** to view:
 ### Why Label Transactions?
 
 Labels help you:
+
 - Measure false positive rates
 - Identify false negatives (missed fraud)
 - Validate rule changes before deployment
@@ -149,6 +151,7 @@ Labels help you:
 ### Labeling via Web Interface
 
 Use the bulk upload workflow:
+
 1. Navigate to **Labels → Upload Labels**
 2. Upload a CSV file (no header row, two columns: `event_id,label_name`)
 3. Review the summary of applied labels and any validation errors
@@ -282,7 +285,7 @@ if 2 <= $hour <= 5:
 # Flag deviation from normal behavior
 
 # Flag if 5x normal spending
-if $amount > $ser_avg_amount * 5:
+if $amount > $user_avg_amount * 5:
     return 'HOLD'
 ```
 

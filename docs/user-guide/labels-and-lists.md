@@ -9,6 +9,7 @@ Learn how to use transaction labels for analytics and user lists for rule execut
 ### Overview
 
 Labels help you:
+
 - Measure rule performance (false positives/negatives)
 - Build training datasets for ML models
 - Analyze fraud patterns over time

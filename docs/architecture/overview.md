@@ -60,6 +60,7 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 **Purpose:** Web interface for human users
 
 **Responsibilities:**
+
 - Rule creation and editing
 - Outcome management
 - User authentication and authorization
@@ -68,6 +69,7 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 - User list (blocklist/allowlist) management
 
 **Technology:**
+
 - Flask web framework
 - Jinja2 templates
 - SQLAlchemy ORM
@@ -82,12 +84,14 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 **Purpose:** API service for rule evaluation
 
 **Responsibilities:**
+
 - Accept events via REST API
 - Execute rules against events
 - Record outcomes
 - Return evaluation results
 
 **Technology:**
+
 - Flask RESTful API
 - Python rule execution engine
 - SQLAlchemy ORM
@@ -95,6 +99,7 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 **Port:** 9999 (default)
 
 **Design Considerations:**
+
 - Stateless for horizontal scaling
 - Optimized for low-latency responses
 - Can run multiple instances behind load balancer
@@ -110,6 +115,7 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 **Schema Components:**
 
 **Rules & Configuration**
+
 - `rule_engine_config` – Serialized rule engine payloads
 - `rule_engine_config_history` – Versioned history of the configs
 - `rules` – Rule definitions and logic
@@ -117,16 +123,19 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 - `rule_backtesting_results` – Records of Celery backtests
 
 **Events & Outcomes**
+
 - `testing_record_log` – Stored events evaluated by the system
 - `testing_results_log` – Rule outcomes linked to each event
 - `allowed_outcomes` – Whitelist of valid outcome names
 - `event_labels` – Available labels
 
 **User Lists**
+
 - `user_lists` – List definitions scoped by organisation
 - `user_list_entries` – Individual values contained in each list
 
 **Access Control**
+
 - `user` – Accounts managed by Flask-Security
 - `role` – Role definitions
 - `roles_users` – Relationship table between users and roles
@@ -134,6 +143,7 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 - `role_actions` – Permissions assigned to each role (optionally scoped to a resource)
 
 **Audit**
+
 - Versioned tables in `history_meta.py` capture rule and config changes
 
 ---
@@ -161,6 +171,7 @@ def evaluate_event(event_data):
 ```
 
 **Characteristics:**
+
 - Rules run as native Python functions within the evaluator process (no sandbox).
 - `RuleEngine` aggregates outcomes into `rule_results`, `outcome_counters`, and `outcome_set`.
 - New deployments serialise the current rule set into `rule_engine_config` for fast loading.
@@ -227,12 +238,14 @@ def evaluate_event(event_data):
 ### Authentication
 
 **Manager Service:**
+
 - Session-based authentication
 - Password hashing (bcrypt or similar)
 - Session cookies with secure flags
 - Login/logout endpoints
 
 **Evaluator Service:**
+
 - No built-in authentication (internal service)
 - Should be behind API gateway in production
 - Network-level access control recommended
@@ -256,6 +269,7 @@ Example:
 ```
 
 **Permission Enforcement:**
+
 - Checked at endpoint level
 - Database queries filtered by user permissions
 - Audit trail records all actions
@@ -277,6 +291,7 @@ Stored in `audit_log` table with immutable records.
 ### Horizontal Scaling
 
 **Evaluator Service:**
+
 - Stateless design allows multiple instances
 - Deploy behind load balancer
 - Shared database handles state
@@ -294,6 +309,7 @@ Load Balancer (HAProxy/nginx)
 ```
 
 **Manager Service:**
+
 - Typically single instance sufficient
 - Can scale horizontally with session storage in Redis/PostgreSQL
 - Less critical for scaling (admin interface)
@@ -314,11 +330,13 @@ CREATE INDEX idx_testing_record_label_id ON testing_record_log(el_id);
 ```
 
 **Connection Pooling:**
+
 - SQLAlchemy connection pool
 - Default: 5 connections per process
 - Configurable based on load
 
 **Query Optimization:**
+
 - Eager loading for related data
 - Pagination for large result sets
 - Caching for frequently accessed data
@@ -336,11 +354,13 @@ Performance varies significantly based on:
 - Event data size and structure
 
 **Evaluator Service:**
+
 - Latency depends heavily on rule complexity (simple rules: ~50ms, complex rules with queries: several seconds)
 - Throughput scales with number of instances (stateless design)
 - Database connection pooling is critical for performance
 
 **Manager Service:**
+
 - Web interface performance depends on database query optimization
 - Analytics queries can be resource-intensive for large datasets
 - CSV upload performance depends on file size and validation complexity
@@ -351,15 +371,18 @@ Performance varies significantly based on:
 ### Bottlenecks
 
 **Database:**
+
 - Most common bottleneck
 - Mitigate with indexing, connection pooling, read replicas
 
 **Rule Complexity:**
+
 - Complex rules (many queries) slow evaluation
 - Monitor execution times
 - Optimize or cache expensive operations
 
 **Network:**
+
 - External API calls in rules add latency
 - Use async where possible
 - Cache external data
@@ -369,17 +392,20 @@ Performance varies significantly based on:
 ## Technology Stack
 
 **Backend:**
+
 - Python 3.12+
 - Flask (web framework)
 - SQLAlchemy (ORM)
 - PostgreSQL (database)
 
 **Optional Components:**
+
 - Celery (background tasks)
 - Redis (caching, Celery broker)
 - Next.js (frontend dashboard)
 
 **Development Tools:**
+
 - uv (package management)
 - pytest (testing)
 - ruff (linting)
