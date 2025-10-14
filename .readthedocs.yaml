@@ -5,10 +5,11 @@ build:
   tools:
     python: "3.12"
 
-sphinx:
-   configuration: conf.py
+mkdocs:
+  configuration: mkdocs.yml
 
 python:
   install:
-  - method: pip
-    path: .
+    - method: pip
+      path: .
+    - requirements: docs/requirements.txt
