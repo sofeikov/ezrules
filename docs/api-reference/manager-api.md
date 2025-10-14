@@ -1,497 +1,160 @@
-# Manager API Reference
+# Manager Service Reference
 
-The Manager service provides the web interface and REST APIs for rule management, user administration, and analytics.
+The manager service powers the web console and exposes a small set of JSON endpoints used by the dashboard views.
 
-**Base URL:** `http://localhost:8888` (default)
+**Base URL:** `http://localhost:8888`
 
 ---
 
 ## Authentication
 
-The Manager service uses session-based authentication. Users must log in via the web interface before accessing protected endpoints.
+The manager uses Flask-Security session-based authentication.
 
 ### Login
 
-**Endpoint:** `POST /login`
+- **Endpoint:** `POST /login`
+- **Body:** form-encoded parameters `email` and `password`
+- **Response:** redirect to `/rules` on success; sets a session cookie
 
-**Request Body:**
-```json
-{
-  "email": "admin@example.com",
-  "password": "your-password"
-}
-```
-
-**Response:**
-Sets session cookie for subsequent requests.
-
-**Status Codes:**
-- `200 OK` - Login successful, redirects to dashboard
-- `401 Unauthorized` - Invalid credentials
+For scripted use, perform the login request with a client that preserves cookies (for example, `requests.Session`).
 
 ---
 
 ## Web Interface Pages
 
-### Dashboard
+| Page | Endpoint | Description |
+|------|----------|-------------|
+| Rules list | `GET /rules` | View all rules and navigate to rule details |
+| Create rule | `GET /create_rule` | Form for creating a new rule |
+| Rule detail | `GET /rule/<int:rule_id>` | Edit a rule, test logic, view revision history |
+| Dashboard | `GET /dashboard` | Active rule count, transaction volume, and outcome trend charts |
+| Outcomes | `GET /management/outcomes` | Manage allowed outcome names |
+| Labels | `GET /management/labels` | Manage available label values |
+| Upload labels | `GET /upload_labels` | Bulk label upload via CSV form |
+| Label analytics | `GET /label_analytics` | Charts summarising labels over time |
+| User lists | `GET /management/lists` | Manage allow/block/watch list entries |
+| Audit trail | `GET /audit` | Recent rule and configuration history |
+| User management | `GET /user_management` | Manage user accounts |
+| Role management | `GET /role_management` | Manage roles and permissions |
 
-**Endpoint:** `GET /`
-
-Main dashboard showing overview metrics and recent activity.
-
-### Rules Management
-
-**List Rules:** `GET /rules`
-- View all business rules
-- Search and filter rules
-- See rule status (active/inactive)
-
-**Create Rule:** `GET /rules/new`
-- Form to create new rule
-- Code editor for rule logic
-
-**Edit Rule:** `GET /rules/{rule_id}/edit`
-- Modify existing rule
-- View rule history
-
-**Rule Details:** `GET /rules/{rule_id}`
-- View rule configuration
-- See linked outcomes
-- Review execution history
-
-### Outcomes Management
-
-**List Outcomes:** `GET /outcomes`
-- View all outcomes
-- See trigger counts
-
-**Create Outcome:** `GET /outcomes/new`
-- Form to create new outcome
-
-**Outcome Details:** `GET /outcomes/{outcome_id}`
-- View triggered events
-- Analytics for specific outcome
-
-### Labels Management
-
-**Labels Page:** `GET /labels`
-- View labeled transactions
-- Filter by label type
-
-**Upload Labels:** `GET /upload_labels`
-- Bulk upload labels via CSV
-- Preview upload results
-
-**Label Analytics:** `GET /label_analytics`
-- Time-series charts for labels
-- Distribution analysis
-- Time range selection (1h, 6h, 12h, 24h, 30d)
-
-### Lists Management
-
-**List User Lists:** `GET /lists`
-- View all user lists (blocklists, allowlists, etc.)
-
-**Create List:** `GET /lists/new`
-- Form to create new list
-
-**List Details:** `GET /lists/{list_id}`
-- View list members
-- Add/remove entries
+All GET routes render HTML templates. Form submissions respond with redirects and flash messages rather than JSON payloads.
 
 ---
 
-## Analytics APIs
+## JSON APIs
 
-These APIs power the analytics dashboards and can be used programmatically.
+These endpoints back the dashboard charts. Authentication is required (session cookie from `/login`).
+
+### Transaction Volume
+
+- **Endpoint:** `GET /api/transaction_volume`
+- **Query Parameters:** `aggregation` (`1h`, `6h`, `12h`, `24h`, `30d`)
+- **Response:**
+  ```json
+  {
+    "aggregation": "6h",
+    "labels": ["2025-01-09 10:00", "2025-01-09 16:00"],
+    "data": [120, 135]
+  }
+  ```
+
+### Outcome Distribution
+
+- **Endpoint:** `GET /api/outcomes_distribution`
+- **Query Parameters:** `aggregation` (`1h`, `6h`, `12h`, `24h`, `30d`)
+- **Response:**
+  ```json
+  {
+    "aggregation": "24h",
+    "labels": ["2025-01-09 10:00"],
+    "datasets": [
+      {
+        "label": "APPROVE",
+        "data": [8],
+        "borderColor": "rgb(54, 162, 235)",
+        "backgroundColor": "rgba(54, 162, 235, 0.1)"
+      },
+      {
+        "label": "REVIEW",
+        "data": [3],
+        "borderColor": "rgb(255, 99, 132)",
+        "backgroundColor": "rgba(255, 99, 132, 0.1)"
+      }
+    ]
+  }
+  ```
 
 ### Labels Summary
 
-**Endpoint:** `GET /api/labels_summary`
-
-**Response:**
-```json
-{
-  "total_labeled": 1500
-}
-```
-
-Returns the count of all labeled events.
-
-**Status Codes:**
-- `200 OK` - Success
-
----
+- **Endpoint:** `GET /api/labels_summary`
+- **Response:**
+  ```json
+  {
+    "total_labeled": 42,
+    "pie_chart": {
+      "labels": ["FRAUD", "NORMAL"],
+      "data": [12, 30],
+      "backgroundColor": ["rgb(255, 99, 132)", "rgb(54, 162, 235)"]
+    }
+  }
+  ```
 
 ### Labels Distribution
 
-**Endpoint:** `GET /api/labels_distribution`
-
-**Query Parameters:**
-- `period` (string, optional) - Time period: "1h", "6h", "12h", "24h", "30d"
-  - Default: "24h"
-
-**Response:**
-```json
-{
-  "FRAUD": [
-    {"time": "2025-01-09T00:00:00Z", "count": 12},
-    {"time": "2025-01-09T01:00:00Z", "count": 8}
-  ],
-  "NORMAL": [...],
-  "CHARGEBACK": [...]
-}
-```
-
-Returns time-series data for each label type within the specified period.
-
-**Status Codes:**
-- `200 OK` - Success
-
-**Example:**
-```bash
-curl "http://localhost:8888/api/labels_distribution?period=24h"
-```
+- **Endpoint:** `GET /api/labels_distribution`
+- **Query Parameters:** `aggregation` (`1h`, `6h`, `12h`, `24h`, `30d`)
+- **Response:** same structure as `/api/outcomes_distribution`, but for labels instead of rule outcomes.
 
 ---
 
-### Event Volume
+## Labeling Endpoint
 
-**Endpoint:** `GET /api/event_volume`
+Use the manager API to assign labels to stored events.
 
-**Query Parameters:**
-- `period` (string, optional) - Time period: "1h", "6h", "12h", "24h", "30d"
-  - Default: "24h"
+- **Endpoint:** `POST /mark-event`
+- **Body:** JSON with `event_id` and `label_name`
+- **Response:**
+  ```json
+  {
+    "message": "Event 'txn_002' successfully marked with label 'FRAUD'",
+    "event_id": "txn_002",
+    "label_name": "FRAUD"
+  }
+  ```
 
-**Response:**
-```json
-{
-  "data": [
-    {"time": "2025-01-09T00:00:00Z", "count": 1250},
-    {"time": "2025-01-09T01:00:00Z", "count": 980}
-  ],
-  "total": 25840
-}
-```
-
-Returns event volume over time.
-
-**Status Codes:**
-- `200 OK` - Success
-
----
-
-### Outcome Statistics
-
-**Endpoint:** `GET /api/outcome_stats`
-
-**Query Parameters:**
-- `period` (string, optional) - Time period for statistics
-
-**Response:**
-```json
-{
-  "outcomes": [
-    {
-      "id": 1,
-      "name": "High Value Alert",
-      "triggered_count": 245,
-      "percentage": 15.2
-    },
-    {
-      "id": 2,
-      "name": "Geographic Risk",
-      "triggered_count": 123,
-      "percentage": 7.6
-    }
-  ],
-  "total_triggered": 1612
-}
-```
-
-Returns outcome distribution and statistics.
-
-**Status Codes:**
-- `200 OK` - Success
-
----
-
-## Upload Endpoints
-
-### Upload Labels CSV
-
-**Endpoint:** `POST /upload_labels`
-
-**Request:**
-- Method: `POST`
-- Content-Type: `multipart/form-data`
-- Form field: `file` (CSV file)
-
-**CSV Format (no header row, 2 columns: event_id, label_name):**
-```csv
-txn_001,FRAUD
-txn_002,NORMAL
-txn_003,CHARGEBACK
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "uploaded": 3,
-  "errors": [],
-  "message": "Successfully uploaded 3 labels"
-}
-```
-
-**Error Response:**
-```json
-{
-  "success": false,
-  "uploaded": 2,
-  "errors": [
-    {"row": 3, "error": "Invalid label name: INVALID"}
-  ],
-  "message": "Uploaded 2 labels with 1 error"
-}
-```
-
-**Status Codes:**
-- `200 OK` - Upload processed (check response for errors)
-- `400 Bad Request` - Invalid file format
-- `413 Payload Too Large` - File too large
-
-**Limits:**
-- Max file size: 10MB
-- Max rows: 10,000
-
-**Example:**
-```bash
-curl -X POST http://localhost:8888/upload_labels \
-  -F "file=@labels.csv"
-```
-
----
-
-### Upload User List CSV
-
-**Endpoint:** `POST /lists/{list_id}/upload`
-
-**Request:**
-- Method: `POST`
-- Content-Type: `multipart/form-data`
-- Form field: `file` (CSV file)
-
-**CSV Format:**
-```csv
-user_id
-user_001
-user_002
-user_003
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "added": 3,
-  "message": "Added 3 members to list"
-}
-```
-
-**Status Codes:**
-- `200 OK` - Upload successful
-- `400 Bad Request` - Invalid file format
-- `404 Not Found` - List doesn't exist
-
----
-
-## Rule Management APIs
-
-### Create Rule
-
-**Endpoint:** `POST /api/rules`
-
-**Request Body:**
-```json
-{
-  "name": "High Value Transaction",
-  "description": "Flag transactions over $10,000",
-  "code": "if $amount > 10000:\n    return True\nreturn False",
-  "active": true
-}
-```
-
-**Response:**
-```json
-{
-  "id": 42,
-  "name": "High Value Transaction",
-  "created_at": "2025-01-09T10:30:00Z"
-}
-```
-
-**Status Codes:**
-- `201 Created` - Rule created successfully
-- `400 Bad Request` - Invalid rule code or parameters
-
----
-
-### Update Rule
-
-**Endpoint:** `PUT /api/rules/{rule_id}`
-
-**Request Body:**
-```json
-{
-  "name": "Updated Rule Name",
-  "code": "# Updated code",
-  "active": false
-}
-```
-
-**Response:**
-```json
-{
-  "id": 42,
-  "name": "Updated Rule Name",
-  "version": 2,
-  "updated_at": "2025-01-09T11:00:00Z"
-}
-```
-
-**Status Codes:**
-- `200 OK` - Rule updated successfully
-- `404 Not Found` - Rule doesn't exist
-- `400 Bad Request` - Invalid parameters
-
----
-
-### Delete Rule
-
-**Endpoint:** `DELETE /api/rules/{rule_id}`
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Rule deleted"
-}
-```
-
-**Status Codes:**
-- `200 OK` - Rule deleted successfully
-- `404 Not Found` - Rule doesn't exist
+Validation errors return `400` (missing fields), `404` (unknown event or label), or `500` (database error).
 
 ---
 
 ## Permissions
 
-Most Manager API endpoints require authentication and specific permissions:
+Access to each endpoint is governed by `PermissionAction` values. The table below summarises the defaults:
 
-| Endpoint | Permission Required |
-|----------|-------------------|
-| `GET /rules` | `view_rules` |
-| `POST /api/rules` | `create_rule` |
-| `PUT /api/rules/{id}` | `modify_rule` |
-| `DELETE /api/rules/{id}` | `delete_rule` |
-| `GET /outcomes` | `view_outcomes` |
-| `POST /api/outcomes` | `create_outcome` |
-| `GET /labels` | `view_rules` (any view permission) |
-| `POST /upload_labels` | `modify_rule` |
-
----
-
-## CORS Configuration
-
-For production deployments, configure CORS appropriately:
-
-```python
-# config.py
-CORS_ALLOWED_ORIGINS = [
-    "https://your-frontend.com",
-    "https://analytics.company.com"
-]
-```
+| Endpoint | Permission |
+|----------|------------|
+| `GET /rules`, `GET /dashboard`, `GET /rule/<id>` | `view_rules` |
+| `POST /create_rule` | `create_rule` |
+| `POST /rule/<id>` | `modify_rule` |
+| `GET /management/outcomes` | `view_outcomes` |
+| `POST /management/outcomes` | `create_outcome` / `delete_outcome` (per action) |
+| `GET /management/labels` | `view_labels` |
+| `POST /management/labels` | `create_label` / `delete_label` (per action) |
+| `GET /upload_labels` | `view_labels` |
+| `POST /upload_labels` | `create_label` (used to upload assignments) |
+| `GET /label_analytics` | `view_labels` |
+| `GET /management/lists` | `view_lists` |
+| `POST /management/lists` | `create_list`, `modify_list`, or `delete_list` based on the submitted action |
+| `GET /audit` | `access_audit_trail` |
+| `GET /user_management` | `view_users` |
+| `POST /user_management` | `create_user` |
+| `GET /role_management` | `view_roles` |
+| `POST /role_management` | `create_role`, `modify_role`, `delete_role`, or `manage_permissions` |
+| `/mark-event` | Accessible without additional permission checks (CSRF exempt) |
 
 ---
 
-## Webhooks
+## Notes
 
-Configure webhooks to receive notifications for events:
-
-**Webhook Events:**
-- `rule.triggered` - When a rule fires
-- `outcome.created` - New outcome triggered
-- `label.added` - Transaction labeled
-
-**Webhook Payload:**
-```json
-{
-  "event": "rule.triggered",
-  "timestamp": "2025-01-09T10:30:00Z",
-  "data": {
-    "rule_id": 42,
-    "rule_name": "High Value Transaction",
-    "event_id": "txn_123",
-    "outcomes": ["High Value Alert"]
-  }
-}
-```
-
----
-
-## Examples
-
-### Python Client
-
-```python
-import requests
-
-class EzrulesManager:
-    def __init__(self, base_url="http://localhost:8888"):
-        self.base_url = base_url
-        self.session = requests.Session()
-
-    def login(self, email, password):
-        response = self.session.post(
-            f"{self.base_url}/login",
-            json={"email": email, "password": password}
-        )
-        return response.status_code == 200
-
-    def get_labels_distribution(self, period="24h"):
-        response = self.session.get(
-            f"{self.base_url}/api/labels_distribution",
-            params={"period": period}
-        )
-        return response.json()
-
-    def upload_labels(self, csv_file_path):
-        with open(csv_file_path, 'rb') as f:
-            response = self.session.post(
-                f"{self.base_url}/upload_labels",
-                files={"file": f}
-            )
-        return response.json()
-
-# Usage
-manager = EzrulesManager()
-manager.login("admin@example.com", "password")
-
-# Get analytics
-distribution = manager.get_labels_distribution(period="24h")
-print(f"FRAUD count: {len(distribution['FRAUD'])}")
-
-# Upload labels
-result = manager.upload_labels("labels.csv")
-print(f"Uploaded: {result['uploaded']} labels")
-```
-
----
-
-## Next Steps
-
-- **[Evaluator API](evaluator-api.md)** - Rule evaluation API reference
-- **[Admin Guide](../user-guide/admin-guide.md)** - Administrative tasks
-- **[Configuration](../getting-started/configuration.md)** - Service configuration
+- There are no REST endpoints for creating rules or outcomes programmatically; use the web forms or extend the application.
+- The upload forms (`/upload_labels`, `/management/outcomes`, `/management/lists`) respond with HTML redirects, so automated integrations should interact with the JSON APIs listed above instead.
+- Webhooks and additional management APIs are not implemented at this time.

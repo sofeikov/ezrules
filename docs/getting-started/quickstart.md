@@ -130,30 +130,33 @@ curl -X POST http://localhost:9999/evaluate \
 
 ### In the Web Interface
 
-1. Navigate to **Outcomes** in the sidebar
-2. Click on **High Value Alert**
-3. You'll see all events that triggered this outcome
-4. Check the timestamp, event ID, and event data
+1. Navigate to **Rules** in the sidebar and open your **High Value Transaction** rule.
+2. Use the **Test Rule** panel to replay sample payloads or submit a backtest if Celery is configured.
+3. The Outcomes page lists the allowed outcome names; outcome counts and transaction lists are not displayed in the UI yet.
+
+### Inspect the API Response
+
+The evaluator response already tells you which rule fired and what outcomes were produced. Re-run the high-value transaction call:
+
+```bash
+curl -X POST http://localhost:9999/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id": "txn_002",
+    "event_timestamp": 1704801000,
+    "event_data": {
+      "amount": 15000,
+      "user_id": "user_456"
+    }
+  }'
+```
+
+Look at the `rule_results`, `outcome_counters`, and `outcome_set` fields in the JSON response to confirm the rule triggered.
 
 ### Via Analytics Dashboard
 
-1. Navigate to **Analytics** in the sidebar
-2. View charts showing:
-   - Events over time
-   - Outcome distribution
-   - Rule execution stats
-
-### Via API
-
-Query the API directly:
-
-```bash
-# Get all outcomes
-curl http://localhost:9999/api/outcomes
-
-# Get specific outcome details
-curl http://localhost:9999/api/outcomes/1
-```
+1. Navigate to **Dashboard** in the sidebar.
+2. Review the transaction volume chart and the rule outcome trend lines over the selected time range.
 
 ---
 
@@ -164,7 +167,7 @@ Let's label a transaction as fraud for analytics.
 ### Via API
 
 ```bash
-curl -X POST http://localhost:9999/mark-event \
+curl -X POST http://localhost:8888/mark-event \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "txn_002",
@@ -186,7 +189,7 @@ curl -X POST http://localhost:9999/mark-event \
 ### View Label Analytics
 
 1. Navigate to **Label Analytics** in the sidebar
-2. View time-series charts for each label type
+2. Review the total labeled count and individual label charts
 3. Select different time ranges (1h, 6h, 12h, 24h, 30d)
 
 ---

@@ -55,21 +55,18 @@ View-only access:
 
 ### Assigning Roles
 
-Roles are assigned via database or programmatically:
+Assign roles directly through SQLAlchemy:
 
 ```python
-from ezrules.models import User, Role
-from ezrules.core.database import Session
+from ezrules.models.backend_core import Role, User
+from ezrules.models.database import db_session
 
-session = Session()
+user = db_session.query(User).filter_by(email="analyst@company.com").first()
+editor_role = db_session.query(Role).filter_by(name="rule_editor").first()
 
-# Get user and role
-user = session.query(User).filter_by(email='analyst@company.com').first()
-editor_role = session.query(Role).filter_by(name='Rule Editor').first()
-
-# Assign role
-user.roles.append(editor_role)
-session.commit()
+if user and editor_role and editor_role not in user.roles:
+    user.roles.append(editor_role)
+    db_session.commit()
 ```
 
 ---
@@ -78,58 +75,54 @@ session.commit()
 
 ### Available Permissions
 
-ezrules has 13 granular permission types:
+ezrules defines 24 permission actions that can be combined per role:
 
-**Rule Management:**
-- `create_rule` - Create new business rules
-- `modify_rule` - Edit existing rules
-- `delete_rule` - Delete rules
-- `view_rules` - View rules and history
+**Rule Management**
+- `create_rule`, `modify_rule`, `delete_rule`, `view_rules`
 
-**Outcome Management:**
-- `create_outcome` - Add outcome types
-- `modify_outcome` - Edit outcomes
-- `delete_outcome` - Remove outcomes
-- `view_outcomes` - View outcome configurations
+**Outcome Management**
+- `create_outcome`, `modify_outcome`, `delete_outcome`, `view_outcomes`
 
-**List Management:**
-- `create_list` - Create user lists (blocklists, allowlists)
-- `modify_list` - Add/remove list entries
-- `delete_list` - Delete entire lists
-- `view_lists` - View user lists
+**Label Management**
+- `create_label`, `modify_label`, `delete_label`, `view_labels`
 
-**Audit:**
-- `access_audit_trail` - View system audit logs
+**List Management**
+- `create_list`, `modify_list`, `delete_list`, `view_lists`
+
+**Audit & History**
+- `access_audit_trail`
+
+**User Administration**
+- `view_users`, `create_user`
+
+**Role Administration**
+- `view_roles`, `create_role`, `modify_role`, `delete_role`, `manage_permissions`
 
 ### Custom Roles
 
-Create custom roles for your organization:
+To define custom roles, create the role record and link the appropriate `Action` entries via `RoleActions`. The CLI helper `uv run ezrules init-permissions` seeds default roles and actions; reuse `PermissionManager.grant_permission` to attach additional actions.
 
 ```python
-from ezrules.models import Role, Permission
+from ezrules.models.backend_core import Role
+from ezrules.models.database import db_session
+from ezrules.core.permissions import PermissionManager, PermissionAction
 
-# Create role
-custom_role = Role(
-    name='Compliance Reviewer',
-    description='Can view everything but not modify'
-)
+custom_role = Role(name="compliance_reviewer", description="Read + audit")
+db_session.add(custom_role)
+db_session.commit()
 
-# Add permissions
-permissions = ['view_rules', 'view_outcomes', 'view_lists', 'access_audit_trail']
-for perm_name in permissions:
-    perm = session.query(Permission).filter_by(name=perm_name).first()
-    custom_role.permissions.append(perm)
-
-session.add(custom_role)
-session.commit()
+PermissionManager.grant_permission(role_id=custom_role.id, action_name=PermissionAction.VIEW_RULES)
+PermissionManager.grant_permission(role_id=custom_role.id, action_name=PermissionAction.ACCESS_AUDIT_TRAIL)
 ```
 
 ### Checking Permissions
 
-Users can have multiple roles. Permissions are aggregated:
+Permissions are evaluated through `PermissionManager`:
 
 ```python
-user.has_permission('create_rule')  # Returns True/False
+from ezrules.core.permissions import PermissionManager, PermissionAction
+
+can_create = PermissionManager.user_has_permission(current_user, PermissionAction.CREATE_RULE)
 ```
 
 ---
@@ -157,7 +150,7 @@ uv run ezrules init-permissions
 ```
 
 This creates:
-- All 13 permission types
+- All 24 permission actions
 - 3 default roles (Admin, Rule Editor, Read-only)
 - Role-permission mappings
 
@@ -262,10 +255,7 @@ LIMIT 10;
 
 **Application Logs:**
 
-Set log level via environment:
-```bash
-export EZRULES_LOG_LEVEL="INFO"
-```
+The project uses Python's standard logging configuration. Override handlers or levels within your deployment scripts (for example, via `logging.basicConfig`) before starting the services.
 
 **Centralized Logging:**
 
@@ -293,11 +283,11 @@ Run multiple evaluator instances behind a load balancer:
 services:
   evaluator-1:
     image: ezrules:latest
-    command: evaluator --port 9999
+    command: ["uv", "run", "ezrules", "evaluator", "--port", "9999"]
 
   evaluator-2:
     image: ezrules:latest
-    command: evaluator --port 9999
+    command: ["uv", "run", "ezrules", "evaluator", "--port", "9999"]
 
   evaluator-3:
     image: ezrules:latest
@@ -550,12 +540,7 @@ systemctl restart ezrules-evaluator
    journalctl -u ezrules-manager -n 50
    ```
 
-2. Verify configuration:
-   ```bash
-   uv run ezrules validate-config
-   ```
-
-3. Test database connectivity:
+2. Test database connectivity:
    ```bash
    psql "$EZRULES_DB_ENDPOINT"
    ```

@@ -37,10 +37,9 @@ ezrules uses a multi-service architecture for scalability and separation of conc
                     │
 ┌──────────────────────────────────────────────────────────┐
 │                 Evaluator Service                         │
-│  - REST API for event evaluation                         │
+│  - REST API for event evaluation                          │
 │  - Rule execution engine                                  │
 │  - Real-time processing                                   │
-│  - Event labeling API                                     │
 └───────────────────▲──────────────────────────────────────┘
                     │ HTTP (9999)
                     │
@@ -86,7 +85,6 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 - Accept events via REST API
 - Execute rules against events
 - Record outcomes
-- Provide labeling API
 - Return evaluation results
 
 **Technology:**
@@ -111,33 +109,32 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 
 **Schema Components:**
 
-**Rules Management:**
-- `rules` - Rule definitions and code
-- `rule_history` - Version history for rules
-- `rule_executions` - Execution logs
+**Rules & Configuration**
+- `rule_engine_config` – Serialized rule engine payloads
+- `rule_engine_config_history` – Versioned history of the configs
+- `rules` – Rule definitions and logic
+- `rule_history` – Change log produced via SQLAlchemy versioning
+- `rule_backtesting_results` – Records of Celery backtests
 
-**Outcomes:**
-- `outcomes` - Outcome definitions
-- `rule_outcomes` - Mapping between rules and outcomes
-- `triggered_outcomes` - Events that triggered outcomes
+**Events & Outcomes**
+- `testing_record_log` – Stored events evaluated by the system
+- `testing_results_log` – Rule outcomes linked to each event
+- `allowed_outcomes` – Whitelist of valid outcome names
+- `event_labels` – Available labels
 
-**Events:**
-- `events` - Transaction data
-- `event_labels` - Labels assigned to events
+**User Lists**
+- `user_lists` – List definitions scoped by organisation
+- `user_list_entries` – Individual values contained in each list
 
-**Access Control:**
-- `users` - User accounts
-- `roles` - Role definitions
-- `permissions` - Permission types
-- `user_roles` - User-role mappings
-- `role_permissions` - Role-permission mappings
+**Access Control**
+- `user` – Accounts managed by Flask-Security
+- `role` – Role definitions
+- `roles_users` – Relationship table between users and roles
+- `actions` – Permission action catalog
+- `role_actions` – Permissions assigned to each role (optionally scoped to a resource)
 
-**Lists:**
-- `user_lists` - List definitions (blocklists, etc.)
-- `list_members` - List membership
-
-**Audit:**
-- `audit_log` - Complete change history
+**Audit**
+- Versioned tables in `history_meta.py` capture rule and config changes
 
 ---
 
@@ -148,37 +145,26 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 **Architecture:**
 
 ```python
-# Rule execution flow
+from ezrules.core.rule_engine import RuleEngineFactory
+
 def evaluate_event(event_data):
-    # 1. Load active rules from database
-    rules = get_active_rules()
+    # 1. Load compiled rule config from rule_engine_config
+    rule_engine = RuleEngineFactory.from_json(active_config)
 
-    # 2. Execute each rule
-    for rule in rules:
-        try:
-            # 3. Execute rule code in sandboxed environment
-            result = execute_rule_code(rule.code, event_data)
+    # 2. Execute each rule (Python code compiled with ast + exec)
+    results = rule_engine(event_data)
 
-            # 4. If rule triggers (returns True)
-            if result:
-                # 5. Record outcome
-                for outcome in rule.outcomes:
-                    record_outcome(outcome, event_data)
+    # 3. Persist TestingRecordLog + TestingResultsLog entries
+    store_results(event_data, results)
 
-        except Exception as e:
-            # 6. Log error, continue with other rules
-            log_error(rule, e)
-
-    # 7. Return results
-    return get_triggered_outcomes(event_data)
+    return results
 ```
 
-**Features:**
-- Rules are Python functions
-- Full programmatic flexibility
-- Error isolation (one rule failure doesn't stop others)
-- Execution time tracking
-- Rule version control
+**Characteristics:**
+- Rules run as native Python functions within the evaluator process (no sandbox).
+- `RuleEngine` aggregates outcomes into `rule_results`, `outcome_counters`, and `outcome_set`.
+- New deployments serialise the current rule set into `rule_engine_config` for fast loading.
+- Backtesting tasks reuse the same execution pipeline via Celery.
 
 ---
 
@@ -317,18 +303,14 @@ Load Balancer (HAProxy/nginx)
 **Indexing Strategy:**
 ```sql
 -- Event lookups
-CREATE INDEX idx_events_event_id ON events(event_id);
-CREATE INDEX idx_events_timestamp ON events(created_at);
-CREATE INDEX idx_events_user_id ON events(user_id);
+CREATE INDEX idx_testing_record_event_id ON testing_record_log(event_id);
+CREATE INDEX idx_testing_record_created_at ON testing_record_log(created_at);
 
 -- Outcome queries
-CREATE INDEX idx_outcomes_rule_id ON triggered_outcomes(rule_id);
-CREATE INDEX idx_outcomes_timestamp ON triggered_outcomes(created_at);
+CREATE INDEX idx_testing_results_rule_id ON testing_results_log(r_id);
 
 -- Label analytics
-CREATE INDEX idx_labels_event_id ON event_labels(event_id);
-CREATE INDEX idx_labels_timestamp ON event_labels(created_at);
-CREATE INDEX idx_labels_name ON event_labels(label_name);
+CREATE INDEX idx_testing_record_label_id ON testing_record_log(el_id);
 ```
 
 **Connection Pooling:**
@@ -417,21 +399,8 @@ def get_user_risk_score(user_id):
     # Custom logic
     return score
 
-# Available in rules as:
+# Available in rules as (after registering helper yourself):
 score = get_user_risk_score(event['user_id'])
-```
-
-### Webhooks
-
-Implement webhooks for external notifications:
-
-```python
-# On outcome trigger
-def notify_webhook(outcome, event):
-    requests.post(WEBHOOK_URL, json={
-        'outcome': outcome.name,
-        'event_id': event.event_id
-    })
 ```
 
 ### Custom Executors

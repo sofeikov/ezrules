@@ -1,342 +1,125 @@
 # Monitoring & Analytics
 
-Comprehensive guide to monitoring your rules and analyzing transaction patterns.
+Monitor rule activity and labeling trends through the manager application and REST APIs.
 
 ---
 
-## Analytics Dashboard
+## Dashboard Overview
 
-Access the analytics dashboard from the sidebar to view real-time metrics and historical trends.
+Open **Dashboard** in the web UI to review the current state of the system.
 
-### Available Views
+- **Active Rules** – Total number of rules deployed for the active organisation.
+- **Transaction Volume** – Line chart of events stored in `testing_record_log`, grouped by a selectable time window.
+- **Outcome Trends** – Per-outcome lines that show how often each decision was produced over the selected window.
 
-- **Events Over Time** - Transaction volume charts
-- **Outcome Distribution** - Which outcomes fire most frequently
-- **Rule Performance** - Execution stats and hit rates
-- **Label Analytics** - Time-series for labeled transactions
+### Available Aggregations
 
-### Time Range Selection
+Choose one of the built-in presets to update every chart:
 
-Choose from multiple time windows:
+- **1 hour**
+- **6 hours**
+- **12 hours**
+- **24 hours**
+- **30 days**
 
-- **1 hour** - Real-time monitoring
-- **6 hours** - Short-term trends
-- **12 hours** - Half-day patterns
-- **24 hours** - Daily cycles
-- **30 days** - Monthly analysis
+### Working with the Charts
 
----
-
-## Key Metrics
-
-### Event Volume
-
-**Total Events:** Overall transaction count
-- Monitor for unusual spikes or drops
-- Compare to historical baselines
-- Identify system issues or business changes
-
-**Events Per Hour:** Throughput metric
-- Track system capacity
-- Plan scaling decisions
-- Identify peak times
-
-### Outcome Metrics
-
-**Trigger Rate:** Percentage of events triggering outcomes
-
-```
-Trigger Rate = Events with outcomes / Total events
-```
-
-**Typical ranges:**
-- Too low (<1%): Rules may be too strict
-- Normal (1-5%): Expected for fraud detection
-- Too high (>10%): May indicate false positives
-
-**Outcome Distribution:** Which outcomes fire most
-
-Use to:
-- Identify most active rules
-- Prioritize investigation efforts
-- Allocate team resources
-
-### Rule Performance
-
-**Hit Rate per Rule:**
-```
-Hit Rate = Events triggering rule / Total events
-```
-
-**Execution Time:** Average time per rule evaluation
-- Target: <100ms per rule
-- Monitor for slow rules
-- Optimize expensive queries
-
-**Success Rate:** Percentage of successful executions
-- Should be >99.9%
-- Failures may indicate code errors
-- Review error logs for failures
+- Spikes or drops in the transaction series can highlight ingestion issues or abnormal traffic.
+- Compare outcome lines to understand which rules drive most of the decisions.
+- Switch between aggregations to zoom into an incident or to review longer-term trends.
 
 ---
 
 ## Label Analytics
 
-### Overview Dashboard
+Select **Label Analytics** from the sidebar to focus on ground-truth labels.
 
-Navigate to **Label Analytics** for comprehensive labeling metrics.
-
-### Metrics Available
-
-**Total Labeled Events:** Measures labeling coverage
-
-```
-Coverage = Labeled events / Total events
-```
-
-Aim for >20% coverage for meaningful analysis.
-
-**Labels Over Time:** Individual time-series charts
-
-View trends for:
-- FRAUD labels
-- NORMAL labels
-- CHARGEBACK labels
-
-**Distribution:** Breakdown by label type
-
-Understand your transaction mix:
-- High fraud rate: May need stricter rules
-- Low fraud rate: May have effective prevention
-- High chargebacks: Customer service issues
-
-### Time Period Analysis
-
-Select different time ranges to identify:
-
-- **Hourly patterns** - Time-of-day fraud trends
-- **Daily patterns** - Day-of-week variations
-- **Monthly trends** - Long-term fraud evolution
+- **Total Labeled Events** – Metric card showing how many stored events carry a label (`testing_record_log.el_id`).
+- **Labels Over Time** – One chart per label name with the same aggregation control as the dashboard.
+- Use the **Upload Labels** page or the `/mark-event` API to feed data into these views.
 
 ---
 
-## Real-Time Monitoring
+## API Endpoints
 
-### Dashboard Widgets
+The dashboard fetches its data from JSON endpoints that you can also call directly.
 
-Key widgets to monitor:
+- `GET /api/transaction_volume?aggregation=6h`
+  ```json
+  {
+    "aggregation": "6h",
+    "labels": ["2025-01-09 10:00"],
+    "data": [120]
+  }
+  ```
+- `GET /api/outcomes_distribution?aggregation=24h`
+  ```json
+  {
+    "aggregation": "24h",
+    "labels": ["2025-01-09 10:00", "2025-01-09 11:00"],
+    "datasets": [
+      {"label": "APPROVE", "data": [8, 6], "borderColor": "rgb(54, 162, 235)"},
+      {"label": "REVIEW", "data": [3, 2], "borderColor": "rgb(255, 99, 132)"}
+    ]
+  }
+  ```
+- `GET /api/labels_summary`
+  ```json
+  {
+    "total_labeled": 42,
+    "pie_chart": {
+      "labels": ["FRAUD", "NORMAL"],
+      "data": [12, 30],
+      "backgroundColor": ["rgb(255, 99, 132)", "rgb(54, 162, 235)"]
+    }
+  }
+  ```
+- `GET /api/labels_distribution?aggregation=6h`
+  ```json
+  {
+    "aggregation": "6h",
+    "labels": ["2025-01-09 06:00", "2025-01-09 12:00"],
+    "datasets": [
+      {"label": "FRAUD", "data": [4, 2]},
+      {"label": "NORMAL", "data": [10, 8]}
+    ]
+  }
+  ```
 
-**Recent Events:**
-- Last 10-20 events processed
-- Current processing rate
-- Any errors or warnings
-
-**Active Outcomes:**
-- Currently triggered outcomes
-- Requiring immediate attention
-- Queue depth for manual review
-
-**System Health:**
-- Service uptime
-- Database connectivity
-- API response times
-
-### Alerts
-
-Set up alerts for:
-
-**Volume Anomalies:**
-- Event volume drops >50%
-- Event volume spikes >200%
-- Unusual time-of-day patterns
-
-**Rule Issues:**
-- Rule execution failures
-- Slow rule execution (>1s)
-- High false positive rates
-
-**System Problems:**
-- Database connection errors
-- API timeouts
-- Service crashes
-
----
-
-## Performance Analysis
-
-### Rule Effectiveness
-
-#### True Positive Rate (Precision)
-
-```
-Precision = Correctly flagged fraud / Total flagged
-```
-
-Measures accuracy of detections:
-- High precision (>70%): Accurate rules
-- Low precision (<30%): Too many false positives
-
-#### False Positive Rate
-
-```
-FPR = False positives / Total legitimate transactions
-```
-
-Target FPR: <5% for most use cases
-
-#### False Negative Rate
-
-```
-FNR = Missed fraud / Total fraud
-```
-
-Target FNR: <10% for critical fraud
-
-### A/B Testing Rules
-
-Compare rule versions:
-
-1. Deploy new version to 10% of traffic
-2. Run for 7 days alongside old version
-3. Compare metrics:
-   - Hit rate
-   - False positive rate
-   - False negative rate
-4. Roll out winner to 100%
+Tip: Responses are structured for Chart.js, so `labels` contains the x-axis values and each dataset contains the y-axis series.
 
 ---
 
-## Reporting
+## Deeper Analysis
 
-### Daily Reports
+For customised reporting, query the underlying tables directly.
 
-Generate daily summaries:
-
-```python
-# Daily report data
-- Total events: 15,000
-- Outcomes triggered: 450 (3%)
-- Top 3 outcomes:
-  1. High Value Alert: 180
-  2. Velocity Alert: 150
-  3. Geographic Risk: 120
-- Labels added: 95
-- False positive rate: 4.2%
+```sql
+-- Outcome counts by hour
+SELECT date_trunc('hour', tr.created_at) AS hour,
+       trl.rule_result,
+       COUNT(*) AS total
+FROM testing_results_log trl
+JOIN testing_record_log tr ON trl.tl_id = tr.tl_id
+WHERE tr.created_at >= NOW() - INTERVAL '7 days'
+GROUP BY hour, trl.rule_result
+ORDER BY hour;
 ```
 
-### Weekly Reports
-
-Track trends over week:
-
-- Event volume trends
-- Outcome frequency changes
-- New fraud patterns identified
-- Rule performance changes
-- Team productivity metrics
-
-### Monthly Reports
-
-Executive summaries:
-
-- Total fraud prevented (estimated value)
-- False positive reduction progress
-- System performance metrics
-- Staffing recommendations
-- Rule optimization opportunities
-
----
-
-## Best Practices
-
-### Daily Routine
-
-!!! tip "Morning Check"
-    - Review overnight outcomes
-    - Check for volume anomalies
-    - Address critical alerts
-    - Label urgent cases
-
-### Weekly Tasks
-
-!!! tip "Performance Review"
-    - Analyze false positive rates
-    - Review rule effectiveness
-    - Update blocklists
-    - Plan rule adjustments
-
-### Monthly Activities
-
-!!! tip "Strategic Analysis"
-    - Deep-dive analytics review
-    - A/B test new rules
-    - Archive old data
-    - Update documentation
+```sql
+-- Labeled events summary
+SELECT el.label, COUNT(*) AS total
+FROM testing_record_log tr
+JOIN event_labels el ON tr.el_id = el.el_id
+GROUP BY el.label;
+```
 
 ---
 
 ## Troubleshooting
 
-### No Data Showing
+- No data in charts? Ensure events are reaching the evaluator, and verify `testing_record_log` contains rows within the selected time window.
+- Empty label analytics? Make sure labels exist (`event_labels`) and events are marked via `/mark-event` or the CSV upload page.
+- API errors? An invalid `aggregation` parameter returns `400`; valid options are `1h`, `6h`, `12h`, `24h`, and `30d`.
 
-1. Verify services are running
-2. Check date range selection
-3. Confirm database connectivity
-4. Review browser console for errors
-
-### Slow Dashboard
-
-1. Reduce time range
-2. Add database indexes
-3. Implement caching
-4. Optimize queries
-
-### Missing Events
-
-1. Check evaluator service logs
-2. Verify API connectivity
-3. Review event submission code
-4. Test with sample events
-
----
-
-## Advanced Analytics
-
-### Custom Queries
-
-Run custom SQL for deeper analysis:
-
-```sql
--- Hourly fraud rate
-SELECT
-  date_trunc('hour', created_at) as hour,
-  COUNT(*) as total_events,
-  SUM(CASE WHEN label = 'FRAUD' THEN 1 ELSE 0 END) as fraud_events,
-  ROUND(100.0 * SUM(CASE WHEN label = 'FRAUD' THEN 1 ELSE 0 END) / COUNT(*), 2) as fraud_rate
-FROM events
-WHERE created_at > NOW() - INTERVAL '7 days'
-GROUP BY hour
-ORDER BY hour DESC;
-```
-
-### Export Data
-
-Export for external analysis:
-
-```bash
-# Export events to CSV
-uv run ezrules export-events --start-date 2025-01-01 --output events.csv
-
-# Export outcomes
-uv run ezrules export-outcomes --output outcomes.csv
-
-# Export labels
-uv run ezrules export-labels --output labels.csv
-```
-
----
-
-## Next Steps
-
-- **[Analyst Guide](analyst-guide.md)** - Complete analyst workflows
-- **[Labels and Lists](labels-and-lists.md)** - Enhance analytics with labels
-- **[API Reference](../api-reference/evaluator-api.md)** - Programmatic access
+For additional help, open an issue on [GitHub](https://github.com/sofeikov/ezrules/issues).

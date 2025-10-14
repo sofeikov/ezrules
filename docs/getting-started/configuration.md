@@ -216,15 +216,7 @@ EZRULES_ORG_ID=1
 
 ## Logging Configuration
 
-ezrules uses Python's built-in logging. Configure via environment:
-
-```bash
-# Set log level
-export EZRULES_LOG_LEVEL="INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
-
-# Log to file
-export EZRULES_LOG_FILE="/var/log/ezrules/app.log"
-```
+The project relies on Python's standard logging module. Adjust handlers or levels inside your service wrappers (for example, by calling `logging.basicConfig`) before invoking `uv run ezrules …`.
 
 ---
 
@@ -232,51 +224,17 @@ export EZRULES_LOG_FILE="/var/log/ezrules/app.log"
 
 If using background workers:
 
-```bash
-# Redis broker
-export CELERY_BROKER_URL="redis://localhost:6379/0"
-export CELERY_RESULT_BACKEND="redis://localhost:6379/0"
-
-# Or PostgreSQL broker
-export CELERY_BROKER_URL="postgresql://postgres:password@localhost:5432/ezrules"
-```
+- The Celery app lives in `ezrules/backend/tasks.py`.
+- The broker is currently fixed to `redis://localhost:6379` and the result backend uses the primary database URL.
+- Adjust those settings in code before deploying to production.
 
 ---
 
 ## Advanced Configuration
 
-### Custom Rule Paths
+### Customisation Hooks
 
-Add custom rule directories:
-
-```bash
-export EZRULES_RULE_PATHS="/app/custom_rules:/opt/rules"
-```
-
-### Performance Tuning
-
-```bash
-# Database query timeout (seconds)
-export EZRULES_QUERY_TIMEOUT="30"
-
-# Max events per batch
-export EZRULES_BATCH_SIZE="1000"
-
-# Rule execution timeout (seconds)
-export EZRULES_RULE_TIMEOUT="5"
-```
-
-### Multi-Tenancy
-
-For multi-organization deployments:
-
-```bash
-# Enable tenant isolation
-export EZRULES_MULTI_TENANT="true"
-
-# Default organization
-export EZRULES_DEFAULT_ORG_ID="1"
-```
+Additional runtime behaviours (rule paths, query limits, multi-tenancy) are not controlled via environment variables today. Extend the codebase where needed—for example, by adapting `RuleManagerFactory` or wrapping database sessions with your own configuration.
 
 ---
 

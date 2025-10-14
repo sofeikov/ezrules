@@ -83,6 +83,7 @@ uv sync
 ```
 
 This command will:
+
 - Create a virtual environment
 - Install all Python dependencies
 - Set up the development environment

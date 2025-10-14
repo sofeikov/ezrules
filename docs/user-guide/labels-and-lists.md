@@ -27,7 +27,7 @@ ezrules includes three standard labels:
 #### Single Event via API
 
 ```bash
-curl -X POST http://localhost:9999/mark-event \
+curl -X POST http://localhost:8888/mark-event \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "txn_123",
@@ -52,10 +52,7 @@ txn_004,FRAUD
 
 #### Via Web Interface
 
-1. Find event in outcome view
-2. Click **Label** button
-3. Select label type
-4. Save
+The manager UI supports bulk uploads today. Use the **Upload Labels** workflow above to apply labels from CSV.
 
 ---
 
@@ -129,11 +126,9 @@ Via web interface:
 
 1. Navigate to **Lists**
 2. Click **Create New List**
-3. Enter:
-   - **Name**: `High Risk Users`
-   - **Description**: Purpose of list
-4. Add members (user IDs, one per line)
-5. Save
+3. Enter a list name (for example `HighRiskUsers`)
+4. Save — the list starts empty
+5. Use the “Add entry” form to add individual identifiers one at a time
 
 ### Using Lists in Rules
 
@@ -145,29 +140,11 @@ if $user_id in @high_risk_users:
 
 ### Managing Lists
 
-#### Adding Members
+#### Adding or Removing Members
 
-```python
-# Via API or database
-blocklist.add_member('user_12345')
-```
-
-#### Removing Members
-
-```python
-blocklist.remove_member('user_12345')
-```
-
-#### Bulk Operations
-
-Upload CSV file:
-
-```csv
-user_id
-user_001
-user_002
-user_003
-```
+- Use the **Add** button in the list card to append a single value.
+- Use the inline remove button next to each entry to delete it.
+- For automation, interact with `PersistentUserListManager` from application code.
 
 ---
 
@@ -248,23 +225,36 @@ GET /api/labels_summary
 Response:
 {
   "total_labeled": 1500,
-  "by_label": {
-    "FRAUD": 450,
-    "NORMAL": 900,
-    "CHARGEBACK": 150
+  "pie_chart": {
+    "labels": ["FRAUD", "NORMAL", "CHARGEBACK"],
+    "data": [450, 900, 150],
+    "backgroundColor": ["rgb(255, 99, 132)", "..."]
   }
 }
 ```
 
 **Get Labels Distribution:**
 ```http
-GET /api/labels_distribution?period=24h
+GET /api/labels_distribution?aggregation=24h
 
 Response:
 {
-  "FRAUD": [...],
-  "NORMAL": [...],
-  "CHARGEBACK": [...]
+  "labels": ["2025-01-09 10:00", "2025-01-09 11:00"],
+  "datasets": [
+    {
+      "label": "FRAUD",
+      "data": [12, 8],
+      "borderColor": "rgb(255, 99, 132)",
+      "backgroundColor": "rgba(255, 99, 132, 0.1)"
+    },
+    {
+      "label": "NORMAL",
+      "data": [20, 15],
+      "borderColor": "rgb(54, 162, 235)",
+      "backgroundColor": "rgba(54, 162, 235, 0.1)"
+    }
+  ],
+  "aggregation": "24h"
 }
 ```
 

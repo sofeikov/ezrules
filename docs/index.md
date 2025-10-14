@@ -14,10 +14,10 @@ ezrules is designed for organizations that need to monitor transactions, detect 
 
 - **Flexible Rule Engine** - Write business rules in a Python-like language with expressive syntax for transaction logic
 - **Web Management Interface** - Create and manage rules through an intuitive web UI
-- **Enterprise Security** - Granular role-based access control with 13 permission types
-- **Transaction Labeling** - Comprehensive fraud analytics with API and bulk CSV upload
-- **Analytics Dashboard** - Real-time monitoring with configurable time ranges
-- **Audit Trail** - Complete change tracking for compliance and regulatory requirements
+- **Role-Based Access Control** - Granular permissions with 24 distinct actions that can be assigned per role
+- **Transaction Labeling** - Label events through the manager UI or REST API for analytics
+- **Analytics Dashboard** - Monitor transaction volume and outcome trends with configurable time ranges
+- **Audit Trail** - Track rule revisions and configuration history for compliance requirements
 
 ---
 
@@ -64,7 +64,7 @@ Automated decision-making based on configurable business logic without requiring
 | **Rule Engine** | Python-based rule execution with custom logic support |
 | **Web Interface** | Flask-based UI for rule creation and management |
 | **API Service** | Dedicated evaluator service for real-time rule execution |
-| **Security** | 13 permission types with role-based access control |
+| **Security** | 24 permission actions with role-based access control |
 | **Labeling** | API and bulk CSV upload for transaction labels |
 | **Analytics** | Time-series charts with 1h, 6h, 12h, 24h, 30d ranges |
 | **Database** | PostgreSQL backend with SQLAlchemy ORM |

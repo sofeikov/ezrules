@@ -205,11 +205,10 @@ uv run ezrules generate-random-data --n-rules 5 --n-events 100
 
 ### Debugging
 
-Enable debug logging:
+Enable verbose logging by configuring Python's logging module or by running the Flask development server directly:
 
 ```bash
-export EZRULES_LOG_LEVEL="DEBUG"
-uv run ezrules manager --debug
+uv run flask --app ezrules.backend.ezruleapp:app run --reload --port 8888
 ```
 
 ---

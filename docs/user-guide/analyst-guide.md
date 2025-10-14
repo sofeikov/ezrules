@@ -46,8 +46,9 @@ return False
 ### Velocity Rule
 
 ```python
-# Flag users with too many transactions in short time
-recent_events = count_user_events($user_id, hours=1)
+# Flag users with too many transactions in a short time.
+# Implement `count_events_for_user` in your own helper module.
+recent_events = count_events_for_user($user_id, window_hours=1)
 
 if recent_events > 10:
     return True
@@ -106,21 +107,18 @@ Outcomes represent actions taken when rules fire:
 
 ### Reviewing Flagged Transactions
 
-1. Navigate to **Outcomes** in the sidebar
-2. Click on an outcome to see all triggered events
-3. Review event details:
-   - Transaction amount, user ID, timestamp
-   - Which rules triggered
-   - Original event data (JSON)
+1. Capture evaluator responses (`/evaluate`) or run SQL against `testing_results_log` joined with `testing_record_log` to list the events a rule triggered.
+2. Inspect those stored payloads to understand why the rule matched and whether it should have.
+3. Use the rule detail page to experiment with new logic and, if Celery is configured, submit a backtest for historical comparisons.
 
 ### Using the Analytics Dashboard
 
-Access **Analytics** to view:
+Open **Dashboard** to view:
 
-- **Events Over Time**: Transaction volume charts
-- **Outcome Distribution**: Which outcomes fire most frequently
-- **Rule Performance**: Hit rates for each rule
-- **Time Range Selection**: 1h, 6h, 12h, 24h, 30d views
+- **Active Rules** – Count of deployed rules.
+- **Transaction Volume** – Time-series chart of processed events.
+- **Outcome Trends** – Per-outcome lines showing how often each decision was produced.
+- **Time Range Selection** – 1h, 6h, 12h, 24h, 30d views.
 
 ### Interpreting Charts
 
@@ -153,25 +151,15 @@ Labels help you:
 
 ### Labeling via Web Interface
 
-**Single Transaction:**
-1. Find the event in an outcome view
-2. Click **Label** button
-3. Select label: FRAUD, CHARGEBACK, or NORMAL
-
-**Bulk Upload:**
+Use the bulk upload workflow:
 1. Navigate to **Labels → Upload Labels**
-2. Upload CSV file (no header row, 2 columns: event_id, label_name):
-   ```csv
-   txn_001,FRAUD
-   txn_002,NORMAL
-   txn_003,CHARGEBACK
-   ```
-3. Review upload summary
+2. Upload a CSV file (no header row, two columns: `event_id,label_name`)
+3. Review the summary of applied labels and any validation errors
 
 ### Labeling via API
 
 ```bash
-curl -X POST http://localhost:9999/mark-event \
+curl -X POST http://localhost:8888/mark-event \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "txn_123",
@@ -195,10 +183,9 @@ False positives occur when legitimate transactions are flagged.
 
 **Steps to measure:**
 
-1. Review flagged transactions in an outcome
-2. Label legitimate ones as NORMAL
-3. View **Label Analytics** dashboard
-4. Compare NORMAL labels in flagged events vs. total NORMAL
+1. Capture the evaluator responses or query `testing_results_log` to list events flagged by the rule or outcome you are assessing.
+2. Label legitimate events as NORMAL using `/mark-event` or the bulk upload page.
+3. View the **Label Analytics** dashboard to compare the NORMAL counts against your triggered volume.
 
 **Calculation:**
 ```
@@ -211,9 +198,9 @@ False negatives are fraud cases your rules missed.
 
 **Steps to identify:**
 
-1. Label known fraud cases as FRAUD
-2. Check if those events triggered relevant outcomes
-3. View events NOT in outcomes but labeled FRAUD
+1. Label known fraud cases as FRAUD.
+2. Query `testing_results_log` (joined with `testing_record_log`) to verify whether those events triggered an outcome.
+3. Investigate any FRAUD-labelled events that do not appear in the outcome results and adjust rules accordingly.
 
 **To reduce false negatives:**
 - Lower rule thresholds

@@ -62,7 +62,7 @@ services:
 
   evaluator:
     build: .
-    command: ["uv", "run", "ezrules", "evaluator", "--port", "9999", "--workers", "4"]
+    command: ["uv", "run", "ezrules", "evaluator", "--port", "9999"]
     environment:
       - EZRULES_DB_ENDPOINT=postgresql://ezrules:${DB_PASSWORD}@postgres:5432/ezrules
     ports:
@@ -212,13 +212,13 @@ spec:
             cpu: "1000m"
         livenessProbe:
           httpGet:
-            path: /health
+            path: /ping
             port: 9999
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /health
+            path: /ping
             port: 9999
           initialDelaySeconds: 10
           periodSeconds: 5
@@ -390,7 +390,7 @@ Type=simple
 User=ezrules
 WorkingDirectory=/opt/ezrules
 Environment="EZRULES_DB_ENDPOINT=postgresql://ezrules:password@localhost:5432/ezrules"
-ExecStart=/usr/local/bin/uv run ezrules evaluator --port 9999 --workers 4
+ExecStart=/usr/local/bin/uv run ezrules evaluator --port 9999
 Restart=always
 
 [Install]
@@ -516,14 +516,14 @@ hot_standby = on
 ```yaml
 livenessProbe:
   httpGet:
-    path: /health
+    path: /ping
     port: 9999
   initialDelaySeconds: 30
   periodSeconds: 10
 
 readinessProbe:
   httpGet:
-    path: /health
+    path: /ping
     port: 9999
   initialDelaySeconds: 10
   periodSeconds: 5
@@ -541,25 +541,11 @@ if ! curl -f http://localhost:8888/ping > /dev/null 2>&1; then
 fi
 
 # Check evaluator
-if ! curl -f http://localhost:9999/health > /dev/null 2>&1; then
+if ! curl -f http://localhost:9999/ping > /dev/null 2>&1; then
     echo "Evaluator service down"
     systemctl restart ezrules-evaluator
 fi
 ```
-
-### Prometheus Metrics
-
-Expose metrics endpoint:
-
-```python
-# ezrules/backend/metrics.py
-from prometheus_client import Counter, Histogram
-
-rule_executions = Counter('ezrules_rule_executions_total', 'Total rule executions')
-rule_duration = Histogram('ezrules_rule_duration_seconds', 'Rule execution duration')
-```
-
----
 
 ## Security
 

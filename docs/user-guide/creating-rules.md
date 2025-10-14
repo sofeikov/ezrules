@@ -60,8 +60,8 @@ from datetime import datetime, timedelta
 
 cutoff = datetime.now() - timedelta(hours=1)
 
-# Count events from this user in last hour
-recent_count = count_user_events($user_id, since=cutoff)
+# Implement `count_events_since` in your own helper module.
+recent_count = count_events_since($user_id, since=cutoff)
 
 if recent_count > 10:
     return True
@@ -173,7 +173,8 @@ for pattern in suspicious_patterns:
 ### Statistical Rules
 
 ```python
-# Flag outliers (Z-score > 3)
+# Flag outliers (Z-score > 3).
+# Provide `get_user_avg_amount` and `get_user_std_amount` from your analytics layer.
 user_avg = get_user_avg_amount($user_id)
 user_std = get_user_std_amount($user_id)
 
