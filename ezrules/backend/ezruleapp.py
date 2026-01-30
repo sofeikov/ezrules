@@ -110,6 +110,24 @@ def rules():
     return render_template("rules.html", rules=rules, evaluator_endpoint=app.config["EVALUATOR_ENDPOINT"])
 
 
+@app.route("/api/rules", methods=["GET"])
+@csrf.exempt
+def api_rules():
+    """API endpoint to get all rules as JSON for Angular frontend."""
+    rules = fsrm.load_all_rules()
+    rules_data = [
+        {
+            "r_id": rule.r_id,
+            "rid": rule.rid,
+            "description": rule.description,
+            "logic": rule.logic,
+            "created_at": rule.created_at.isoformat() if rule.created_at else None,  # type: ignore[union-attr]
+        }
+        for rule in rules
+    ]
+    return jsonify({"rules": rules_data, "evaluator_endpoint": app.config["EVALUATOR_ENDPOINT"]})
+
+
 @app.route("/create_rule", methods=["GET", "POST"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
 @conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.CREATE_RULE))

@@ -22,7 +22,8 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 ezrules consists of several core components:
 
 - **Rule Engine**: Evaluates events against defined rules and aggregates outcomes
-- **Manager Service**: Web interface for rule management (default port 8888)
+- **Manager Service**: Flask backend providing REST API for rule management (default port 8888)
+- **Angular Frontend**: Modern standalone UI for rule management (optional, under development)
 - **Evaluator Service**: API service for real-time rule evaluation (default port 9999)
 - **Database Layer**: PostgreSQL storage for rules, events, and execution logs
 
@@ -80,6 +81,39 @@ uv run ezrules evaluator --port 9999
 # Run the Celery workers
 uv run celery -A ezrules.backend.tasks worker -l INFO
 ```
+
+### Angular Frontend 
+
+ezrules now includes a modern Angular frontend as a standalone application that communicates with the Flask backend via REST API.
+
+#### Build the Angular App
+
+```bash
+cd ezrules/frontend
+npm install --cache /tmp/npm-cache-ezrules
+npm run build
+```
+
+#### Run the Angular Development Server
+
+```bash
+cd ezrules/frontend
+npm start
+```
+
+The Angular app will be available at `http://localhost:4200` and will connect to the Flask backend API at `http://localhost:8888` by default.
+
+#### Production Deployment
+
+For production, build the Angular app and serve the `dist` directory using a web server (nginx, Apache, etc.):
+
+```bash
+cd ezrules/frontend
+npm run build
+# The built files will be in ezrules/frontend/dist/browser/
+```
+
+Configure the API URL by editing `ezrules/frontend/src/environments/environment.ts` before building.
 
 ### Generate Test Data
 

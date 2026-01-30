@@ -581,3 +581,48 @@ class TestLabelAnalytics:
             assert rv.status_code == 200
             data = rv.get_json()
             assert data["aggregation"] == agg
+
+
+class TestAPIEndpoints:
+    """Test API endpoints for Angular frontend integration."""
+
+    def test_api_rules_endpoint_returns_json(self, logged_in_manager_client):
+        """Test that /api/rules endpoint returns JSON with rules data."""
+        rv = logged_in_manager_client.get("/api/rules")
+        assert rv.status_code == 200
+        assert rv.content_type == "application/json"
+
+        data = rv.get_json()
+        assert "rules" in data
+        assert "evaluator_endpoint" in data
+        assert isinstance(data["rules"], list)
+
+    def test_api_rules_contains_required_fields(self, session, logged_in_manager_client):
+        """Test that /api/rules returns rules with all required fields."""
+        from ezrules.models.backend_core import Rule as RuleModel, Organisation
+
+        org = session.query(Organisation).first()
+
+        # Create a test rule
+        test_rule = RuleModel(
+            rid="test_api_rule",
+            logic="def rule(t): return 'PASS'",
+            description="Test rule for API endpoint",
+            o_id=org.o_id,
+        )
+        session.add(test_rule)
+        session.commit()
+
+        rv = logged_in_manager_client.get("/api/rules")
+        assert rv.status_code == 200
+
+        data = rv.get_json()
+        assert len(data["rules"]) > 0
+
+        # Check that each rule has required fields
+        for rule in data["rules"]:
+            assert "r_id" in rule
+            assert "rid" in rule
+            assert "description" in rule
+            assert "logic" in rule
+            assert "created_at" in rule
