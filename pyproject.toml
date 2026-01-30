@@ -33,6 +33,7 @@ dependencies = [
     "celery>=5.4.0",
     "pandas>=2.2.2",
     "redis>=6.4.0",
+    "flask-cors>=6.0.2",
 ]
 
 [tool.uv]

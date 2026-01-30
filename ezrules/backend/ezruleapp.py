@@ -23,6 +23,7 @@ from flask import (
     url_for,
 )
 from flask_bootstrap import Bootstrap5
+from flask_cors import CORS
 from flask_security import Security, SQLAlchemySessionUserDatastore, auth_required, current_user
 from flask_security.utils import hash_password
 from flask_wtf import CSRFProtect
@@ -77,6 +78,7 @@ set_user_list_manager(user_list_manager)
 rule_checker = RuleCheckingPipeline(checkers=[OnlyAllowedOutcomesAreReturnedChecker(outcome_manager=outcome_manager)])
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for Angular frontend
 app.logger.setLevel(logging.INFO)
 app.secret_key = app_settings.APP_SECRET
 app.config["SECURITY_PASSWORD_SALT"] = os.environ.get(
