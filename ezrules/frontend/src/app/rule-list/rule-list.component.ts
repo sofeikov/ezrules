@@ -1,11 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Rule, RuleService } from '../services/rule.service';
+import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
   selector: 'app-rule-list',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, SidebarComponent],
   templateUrl: './rule-list.component.html'
 })
 export class RuleListComponent implements OnInit {
@@ -13,6 +14,7 @@ export class RuleListComponent implements OnInit {
   evaluatorEndpoint: string = '';
   loading: boolean = true;
   error: string | null = null;
+  showHowToRun: boolean = false;
 
   constructor(private ruleService: RuleService) { }
 
@@ -36,6 +38,10 @@ export class RuleListComponent implements OnInit {
         console.error('Error loading rules:', error);
       }
     });
+  }
+
+  toggleHowToRun(): void {
+    this.showHowToRun = !this.showHowToRun;
   }
 
   formatDate(dateString: string | null): string {
