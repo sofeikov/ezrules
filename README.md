@@ -279,9 +279,17 @@ uv run pytest
 
 ### Testing
 
+#### Backend Tests
+
 ```bash
 # Run tests with coverage
-uv run pytest --cov=ezrules
+uv run pytest --cov=ezrules.backend --cov=ezrules.core --cov-report=term-missing --cov-report=xml tests
+
+# Run CLI tests
+./test_cli.sh
+
+# Code quality checks (ruff format, type checking, linting)
+uv run poe check
 
 # Generate test data
 uv run ezrules generate-random-data
@@ -289,6 +297,34 @@ uv run ezrules generate-random-data
 # Clean up test data
 uv run ezrules delete-test-data
 ```
+
+#### Frontend E2E Tests
+
+The Angular frontend includes comprehensive end-to-end tests using Playwright.
+
+**Prerequisites:**
+- Backend services running (Manager on port 8888, Evaluator on port 9999)
+- Angular dev server running (port 4200)
+- Playwright browsers installed (first time only): `npx playwright install chromium`
+
+**Running tests:**
+```bash
+cd ezrules/frontend
+
+# Run all E2E tests
+npm run test:e2e
+
+# Run with UI mode (interactive debugging)
+npm run test:e2e:ui
+
+# Run with visible browser
+npm run test:e2e:headed
+
+# View test report
+npm run test:e2e:report
+```
+
+See [ezrules/frontend/e2e/README.md](ezrules/frontend/e2e/README.md) for detailed E2E testing documentation.
 
 ## 📄 License
 
