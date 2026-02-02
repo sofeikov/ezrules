@@ -401,8 +401,9 @@ class TestLabelAnalytics:
 
     def test_labels_summary_endpoint(self, session, logged_in_manager_client):
         """Test labels summary API endpoint."""
-        from ezrules.models.backend_core import Label, TestingRecordLog, Organisation
         import uuid
+
+        from ezrules.models.backend_core import Label, Organisation, TestingRecordLog
 
         org = session.query(Organisation).first()
 
@@ -449,9 +450,10 @@ class TestLabelAnalytics:
 
     def test_labeled_transaction_volume_endpoint(self, session, logged_in_manager_client):
         """Test labeled transaction volume API endpoint."""
-        from ezrules.models.backend_core import Label, TestingRecordLog, Organisation
         import datetime
         import uuid
+
+        from ezrules.models.backend_core import Label, Organisation, TestingRecordLog
 
         org = session.query(Organisation).first()
 
@@ -484,9 +486,10 @@ class TestLabelAnalytics:
 
     def test_labels_distribution_endpoint(self, session, logged_in_manager_client):
         """Test labels distribution over time API endpoint."""
-        from ezrules.models.backend_core import Label, TestingRecordLog, Organisation
         import datetime
         import uuid
+
+        from ezrules.models.backend_core import Label, Organisation, TestingRecordLog
 
         org = session.query(Organisation).first()
 
@@ -551,9 +554,10 @@ class TestLabelAnalytics:
 
     def test_labels_distribution_all_aggregations(self, session, logged_in_manager_client):
         """Test labels distribution endpoint with all valid aggregations."""
-        from ezrules.models.backend_core import Label, TestingRecordLog, Organisation
         import datetime
         import uuid
+
+        from ezrules.models.backend_core import Label, Organisation, TestingRecordLog
 
         org = session.query(Organisation).first()
 
@@ -599,7 +603,8 @@ class TestAPIEndpoints:
 
     def test_api_rules_contains_required_fields(self, session, logged_in_manager_client):
         """Test that /api/rules returns rules with all required fields."""
-        from ezrules.models.backend_core import Rule as RuleModel, Organisation
+        from ezrules.models.backend_core import Organisation
+        from ezrules.models.backend_core import Rule as RuleModel
 
         org = session.query(Organisation).first()
 
@@ -626,3 +631,70 @@ class TestAPIEndpoints:
             assert "description" in rule
             assert "logic" in rule
             assert "created_at" in rule
+
+    def test_api_rule_detail_endpoint(self, session, logged_in_manager_client):
+        """Test that /api/rules/<id> endpoint returns rule details."""
+        from ezrules.models.backend_core import Organisation
+        from ezrules.models.backend_core import Rule as RuleModel
+
+        org = session.query(Organisation).first()
+
+        # Create a test rule
+        test_rule = RuleModel(
+            rid="test_detail_rule",
+            logic="def rule(t): return 'PASS'",
+            description="Test rule for detail endpoint",
+            o_id=org.o_id,
+        )
+        session.add(test_rule)
+        session.commit()
+
+        rv = logged_in_manager_client.get(f"/api/rules/{test_rule.r_id}")
+        assert rv.status_code == 200
+        assert rv.content_type == "application/json"
+
+        data = rv.get_json()
+        assert data["r_id"] == test_rule.r_id
+        assert data["rid"] == "test_detail_rule"
+        assert data["description"] == "Test rule for detail endpoint"
+        assert data["logic"] == "def rule(t): return 'PASS'"
+        assert "created_at" in data
+        assert "revisions" in data
+
+    def test_api_rule_detail_not_found(self, logged_in_manager_client):
+        """Test that /api/rules/<id> returns 404 for non-existent rule."""
+        rv = logged_in_manager_client.get("/api/rules/999999")
+        assert rv.status_code == 404
+
+        data = rv.get_json()
+        assert "error" in data
+        assert data["error"] == "Rule not found"
+
+    def test_api_rule_detail_includes_revisions(self, session, logged_in_manager_client):
+        """Test that /api/rules/<id> includes revision history."""
+        from ezrules.models.backend_core import Organisation
+        from ezrules.models.backend_core import Rule as RuleModel
+
+        org = session.query(Organisation).first()
+
+        # Create a test rule
+        test_rule = RuleModel(
+            rid="test_revision_rule",
+            logic="def rule(t): return 'PASS'",
+            description="Original description",
+            o_id=org.o_id,
+        )
+        session.add(test_rule)
+        session.commit()
+
+        # Update the rule to create a revision
+        test_rule.description = "Updated description"
+        session.add(test_rule)
+        session.commit()
+
+        rv = logged_in_manager_client.get(f"/api/rules/{test_rule.r_id}")
+        assert rv.status_code == 200
+
+        data = rv.get_json()
+        assert "revisions" in data
+        assert isinstance(data["revisions"], list)

@@ -130,6 +130,34 @@ def api_rules():
     return jsonify({"rules": rules_data, "evaluator_endpoint": app.config["EVALUATOR_ENDPOINT"]})
 
 
+@app.route("/api/rules/<int:rule_id>", methods=["GET"])
+@csrf.exempt
+def api_rule_detail(rule_id: int):
+    """API endpoint to get a single rule's details as JSON for Angular frontend."""
+    rule = fsrm.load_rule(rule_id)  # type: ignore[arg-type]
+    if rule is None:
+        return jsonify({"error": "Rule not found"}), 404
+
+    revision_list = fsrm.get_rule_revision_list(rule)
+    revisions_data = [
+        {
+            "revision_number": rev.revision_number,
+            "created_at": rev.created.isoformat() if rev.created else None,
+        }
+        for rev in revision_list
+    ]
+
+    rule_data = {
+        "r_id": rule.r_id,
+        "rid": rule.rid,
+        "description": rule.description,
+        "logic": rule.logic,
+        "created_at": rule.created_at.isoformat() if rule.created_at else None,  # type: ignore[union-attr]
+        "revisions": revisions_data,
+    }
+    return jsonify(rule_data)
+
+
 @app.route("/create_rule", methods=["GET", "POST"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
 @conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.CREATE_RULE))

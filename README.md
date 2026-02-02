@@ -82,9 +82,20 @@ uv run ezrules evaluator --port 9999
 uv run celery -A ezrules.backend.tasks worker -l INFO
 ```
 
-### Angular Frontend 
+### Angular Frontend
 
 ezrules now includes a modern Angular frontend as a standalone application that communicates with the Flask backend via REST API.
+
+#### Features
+
+The Angular frontend provides:
+- **Rule List View**: Browse all rules with a modern, responsive interface
+- **Rule Detail View**: View comprehensive rule details including:
+  - Rule ID, description, and logic
+  - Created date and version history
+  - Test functionality with dynamic JSON input
+  - Real-time rule testing with sample data
+- **Seamless Navigation**: Navigate between rule list and detail pages with Angular routing
 
 #### Build the Angular App
 

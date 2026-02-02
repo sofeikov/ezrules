@@ -1,12 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
 import { Rule, RuleService } from '../services/rule.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
   selector: 'app-rule-list',
   standalone: true,
-  imports: [CommonModule, SidebarComponent],
+  imports: [CommonModule, RouterModule, SidebarComponent],
   templateUrl: './rule-list.component.html'
 })
 export class RuleListComponent implements OnInit {
