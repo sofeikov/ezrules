@@ -698,3 +698,179 @@ class TestAPIEndpoints:
         data = rv.get_json()
         assert "revisions" in data
         assert isinstance(data["revisions"], list)
+
+    def test_api_update_rule_success(self, session, logged_in_manager_client):
+        """Test that PUT /api/rules/<id> updates a rule successfully."""
+        from ezrules.models.backend_core import Organisation
+        from ezrules.models.backend_core import Rule as RuleModel
+
+        org = session.query(Organisation).first()
+
+        # Create a test rule
+        test_rule = RuleModel(
+            rid="test_update_rule",
+            logic="if $amount > 100:\n\treturn 'HOLD'",
+            description="Original description",
+            o_id=org.o_id,
+        )
+        session.add(test_rule)
+        session.commit()
+
+        # Update the rule via API
+        rv = logged_in_manager_client.put(
+            f"/api/rules/{test_rule.r_id}",
+            json={
+                "description": "Updated description via API",
+                "logic": "if $amount > 200:\n\treturn 'REVIEW'",
+            },
+        )
+        assert rv.status_code == 200
+
+        data = rv.get_json()
+        assert data["success"] is True
+        assert data["message"] == "Rule updated successfully"
+        assert "rule" in data
+        assert data["rule"]["description"] == "Updated description via API"
+        assert data["rule"]["logic"] == "if $amount > 200:\n\treturn 'REVIEW'"
+
+    def test_api_update_rule_creates_revision(self, session, logged_in_manager_client):
+        """Test that updating a rule via API creates a new revision."""
+        from ezrules.models.backend_core import Organisation
+        from ezrules.models.backend_core import Rule as RuleModel
+
+        org = session.query(Organisation).first()
+
+        # Create a test rule
+        test_rule = RuleModel(
+            rid="test_revision_api_rule",
+            logic="if $amount > 100:\n\treturn 'HOLD'",
+            description="Original description",
+            o_id=org.o_id,
+        )
+        session.add(test_rule)
+        session.commit()
+
+        # Get initial revision count
+        rv = logged_in_manager_client.get(f"/api/rules/{test_rule.r_id}")
+        initial_data = rv.get_json()
+        initial_revision_count = len(initial_data.get("revisions", []))
+
+        # Update the rule via API
+        rv = logged_in_manager_client.put(
+            f"/api/rules/{test_rule.r_id}",
+            json={
+                "description": "Updated for revision test",
+                "logic": "if $amount > 300:\n\treturn 'BLOCK'",
+            },
+        )
+        assert rv.status_code == 200
+
+        data = rv.get_json()
+        assert data["success"] is True
+        # New revision count should be greater
+        new_revision_count = len(data["rule"].get("revisions", []))
+        assert new_revision_count > initial_revision_count
+
+    def test_api_update_rule_not_found(self, logged_in_manager_client):
+        """Test that PUT /api/rules/<id> returns 404 for non-existent rule."""
+        rv = logged_in_manager_client.put(
+            "/api/rules/999999",
+            json={"description": "Test", "logic": "if True:\n\treturn 'OK'"},
+        )
+        assert rv.status_code == 404
+
+        data = rv.get_json()
+        assert data["success"] is False
+        assert "Rule not found" in data["error"]
+
+    def test_api_update_rule_invalid_logic(self, session, logged_in_manager_client):
+        """Test that PUT /api/rules/<id> returns error for invalid logic."""
+        from ezrules.models.backend_core import Organisation
+        from ezrules.models.backend_core import Rule as RuleModel
+
+        org = session.query(Organisation).first()
+
+        # Create a test rule
+        test_rule = RuleModel(
+            rid="test_invalid_logic_rule",
+            logic="if $amount > 100:\n\treturn 'HOLD'",
+            description="Valid rule",
+            o_id=org.o_id,
+        )
+        session.add(test_rule)
+        session.commit()
+
+        # Try to update with invalid logic
+        rv = logged_in_manager_client.put(
+            f"/api/rules/{test_rule.r_id}",
+            json={
+                "description": "Updated description",
+                "logic": "this is not valid python syntax !!!",
+            },
+        )
+        assert rv.status_code == 400
+
+        data = rv.get_json()
+        assert data["success"] is False
+        assert "Invalid rule logic" in data["error"]
+
+    def test_api_update_rule_empty_json(self, session, logged_in_manager_client):
+        """Test that PUT /api/rules/<id> handles empty JSON body."""
+        from ezrules.models.backend_core import Organisation
+        from ezrules.models.backend_core import Rule as RuleModel
+
+        org = session.query(Organisation).first()
+
+        # Create a test rule
+        original_logic = "if $amount > 100:\n\treturn 'HOLD'"
+        test_rule = RuleModel(
+            rid="test_empty_json_rule",
+            logic=original_logic,
+            description="Valid rule",
+            o_id=org.o_id,
+        )
+        session.add(test_rule)
+        session.commit()
+
+        # Update with empty JSON object - should succeed as it keeps original values
+        rv = logged_in_manager_client.put(
+            f"/api/rules/{test_rule.r_id}",
+            json={},
+        )
+        assert rv.status_code == 200
+
+        data = rv.get_json()
+        assert data["success"] is True
+        # Logic should remain unchanged
+        assert data["rule"]["logic"] == original_logic
+
+    def test_api_update_rule_partial_update(self, session, logged_in_manager_client):
+        """Test that PUT /api/rules/<id> allows partial updates."""
+        from ezrules.models.backend_core import Organisation
+        from ezrules.models.backend_core import Rule as RuleModel
+
+        org = session.query(Organisation).first()
+
+        # Create a test rule
+        original_logic = "if $amount > 100:\n\treturn 'HOLD'"
+        test_rule = RuleModel(
+            rid="test_partial_update_rule",
+            logic=original_logic,
+            description="Original description",
+            o_id=org.o_id,
+        )
+        session.add(test_rule)
+        session.commit()
+
+        # Update only description
+        rv = logged_in_manager_client.put(
+            f"/api/rules/{test_rule.r_id}",
+            json={"description": "Only description updated"},
+        )
+        assert rv.status_code == 200
+
+        data = rv.get_json()
+        assert data["success"] is True
+        assert data["rule"]["description"] == "Only description updated"
+        # Logic should remain unchanged
+        assert data["rule"]["logic"] == original_logic

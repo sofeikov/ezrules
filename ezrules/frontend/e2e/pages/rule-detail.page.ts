@@ -21,6 +21,15 @@ export class RuleDetailPage {
   readonly backButton: Locator;
   readonly revisionsSection: Locator;
 
+  // Edit mode locators
+  readonly editButton: Locator;
+  readonly saveButton: Locator;
+  readonly cancelButton: Locator;
+  readonly descriptionTextarea: Locator;
+  readonly editableLogicTextarea: Locator;
+  readonly saveSuccessMessage: Locator;
+  readonly saveErrorMessage: Locator;
+
   constructor(page: Page) {
     this.page = page;
     this.breadcrumb = page.locator('nav.mb-6');
@@ -37,6 +46,15 @@ export class RuleDetailPage {
     this.testResultError = page.locator('.bg-red-50').or(page.locator('text=/Failed to load rule/i'));
     this.backButton = page.locator('button:has-text("Back to Rules")');
     this.revisionsSection = page.locator('text=Other Rule Versions');
+
+    // Edit mode locators
+    this.editButton = page.locator('button:has-text("Edit Rule")');
+    this.saveButton = page.locator('button:has-text("Save Changes")');
+    this.cancelButton = page.locator('button:has-text("Cancel")');
+    this.descriptionTextarea = page.locator('label:has-text("Description") + textarea');
+    this.editableLogicTextarea = page.locator('label:has-text("Logic") + textarea:not([readonly])');
+    this.saveSuccessMessage = page.locator('text=Rule saved successfully');
+    this.saveErrorMessage = page.locator('.bg-red-50:has-text("Failed")').or(page.locator('.bg-red-50:has-text("Invalid")'));
   }
 
   /**
@@ -118,5 +136,72 @@ export class RuleDetailPage {
     // If Tab was captured, value should have changed (tab character added)
     // If Tab wasn't captured, focus would move and value stays the same
     return valueAfter !== valueBefore || valueAfter.includes('\t');
+  }
+
+  /**
+   * Click the edit button to enter edit mode
+   */
+  async clickEdit() {
+    await this.editButton.click();
+  }
+
+  /**
+   * Click the save button to save changes
+   */
+  async clickSave() {
+    await this.saveButton.click();
+  }
+
+  /**
+   * Click the cancel button to discard changes
+   */
+  async clickCancel() {
+    await this.cancelButton.click();
+  }
+
+  /**
+   * Set description in edit mode
+   */
+  async setDescription(text: string) {
+    await this.descriptionTextarea.click();
+    await this.descriptionTextarea.clear();
+    await this.descriptionTextarea.fill(text);
+  }
+
+  /**
+   * Set logic in edit mode
+   */
+  async setLogic(text: string) {
+    await this.editableLogicTextarea.click();
+    await this.editableLogicTextarea.clear();
+    await this.editableLogicTextarea.fill(text);
+  }
+
+  /**
+   * Wait for save success message
+   */
+  async waitForSaveSuccess() {
+    await this.saveSuccessMessage.waitFor({ state: 'visible', timeout: 10000 });
+  }
+
+  /**
+   * Check if in edit mode
+   */
+  async isInEditMode(): Promise<boolean> {
+    return await this.saveButton.isVisible();
+  }
+
+  /**
+   * Get the current description value in edit mode
+   */
+  async getEditedDescription(): Promise<string> {
+    return await this.descriptionTextarea.inputValue();
+  }
+
+  /**
+   * Get the current logic value in edit mode
+   */
+  async getEditedLogic(): Promise<string> {
+    return await this.editableLogicTextarea.inputValue();
   }
 }

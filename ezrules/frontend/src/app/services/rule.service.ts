@@ -35,6 +35,18 @@ export interface TestRuleResponse {
   reason: string;
 }
 
+export interface UpdateRuleRequest {
+  description: string;
+  logic: string;
+}
+
+export interface UpdateRuleResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  rule?: RuleDetail;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -63,5 +75,9 @@ export class RuleService {
       rule_source: ruleSource,
       test_json: testJson
     });
+  }
+
+  updateRule(ruleId: number, data: UpdateRuleRequest): Observable<UpdateRuleResponse> {
+    return this.http.put<UpdateRuleResponse>(`${this.apiUrl}/${ruleId}`, data);
   }
 }

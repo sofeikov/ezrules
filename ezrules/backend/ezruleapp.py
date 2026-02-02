@@ -158,6 +158,59 @@ def api_rule_detail(rule_id: int):
     return jsonify(rule_data)
 
 
+@app.route("/api/rules/<int:rule_id>", methods=["PUT"])
+@csrf.exempt
+def api_update_rule(rule_id: int):
+    """API endpoint to update a rule for Angular frontend."""
+    rule = fsrm.load_rule(rule_id)  # type: ignore[arg-type]
+    if rule is None:
+        return jsonify({"success": False, "error": "Rule not found"}), 404
+
+    data = request.get_json()
+    if data is None:
+        return jsonify({"success": False, "error": "No data provided"}), 400
+
+    description = data.get("description", rule.description)
+    logic = data.get("logic", rule.logic)
+
+    # Validate the rule logic by trying to compile it
+    try:
+        rule_config = {"rid": rule.rid, "logic": logic, "description": description}
+        RuleFactory.from_json(rule_config)
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Invalid rule logic: {str(e)}"}), 400
+
+    # Update the rule
+    rule.description = description
+    rule.logic = logic
+    fsrm.save_rule(rule)
+
+    # Update rule engine config
+    app.logger.info("Saving new version of the rules via API")
+    rule_engine_config_producer.save_config(fsrm)
+
+    # Get updated revision list
+    revision_list = fsrm.get_rule_revision_list(rule)
+    revisions_data = [
+        {
+            "revision_number": rev.revision_number,
+            "created_at": rev.created.isoformat() if rev.created else None,
+        }
+        for rev in revision_list
+    ]
+
+    rule_data = {
+        "r_id": rule.r_id,
+        "rid": rule.rid,
+        "description": rule.description,
+        "logic": rule.logic,
+        "created_at": rule.created_at.isoformat() if rule.created_at else None,  # type: ignore[union-attr]
+        "revisions": revisions_data,
+    }
+
+    return jsonify({"success": True, "message": "Rule updated successfully", "rule": rule_data})
+
+
 @app.route("/create_rule", methods=["GET", "POST"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
 @conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.CREATE_RULE))

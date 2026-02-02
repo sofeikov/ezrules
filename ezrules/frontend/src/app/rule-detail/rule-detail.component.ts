@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { RuleDetail, RuleService } from '../services/rule.service';
+import { RuleDetail, RuleService, UpdateRuleRequest } from '../services/rule.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -19,6 +19,14 @@ export class RuleDetailComponent implements OnInit {
   testResult: any = null;
   testError: string | null = null;
   testing: boolean = false;
+
+  // Edit mode properties
+  isEditMode: boolean = false;
+  editedDescription: string = '';
+  editedLogic: string = '';
+  saving: boolean = false;
+  saveError: string | null = null;
+  saveSuccess: boolean = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -114,5 +122,59 @@ export class RuleDetailComponent implements OnInit {
 
   goBack(): void {
     this.router.navigate(['/rules']);
+  }
+
+  toggleEditMode(): void {
+    if (!this.isEditMode && this.rule) {
+      // Entering edit mode - copy current values
+      this.editedDescription = this.rule.description;
+      this.editedLogic = this.rule.logic;
+      this.saveError = null;
+      this.saveSuccess = false;
+    }
+    this.isEditMode = !this.isEditMode;
+  }
+
+  cancelEdit(): void {
+    this.isEditMode = false;
+    this.saveError = null;
+    this.saveSuccess = false;
+    if (this.rule) {
+      this.editedDescription = this.rule.description;
+      this.editedLogic = this.rule.logic;
+    }
+  }
+
+  saveRule(): void {
+    if (!this.rule) return;
+
+    this.saving = true;
+    this.saveError = null;
+    this.saveSuccess = false;
+
+    const updateData: UpdateRuleRequest = {
+      description: this.editedDescription,
+      logic: this.editedLogic
+    };
+
+    this.ruleService.updateRule(this.rule.r_id, updateData).subscribe({
+      next: (response) => {
+        this.saving = false;
+        if (response.success && response.rule) {
+          this.rule = response.rule;
+          this.saveSuccess = true;
+          this.isEditMode = false;
+          // Update test JSON with new parameters
+          this.fillInExampleParams();
+        } else {
+          this.saveError = response.error || 'Failed to save rule';
+        }
+      },
+      error: (error) => {
+        this.saving = false;
+        this.saveError = error.error?.error || 'Failed to save rule. Please try again.';
+        console.error('Error saving rule:', error);
+      }
+    });
   }
 }

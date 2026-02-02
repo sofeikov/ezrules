@@ -7,7 +7,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "tdest": "ng test",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --workers 1",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:heaed": "playwright test --headed",
