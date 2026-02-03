@@ -946,3 +946,140 @@ class TestAPIEndpoints:
 
         data = rv.get_json()
         assert "error" in data
+
+    def test_api_rule_history_success(self, session, logged_in_manager_client):
+        """Test that GET /api/rules/<id>/history returns ordered history with diffs."""
+        from ezrules.models.backend_core import Organisation
+        from ezrules.models.backend_core import Rule as RuleModel
+
+        org = session.query(Organisation).first()
+
+        test_rule = RuleModel(
+            rid="test_history_success",
+            logic="if $amount > 100:\n\treturn 'HOLD'",
+            description="History test original",
+            o_id=org.o_id,
+        )
+        session.add(test_rule)
+        session.commit()
+
+        # Update once to create revision 1 in history
+        rv = logged_in_manager_client.put(
+            f"/api/rules/{test_rule.r_id}",
+            json={
+                "description": "History test updated",
+                "logic": "if $amount > 200:\n\treturn 'REVIEW'",
+            },
+        )
+        assert rv.status_code == 200
+
+        # Update again to create revision 2 in history
+        rv = logged_in_manager_client.put(
+            f"/api/rules/{test_rule.r_id}",
+            json={
+                "description": "History test final",
+                "logic": "if $amount > 500:\n\treturn 'BLOCK'",
+            },
+        )
+        assert rv.status_code == 200
+
+        # Fetch history
+        rv = logged_in_manager_client.get(f"/api/rules/{test_rule.r_id}/history")
+        assert rv.status_code == 200
+
+        data = rv.get_json()
+        assert data["r_id"] == test_rule.r_id
+        assert data["rid"] == "test_history_success"
+        assert "history" in data
+
+        history = data["history"]
+        # Should have at least 3 entries: rev 1, rev 2, and current
+        assert len(history) >= 3
+
+        # Last entry should be the current version
+        assert history[-1]["is_current"] is True
+        assert history[-1]["logic"] == "if $amount > 500:\n\treturn 'BLOCK'"
+        assert history[-1]["description"] == "History test final"
+
+        # First entry should be the oldest revision
+        assert history[0]["logic"] == "if $amount > 100:\n\treturn 'HOLD'"
+        assert history[0]["description"] == "History test original"
+
+        # All entries should have revision_number, logic, description, created_at
+        for entry in history:
+            assert "revision_number" in entry
+            assert "logic" in entry
+            assert "description" in entry
+            assert "created_at" in entry
+
+    def test_api_rule_history_not_found(self, logged_in_manager_client):
+        """Test that GET /api/rules/<bad_id>/history returns 404."""
+        rv = logged_in_manager_client.get("/api/rules/999999/history")
+        assert rv.status_code == 404
+
+        data = rv.get_json()
+        assert "error" in data
+
+    def test_api_rule_history_limit(self, session, logged_in_manager_client):
+        """Test that the ?limit= parameter caps the number of history entries returned."""
+        from ezrules.models.backend_core import Organisation
+        from ezrules.models.backend_core import Rule as RuleModel
+
+        org = session.query(Organisation).first()
+
+        test_rule = RuleModel(
+            rid="test_history_limit",
+            logic="if $amount > 100:\n\treturn 'HOLD'",
+            description="Limit test",
+            o_id=org.o_id,
+        )
+        session.add(test_rule)
+        session.commit()
+
+        # Create 3 revisions
+        for i in range(3):
+            rv = logged_in_manager_client.put(
+                f"/api/rules/{test_rule.r_id}",
+                json={
+                    "description": f"Limit test v{i + 1}",
+                    "logic": f"if $amount > {(i + 2) * 100}:\n\treturn 'HOLD'",
+                },
+            )
+            assert rv.status_code == 200
+
+        # Fetch with limit=2 — should return at most 2 revisions + current = 3 entries
+        rv = logged_in_manager_client.get(f"/api/rules/{test_rule.r_id}/history?limit=2")
+        assert rv.status_code == 200
+
+        data = rv.get_json()
+        history = data["history"]
+        # At most limit revisions + 1 current entry
+        assert len(history) <= 3
+        # Last entry is always current
+        assert history[-1]["is_current"] is True
+
+    def test_api_rule_history_single_version(self, session, logged_in_manager_client):
+        """Test history for a rule that has never been updated (no revisions)."""
+        from ezrules.models.backend_core import Organisation
+        from ezrules.models.backend_core import Rule as RuleModel
+
+        org = session.query(Organisation).first()
+
+        test_rule = RuleModel(
+            rid="test_history_single",
+            logic="if $amount > 100:\n\treturn 'HOLD'",
+            description="Single version rule",
+            o_id=org.o_id,
+        )
+        session.add(test_rule)
+        session.commit()
+
+        rv = logged_in_manager_client.get(f"/api/rules/{test_rule.r_id}/history")
+        assert rv.status_code == 200
+
+        data = rv.get_json()
+        history = data["history"]
+        # Only the current version, no historical revisions
+        assert len(history) == 1
+        assert history[0]["is_current"] is True
+        assert history[0]["logic"] == "if $amount > 100:\n\treturn 'HOLD'"

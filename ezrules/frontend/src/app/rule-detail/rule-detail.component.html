@@ -170,7 +170,10 @@
 
           <!-- Revisions Card -->
           <div *ngIf="!isRevisionView && rule.revisions && rule.revisions.length > 0" class="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4">Other Rule Versions</h2>
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-xl font-semibold text-gray-900">Other Rule Versions</h2>
+              <a [routerLink]="['/rules', rule.r_id, 'history']" class="text-sm text-blue-600 hover:text-blue-800 font-medium">Visualize history</a>
+            </div>
             <div class="space-y-2">
               <div *ngFor="let revision of rule.revisions" class="border-b border-gray-200 last:border-0 py-2">
                 <a [routerLink]="['/rules', rule.r_id, 'revisions', revision.revision_number]" class="text-blue-600 hover:text-blue-800 text-sm">

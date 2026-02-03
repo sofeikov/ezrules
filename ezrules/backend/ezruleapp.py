@@ -179,6 +179,63 @@ def api_rule_revision(rule_id: int, revision_number: int):
     return jsonify(rule_data)
 
 
+HISTORY_LIMIT_DEFAULT = 10
+
+
+@app.route("/api/rules/<int:rule_id>/history", methods=["GET"])
+@csrf.exempt
+def api_rule_history(rule_id: int):
+    """API endpoint to get the ordered logic history for a rule (for diff timeline).
+
+    Returns up to HISTORY_LIMIT_DEFAULT most recent revisions plus the current version.
+    The limit can be overridden via the ?limit= query parameter.
+    """
+    limit = request.args.get("limit", HISTORY_LIMIT_DEFAULT, type=int)
+
+    latest_version = fsrm.load_rule(rule_id)  # type: ignore[arg-type]
+    if latest_version is None:
+        return jsonify({"error": "Rule not found"}), 404
+
+    revision_list = fsrm.get_rule_revision_list(latest_version)
+
+    # Take only the most recent `limit` revisions (revision_list is oldest-first)
+    trimmed_revisions = revision_list[-limit:] if len(revision_list) > limit else revision_list
+
+    history: list[dict] = []
+    for rev in trimmed_revisions:
+        try:
+            rule = fsrm.load_rule(rule_id, revision_number=rev.revision_number)  # type: ignore[arg-type]
+        except sqlalchemy.exc.NoResultFound:
+            continue
+        history.append(
+            {
+                "revision_number": rev.revision_number,
+                "logic": rule.logic,
+                "description": rule.description,
+                "created_at": rev.created.isoformat() if rev.created else None,
+            }
+        )
+
+    # Append the current (latest) version
+    history.append(
+        {
+            "revision_number": latest_version.version,  # type: ignore[attr-defined]
+            "logic": latest_version.logic,
+            "description": latest_version.description,
+            "created_at": latest_version.created_at.isoformat() if latest_version.created_at else None,  # type: ignore[union-attr]
+            "is_current": True,
+        }
+    )
+
+    return jsonify(
+        {
+            "r_id": rule_id,
+            "rid": latest_version.rid,
+            "history": history,
+        }
+    )
+
+
 @app.route("/api/rules/<int:rule_id>", methods=["PUT"])
 @csrf.exempt
 def api_update_rule(rule_id: int):

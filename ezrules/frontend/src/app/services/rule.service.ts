@@ -39,6 +39,20 @@ export interface RuleRevisionDetail extends RuleDetail {
   revision_number: number;
 }
 
+export interface RuleHistoryEntry {
+  revision_number: number;
+  logic: string;
+  description: string;
+  created_at: string | null;
+  is_current?: boolean;
+}
+
+export interface RuleHistoryResponse {
+  r_id: number;
+  rid: string;
+  history: RuleHistoryEntry[];
+}
+
 export interface UpdateRuleRequest {
   description: string;
   logic: string;
@@ -83,6 +97,10 @@ export class RuleService {
 
   getRuleRevision(ruleId: number, revisionNumber: number): Observable<RuleRevisionDetail> {
     return this.http.get<RuleRevisionDetail>(`${this.apiUrl}/${ruleId}/revisions/${revisionNumber}`);
+  }
+
+  getRuleHistory(ruleId: number, limit: number = 10): Observable<RuleHistoryResponse> {
+    return this.http.get<RuleHistoryResponse>(`${this.apiUrl}/${ruleId}/history`, { params: { limit: limit.toString() } });
   }
 
   updateRule(ruleId: number, data: UpdateRuleRequest): Observable<UpdateRuleResponse> {
