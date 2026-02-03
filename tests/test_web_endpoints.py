@@ -874,3 +874,75 @@ class TestAPIEndpoints:
         assert data["rule"]["description"] == "Only description updated"
         # Logic should remain unchanged
         assert data["rule"]["logic"] == original_logic
+
+    def test_api_rule_revision_success(self, session, logged_in_manager_client):
+        """Test that GET /api/rules/<id>/revisions/<rev> returns the historical revision."""
+        from ezrules.models.backend_core import Organisation
+        from ezrules.models.backend_core import Rule as RuleModel
+
+        org = session.query(Organisation).first()
+
+        # Create a test rule
+        test_rule = RuleModel(
+            rid="test_rev_success",
+            logic="if $amount > 100:\n\treturn 'HOLD'",
+            description="Original description",
+            o_id=org.o_id,
+        )
+        session.add(test_rule)
+        session.commit()
+
+        # Update via API to create a revision (version 1 in history)
+        rv = logged_in_manager_client.put(
+            f"/api/rules/{test_rule.r_id}",
+            json={
+                "description": "Updated description",
+                "logic": "if $amount > 200:\n\treturn 'REVIEW'",
+            },
+        )
+        assert rv.status_code == 200
+
+        # Fetch revision 1 (the original state stored in history)
+        rv = logged_in_manager_client.get(f"/api/rules/{test_rule.r_id}/revisions/1")
+        assert rv.status_code == 200
+
+        data = rv.get_json()
+        assert data["r_id"] == test_rule.r_id
+        assert data["rid"] == "test_rev_success"
+        assert data["revision_number"] == 1
+        assert data["description"] == "Original description"
+        assert data["logic"] == "if $amount > 100:\n\treturn 'HOLD'"
+        assert "created_at" in data
+        assert data["revisions"] == []
+
+    def test_api_rule_revision_not_found_bad_rule(self, logged_in_manager_client):
+        """Test that GET /api/rules/<bad_id>/revisions/<rev> returns 404."""
+        rv = logged_in_manager_client.get("/api/rules/999999/revisions/1")
+        assert rv.status_code == 404
+
+        data = rv.get_json()
+        assert "error" in data
+
+    def test_api_rule_revision_not_found_bad_revision(self, session, logged_in_manager_client):
+        """Test that GET /api/rules/<id>/revisions/<bad_rev> returns 404."""
+        from ezrules.models.backend_core import Organisation
+        from ezrules.models.backend_core import Rule as RuleModel
+
+        org = session.query(Organisation).first()
+
+        # Create a test rule (no updates, so no revisions in history)
+        test_rule = RuleModel(
+            rid="test_rev_bad_rev",
+            logic="if $amount > 100:\n\treturn 'HOLD'",
+            description="No revisions rule",
+            o_id=org.o_id,
+        )
+        session.add(test_rule)
+        session.commit()
+
+        # Try to fetch a non-existent revision
+        rv = logged_in_manager_client.get(f"/api/rules/{test_rule.r_id}/revisions/999")
+        assert rv.status_code == 404
+
+        data = rv.get_json()
+        assert "error" in data

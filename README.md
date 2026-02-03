@@ -95,6 +95,7 @@ The Angular frontend provides:
   - Created date and version history
   - Test functionality with dynamic JSON input
   - Real-time rule testing with sample data
+  - Revision history browsing with read-only historical revision views
 - **Seamless Navigation**: Navigate between rule list and detail pages with Angular routing
 
 #### Build the Angular App

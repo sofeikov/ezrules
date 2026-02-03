@@ -35,6 +35,10 @@ export interface TestRuleResponse {
   reason: string;
 }
 
+export interface RuleRevisionDetail extends RuleDetail {
+  revision_number: number;
+}
+
 export interface UpdateRuleRequest {
   description: string;
   logic: string;
@@ -75,6 +79,10 @@ export class RuleService {
       rule_source: ruleSource,
       test_json: testJson
     });
+  }
+
+  getRuleRevision(ruleId: number, revisionNumber: number): Observable<RuleRevisionDetail> {
+    return this.http.get<RuleRevisionDetail>(`${this.apiUrl}/${ruleId}/revisions/${revisionNumber}`);
   }
 
   updateRule(ruleId: number, data: UpdateRuleRequest): Observable<UpdateRuleResponse> {

@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { RuleDetail, RuleService, UpdateRuleRequest } from '../services/rule.service';
+import { RuleDetail, RuleRevisionDetail, RuleService, UpdateRuleRequest } from '../services/rule.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -20,6 +20,10 @@ export class RuleDetailComponent implements OnInit {
   testError: string | null = null;
   testing: boolean = false;
 
+  // Revision view properties
+  isRevisionView: boolean = false;
+  revisionNumber: number | null = null;
+
   // Edit mode properties
   isEditMode: boolean = false;
   editedDescription: string = '';
@@ -36,7 +40,12 @@ export class RuleDetailComponent implements OnInit {
 
   ngOnInit(): void {
     const ruleId = this.route.snapshot.paramMap.get('id');
-    if (ruleId) {
+    const revision = this.route.snapshot.paramMap.get('revision');
+    if (ruleId && revision) {
+      this.isRevisionView = true;
+      this.revisionNumber = parseInt(revision, 10);
+      this.loadRevision(parseInt(ruleId, 10), this.revisionNumber);
+    } else if (ruleId) {
       this.loadRule(parseInt(ruleId, 10));
     }
   }
@@ -55,6 +64,24 @@ export class RuleDetailComponent implements OnInit {
         this.error = 'Failed to load rule. Please try again.';
         this.loading = false;
         console.error('Error loading rule:', error);
+      }
+    });
+  }
+
+  loadRevision(ruleId: number, revisionNumber: number): void {
+    this.loading = true;
+    this.error = null;
+
+    this.ruleService.getRuleRevision(ruleId, revisionNumber).subscribe({
+      next: (revision: RuleRevisionDetail) => {
+        this.rule = revision;
+        this.loading = false;
+        this.fillInExampleParams();
+      },
+      error: (error) => {
+        this.error = 'Failed to load rule revision. Please try again.';
+        this.loading = false;
+        console.error('Error loading rule revision:', error);
       }
     });
   }

@@ -21,6 +21,11 @@ export class RuleDetailPage {
   readonly backButton: Locator;
   readonly revisionsSection: Locator;
 
+  // Revision view locators
+  readonly revisionBanner: Locator;
+  readonly goToLatestLink: Locator;
+  readonly revisionLinks: Locator;
+
   // Edit mode locators
   readonly editButton: Locator;
   readonly saveButton: Locator;
@@ -46,6 +51,11 @@ export class RuleDetailPage {
     this.testResultError = page.locator('.bg-red-50').or(page.locator('text=/Failed to load rule/i'));
     this.backButton = page.locator('button:has-text("Back to Rules")');
     this.revisionsSection = page.locator('text=Other Rule Versions');
+
+    // Revision view locators
+    this.revisionBanner = page.locator('.bg-yellow-50');
+    this.goToLatestLink = page.locator('a:has-text("Go to latest version")');
+    this.revisionLinks = page.locator('h2:has-text("Other Rule Versions") ~ div a');
 
     // Edit mode locators
     this.editButton = page.locator('button:has-text("Edit Rule")');
@@ -203,5 +213,26 @@ export class RuleDetailPage {
    */
   async getEditedLogic(): Promise<string> {
     return await this.editableLogicTextarea.inputValue();
+  }
+
+  /**
+   * Navigate directly to a specific revision
+   */
+  async gotoRevision(ruleId: number, revisionNumber: number) {
+    await this.page.goto(`/rules/${ruleId}/revisions/${revisionNumber}`);
+  }
+
+  /**
+   * Click a revision link by its index (0-based) in the revisions list
+   */
+  async clickRevision(index: number) {
+    await this.revisionLinks.nth(index).click();
+  }
+
+  /**
+   * Click the "Go to latest version" link in the revision banner
+   */
+  async clickGoToLatest() {
+    await this.goToLatestLink.first().click();
   }
 }

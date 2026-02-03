@@ -45,6 +45,19 @@
         </div>
       </div>
 
+      <!-- Revision View Banner -->
+      <div *ngIf="isRevisionView && !loading && rule" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-yellow-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p class="text-sm font-medium text-yellow-800">You are viewing Revision {{ revisionNumber }} of this rule (read-only).</p>
+          </div>
+          <a [routerLink]="['/rules', rule.r_id]" class="text-sm text-blue-600 hover:text-blue-800 font-medium">Go to latest version</a>
+        </div>
+      </div>
+
       <!-- Rule Details -->
       <div *ngIf="!loading && !error && rule" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Left Column - Rule Details -->
@@ -54,7 +67,7 @@
             <div class="flex justify-between items-center mb-4">
               <h2 class="text-xl font-semibold text-gray-900">Rule Details</h2>
               <button
-                *ngIf="!isEditMode"
+                *ngIf="!isEditMode && !isRevisionView"
                 (click)="toggleEditMode()"
                 class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
               >
@@ -156,17 +169,12 @@
           </div>
 
           <!-- Revisions Card -->
-          <div *ngIf="rule.revisions && rule.revisions.length > 0" class="bg-white border border-gray-200 rounded-lg p-6">
+          <div *ngIf="!isRevisionView && rule.revisions && rule.revisions.length > 0" class="bg-white border border-gray-200 rounded-lg p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Other Rule Versions</h2>
             <div class="space-y-2">
               <div *ngFor="let revision of rule.revisions" class="border-b border-gray-200 last:border-0 py-2">
-                <a href="/rule/{{ rule.r_id }}/{{ revision.revision_number }}" class="text-blue-600 hover:text-blue-800 text-sm">
+                <a [routerLink]="['/rules', rule.r_id, 'revisions', revision.revision_number]" class="text-blue-600 hover:text-blue-800 text-sm">
                   Revision {{ revision.revision_number }} created at {{ formatDate(revision.created_at) }}
-                </a>
-              </div>
-              <div class="pt-2">
-                <a href="/rule/{{ rule.r_id }}" class="text-sm text-gray-600 hover:text-gray-800">
-                  Go to latest version
                 </a>
               </div>
             </div>

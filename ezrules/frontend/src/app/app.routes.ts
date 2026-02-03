@@ -5,5 +5,6 @@ import { RuleDetailComponent } from './rule-detail/rule-detail.component';
 export const routes: Routes = [
   { path: '', component: RuleListComponent },
   { path: 'rules', component: RuleListComponent },
+  { path: 'rules/:id/revisions/:revision', component: RuleDetailComponent },
   { path: 'rules/:id', component: RuleDetailComponent }
 ];

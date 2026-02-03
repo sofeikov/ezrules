@@ -158,6 +158,27 @@ def api_rule_detail(rule_id: int):
     return jsonify(rule_data)
 
 
+@app.route("/api/rules/<int:rule_id>/revisions/<int:revision_number>", methods=["GET"])
+@csrf.exempt
+def api_rule_revision(rule_id: int, revision_number: int):
+    """API endpoint to get a specific historical revision of a rule."""
+    try:
+        rule = fsrm.load_rule(rule_id, revision_number=revision_number)  # type: ignore[arg-type]
+    except sqlalchemy.exc.NoResultFound:
+        return jsonify({"error": "Rule or revision not found"}), 404
+
+    rule_data = {
+        "r_id": rule_id,
+        "rid": rule.rid,
+        "description": rule.description,
+        "logic": rule.logic,
+        "created_at": rule.created_at.isoformat() if rule.created_at else None,  # type: ignore[union-attr]
+        "revision_number": revision_number,
+        "revisions": [],
+    }
+    return jsonify(rule_data)
+
+
 @app.route("/api/rules/<int:rule_id>", methods=["PUT"])
 @csrf.exempt
 def api_update_rule(rule_id: int):

@@ -20,6 +20,7 @@
 * Individual time-series charts for each label type showing temporal trends over configurable time ranges
 * Label analytics API endpoints: /api/labels_summary, /api/labels_distribution
 * Configurable time ranges for label analytics (1h, 6h, 12h, 24h, 30d)
+* Angular frontend revision navigation: clicking a rule revision link now navigates to a read-only view of that historical revision via GET /api/rules/<id>/revisions/<rev>
 
 ## v0.7
 
