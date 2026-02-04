@@ -97,7 +97,8 @@ The Angular frontend provides:
   - Real-time rule testing with sample data
   - Revision history browsing with read-only historical revision views
 - **Labels Management**: Full CRUD for transaction labels — list, create, and delete labels (with confirmation), plus a link to bulk CSV upload
-- **Seamless Navigation**: Navigate between rule list, detail, and labels pages with Angular routing
+- **Label Analytics**: View labeled transaction analytics — total labeled events metric card, per-label time-series charts with Chart.js, and a time range selector (1h, 6h, 12h, 24h, 30d)
+- **Seamless Navigation**: Navigate between rule list, detail, labels, and analytics pages with Angular routing
 
 #### Build the Angular App
 

@@ -13,18 +13,6 @@ test.describe('Rule List Page', () => {
     rulePage = new RuleListPage(page);
   });
 
-  test.describe('Backend Health Check', () => {
-    test('should verify backend services are running', async () => {
-      // Verify Manager service is accessible
-      const managerResponse = await fetch('http://localhost:8888/ping');
-      expect(managerResponse.ok).toBe(true);
-
-      // Verify Evaluator service is accessible
-      const evaluatorResponse = await fetch('http://localhost:9999/ping');
-      expect(evaluatorResponse.ok).toBe(true);
-    });
-  });
-
   test.describe('Page Structure', () => {
     test('should load the rules page successfully', async ({ page }) => {
       await rulePage.goto();

@@ -22,6 +22,7 @@
 * Configurable time ranges for label analytics (1h, 6h, 12h, 24h, 30d)
 * Angular frontend revision navigation: clicking a rule revision link now navigates to a read-only view of that historical revision via GET /api/rules/<id>/revisions/<rev>
 * **Outcomes management page**: Ported to Angular frontend. Users can list, create, and delete allowed outcomes via the new /outcomes page, reachable from the sidebar. Backend API endpoints added: GET/POST /api/outcomes, DELETE /api/outcomes/<name>
+* **Label Analytics page ported to Angular frontend**: The /label_analytics page is now available in the Angular app, reachable via the sidebar "Analytics" link. Displays the total labeled events metric card and per-label time-series line charts powered by Chart.js, with a time range selector (1h, 6h, 12h, 24h, 30d) that updates charts in real time
 
 ## v0.7
 
