@@ -520,6 +520,46 @@ def verified_outcomes():
             return render_template("outcomes.html", form=form, outcomes=outcome_manager.get_allowed_outcomes())
 
 
+@app.route("/api/outcomes", methods=["GET"])
+@csrf.exempt
+def api_outcomes_list():
+    """API endpoint to get all allowed outcomes as JSON for Angular frontend."""
+    outcomes = outcome_manager.get_allowed_outcomes()
+    return jsonify({"outcomes": outcomes})
+
+
+@app.route("/api/outcomes", methods=["POST"])
+@csrf.exempt
+def api_outcomes_create():
+    """API endpoint to create a new outcome for Angular frontend."""
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({"success": False, "error": "No data provided"}), 400
+
+    outcome_name = data.get("outcome", "").strip()
+    if not outcome_name:
+        return jsonify({"success": False, "error": "Outcome name is required"}), 400
+
+    outcome_name = outcome_name.upper()
+    if outcome_manager.is_allowed_outcome(outcome_name):
+        return jsonify({"success": False, "error": f"Outcome '{outcome_name}' already exists"}), 409
+
+    outcome_manager.add_outcome(outcome_name)
+    return jsonify({"success": True, "outcome": outcome_name})
+
+
+@app.route("/api/outcomes/<string:outcome_name>", methods=["DELETE"])
+@csrf.exempt
+def api_outcomes_delete(outcome_name: str):
+    """API endpoint to delete an outcome for Angular frontend."""
+    outcome_name = outcome_name.strip().upper()
+    if not outcome_manager.is_allowed_outcome(outcome_name):
+        return jsonify({"error": f"Outcome '{outcome_name}' not found"}), 404
+
+    outcome_manager.remove_outcome(outcome_name)
+    return jsonify({"message": f"Outcome '{outcome_name}' deleted successfully"})
+
+
 @app.route("/backtesting", methods=["POST"])
 @csrf.exempt
 def backtesting():
