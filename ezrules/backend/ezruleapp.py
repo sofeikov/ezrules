@@ -629,6 +629,19 @@ def label():
         return jsonify(response="OK", failed_to_add=failed_to_add)
 
 
+@app.route("/api/labels/<string:label_name>", methods=["DELETE"])
+@csrf.exempt
+def delete_label(label_name: str):
+    label_name = label_name.strip()
+    existing = db_session.query(Label).filter_by(label=label_name).first()
+    if not existing:
+        return jsonify({"error": f"Label '{label_name}' not found"}), 404
+    db_session.delete(existing)
+    db_session.commit()
+    label_manager._cached_labels = None
+    return jsonify({"message": f"Label '{label_name}' deleted successfully"})
+
+
 @app.route("/get_task_status/<string:task_id>", methods=["GET"])
 def get_task_status(task_id: str):
     t = AsyncResult(id=task_id, backend=celery_app.backend)

@@ -96,7 +96,8 @@ The Angular frontend provides:
   - Test functionality with dynamic JSON input
   - Real-time rule testing with sample data
   - Revision history browsing with read-only historical revision views
-- **Seamless Navigation**: Navigate between rule list and detail pages with Angular routing
+- **Labels Management**: Full CRUD for transaction labels — list, create, and delete labels (with confirmation), plus a link to bulk CSV upload
+- **Seamless Navigation**: Navigate between rule list, detail, and labels pages with Angular routing
 
 #### Build the Angular App
 
