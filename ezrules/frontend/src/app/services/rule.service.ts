@@ -65,6 +65,19 @@ export interface UpdateRuleResponse {
   rule?: RuleDetail;
 }
 
+export interface CreateRuleRequest {
+  rid: string;
+  description: string;
+  logic: string;
+}
+
+export interface CreateRuleResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  rule?: RuleDetail;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -105,5 +118,9 @@ export class RuleService {
 
   updateRule(ruleId: number, data: UpdateRuleRequest): Observable<UpdateRuleResponse> {
     return this.http.put<UpdateRuleResponse>(`${this.apiUrl}/${ruleId}`, data);
+  }
+
+  createRule(data: CreateRuleRequest): Observable<CreateRuleResponse> {
+    return this.http.post<CreateRuleResponse>(this.apiUrl, data);
   }
 }

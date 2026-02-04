@@ -56,7 +56,7 @@ export class RuleDetailPage {
     // Revision view locators
     this.revisionBanner = page.locator('.bg-yellow-50');
     this.goToLatestLink = page.locator('a:has-text("Go to latest version")');
-    this.revisionLinks = page.locator('h2:has-text("Other Rule Versions") ~ div a');
+    this.revisionLinks = page.locator('h2:has-text("Other Rule Versions")').locator("..").locator("~ div a");
     this.visualizeHistoryLink = page.locator('a:has-text("Visualize history")');
 
     // Edit mode locators

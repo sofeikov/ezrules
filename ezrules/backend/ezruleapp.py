@@ -289,6 +289,51 @@ def api_update_rule(rule_id: int):
     return jsonify({"success": True, "message": "Rule updated successfully", "rule": rule_data})
 
 
+@app.route("/api/rules", methods=["POST"])
+@csrf.exempt
+def api_create_rule():
+    """API endpoint to create a new rule for Angular frontend."""
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({"success": False, "error": "No data provided"}), 400
+
+    rid = data.get("rid", "").strip()
+    description = data.get("description", "").strip()
+    logic = data.get("logic", "").strip()
+
+    if not rid:
+        return jsonify({"success": False, "error": "Rule ID is required"}), 400
+    if not description:
+        return jsonify({"success": False, "error": "Description is required"}), 400
+    if not logic:
+        return jsonify({"success": False, "error": "Logic is required"}), 400
+
+    # Validate the rule logic by trying to compile it
+    try:
+        rule_raw_config = {"rid": rid, "logic": logic, "description": description}
+        RuleFactory.from_json(rule_raw_config)
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Invalid rule logic: {str(e)}"}), 400
+
+    # Create and persist the new rule
+    new_rule = RuleModel(rid=rid, logic=logic, description=description)
+    fsrm.save_rule(new_rule)
+
+    app.logger.info("Saving new version of the rules via API (create)")
+    rule_engine_config_producer.save_config(fsrm)
+
+    rule_data = {
+        "r_id": new_rule.r_id,
+        "rid": new_rule.rid,
+        "description": new_rule.description,
+        "logic": new_rule.logic,
+        "created_at": new_rule.created_at.isoformat() if new_rule.created_at else None,  # type: ignore[union-attr]
+        "revisions": [],
+    }
+
+    return jsonify({"success": True, "message": "Rule created successfully", "rule": rule_data})
+
+
 @app.route("/create_rule", methods=["GET", "POST"])
 @conditional_decorator(not app.config["TESTING"], auth_required())
 @conditional_decorator(not app.config["TESTING"], requires_permission(PermissionAction.CREATE_RULE))
