@@ -39,6 +39,7 @@ dependencies = [
     "uvicorn[standard]>=0.34.0",
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.9",  # Required for form data (OAuth2 login)
 ]
 
 [tool.uv]
@@ -50,6 +51,7 @@ dev-dependencies = [
     "ty>=0.0.1a20",
     "poethepoet>=0.37.0",
     "mkdocs-material>=9.6.21",
+    "httpx>=0.27.0",  # Required for FastAPI TestClient
 ]
 
 [project.scripts]
@@ -72,6 +74,7 @@ select = [
 ]
 ignore = [
     "E501", # line too long, handled by line-length
+    "B008", # function call in default argument - false positive for FastAPI Depends()
 ]
 
 [tool.ruff.lint.isort]

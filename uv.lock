@@ -584,6 +584,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyparsing" },
     { name = "python-jose", extra = ["cryptography"] },
+    { name = "python-multipart" },
     { name = "pytz" },
     { name = "pyyaml" },
     { name = "redis" },
@@ -597,6 +598,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "coverage" },
+    { name = "httpx" },
     { name = "mkdocs-material" },
     { name = "poethepoet" },
     { name = "pytest" },
@@ -624,6 +626,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.3.3" },
     { name = "pyparsing" },
     { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3.0" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "pytz" },
     { name = "pyyaml" },
     { name = "redis", specifier = ">=6.4.0" },
@@ -637,6 +640,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "coverage" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "mkdocs-material", specifier = ">=9.6.21" },
     { name = "poethepoet", specifier = ">=0.37.0" },
     { name = "pytest" },
@@ -842,6 +846,19 @@ wheels = [
 ]
 
 [[package]]
+name = "httpcore"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "h11" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/06/94/82699a10bca87a5556c9c59b5963f2d039dbd239f25bc2a63907a05a14cb/httpcore-1.0.9.tar.gz", hash = "sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8", size = 85484 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl", hash = "sha256:2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55", size = 78784 },
+]
+
+[[package]]
 name = "httptools"
 version = "0.7.1"
 source = { registry = "https://pypi.org/simple" }
@@ -868,6 +885,21 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/4d/31/14df99e1c43bd132eec921c2e7e11cda7852f65619bc0fc5bdc2d0cb126c/httptools-0.7.1-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:f084813239e1eb403ddacd06a30de3d3e09a9b76e7894dcda2b22f8a726e9c60", size = 452631 },
     { url = "https://files.pythonhosted.org/packages/22/d2/b7e131f7be8d854d48cb6d048113c30f9a46dca0c9a8b08fcb3fcd588cdc/httptools-0.7.1-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:7347714368fb2b335e9063bc2b96f2f87a9ceffcd9758ac295f8bbcd3ffbc0ca", size = 452910 },
     { url = "https://files.pythonhosted.org/packages/53/cf/878f3b91e4e6e011eff6d1fa9ca39f7eb17d19c9d7971b04873734112f30/httptools-0.7.1-cp314-cp314-win_amd64.whl", hash = "sha256:cfabda2a5bb85aa2a904ce06d974a3f30fb36cc63d7feaddec05d2050acede96", size = 88205 },
+]
+
+[[package]]
+name = "httpx"
+version = "0.28.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "certifi" },
+    { name = "httpcore" },
+    { name = "idna" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b1/df/48c586a5fe32a0f01324ee087459e112ebb7224f646c0b5023f5e79e9956/httpx-0.28.1.tar.gz", hash = "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc", size = 141406 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl", hash = "sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad", size = 73517 },
 ]
 
 [[package]]
@@ -1460,6 +1492,15 @@ wheels = [
 [package.optional-dependencies]
 cryptography = [
     { name = "cryptography" },
+]
+
+[[package]]
+name = "python-multipart"
+version = "0.0.22"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/01/979e98d542a70714b0cb2b6728ed0b7c46792b695e3eaec3e20711271ca3/python_multipart-0.0.22.tar.gz", hash = "sha256:7340bef99a7e0032613f56dc36027b959fd3b30a787ed62d310e951f7c3a3a58", size = 37612 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1b/d0/397f9626e711ff749a95d96b7af99b9c566a9bb5129b8e4c10fc4d100304/python_multipart-0.0.22-py3-none-any.whl", hash = "sha256:2b2cd894c83d21bf49d702499531c7bafd057d730c201782048f7945d82de155", size = 24579 },
 ]
 
 [[package]]
