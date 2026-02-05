@@ -1,5 +1,5 @@
 """
-FastAPI dependencies for authentication.
+FastAPI dependencies for authentication and authorization.
 
 Dependencies are reusable functions that FastAPI "injects" into your route handlers.
 Think of them as middleware that runs before your route code.
@@ -16,15 +16,27 @@ The magic is in `Depends()`. FastAPI sees it and:
 1. Calls get_current_user() before your route
 2. Passes the return value as the 'user' parameter
 3. If get_current_user raises an HTTPException, the route is never called
+
+For permission checking, use require_permission():
+
+    @router.get("/rules")
+    def get_rules(
+        user: User = Depends(get_current_active_user),
+        _: None = Depends(require_permission(PermissionAction.VIEW_RULES))
+    ):
+        # Only reaches here if user is authenticated AND has VIEW_RULES permission
+        return {"rules": [...]}
 """
 
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
 from ezrules.backend.api_v2.auth.jwt import decode_token
-from ezrules.models.backend_core import User
+from ezrules.core.permissions_constants import PermissionAction
+from ezrules.models.backend_core import Action, RoleActions, User
 from ezrules.models.database import db_session
 
 # =============================================================================
@@ -146,3 +158,161 @@ def get_current_active_user(
             detail="User account is disabled",
         )
     return user
+
+
+# =============================================================================
+# PERMISSION CHECKING DEPENDENCIES
+# =============================================================================
+
+
+def require_permission(
+    action: PermissionAction,
+    resource_id: int | None = None,
+) -> Callable[..., None]:
+    """
+    Create a dependency that checks if the user has a specific permission.
+
+    This is a "dependency factory" - it returns a dependency function.
+    The returned function is what FastAPI actually calls.
+
+    Usage:
+
+        @router.get("/rules")
+        def get_rules(
+            user: User = Depends(get_current_active_user),
+            _: None = Depends(require_permission(PermissionAction.VIEW_RULES))
+        ):
+            ...
+
+        # With resource-specific permission:
+        @router.delete("/rules/{rule_id}")
+        def delete_rule(
+            rule_id: int,
+            user: User = Depends(get_current_active_user),
+            _: None = Depends(require_permission(PermissionAction.DELETE_RULE))
+        ):
+            ...
+
+    How it works:
+    1. require_permission(VIEW_RULES) is called at import time
+    2. It returns the `check_permission` function
+    3. When a request comes in, FastAPI calls check_permission()
+    4. check_permission gets the current user and checks their permissions
+    5. If permission denied, raises 403. Otherwise, returns None.
+
+    Args:
+        action: The permission action to check (from PermissionAction enum)
+        resource_id: Optional specific resource ID to check permission for
+
+    Returns:
+        A dependency function that checks the permission
+    """
+
+    def check_permission(
+        user: User = Depends(get_current_active_user),
+        db: Any = Depends(get_db),
+    ) -> None:
+        """
+        The actual permission checking logic.
+
+        This function is called by FastAPI for each request to a protected route.
+        """
+        # Check if permissions have been initialized in the database
+        # If no actions exist, we're in backward-compatibility mode - allow all
+        actions_exist = db.query(Action).first() is not None
+        if not actions_exist:
+            return None
+
+        # Convert enum to string for database lookup
+        action_str = action.value if isinstance(action, PermissionAction) else action
+
+        # Find the action in the database
+        db_action = db.query(Action).filter_by(name=action_str).first()
+        if not db_action:
+            # Action doesn't exist in DB - this shouldn't happen if DB is properly initialized
+            # Fail secure: deny access
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied",
+            )
+
+        # Check if any of the user's roles have this permission
+        for role in user.roles:
+            role_action = (
+                db.query(RoleActions)
+                .filter_by(role_id=role.id, action_id=db_action.id)
+                .filter((RoleActions.resource_id == resource_id) | (RoleActions.resource_id.is_(None)))
+                .first()
+            )
+            if role_action:
+                # Permission granted!
+                return None
+
+        # No matching permission found
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied",
+        )
+
+    return check_permission
+
+
+def require_any_permission(*actions: PermissionAction) -> Callable[..., None]:
+    """
+    Create a dependency that checks if the user has ANY of the specified permissions.
+
+    Useful when multiple permissions could grant access to the same resource.
+
+    Usage:
+
+        @router.get("/dashboard")
+        def get_dashboard(
+            user: User = Depends(get_current_active_user),
+            _: None = Depends(require_any_permission(
+                PermissionAction.VIEW_RULES,
+                PermissionAction.VIEW_OUTCOMES
+            ))
+        ):
+            # User needs VIEW_RULES OR VIEW_OUTCOMES to access
+            ...
+
+    Args:
+        *actions: Variable number of PermissionAction values to check
+
+    Returns:
+        A dependency function that checks if user has any of the permissions
+    """
+
+    def check_any_permission(
+        user: User = Depends(get_current_active_user),
+        db: Any = Depends(get_db),
+    ) -> None:
+        """Check if user has any of the specified permissions."""
+        # Check if permissions have been initialized
+        actions_exist = db.query(Action).first() is not None
+        if not actions_exist:
+            return None
+
+        # Check each permission
+        for action in actions:
+            action_str = action.value if isinstance(action, PermissionAction) else action
+            db_action = db.query(Action).filter_by(name=action_str).first()
+
+            if db_action:
+                for role in user.roles:
+                    role_action = (
+                        db.query(RoleActions)
+                        .filter_by(role_id=role.id, action_id=db_action.id)
+                        .filter(RoleActions.resource_id.is_(None))
+                        .first()
+                    )
+                    if role_action:
+                        return None
+
+        # No matching permission found
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied",
+        )
+
+    return check_any_permission
