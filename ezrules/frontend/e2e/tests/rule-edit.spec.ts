@@ -167,7 +167,7 @@ test.describe('Rule Edit Functionality', () => {
 
       // Wait for the PUT request to complete when clicking save
       await Promise.all([
-        page.waitForResponse(resp => resp.url().includes('/api/rules/') && resp.request().method() === 'PUT'),
+        page.waitForResponse(resp => resp.url().includes('/api/v2/rules/') && resp.request().method() === 'PUT'),
         ruleDetailPage.clickSave()
       ]);
 
@@ -186,7 +186,7 @@ test.describe('Rule Edit Functionality', () => {
       await ruleDetailPage.clickEdit();
       await ruleDetailPage.setDescription(originalDescription);
       await Promise.all([
-        page.waitForResponse(resp => resp.url().includes('/api/rules/') && resp.request().method() === 'PUT'),
+        page.waitForResponse(resp => resp.url().includes('/api/v2/rules/') && resp.request().method() === 'PUT'),
         ruleDetailPage.clickSave()
       ]);
       await ruleDetailPage.waitForSaveSuccess();
@@ -203,7 +203,7 @@ test.describe('Rule Edit Functionality', () => {
 
       // Wait for the PUT request to complete when clicking save
       await Promise.all([
-        page.waitForResponse(resp => resp.url().includes('/api/rules/') && resp.request().method() === 'PUT'),
+        page.waitForResponse(resp => resp.url().includes('/api/v2/rules/') && resp.request().method() === 'PUT'),
         ruleDetailPage.clickSave()
       ]);
 
@@ -213,7 +213,7 @@ test.describe('Rule Edit Functionality', () => {
       await ruleDetailPage.clickEdit();
       await ruleDetailPage.setDescription(originalDescription);
       await Promise.all([
-        page.waitForResponse(resp => resp.url().includes('/api/rules/') && resp.request().method() === 'PUT'),
+        page.waitForResponse(resp => resp.url().includes('/api/v2/rules/') && resp.request().method() === 'PUT'),
         ruleDetailPage.clickSave()
       ]);
     });
@@ -237,7 +237,7 @@ test.describe('Rule Edit Functionality', () => {
 
       // Wait for the PUT request to complete when clicking save
       await Promise.all([
-        page.waitForResponse(resp => resp.url().includes('/api/rules/') && resp.request().method() === 'PUT'),
+        page.waitForResponse(resp => resp.url().includes('/api/v2/rules/') && resp.request().method() === 'PUT'),
         ruleDetailPage.clickSave()
       ]);
       await ruleDetailPage.waitForSaveSuccess();
@@ -254,7 +254,7 @@ test.describe('Rule Edit Functionality', () => {
       await ruleDetailPage.clickEdit();
       await ruleDetailPage.setDescription(originalDescription);
       await Promise.all([
-        page.waitForResponse(resp => resp.url().includes('/api/rules/') && resp.request().method() === 'PUT'),
+        page.waitForResponse(resp => resp.url().includes('/api/v2/rules/') && resp.request().method() === 'PUT'),
         ruleDetailPage.clickSave()
       ]);
     });
@@ -284,7 +284,7 @@ test.describe('Rule Edit Functionality', () => {
       let requestBody: any = null;
 
       page.on('request', request => {
-        if (request.method() === 'PUT' && request.url().includes('/api/rules/')) {
+        if (request.method() === 'PUT' && request.url().includes('/api/v2/rules/')) {
           putRequestMade = true;
           requestBody = request.postDataJSON();
         }
@@ -301,7 +301,7 @@ test.describe('Rule Edit Functionality', () => {
 
       // Wait for the PUT request to complete when clicking save
       await Promise.all([
-        page.waitForResponse(resp => resp.url().includes('/api/rules/') && resp.request().method() === 'PUT'),
+        page.waitForResponse(resp => resp.url().includes('/api/v2/rules/') && resp.request().method() === 'PUT'),
         ruleDetailPage.clickSave()
       ]);
 
@@ -313,7 +313,7 @@ test.describe('Rule Edit Functionality', () => {
       await ruleDetailPage.clickEdit();
       await ruleDetailPage.setDescription(originalDescription);
       await Promise.all([
-        page.waitForResponse(resp => resp.url().includes('/api/rules/') && resp.request().method() === 'PUT'),
+        page.waitForResponse(resp => resp.url().includes('/api/v2/rules/') && resp.request().method() === 'PUT'),
         ruleDetailPage.clickSave()
       ]);
     });

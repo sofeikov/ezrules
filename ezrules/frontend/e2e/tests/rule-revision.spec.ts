@@ -48,7 +48,7 @@ test.describe('Rule Revision Navigation', () => {
     await ruleDetailPage.setDescription('Temp revision trigger ' + Date.now());
 
     await Promise.all([
-      page.waitForResponse((resp: any) => resp.url().includes('/api/rules/') && resp.request().method() === 'PUT'),
+      page.waitForResponse((resp: any) => resp.url().includes('/api/v2/rules/') && resp.request().method() === 'PUT'),
       ruleDetailPage.clickSave()
     ]);
     await ruleDetailPage.waitForSaveSuccess();
@@ -58,7 +58,7 @@ test.describe('Rule Revision Navigation', () => {
     await ruleDetailPage.setDescription(originalDescription);
 
     await Promise.all([
-      page.waitForResponse((resp: any) => resp.url().includes('/api/rules/') && resp.request().method() === 'PUT'),
+      page.waitForResponse((resp: any) => resp.url().includes('/api/v2/rules/') && resp.request().method() === 'PUT'),
       ruleDetailPage.clickSave()
     ]);
     await ruleDetailPage.waitForSaveSuccess();
@@ -230,11 +230,11 @@ test.describe('Rule Revision Navigation', () => {
   });
 
   test.describe('API Integration', () => {
-    test('should fetch revision data from /api/rules/:id/revisions/:rev endpoint', async ({ page }) => {
+    test('should fetch revision data from /api/v2/rules/:id/revisions/:rev endpoint', async ({ page }) => {
       await ensureRevisionExists(page);
 
       // Verify the API endpoint directly
-      const response = await page.request.get(`http://localhost:8888/api/rules/${testRuleId}/revisions/1`);
+      const response = await page.request.get(`http://localhost:8888/api/v2/rules/${testRuleId}/revisions/1`);
       expect(response.ok()).toBe(true);
 
       const data = await response.json();
@@ -246,7 +246,7 @@ test.describe('Rule Revision Navigation', () => {
     });
 
     test('should return 404 for non-existent revision via API', async ({ page }) => {
-      const response = await page.request.get(`http://localhost:8888/api/rules/${testRuleId}/revisions/99999`);
+      const response = await page.request.get(`http://localhost:8888/api/v2/rules/${testRuleId}/revisions/99999`);
       expect(response.ok()).toBe(false);
       expect(response.status()).toBe(404);
     });

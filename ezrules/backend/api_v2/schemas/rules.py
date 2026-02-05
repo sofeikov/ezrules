@@ -76,6 +76,7 @@ class RuleResponse(BaseModel):
     logic: str
     created_at: datetime | None = None
     revisions: list[RuleRevisionSummary] = Field(default_factory=list)
+    revision_number: int | None = Field(None, description="Revision number (only for historical revisions)")
 
     model_config = {"from_attributes": True}
 

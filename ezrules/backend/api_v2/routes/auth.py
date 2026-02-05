@@ -14,7 +14,7 @@ import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from ezrules.backend.api_v2.auth.dependencies import get_current_active_user, get_db
+from ezrules.backend.api_v2.auth.dependencies import get_current_active_user_strict, get_db
 from ezrules.backend.api_v2.auth.jwt import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     create_access_token,
@@ -265,7 +265,7 @@ def refresh_token(
     },
 )
 def get_current_user_info(
-    user: User = Depends(get_current_active_user),
+    user: User = Depends(get_current_active_user_strict),
 ):
     """
     Get information about the currently authenticated user.

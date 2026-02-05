@@ -263,9 +263,9 @@ test.describe('Rule Detail Page', () => {
   });
 
   test.describe('Integration with API', () => {
-    test('should load data from /api/rules/:id endpoint', async ({ page }) => {
+    test('should load data from /api/v2/rules/:id endpoint', async ({ page }) => {
       // Verify the API endpoint returns data
-      const response = await page.request.get(`http://localhost:8888/api/rules/${testRuleId}`);
+      const response = await page.request.get(`http://localhost:8888/api/v2/rules/${testRuleId}`);
       expect(response.ok()).toBe(true);
 
       const data = await response.json();

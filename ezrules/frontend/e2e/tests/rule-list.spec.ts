@@ -3,7 +3,7 @@ import { RuleListPage } from '../pages/rule-list.page';
 
 /**
  * E2E tests for the Rule List page.
- * Tests only implemented features - displaying rules from the /api/rules endpoint.
+ * Tests only implemented features - displaying rules from the /api/v2/rules endpoint.
  */
 
 test.describe('Rule List Page', () => {

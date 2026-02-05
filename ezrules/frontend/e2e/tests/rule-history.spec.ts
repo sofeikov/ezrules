@@ -50,7 +50,7 @@ test.describe('Rule History Diff Timeline', () => {
     await ruleDetailPage.clickEdit();
     await ruleDetailPage.setDescription('History test edit ' + Date.now());
     await Promise.all([
-      page.waitForResponse((resp: any) => resp.url().includes('/api/rules/') && resp.request().method() === 'PUT'),
+      page.waitForResponse((resp: any) => resp.url().includes('/api/v2/rules/') && resp.request().method() === 'PUT'),
       ruleDetailPage.clickSave()
     ]);
     await ruleDetailPage.waitForSaveSuccess();
@@ -59,7 +59,7 @@ test.describe('Rule History Diff Timeline', () => {
     await ruleDetailPage.clickEdit();
     await ruleDetailPage.setDescription(originalDescription);
     await Promise.all([
-      page.waitForResponse((resp: any) => resp.url().includes('/api/rules/') && resp.request().method() === 'PUT'),
+      page.waitForResponse((resp: any) => resp.url().includes('/api/v2/rules/') && resp.request().method() === 'PUT'),
       ruleDetailPage.clickSave()
     ]);
     await ruleDetailPage.waitForSaveSuccess();
@@ -177,10 +177,10 @@ test.describe('Rule History Diff Timeline', () => {
   });
 
   test.describe('API Integration', () => {
-    test('should fetch history from /api/rules/:id/history endpoint', async ({ page }) => {
+    test('should fetch history from /api/v2/rules/:id/history endpoint', async ({ page }) => {
       await ensureMultipleRevisions(page);
 
-      const response = await page.request.get(`http://localhost:8888/api/rules/${testRuleId}/history`);
+      const response = await page.request.get(`http://localhost:8888/api/v2/rules/${testRuleId}/history`);
       expect(response.ok()).toBe(true);
 
       const data = await response.json();
@@ -195,7 +195,7 @@ test.describe('Rule History Diff Timeline', () => {
     });
 
     test('should return 404 for non-existent rule via history API', async ({ page }) => {
-      const response = await page.request.get('http://localhost:8888/api/rules/999999/history');
+      const response = await page.request.get('http://localhost:8888/api/v2/rules/999999/history');
       expect(response.ok()).toBe(false);
       expect(response.status()).toBe(404);
     });
@@ -203,7 +203,7 @@ test.describe('Rule History Diff Timeline', () => {
     test('should respect limit parameter on history API', async ({ page }) => {
       await ensureMultipleRevisions(page);
 
-      const response = await page.request.get(`http://localhost:8888/api/rules/${testRuleId}/history?limit=1`);
+      const response = await page.request.get(`http://localhost:8888/api/v2/rules/${testRuleId}/history?limit=1`);
       expect(response.ok()).toBe(true);
 
       const data = await response.json();

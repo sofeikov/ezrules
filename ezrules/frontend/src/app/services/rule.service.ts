@@ -82,8 +82,7 @@ export interface CreateRuleResponse {
   providedIn: 'root'
 })
 export class RuleService {
-  private apiUrl = `${environment.apiUrl}/api/rules`;
-  private baseUrl = environment.apiUrl;
+  private apiUrl = `${environment.apiUrl}/api/v2/rules`;
 
   constructor(private http: HttpClient) { }
 
@@ -96,13 +95,13 @@ export class RuleService {
   }
 
   verifyRule(ruleSource: string): Observable<VerifyRuleResponse> {
-    return this.http.post<VerifyRuleResponse>(`${this.baseUrl}/verify_rule`, {
+    return this.http.post<VerifyRuleResponse>(`${this.apiUrl}/verify`, {
       rule_source: ruleSource
     });
   }
 
   testRule(ruleSource: string, testJson: string): Observable<TestRuleResponse> {
-    return this.http.post<TestRuleResponse>(`${this.baseUrl}/test_rule`, {
+    return this.http.post<TestRuleResponse>(`${this.apiUrl}/test`, {
       rule_source: ruleSource,
       test_json: testJson
     });

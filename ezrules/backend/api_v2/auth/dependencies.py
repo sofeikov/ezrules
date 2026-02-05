@@ -48,7 +48,8 @@ from ezrules.models.database import db_session
 #
 # The tokenUrl is used by Swagger UI's "Authorize" button.
 # When you click it and enter credentials, Swagger POSTs to this URL.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v2/auth/login")
+# auto_error=False allows unauthenticated requests (for optional auth mode)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v2/auth/login", auto_error=False)
 
 
 # =============================================================================
@@ -75,7 +76,7 @@ def get_db() -> Any:
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    token: str | None = Depends(oauth2_scheme),
     db: Any = Depends(get_db),
 ) -> User:
     """
@@ -92,6 +93,10 @@ def get_current_user(
     2. We decode the token and verify it's valid (signature + not expired)
     3. We look up the user in the database
     4. We return the User object (or raise 401 if anything fails)
+
+    Optional Auth Mode:
+    If no token is provided AND no permissions exist in the database,
+    return the first available user (for backward compatibility during migration).
 
     Args:
         token: JWT token extracted from Authorization header (injected by oauth2_scheme)
@@ -110,6 +115,17 @@ def get_current_user(
         # This header tells the client what auth scheme we expect
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # If no token provided, check for optional auth mode
+    if token is None:
+        # Check if permissions have been initialized
+        actions_exist = db.query(Action).first() is not None
+        if not actions_exist:
+            # No permissions configured - use first available user for backward compatibility
+            first_user = db.query(User).filter(User.active.is_(True)).first()
+            if first_user:
+                return first_user
+        raise credentials_exception
 
     # Decode the token - this verifies signature and expiration
     payload = decode_token(token)
@@ -135,8 +151,8 @@ def get_current_active_user(
     """
     Get the current user and verify they're active.
 
-    This is a stricter version of get_current_user that also checks
-    the user's 'active' flag. Use this for most protected endpoints.
+    This version supports optional auth mode - if no token is provided
+    and no permissions are configured, it uses a default user.
 
     A user might be inactive if:
     - An admin disabled their account
@@ -145,6 +161,76 @@ def get_current_active_user(
 
     Args:
         user: The authenticated user (injected by get_current_user)
+
+    Returns:
+        The User object if active
+
+    Raises:
+        HTTPException 401: If user is not active
+    """
+    if not user.active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account is disabled",
+        )
+    return user
+
+
+# OAuth2 scheme that always requires a token (no optional auth)
+oauth2_scheme_strict = OAuth2PasswordBearer(tokenUrl="/api/v2/auth/login", auto_error=True)
+
+
+def get_current_user_strict(
+    token: str = Depends(oauth2_scheme_strict),
+    db: Any = Depends(get_db),
+) -> User:
+    """
+    Validate the JWT token and return the corresponding User.
+
+    This is the strict version that ALWAYS requires a valid token.
+    Use this for endpoints like /me where optional auth makes no sense.
+
+    Args:
+        token: JWT token extracted from Authorization header
+        db: Database session
+
+    Returns:
+        The authenticated User object
+
+    Raises:
+        HTTPException 401: If token is invalid, expired, or user not found
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    payload = decode_token(token)
+    if payload is None:
+        raise credentials_exception
+
+    if payload.token_type != "access":
+        raise credentials_exception
+
+    user = db.query(User).filter(User.id == payload.user_id).first()
+    if user is None:
+        raise credentials_exception
+
+    return user
+
+
+def get_current_active_user_strict(
+    user: User = Depends(get_current_user_strict),
+) -> User:
+    """
+    Get the current user and verify they're active (strict mode).
+
+    Use this for endpoints that ALWAYS require authentication,
+    like /me, /change-password, etc.
+
+    Args:
+        user: The authenticated user
 
     Returns:
         The User object if active

@@ -191,6 +191,7 @@ def get_rule_revision(
         logic=str(rule.logic),
         created_at=created_at,  # type: ignore[arg-type]
         revisions=[],  # Don't include revision list for historical versions
+        revision_number=revision_number,
     )
 
 

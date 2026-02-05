@@ -126,8 +126,8 @@ test.describe('Rule Create Page', () => {
       // Fill in logic with a rule that uses $amount parameter
       await ruleCreatePage.fillLogic("if $amount > 100:\n\treturn 'HOLD'");
 
-      // Wait for the verify_rule API call to complete and populate testJson
-      await page.waitForResponse(resp => resp.url().includes('/verify_rule'));
+      // Wait for the verify API call to complete and populate testJson
+      await page.waitForResponse(resp => resp.url().includes('/api/v2/rules/verify'));
       await page.waitForTimeout(500);
 
       const testJsonValue = await ruleCreatePage.getTestJsonValue();
@@ -141,7 +141,7 @@ test.describe('Rule Create Page', () => {
       await ruleCreatePage.fillLogic("if $amount > 100:\n\treturn 'HOLD'");
 
       // Wait for params to populate
-      await page.waitForResponse(resp => resp.url().includes('/verify_rule'));
+      await page.waitForResponse(resp => resp.url().includes('/api/v2/rules/verify'));
       await page.waitForTimeout(500);
 
       // Fill in test JSON with a value that triggers HOLD
@@ -149,7 +149,7 @@ test.describe('Rule Create Page', () => {
 
       // Click test button and wait for response
       await Promise.all([
-        page.waitForResponse(resp => resp.url().includes('/test_rule')),
+        page.waitForResponse(resp => resp.url().includes('/api/v2/rules/test')),
         ruleCreatePage.clickTestRule()
       ]);
 
@@ -180,7 +180,7 @@ test.describe('Rule Create Page', () => {
 
       // Submit and wait for POST response
       await Promise.all([
-        page.waitForResponse(resp => resp.url().endsWith('/api/rules') && resp.request().method() === 'POST'),
+        page.waitForResponse(resp => resp.url().endsWith('/api/v2/rules') && resp.request().method() === 'POST'),
         ruleCreatePage.clickSubmit()
       ]);
 
@@ -225,11 +225,11 @@ test.describe('Rule Create Page', () => {
       await expect(page).toHaveURL(/\/rules\/create/);
     });
 
-    test('should send POST request with correct body to /api/rules', async ({ page }) => {
+    test('should send POST request with correct body to /api/v2/rules', async ({ page }) => {
       let postRequestBody: any = null;
 
       page.on('request', request => {
-        if (request.method() === 'POST' && request.url().endsWith('/api/rules')) {
+        if (request.method() === 'POST' && request.url().endsWith('/api/v2/rules')) {
           postRequestBody = request.postDataJSON();
         }
       });
@@ -245,7 +245,7 @@ test.describe('Rule Create Page', () => {
       await ruleCreatePage.fillLogic(logic);
 
       await Promise.all([
-        page.waitForResponse(resp => resp.url().endsWith('/api/rules') && resp.request().method() === 'POST'),
+        page.waitForResponse(resp => resp.url().endsWith('/api/v2/rules') && resp.request().method() === 'POST'),
         ruleCreatePage.clickSubmit()
       ]);
 
