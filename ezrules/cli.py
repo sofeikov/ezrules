@@ -71,33 +71,72 @@ def cli():
 @cli.command()
 @click.option("--user-email")
 @click.option("--password")
-def add_user(user_email, password):
+@click.option("--admin", is_flag=True, help="Grant admin role with all permissions to the user")
+def add_user(user_email, password, admin):
     db_endpoint = app_settings.DB_ENDPOINT
     engine = create_engine(db_endpoint)
     db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
     versioned_session(db_session)
+    Base.query = db_session.query_property()
 
+    user = None
     try:
         hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-        db_session.add(
-            User(
-                email=user_email,
-                password=hashed_password,
-                active=True,
-                fs_uniquifier=user_email,
-            )
+        user = User(
+            email=user_email,
+            password=hashed_password,
+            active=True,
+            fs_uniquifier=user_email,
         )
+        db_session.add(user)
         db_session.commit()
         logger.info(f"Done adding {user_email} to {db_endpoint}")
     except Exception as e:
         db_session.rollback()
         logger.error(e)
         logger.info("User already exists")
+        # Try to get existing user
+        user = db_session.query(User).filter_by(email=user_email).first()
+
     try:
         db_session.add(Organisation(name="base"))
         db_session.commit()
     except Exception:
         db_session.rollback()
+
+    # Grant admin permissions if --admin flag is set
+    if admin and user:
+        logger.info("Granting admin permissions...")
+
+        # Initialize default actions
+        PermissionManager.db_session = db_session
+        PermissionManager.init_default_actions()
+
+        # Create or get admin role
+        admin_role = db_session.query(Role).filter_by(name="admin").first()
+        if not admin_role:
+            admin_role = Role(name="admin", description="Full system administrator")
+            db_session.add(admin_role)
+            db_session.commit()
+            logger.info("Created admin role")
+
+        # Grant all permissions to admin role
+        admin_permissions = RoleType.get_role_permissions(RoleType.ADMIN)
+        for permission in admin_permissions:
+            try:
+                PermissionManager.grant_permission(int(admin_role.id), permission)
+            except ValueError:
+                logger.warning(f"Permission {permission.value} not found, skipping")
+
+        # Assign admin role to user
+        if admin_role not in user.roles:
+            user.roles.append(admin_role)
+            db_session.commit()
+            logger.info(f"Assigned admin role to {user_email}")
+        else:
+            logger.info(f"User {user_email} already has admin role")
+
+        logger.info(f"User {user_email} now has full admin permissions")
 
 
 @cli.command()
@@ -268,10 +307,10 @@ def evaluator(port):
 
 
 @cli.command()
-@click.option("--port", default="8889")
+@click.option("--port", default="8888")
 @click.option("--reload", is_flag=True, help="Enable auto-reload for development")
 def api(port, reload):
-    """Start the FastAPI v2 API server."""
+    """Start the FastAPI v2 API server (default port 8888 for Angular frontend)."""
     env = os.environ.copy()
     cmd = [
         "uvicorn",

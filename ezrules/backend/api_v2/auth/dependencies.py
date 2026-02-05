@@ -116,15 +116,11 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # If no token provided, check for optional auth mode
+    # If no token provided, use first active user
     if token is None:
-        # Check if permissions have been initialized
-        actions_exist = db.query(Action).first() is not None
-        if not actions_exist:
-            # No permissions configured - use first available user for backward compatibility
-            first_user = db.query(User).filter(User.active.is_(True)).first()
-            if first_user:
-                return first_user
+        first_user = db.query(User).filter(User.active.is_(True)).first()
+        if first_user:
+            return first_user
         raise credentials_exception
 
     # Decode the token - this verifies signature and expiration
