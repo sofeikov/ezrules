@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ezrules.backend.api_v2.routes import (
     analytics,
+    audit,
     auth,
     labels,
     outcomes,
@@ -89,3 +90,6 @@ app.include_router(roles.router)
 
 # User Lists routes: /api/v2/user-lists/*
 app.include_router(user_lists.router)
+
+# Audit Trail routes: /api/v2/audit/*
+app.include_router(audit.router)
