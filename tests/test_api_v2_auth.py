@@ -142,8 +142,13 @@ class TestJWTFunctions:
         # Create a valid token
         token = create_access_token(user_id=1, email="test@example.com", roles=[])
 
-        # Tamper with it by changing a character
-        tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
+        # Tamper with it more significantly - change multiple characters in the signature
+        # The signature is the last part after the last '.'
+        parts = token.split(".")
+        signature = parts[-1]
+        # Reverse the signature to ensure it's definitely different
+        tampered_signature = signature[::-1]
+        tampered = ".".join(parts[:-1] + [tampered_signature])
 
         payload = decode_token(tampered)
         assert payload is None
