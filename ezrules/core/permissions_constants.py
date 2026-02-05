@@ -34,6 +34,9 @@ class PermissionAction(Enum):
     # User Management (Admin only)
     VIEW_USERS = "view_users"
     CREATE_USER = "create_user"
+    MODIFY_USER = "modify_user"
+    DELETE_USER = "delete_user"
+    MANAGE_USER_ROLES = "manage_user_roles"
 
     # Role Management (Admin only)
     VIEW_ROLES = "view_roles"
@@ -65,6 +68,9 @@ class PermissionAction(Enum):
             (cls.ACCESS_AUDIT_TRAIL.value, "Access audit trail and history", "audit"),
             (cls.VIEW_USERS.value, "View system users", "user"),
             (cls.CREATE_USER.value, "Create new users", "user"),
+            (cls.MODIFY_USER.value, "Modify existing users", "user"),
+            (cls.DELETE_USER.value, "Delete users", "user"),
+            (cls.MANAGE_USER_ROLES.value, "Manage user role assignments", "user"),
             (cls.VIEW_ROLES.value, "View system roles", "role"),
             (cls.CREATE_ROLE.value, "Create new roles", "role"),
             (cls.MODIFY_ROLE.value, "Modify existing roles", "role"),
