@@ -7,7 +7,7 @@ This is the main entry point for the new FastAPI-based API.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from ezrules.backend.api_v2.routes import auth, outcomes, rules
+from ezrules.backend.api_v2.routes import auth, labels, outcomes, rules
 
 # Create FastAPI app
 app = FastAPI(
@@ -65,3 +65,6 @@ app.include_router(rules.router)
 
 # Outcomes routes: /api/v2/outcomes/*
 app.include_router(outcomes.router)
+
+# Labels routes: /api/v2/labels/*
+app.include_router(labels.router)
