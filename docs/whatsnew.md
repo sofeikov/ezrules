@@ -1,5 +1,13 @@
 # What's New
 
+## v0.10
+
+* **FastAPI Migration (In Progress)**: New API v2 service built on FastAPI for improved performance and modern async support
+* New CLI command `uv run ezrules api --port 8889` to start FastAPI server with optional `--reload` flag for development
+* JWT authentication system (coming soon) - will support both local users and future OAuth/SSO integrations
+* OpenAPI documentation automatically available at `/docs` (Swagger UI) and `/redoc`
+* CORS configured for Angular development server (localhost:4200)
+
 ## v0.9
 
 * Implementation of RBAC: per-resource access control, audit trail

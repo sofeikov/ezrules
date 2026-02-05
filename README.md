@@ -23,6 +23,7 @@ ezrules consists of several core components:
 
 - **Rule Engine**: Evaluates events against defined rules and aggregates outcomes
 - **Manager Service**: Flask backend providing REST API for rule management (default port 8888)
+- **API v2 Service**: New FastAPI-based API with JWT authentication (default port 8889) - under development
 - **Angular Frontend**: Modern standalone UI for rule management (optional, under development)
 - **Evaluator Service**: API service for real-time rule evaluation (default port 9999)
 - **Database Layer**: PostgreSQL storage for rules, events, and execution logs
@@ -72,10 +73,15 @@ The `init-db` command automatically handles database creation and provides optio
 ### Start Services
 
 ```bash
-# Start the manager service (web interface)
+# Start the manager service (web interface - Flask/Jinja)
 uv run ezrules manager --port 8888
 
-# Start the evaluator service (API)
+# Start the API v2 service (FastAPI - for Angular frontend)
+uv run ezrules api --port 8889
+# With auto-reload for development:
+uv run ezrules api --port 8889 --reload
+
+# Start the evaluator service (rule evaluation API)
 uv run ezrules evaluator --port 9999
 
 # Run the Celery workers
@@ -277,9 +283,10 @@ The documentation is also available online at [ReadTheDocs](https://ezrules.read
 
 ### Tech Stack
 
-- **Backend**: Python 3.12+, Flask, SQLAlchemy, Celery
+- **Backend**: Python 3.12+, Flask (legacy), FastAPI (new API v2), SQLAlchemy, Celery
 - **Database**: PostgreSQL
 - **Task Queue**: Celery with Redis/PostgreSQL backend (for backtesting)
+- **Authentication**: JWT tokens (API v2), Flask-Security (legacy)
 
 ### Code Quality
 

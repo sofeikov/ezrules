@@ -268,6 +268,28 @@ def evaluator(port):
 
 
 @cli.command()
+@click.option("--port", default="8889")
+@click.option("--reload", is_flag=True, help="Enable auto-reload for development")
+def api(port, reload):
+    """Start the FastAPI v2 API server."""
+    env = os.environ.copy()
+    cmd = [
+        "uvicorn",
+        "ezrules.backend.api_v2.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        port,
+    ]
+    if reload:
+        cmd.append("--reload")
+    subprocess.run(
+        cmd,
+        env=env,
+    )
+
+
+@cli.command()
 @click.option("--n-rules", default=30)
 @click.option("--n-events", default=200)
 @click.option("--label-ratio", default=0.3, help="Ratio of events to label (0.0-1.0)")

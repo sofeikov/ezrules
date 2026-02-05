@@ -34,6 +34,11 @@ dependencies = [
     "pandas>=2.2.2",
     "redis>=6.4.0",
     "flask-cors>=6.0.2",
+    # FastAPI stack
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
 ]
 
 [tool.uv]
