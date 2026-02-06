@@ -15,7 +15,16 @@ interface PermissionGroup {
   selector: 'app-role-permissions',
   standalone: true,
   imports: [CommonModule, FormsModule, SidebarComponent],
-  templateUrl: './role-permissions.component.html'
+  templateUrl: './role-permissions.component.html',
+  styles: [`
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(100px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    :host ::ng-deep .animate-slide-in {
+      animation: slideIn 0.3s ease-out;
+    }
+  `]
 })
 export class RolePermissionsComponent implements OnInit {
   roleId: number = 0;
@@ -29,6 +38,7 @@ export class RolePermissionsComponent implements OnInit {
   error: string | null = null;
   saveError: string | null = null;
   saveSuccess: boolean = false;
+  private saveSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -124,6 +134,17 @@ export class RolePermissionsComponent implements OnInit {
     return name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
 
+  showSaveSuccess(): void {
+    if (this.saveSuccessTimer) {
+      clearTimeout(this.saveSuccessTimer);
+    }
+    this.saveSuccess = true;
+    this.saveSuccessTimer = setTimeout(() => {
+      this.saveSuccess = false;
+      this.saveSuccessTimer = null;
+    }, 3000);
+  }
+
   savePermissions(): void {
     this.saving = true;
     this.saveError = null;
@@ -134,7 +155,7 @@ export class RolePermissionsComponent implements OnInit {
     this.roleService.updateRolePermissions(this.roleId, permissionIds).subscribe({
       next: (response) => {
         if (response.success) {
-          this.saveSuccess = true;
+          this.showSaveSuccess();
           if (response.role) {
             this.selectedPermissionIds = new Set(
               response.role.permissions.map(p => p.id)
