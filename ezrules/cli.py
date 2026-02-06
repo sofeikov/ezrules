@@ -14,6 +14,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 
 from ezrules.backend.data_utils import Event, eval_and_store
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
+from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import RoleType
 from ezrules.core.rule_updater import (
@@ -21,6 +22,7 @@ from ezrules.core.rule_updater import (
     RuleManager,
     RuleManagerFactory,
 )
+from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import Label, Organisation, Role, TestingRecordLog, User
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import Base, db_session
@@ -203,6 +205,18 @@ def init_db(auto_delete):
         PermissionManager.db_session = db_session
         PermissionManager.init_default_actions()
         logger.info("Default permissions initialized")
+
+        # Seed default outcomes (RELEASE, HOLD, CANCEL)
+        logger.info("Seeding default outcomes...")
+        outcome_manager = DatabaseOutcome(db_session=db_session, o_id=1)
+        outcome_manager._ensure_default_outcomes()
+        logger.info("Default outcomes seeded")
+
+        # Seed default user lists (MiddleAsiaCountries, NACountries, LatamCountries)
+        logger.info("Seeding default user lists...")
+        user_list_manager = PersistentUserListManager(db_session=db_session, o_id=1)
+        user_list_manager._ensure_default_lists()
+        logger.info("Default user lists seeded")
 
         logger.info(f"Done initializing the DB at {db_endpoint}")
 

@@ -7,9 +7,11 @@ import { LabelsComponent } from './labels/labels.component';
 import { OutcomesComponent } from './outcomes/outcomes.component';
 import { LabelAnalyticsComponent } from './label-analytics/label-analytics.component';
 import { UserListsComponent } from './user-lists/user-lists.component';
+import { DashboardComponent } from './dashboard/dashboard.component';
 
 export const routes: Routes = [
-  { path: '', component: RuleListComponent },
+  { path: '', component: DashboardComponent },
+  { path: 'dashboard', component: DashboardComponent },
   { path: 'rules', component: RuleListComponent },
   { path: 'rules/create', component: RuleCreateComponent },
   { path: 'rules/:id/history', component: RuleHistoryComponent },

@@ -9,6 +9,9 @@
 * OpenAPI documentation automatically available at `/docs` (Swagger UI) and `/redoc`
 * CORS configured for Angular development server (localhost:4200)
 * **User Lists management page**: Angular frontend page for managing user lists and their entries. Accessible from the sidebar, supports creating/deleting lists, adding/removing entries with a master-detail layout. Backend API at `/api/v2/user-lists/`.
+* **Database initialisation seeds default data**: `uv run ezrules init-db` now seeds default outcomes (RELEASE, HOLD, CANCEL) and default user lists (MiddleAsiaCountries, NACountries, LatamCountries) so rules using `@ListName` notation work out of the box.
+* **Rule test endpoint accepts string outcomes**: The rule test endpoint (`POST /api/v2/rules/test`) now correctly handles rules that return string outcomes like `"HOLD"`, not just booleans.
+* **Dashboard page**: Angular dashboard showing active rules count, transaction volume chart, and rule outcomes over time charts. Includes time range selector (1h, 6h, 12h, 24h, 30d). Accessible from sidebar and is the default landing page.
 
 ## v0.9
 
