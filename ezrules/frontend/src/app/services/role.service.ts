@@ -33,8 +33,19 @@ export interface RoleMutationResponse {
   error?: string;
 }
 
+export interface RolePermissionsResponse {
+  success: boolean;
+  message: string;
+  role?: RoleDetail;
+  error?: string;
+}
+
 interface RolesListResponse {
   roles: RoleListItem[];
+}
+
+interface PermissionsListResponse {
+  permissions: PermissionItem[];
 }
 
 @Injectable({
@@ -65,5 +76,21 @@ export class RoleService {
 
   deleteRole(roleId: number): Observable<RoleMutationResponse> {
     return this.http.delete<RoleMutationResponse>(`${this.rolesUrl}/${roleId}`);
+  }
+
+  getAllPermissions(): Observable<PermissionItem[]> {
+    return this.http.get<PermissionsListResponse>(`${this.rolesUrl}/permissions`).pipe(
+      map(response => response.permissions)
+    );
+  }
+
+  getRolePermissions(roleId: number): Observable<RolePermissionsResponse> {
+    return this.http.get<RolePermissionsResponse>(`${this.rolesUrl}/${roleId}/permissions`);
+  }
+
+  updateRolePermissions(roleId: number, permissionIds: number[]): Observable<RolePermissionsResponse> {
+    return this.http.put<RolePermissionsResponse>(`${this.rolesUrl}/${roleId}/permissions`, {
+      permission_ids: permissionIds
+    });
   }
 }

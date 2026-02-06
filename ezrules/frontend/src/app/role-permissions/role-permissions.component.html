@@ -1,0 +1,107 @@
+<div class="flex min-h-screen bg-gray-50">
+  <app-sidebar></app-sidebar>
+
+  <div class="ml-64 flex-1">
+    <div class="p-8">
+      <!-- Header -->
+      <div class="mb-8">
+        <div class="flex items-center gap-3 mb-2">
+          <a href="/role_management" class="text-blue-600 hover:text-blue-800 text-sm">&larr; Back to Role Management</a>
+        </div>
+        <h1 class="text-3xl font-bold text-gray-900">Permissions for "{{ roleName }}"</h1>
+        <p class="text-gray-600 mt-1">Select which permissions this role should have</p>
+      </div>
+
+      <!-- Loading State -->
+      <div *ngIf="loading" class="flex justify-center items-center py-20">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+
+      <!-- Error State -->
+      <div *ngIf="error && !loading" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="text-sm font-medium text-red-800">{{ error }}</p>
+        </div>
+      </div>
+
+      <div *ngIf="!loading && !error">
+        <!-- Save Error -->
+        <div *ngIf="saveError" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p class="text-sm font-medium text-red-800">{{ saveError }}</p>
+        </div>
+
+        <!-- Save Success -->
+        <div *ngIf="saveSuccess" class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+          <p class="text-sm font-medium text-green-800">Permissions saved successfully.</p>
+        </div>
+
+        <!-- Permission Groups -->
+        <div class="space-y-6 mb-8">
+          <div
+            *ngFor="let group of permissionGroups"
+            class="bg-white border border-gray-200 rounded-lg overflow-hidden"
+          >
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 border-l-4 border-l-blue-500">
+              <h2 class="text-lg font-semibold text-gray-900">{{ group.resourceType }}</h2>
+            </div>
+            <div class="p-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label
+                  *ngFor="let perm of group.permissions"
+                  class="flex items-start gap-3 cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2"
+                >
+                  <input
+                    type="checkbox"
+                    [checked]="isPermissionSelected(perm.id)"
+                    (change)="togglePermission(perm.id)"
+                    class="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <div>
+                    <span class="text-sm font-medium text-gray-900">{{ formatPermissionName(perm.name) }}</span>
+                    <p *ngIf="perm.description" class="text-xs text-gray-500 mt-0.5">{{ perm.description }}</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Current Permissions Summary -->
+        <div class="bg-white border border-gray-200 rounded-lg p-6 mb-8">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Current Permissions Summary</h2>
+          <div *ngIf="getSelectedPermissions().length === 0" class="text-sm text-gray-500">
+            No permissions selected.
+          </div>
+          <div *ngIf="getSelectedPermissions().length > 0" class="flex flex-wrap gap-2">
+            <span
+              *ngFor="let perm of getSelectedPermissions()"
+              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+            >
+              {{ formatPermissionName(perm.name) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-4">
+          <button
+            (click)="savePermissions()"
+            [disabled]="saving"
+            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ saving ? 'Saving...' : 'Save Permissions' }}
+          </button>
+          <a
+            href="/role_management"
+            class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

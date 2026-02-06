@@ -14,6 +14,7 @@
 * **Dashboard page**: Angular dashboard showing active rules count, transaction volume chart, and rule outcomes over time charts. Includes time range selector (1h, 6h, 12h, 24h, 30d). Accessible from sidebar and is the default landing page.
 * **User Management admin panel**: Angular page at `/management/users` for managing user accounts. Supports creating users with optional role assignment, deleting users, toggling active/inactive status, admin-initiated password reset, and inline role assignment/removal. Accessible from sidebar "Security" link.
 * **Role Management page**: Angular page at `/role_management` for managing roles. Supports creating roles with descriptions, assigning roles to users via dropdowns, removing roles from users, deleting roles (only when no users assigned), and links to per-role permission configuration. Accessible from sidebar "Settings" link.
+* **Role Permissions page**: Angular page at `/role_management/{id}/permissions` for configuring per-role permissions. Displays all available permissions grouped by resource type with checkboxes, shows current permissions as green summary badges, and supports saving permission changes. Navigable from the Role Management page via "Manage Permissions" link.
 
 ## v0.9
 
