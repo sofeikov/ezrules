@@ -5,9 +5,10 @@ These endpoints provide CRUD operations for event labels and marking events.
 All endpoints require authentication and appropriate permissions.
 """
 
+import re
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
@@ -24,7 +25,10 @@ from ezrules.backend.api_v2.schemas.labels import (
     LabelsListResponse,
     MarkEventRequest,
     MarkEventResponse,
+    UploadResult,
+    UploadResultError,
 )
+from ezrules.backend.label_upload_service import LabelUploadService
 from ezrules.core.labels import DatabaseLabelManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Label, TestingRecordLog, User
@@ -242,4 +246,62 @@ def mark_event(
         message=f"Event '{event_id}' successfully marked with label '{label_name}'",
         event_id=event_id,
         label_name=label_name,
+    )
+
+
+# =============================================================================
+# CSV UPLOAD
+# =============================================================================
+
+ROW_NUMBER_PATTERN = re.compile(r"^Row (\d+): (.+)$")
+
+
+def _parse_row_error(error_str: str) -> UploadResultError:
+    """Parse an error string from LabelUploadService into an UploadResultError."""
+    match = ROW_NUMBER_PATTERN.match(error_str)
+    if match:
+        return UploadResultError(row=int(match.group(1)), error=match.group(2))
+    return UploadResultError(row=0, error=error_str)
+
+
+@router.post("/upload", response_model=UploadResult)
+async def upload_labels(
+    file: UploadFile,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.CREATE_LABEL)),
+    db: Any = Depends(get_db),
+) -> UploadResult:
+    """
+    Upload a CSV file to bulk-assign labels to events.
+
+    CSV format: event_id,label_name (one per line, no header row).
+    """
+    if file.content_type not in ("text/csv", "application/octet-stream", "text/plain"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type '{file.content_type}'. Expected a CSV file.",
+        )
+
+    raw_bytes = await file.read()
+    try:
+        csv_content = raw_bytes.decode("utf-8")
+    except UnicodeDecodeError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File is not valid UTF-8 encoded text.",
+        ) from err
+
+    service = LabelUploadService(db)
+    result = service.upload_labels_from_csv(csv_content)
+
+    db.commit()
+
+    total_rows = result.success_count + result.error_count
+    errors = [_parse_row_error(e) for e in result.errors]
+
+    return UploadResult(
+        total_rows=total_rows,
+        successful=result.success_count,
+        failed=result.error_count,
+        errors=errors,
     )

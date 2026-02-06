@@ -512,3 +512,70 @@ class TestLabelPermissions:
             )
 
             assert response.status_code == 403
+
+
+# =============================================================================
+# CSV UPLOAD TESTS
+# =============================================================================
+
+
+class TestUploadLabels:
+    """Tests for POST /api/v2/labels/upload."""
+
+    def test_upload_valid_csv(self, labels_test_client, sample_label, sample_event):
+        """Should successfully upload a valid CSV and assign labels to events."""
+        token = labels_test_client.test_data["token"]
+
+        csv_content = f"{sample_event.event_id},{sample_label.label}\n"
+
+        response = labels_test_client.post(
+            "/api/v2/labels/upload",
+            headers={"Authorization": f"Bearer {token}"},
+            files={"file": ("labels.csv", csv_content, "text/csv")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_rows"] == 1
+        assert data["successful"] == 1
+        assert data["failed"] == 0
+        assert data["errors"] == []
+
+    def test_upload_invalid_format(self, labels_test_client):
+        """Should return errors for CSV with invalid format (wrong column count)."""
+        token = labels_test_client.test_data["token"]
+
+        csv_content = "only_one_column\nthree,columns,here\n"
+
+        response = labels_test_client.post(
+            "/api/v2/labels/upload",
+            headers={"Authorization": f"Bearer {token}"},
+            files={"file": ("bad.csv", csv_content, "text/csv")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["successful"] == 0
+        assert data["failed"] == 2
+        assert len(data["errors"]) == 2
+        assert all("Expected 2 columns" in e["error"] for e in data["errors"])
+
+    def test_upload_partial_failure(self, labels_test_client, sample_label, sample_event):
+        """Should handle mix of valid and invalid rows."""
+        token = labels_test_client.test_data["token"]
+
+        csv_content = f"{sample_event.event_id},{sample_label.label}\nnonexistent_event,TEST_LABEL\n"
+
+        response = labels_test_client.post(
+            "/api/v2/labels/upload",
+            headers={"Authorization": f"Bearer {token}"},
+            files={"file": ("mixed.csv", csv_content, "text/csv")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["successful"] == 1
+        assert data["failed"] == 1
+        assert len(data["errors"]) == 1
+        assert data["errors"][0]["row"] == 2
+        assert "not found" in data["errors"][0]["error"]

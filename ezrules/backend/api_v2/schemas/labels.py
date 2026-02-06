@@ -111,3 +111,19 @@ class MarkEventResponse(BaseModel):
     event_id: str | None = None
     label_name: str | None = None
     error: str | None = None
+
+
+class UploadResultError(BaseModel):
+    """Single error from CSV upload."""
+
+    row: int
+    error: str
+
+
+class UploadResult(BaseModel):
+    """Response for CSV label upload."""
+
+    total_rows: int
+    successful: int
+    failed: int
+    errors: list[UploadResultError] = Field(default_factory=list)
