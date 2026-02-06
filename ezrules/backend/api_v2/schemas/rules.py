@@ -129,7 +129,7 @@ class RuleTestResponse(BaseModel):
 
     status: str = Field(..., description="'ok' or 'error'")
     reason: str
-    rule_outcome: bool | None = None
+    rule_outcome: str | None = None
 
 
 class RuleMutationResponse(BaseModel):

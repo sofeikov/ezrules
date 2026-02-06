@@ -461,7 +461,7 @@ def test_rule(
         return RuleTestResponse(
             status="ok",
             reason="ok",
-            rule_outcome=rule_outcome,
+            rule_outcome=str(rule_outcome) if rule_outcome is not None else None,
         )
     except Exception as e:
         return RuleTestResponse(

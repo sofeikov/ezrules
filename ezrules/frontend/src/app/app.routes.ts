@@ -6,6 +6,7 @@ import { RuleCreateComponent } from './rule-create/rule-create.component';
 import { LabelsComponent } from './labels/labels.component';
 import { OutcomesComponent } from './outcomes/outcomes.component';
 import { LabelAnalyticsComponent } from './label-analytics/label-analytics.component';
+import { UserListsComponent } from './user-lists/user-lists.component';
 
 export const routes: Routes = [
   { path: '', component: RuleListComponent },
@@ -16,5 +17,6 @@ export const routes: Routes = [
   { path: 'rules/:id', component: RuleDetailComponent },
   { path: 'labels', component: LabelsComponent },
   { path: 'outcomes', component: OutcomesComponent },
+  { path: 'user-lists', component: UserListsComponent },
   { path: 'label_analytics', component: LabelAnalyticsComponent }
 ];

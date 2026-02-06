@@ -8,6 +8,7 @@
 * JWT authentication system (coming soon) - will support both local users and future OAuth/SSO integrations
 * OpenAPI documentation automatically available at `/docs` (Swagger UI) and `/redoc`
 * CORS configured for Angular development server (localhost:4200)
+* **User Lists management page**: Angular frontend page for managing user lists and their entries. Accessible from the sidebar, supports creating/deleting lists, adding/removing entries with a master-detail layout. Backend API at `/api/v2/user-lists/`.
 
 ## v0.9
 

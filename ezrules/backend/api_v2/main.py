@@ -19,6 +19,10 @@ from ezrules.backend.api_v2.routes import (
     user_lists,
     users,
 )
+from ezrules.core.application_context import set_organization_id, set_user_list_manager
+from ezrules.core.user_lists import PersistentUserListManager
+from ezrules.models.database import db_session
+from ezrules.settings import app_settings
 
 # Create FastAPI app
 app = FastAPI(
@@ -39,6 +43,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# =============================================================================
+# INITIALIZE APPLICATION CONTEXT
+# =============================================================================
+# Set up the user list manager so rule parsing can resolve @ListName references.
+# Without this, the AtNotationConverter falls back to the StaticUserListManager
+# which only knows about a few hardcoded lists.
+_user_list_manager = PersistentUserListManager(db_session=db_session, o_id=app_settings.ORG_ID)
+set_organization_id(app_settings.ORG_ID)
+set_user_list_manager(_user_list_manager)
 
 
 @app.get("/ping")

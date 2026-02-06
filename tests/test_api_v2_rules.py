@@ -393,7 +393,7 @@ class TestTestRule:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
-        assert data["rule_outcome"] is True
+        assert data["rule_outcome"] == "True"
 
     def test_test_rule_success_false(self, rules_test_client):
         """Should return False for non-matching rule."""
@@ -411,7 +411,43 @@ class TestTestRule:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
-        assert data["rule_outcome"] is False
+        assert data["rule_outcome"] == "False"
+
+    def test_test_rule_string_outcome(self, rules_test_client):
+        """Should return string outcome for rules that return strings."""
+        token = rules_test_client.test_data["token"]
+
+        response = rules_test_client.post(
+            "/api/v2/rules/test",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "rule_source": 'if $amount > 100:\n\treturn "HOLD"',
+                "test_json": '{"amount": 150}',
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert data["rule_outcome"] == "HOLD"
+
+    def test_test_rule_string_outcome_no_match(self, rules_test_client):
+        """Should return None when rule condition is not met."""
+        token = rules_test_client.test_data["token"]
+
+        response = rules_test_client.post(
+            "/api/v2/rules/test",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "rule_source": 'if $amount > 100:\n\treturn "HOLD"',
+                "test_json": '{"amount": 50}',
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert data["rule_outcome"] is None
 
     def test_test_rule_invalid_json(self, rules_test_client):
         """Should return error for malformed test JSON."""
