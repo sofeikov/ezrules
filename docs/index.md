@@ -25,19 +25,19 @@ ezrules is designed for organizations that need to monitor transactions, detect 
 
 ### Quick Start
 Get up and running in minutes with our quick start guide
-[→ Quick Start](getting-started/quickstart.md)
+[-> Quick Start](getting-started/quickstart.md)
 
 ### User Guides
 Learn how to use ezrules for your role - analyst, admin, or developer
-[→ Guides](user-guide/analyst-guide.md)
+[-> Guides](user-guide/analyst-guide.md)
 
 ### API Reference
 Integrate ezrules with your applications using our REST APIs
-[→ API Docs](api-reference/evaluator-api.md)
+[-> API Docs](api-reference/evaluator-api.md)
 
 ### Architecture
 Understand how ezrules works under the hood
-[→ Architecture](architecture/overview.md)
+[-> Architecture](architecture/overview.md)
 
 ---
 
@@ -62,8 +62,8 @@ Automated decision-making based on configurable business logic without requiring
 | Feature | Description |
 |---------|-------------|
 | **Rule Engine** | Python-based rule execution with custom logic support |
-| **Web Interface** | Flask-based UI for rule creation and management |
-| **API Service** | Dedicated evaluator service for real-time rule execution |
+| **Web Interface** | Web UI for rule creation and management |
+| **API Service** | Unified FastAPI service for rule management and real-time evaluation at `/api/v2/evaluate` |
 | **Security** | 24 permission actions with role-based access control |
 | **Labeling** | API and bulk CSV upload for transaction labels |
 | **Analytics** | Time-series charts with 1h, 6h, 12h, 24h, 30d ranges |
@@ -76,7 +76,7 @@ Automated decision-making based on configurable business logic without requiring
 
 ## Architecture Overview
 
-ezrules uses a multi-service architecture for scalability and flexibility:
+ezrules uses a unified service architecture where the API service handles both the web interface and rule evaluation:
 
 ```
 ┌─────────────────┐
@@ -85,24 +85,19 @@ ezrules uses a multi-service architecture for scalability and flexibility:
          │
          ▼
 ┌─────────────────┐     ┌─────────────────┐
-│  Manager Service│────▶│    PostgreSQL   │
+│  API Service    │────>│    PostgreSQL   │
 │   (Port 8888)   │     │    Database     │
-└─────────────────┘     └─────────────────┘
-                               ▲
-                               │
-┌─────────────────┐            │
-│ External Apps   │            │
-└────────┬────────┘            │
-         │                     │
-         ▼                     │
-┌─────────────────┐            │
-│ Evaluator Service│───────────┘
-│   (Port 9999)   │
+└────────▲────────┘     └─────────────────┘
+         │
+         │
+┌─────────────────┐
+│ External Apps   │
+│ POST /api/v2/   │
+│   evaluate      │
 └─────────────────┘
 ```
 
-- **Manager Service**: Web UI for rule management and monitoring
-- **Evaluator Service**: REST API for real-time rule evaluation
+- **API Service**: Unified service for web UI, rule management, and real-time rule evaluation
 - **Database**: Central storage for rules, events, and analytics
 - **Celery Workers**: Background task processing for rule backtesting
 
@@ -112,11 +107,11 @@ ezrules uses a multi-service architecture for scalability and flexibility:
 
 Ready to start using ezrules? Follow our installation guide:
 
-[Get Started →](getting-started/installation.md){ .md-button .md-button--primary }
+[Get Started ->](getting-started/installation.md){ .md-button .md-button--primary }
 
 Or jump straight to a practical example:
 
-[Quick Start →](getting-started/quickstart.md){ .md-button }
+[Quick Start ->](getting-started/quickstart.md){ .md-button }
 
 ---
 

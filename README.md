@@ -11,7 +11,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Enterprise Security**: Granular role-based access control with 13 permission types
 - **Transaction Labeling**: Comprehensive fraud analytics with API and bulk CSV upload capabilities
 - **Analytics Dashboard**: Real-time transaction volume charts with configurable time ranges (1h, 6h, 12h, 24h, 30d)
-- **Scalable Architecture**: Multi-service deployment with dedicated manager and evaluator services
+- **Scalable Architecture**: Unified API service with integrated rule evaluation
 - **Database Integration**: PostgreSQL backend with SQLAlchemy ORM and full audit history
 - **Audit Trail**: Complete access control and change tracking for compliance
 - **Backtesting**: Test rule changes against historical data before deployment
@@ -23,14 +23,13 @@ ezrules consists of several core components:
 
 - **Rule Engine**: Evaluates events against defined rules and aggregates outcomes
 - **Manager Service**: Flask backend providing REST API for rule management (default port 8888)
-- **API v2 Service**: New FastAPI-based API with JWT authentication (default port 8889) - under development
+- **API Service**: FastAPI-based API with JWT authentication, including real-time rule evaluation at `/api/v2/evaluate` (default port 8888)
 - **Angular Frontend**: Modern standalone UI for rule management (optional, under development)
-- **Evaluator Service**: API service for real-time rule evaluation (default port 9999)
 - **Database Layer**: PostgreSQL storage for rules, events, and execution logs
 
 ### Data Flow
 
-1. Events are submitted to the evaluator service
+1. Events are submitted to the API service at `/api/v2/evaluate`
 2. Rules are executed against event data
 3. Outcomes are aggregated and stored
 4. Results are available via API and web interface
@@ -76,13 +75,10 @@ The `init-db` command automatically handles database creation and provides optio
 # Start the manager service (web interface - Flask/Jinja)
 uv run ezrules manager --port 8888
 
-# Start the API v2 service (FastAPI - for Angular frontend)
-uv run ezrules api --port 8889
+# Start the API service (FastAPI - includes rule evaluation and Angular frontend API)
+uv run ezrules api --port 8888
 # With auto-reload for development:
-uv run ezrules api --port 8889 --reload
-
-# Start the evaluator service (rule evaluation API)
-uv run ezrules evaluator --port 9999
+uv run ezrules api --port 8888 --reload
 
 # Run the Celery workers
 uv run celery -A ezrules.backend.tasks worker -l INFO
@@ -199,7 +195,7 @@ ezrules includes comprehensive transaction labeling capabilities for fraud detec
 
 **Single Event API**: Programmatically mark individual transactions
 ```bash
-curl -X POST http://localhost:9999/mark-event \
+curl -X POST http://localhost:8888/api/v2/mark-event \
   -H "Content-Type: application/json" \
   -d '{"event_id": "txn_123", "label_name": "FRAUD"}'
 ```
@@ -324,7 +320,7 @@ uv run ezrules delete-test-data
 The Angular frontend includes comprehensive end-to-end tests using Playwright.
 
 **Prerequisites:**
-- Backend services running (Manager on port 8888, Evaluator on port 9999)
+- Backend services running (Manager on port 8888, API service on port 8888)
 - Angular dev server running (port 4200)
 - Playwright browsers installed (first time only): `npx playwright install chromium`
 

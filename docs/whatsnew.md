@@ -3,7 +3,8 @@
 ## v0.10
 
 * **FastAPI Migration (In Progress)**: New API v2 service built on FastAPI for improved performance and modern async support
-* New CLI command `uv run ezrules api --port 8889` to start FastAPI server with optional `--reload` flag for development
+* **Evaluator merged into API service**: The standalone evaluator service (port 9999) has been merged into the main API service. Rule evaluation is now available at `/api/v2/evaluate` on port 8888. The `evaluator` CLI command is deprecated in favour of `api`.
+* New CLI command `uv run ezrules api --port 8888` to start FastAPI server with optional `--reload` flag for development
 * JWT authentication system (coming soon) - will support both local users and future OAuth/SSO integrations
 * OpenAPI documentation automatically available at `/docs` (Swagger UI) and `/redoc`
 * CORS configured for Angular development server (localhost:4200)

@@ -1,20 +1,20 @@
 # Evaluator API Reference
 
-The Evaluator service provides REST APIs for rule evaluation and event submission.
+The evaluate endpoint is part of the main API service and provides REST APIs for rule evaluation and event submission.
 
-**Base URL:** `http://localhost:9999` (default)
+**Base URL:** `http://localhost:8888/api/v2` (default)
 
-!!! note "Manager Service Endpoints"
-    Analytics endpoints, labeling, and outcome management are available through the **Manager Service** (port 8888). See [Manager API Reference](manager-api.md) for those endpoints.
+!!! note "Unified API Service"
+    The evaluator is now part of the main FastAPI API service (port 8888). The legacy standalone `evaluator` CLI command (port 9999) is deprecated. Use `uv run ezrules api --port 8888` instead.
 
 ---
 
 ## Authentication
 
-Currently, the evaluator API does not require authentication. This is suitable for internal network deployments.
+Currently, the evaluate endpoint does not require authentication. This is suitable for internal network deployments.
 
 !!! warning "Production Security"
-    In production, place the evaluator behind an API gateway with authentication or use network-level access control.
+    In production, place the API behind an API gateway with authentication or use network-level access control.
 
 ---
 
@@ -24,7 +24,7 @@ Currently, the evaluator API does not require authentication. This is suitable f
 
 Simple connectivity test.
 
-**Endpoint:** `GET /ping`
+**Endpoint:** `GET /api/v2/ping`
 
 **Response:**
 ```
@@ -41,7 +41,7 @@ OK
 
 Submit an event for rule evaluation.
 
-**Endpoint:** `POST /evaluate`
+**Endpoint:** `POST /api/v2/evaluate`
 
 **Request Body:**
 ```json
@@ -83,7 +83,7 @@ Submit an event for rule evaluation.
 
 **Example:**
 ```bash
-curl -X POST http://localhost:9999/evaluate \
+curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "txn_001",
@@ -101,11 +101,12 @@ curl -X POST http://localhost:9999/evaluate \
 
 ### Error Response Format
 
-Flask returns standard HTTP error responses. For validation errors:
+FastAPI returns standard HTTP error responses. For validation errors:
 
 **Status Codes:**
 
 - `400 Bad Request` - Malformed request body or missing required fields
+- `422 Unprocessable Entity` - Request body fails validation
 - `500 Internal Server Error` - Rule processing failed or database connectivity issue
 
 ---
@@ -126,7 +127,7 @@ import requests
 import time
 
 class EzrulesEvaluatorClient:
-    def __init__(self, base_url="http://localhost:9999"):
+    def __init__(self, base_url="http://localhost:8888/api/v2"):
         self.base_url = base_url
 
     def ping(self):

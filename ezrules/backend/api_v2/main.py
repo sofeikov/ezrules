@@ -11,6 +11,7 @@ from ezrules.backend.api_v2.routes import (
     analytics,
     audit,
     auth,
+    evaluator,
     labels,
     outcomes,
     roles,
@@ -86,3 +87,6 @@ app.include_router(user_lists.router)
 
 # Audit Trail routes: /api/v2/audit/*
 app.include_router(audit.router)
+
+# Evaluator routes: /api/v2/evaluate, /api/v2/ping (merged from evaluator service)
+app.include_router(evaluator.router)

@@ -5,9 +5,8 @@ This directory contains end-to-end (E2E) tests for the ezrules Angular frontend 
 ## Quick Start
 
 ```bash
-# 1. Make sure backend services are running (in separate terminals)
-uv run ezrules manager --port 8888
-uv run ezrules evaluator --port 9999
+# 1. Make sure the API service is running
+uv run ezrules api --port 8888
 
 # 2. Make sure Angular dev server is running
 cd ezrules/frontend
@@ -42,18 +41,15 @@ Navigation and other pages are not yet implemented, so they're not tested.
 
 Before running E2E tests, you need to have the following services running:
 
-1. **Backend Services**: Manager and Evaluator services
+1. **API Service**: The unified API service (includes rule evaluation)
    ```bash
-   # Terminal 1: Start Manager service
-   uv run ezrules manager --port 8888
-
-   # Terminal 2: Start Evaluator service
-   uv run ezrules evaluator --port 9999
+   # Terminal 1: Start API service
+   uv run ezrules api --port 8888
    ```
 
 2. **Angular Dev Server**: Frontend application
    ```bash
-   # Terminal 3: Start Angular dev server
+   # Terminal 2: Start Angular dev server
    cd ezrules/frontend
    npm start
    ```
@@ -214,10 +210,9 @@ Main configuration is in `playwright.config.ts`:
 Tests can be integrated into CI/CD pipelines. Example GitHub Actions workflow:
 
 ```yaml
-- name: Start backend services
+- name: Start API service
   run: |
-    uv run ezrules manager --port 8888 &
-    uv run ezrules evaluator --port 9999 &
+    uv run ezrules api --port 8888 &
     sleep 5
 
 - name: Start Angular dev server
@@ -247,7 +242,7 @@ Tests can be integrated into CI/CD pipelines. Example GitHub Actions workflow:
 
 ### "Connection refused" errors
 
-- Ensure all backend services are running and healthy
+- Ensure the API service is running and healthy
 - Check service logs in `/tmp/ezrules-*.log`
 - Verify ports are not in use by other processes
 

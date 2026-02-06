@@ -207,16 +207,10 @@ gunzip -c backup_20250109.sql.gz | psql -h localhost -U postgres ezrules
 
 ### Health Checks
 
-**Manager Service:**
+**API Service:**
 ```bash
-curl http://localhost:8888/ping
+curl http://localhost:8888/api/v2/ping
 # Should return 200 OK
-```
-
-**Evaluator Service:**
-```bash
-curl http://localhost:9999/health
-# Should return {"status": "healthy"}
 ```
 
 **Database:**
@@ -276,43 +270,43 @@ logging.getLogger('ezrules').addHandler(handler)
 
 ### Horizontal Scaling
 
-Run multiple evaluator instances behind a load balancer:
+Run multiple API service instances behind a load balancer:
 
 ```yaml
 # docker-compose.yml
 services:
-  evaluator-1:
+  api-1:
     image: ezrules:latest
-    command: ["uv", "run", "ezrules", "evaluator", "--port", "9999"]
+    command: ["uv", "run", "ezrules", "api", "--port", "8888"]
 
-  evaluator-2:
+  api-2:
     image: ezrules:latest
-    command: ["uv", "run", "ezrules", "evaluator", "--port", "9999"]
+    command: ["uv", "run", "ezrules", "api", "--port", "8888"]
 
-  evaluator-3:
+  api-3:
     image: ezrules:latest
-    command: evaluator --port 9999
+    command: ["uv", "run", "ezrules", "api", "--port", "8888"]
 
   loadbalancer:
     image: nginx:latest
     ports:
-      - "9999:80"
+      - "8888:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
 ```
 
 **nginx.conf:**
 ```nginx
-upstream evaluators {
-    server evaluator-1:9999;
-    server evaluator-2:9999;
-    server evaluator-3:9999;
+upstream api_instances {
+    server api-1:8888;
+    server api-2:8888;
+    server api-3:8888;
 }
 
 server {
     listen 80;
     location / {
-        proxy_pass http://evaluators;
+        proxy_pass http://api_instances;
     }
 }
 ```
@@ -368,11 +362,8 @@ def get_blocklist():
 Only expose necessary ports:
 
 ```bash
-# Allow only internal network to manager
+# Allow only internal network to API service
 ufw allow from 10.0.0.0/8 to any port 8888
-
-# Allow application servers to evaluator
-ufw allow from 192.168.1.0/24 to any port 9999
 ```
 
 **SSL/TLS:**
@@ -440,7 +431,7 @@ COPY . /app
 RUN pip install uv
 RUN uv sync
 
-CMD ["uv", "run", "ezrules", "manager"]
+CMD ["uv", "run", "ezrules", "api"]
 ```
 
 **Build and Run:**
@@ -449,7 +440,7 @@ CMD ["uv", "run", "ezrules", "manager"]
 docker build -t ezrules:latest .
 
 docker run -d \
-  --name ezrules-manager \
+  --name ezrules-api \
   -e EZRULES_DB_ENDPOINT="postgresql://..." \
   -e EZRULES_APP_SECRET="..." \
   -p 8888:8888 \
@@ -464,21 +455,21 @@ docker run -d \
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ezrules-evaluator
+  name: ezrules-api
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: ezrules-evaluator
+      app: ezrules-api
   template:
     metadata:
       labels:
-        app: ezrules-evaluator
+        app: ezrules-api
     spec:
       containers:
-      - name: evaluator
+      - name: api
         image: ezrules:latest
-        command: ["uv", "run", "ezrules", "evaluator"]
+        command: ["uv", "run", "ezrules", "api"]
         env:
         - name: EZRULES_DB_ENDPOINT
           valueFrom:
@@ -486,7 +477,7 @@ spec:
               name: ezrules-secrets
               key: db-endpoint
         ports:
-        - containerPort: 9999
+        - containerPort: 8888
         resources:
           requests:
             memory: "512Mi"
@@ -524,9 +515,8 @@ git pull origin main
 # Update dependencies
 uv sync
 
-# Restart services
-systemctl restart ezrules-manager
-systemctl restart ezrules-evaluator
+# Restart service
+systemctl restart ezrules-api
 ```
 
 ---
@@ -537,7 +527,7 @@ systemctl restart ezrules-evaluator
 
 1. Check logs:
    ```bash
-   journalctl -u ezrules-manager -n 50
+   journalctl -u ezrules-api -n 50
    ```
 
 2. Test database connectivity:

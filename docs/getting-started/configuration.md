@@ -33,7 +33,7 @@ export EZRULES_DB_ENDPOINT="postgresql://postgres:root@localhost:5432/tests"
 
 #### `EZRULES_APP_SECRET`
 
-Secret key for Flask session management and security features.
+Secret key for session management and security features.
 
 **Default:** Auto-generated random string
 
@@ -86,7 +86,7 @@ Load the file before running commands:
 
 ```bash
 source .env
-uv run ezrules manager
+uv run ezrules api
 ```
 
 Or use a tool like `direnv` to auto-load:
@@ -104,9 +104,30 @@ direnv allow
 
 ## Service Configuration
 
-### Manager Service Options
+### API Service Options
 
-The web interface service accepts these command-line arguments:
+The API service provides both the web interface and the evaluation API. It accepts these command-line arguments:
+
+```bash
+uv run ezrules api [OPTIONS]
+```
+
+**Options:**
+
+- `--port PORT` - Server port (default: 8888)
+- `--reload` - Enable auto-reload for development
+
+**Example:**
+```bash
+uv run ezrules api --port 8888
+```
+
+!!! note "Deprecated: Evaluator Command"
+    The standalone `uv run ezrules evaluator` command is deprecated. The evaluation endpoint is now available at `/api/v2/evaluate` on the main API service. Use `uv run ezrules api` instead.
+
+### Manager Service Options (Legacy)
+
+The legacy Flask manager web interface:
 
 ```bash
 uv run ezrules manager [OPTIONS]
@@ -119,23 +140,6 @@ uv run ezrules manager [OPTIONS]
 **Example:**
 ```bash
 uv run ezrules manager --port 8080
-```
-
-### Evaluator Service Options
-
-The API service for rule evaluation:
-
-```bash
-uv run ezrules evaluator [OPTIONS]
-```
-
-**Options:**
-
-- `--port PORT` - Server port (default: 9999)
-
-**Example:**
-```bash
-uv run ezrules evaluator --port 9000
 ```
 
 !!! note "Additional Configuration"
@@ -205,18 +209,18 @@ EZRULES_ORG_ID=1
 ```
 
 !!! danger "Production Checklist"
-    - ✅ Use strong, unique secrets
-    - ✅ Enable SSL for database connections
-    - ✅ Set `EZRULES_TESTING=false`
-    - ✅ Use connection pooling
-    - ✅ Configure proper logging
-    - ✅ Set up monitoring and alerting
+    - Use strong, unique secrets
+    - Enable SSL for database connections
+    - Set `EZRULES_TESTING=false`
+    - Use connection pooling
+    - Configure proper logging
+    - Set up monitoring and alerting
 
 ---
 
 ## Logging Configuration
 
-The project relies on Python's standard logging module. Adjust handlers or levels inside your service wrappers (for example, by calling `logging.basicConfig`) before invoking `uv run ezrules …`.
+The project relies on Python's standard logging module. Adjust handlers or levels inside your service wrappers (for example, by calling `logging.basicConfig`) before invoking `uv run ezrules ...`.
 
 ---
 
@@ -234,7 +238,7 @@ If using background workers:
 
 ### Customisation Hooks
 
-Additional runtime behaviours (rule paths, query limits, multi-tenancy) are not controlled via environment variables today. Extend the codebase where needed—for example, by adapting `RuleManagerFactory` or wrapping database sessions with your own configuration.
+Additional runtime behaviours (rule paths, query limits, multi-tenancy) are not controlled via environment variables today. Extend the codebase where needed--for example, by adapting `RuleManagerFactory` or wrapping database sessions with your own configuration.
 
 ---
 
@@ -260,22 +264,14 @@ When using Docker, pass environment variables:
 # docker-compose.yml
 version: '3.8'
 services:
-  ezrules-manager:
+  ezrules-api:
     image: ezrules:latest
     environment:
       - EZRULES_DB_ENDPOINT=postgresql://postgres:password@db:5432/ezrules
       - EZRULES_APP_SECRET=${SECRET_KEY}
     ports:
       - "8888:8888"
-    command: manager --port 8888
-
-  ezrules-evaluator:
-    image: ezrules:latest
-    environment:
-      - EZRULES_DB_ENDPOINT=postgresql://postgres:password@db:5432/ezrules
-    ports:
-      - "9999:9999"
-    command: evaluator --port 9999 --workers 4
+    command: api --port 8888
 
   db:
     image: postgres:16

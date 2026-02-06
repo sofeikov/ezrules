@@ -7,25 +7,19 @@ This guide will get you up and running with ezrules in under 10 minutes. You'll 
 
 ---
 
-## Step 1: Start the Services
+## Step 1: Start the Service
 
-Start both the manager and evaluator services in separate terminals:
+Start the API service which provides both the web interface and the evaluation API:
 
-=== "Terminal 1: Manager Service"
+```bash
+uv run ezrules api --port 8888
+```
 
-    ```bash
-    uv run ezrules manager --port 8888
-    ```
+The API service provides:
 
-    The manager service provides the web interface at [http://localhost:8888](http://localhost:8888)
-
-=== "Terminal 2: Evaluator Service"
-
-    ```bash
-    uv run ezrules evaluator --port 9999
-    ```
-
-    The evaluator service provides the REST API at [http://localhost:9999](http://localhost:9999)
+- The web interface at [http://localhost:8888](http://localhost:8888)
+- The REST API at `http://localhost:8888/api/v2`
+- OpenAPI docs at [http://localhost:8888/docs](http://localhost:8888/docs)
 
 ---
 
@@ -102,11 +96,11 @@ This creates 10 random events in the database.
 
 ### Or Submit via API
 
-You can also submit events directly via the evaluator API:
+You can also submit events directly via the evaluate API:
 
 ```bash
 # Low-value transaction (won't trigger rule)
-curl -X POST http://localhost:9999/evaluate \
+curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "txn_001",
@@ -115,7 +109,7 @@ curl -X POST http://localhost:9999/evaluate \
   }'
 
 # High-value transaction (will trigger rule)
-curl -X POST http://localhost:9999/evaluate \
+curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "txn_002",
@@ -136,10 +130,10 @@ curl -X POST http://localhost:9999/evaluate \
 
 ### Inspect the API Response
 
-The evaluator response already tells you which rule fired and what outcomes were produced. Re-run the high-value transaction call:
+The evaluate response already tells you which rule fired and what outcomes were produced. Re-run the high-value transaction call:
 
 ```bash
-curl -X POST http://localhost:9999/evaluate \
+curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "txn_002",
@@ -198,11 +192,11 @@ curl -X POST http://localhost:8888/mark-event \
 
 Congratulations! You've successfully:
 
-- ✅ Created a business rule
-- ✅ Defined an outcome
-- ✅ Submitted events
-- ✅ Labeled transactions
-- ✅ Viewed analytics
+- Created a business rule
+- Defined an outcome
+- Submitted events
+- Labeled transactions
+- Viewed analytics
 
 ### Learn More
 
@@ -262,7 +256,7 @@ if $user_id in @blocklist:
 
 ### Events Not Appearing
 
-1. Ensure the evaluator service is running
+1. Ensure the API service is running
 2. Check the API response for errors
 3. Verify database connectivity
 

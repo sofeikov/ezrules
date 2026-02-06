@@ -6,7 +6,7 @@ Understanding how ezrules is designed and how its components interact.
 
 ## System Architecture
 
-ezrules uses a multi-service architecture for scalability and separation of concerns:
+ezrules uses a unified service architecture where the API service handles both the web interface and rule evaluation:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -15,8 +15,9 @@ ezrules uses a multi-service architecture for scalability and separation of conc
                     │ HTTPS (8888)
                     ▼
 ┌──────────────────────────────────────────────────────────┐
-│                  Manager Service                          │
-│  - Web UI for rule management                            │
+│                   API Service (8888)                      │
+│  - Web UI for rule management (Manager)                  │
+│  - REST API for event evaluation (/api/v2/evaluate)      │
 │  - User authentication                                    │
 │  - Analytics dashboards                                   │
 │  - Label upload interface                                 │
@@ -33,15 +34,7 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 │  - User accounts and permissions                          │
 └───────────────────▲──────────────────────────────────────┘
                     │
-                    │ PostgreSQL
-                    │
-┌──────────────────────────────────────────────────────────┐
-│                 Evaluator Service                         │
-│  - REST API for event evaluation                          │
-│  - Rule execution engine                                  │
-│  - Real-time processing                                   │
-└───────────────────▲──────────────────────────────────────┘
-                    │ HTTP (9999)
+                    │ HTTP (8888) /api/v2/evaluate
                     │
 ┌──────────────────────────────────────────────────────────┐
 │              External Applications                        │
@@ -55,9 +48,9 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 
 ## Core Components
 
-### 1. Manager Service
+### 1. API Service
 
-**Purpose:** Web interface for human users
+**Purpose:** Unified service for the web interface and rule evaluation API
 
 **Responsibilities:**
 
@@ -67,36 +60,20 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 - Analytics dashboards
 - Label management and CSV uploads
 - User list (blocklist/allowlist) management
-
-**Technology:**
-
-- Flask web framework
-- Jinja2 templates
-- SQLAlchemy ORM
-- Session-based authentication
-
-**Port:** 8888 (default)
-
----
-
-### 2. Evaluator Service
-
-**Purpose:** API service for rule evaluation
-
-**Responsibilities:**
-
-- Accept events via REST API
+- Accept events via REST API (`/api/v2/evaluate`)
 - Execute rules against events
 - Record outcomes
 - Return evaluation results
 
 **Technology:**
 
-- Flask RESTful API
-- Python rule execution engine
+- FastAPI web framework (API v2)
+- Flask (legacy manager UI)
+- Jinja2 templates
 - SQLAlchemy ORM
+- Session-based authentication
 
-**Port:** 9999 (default)
+**Port:** 8888 (default)
 
 **Design Considerations:**
 
@@ -106,7 +83,7 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 
 ---
 
-### 3. Database Layer
+### 2. Database Layer
 
 **Purpose:** Central data storage
 
@@ -116,31 +93,31 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 
 **Rules & Configuration**
 
-- `rule_engine_config` – Serialized rule engine payloads
-- `rule_engine_config_history` – Versioned history of the configs
-- `rules` – Rule definitions and logic
-- `rule_history` – Change log produced via SQLAlchemy versioning
-- `rule_backtesting_results` – Records of Celery backtests
+- `rule_engine_config` -- Serialized rule engine payloads
+- `rule_engine_config_history` -- Versioned history of the configs
+- `rules` -- Rule definitions and logic
+- `rule_history` -- Change log produced via SQLAlchemy versioning
+- `rule_backtesting_results` -- Records of Celery backtests
 
 **Events & Outcomes**
 
-- `testing_record_log` – Stored events evaluated by the system
-- `testing_results_log` – Rule outcomes linked to each event
-- `allowed_outcomes` – Whitelist of valid outcome names
-- `event_labels` – Available labels
+- `testing_record_log` -- Stored events evaluated by the system
+- `testing_results_log` -- Rule outcomes linked to each event
+- `allowed_outcomes` -- Whitelist of valid outcome names
+- `event_labels` -- Available labels
 
 **User Lists**
 
-- `user_lists` – List definitions scoped by organisation
-- `user_list_entries` – Individual values contained in each list
+- `user_lists` -- List definitions scoped by organisation
+- `user_list_entries` -- Individual values contained in each list
 
 **Access Control**
 
-- `user` – Accounts managed by Flask-Security
-- `role` – Role definitions
-- `roles_users` – Relationship table between users and roles
-- `actions` – Permission action catalog
-- `role_actions` – Permissions assigned to each role (optionally scoped to a resource)
+- `user` -- Accounts managed by Flask-Security
+- `role` -- Role definitions
+- `roles_users` -- Relationship table between users and roles
+- `actions` -- Permission action catalog
+- `role_actions` -- Permissions assigned to each role (optionally scoped to a resource)
 
 **Audit**
 
@@ -148,7 +125,7 @@ ezrules uses a multi-service architecture for scalability and separation of conc
 
 ---
 
-### 4. Rule Engine
+### 3. Rule Engine
 
 **Purpose:** Execute business rules against events
 
@@ -172,7 +149,7 @@ def evaluate_event(event_data):
 
 **Characteristics:**
 
-- Rules run as native Python functions within the evaluator process (no sandbox).
+- Rules run as native Python functions within the API service process (no sandbox).
 - `RuleEngine` aggregates outcomes into `rule_results`, `outcome_counters`, and `outcome_set`.
 - New deployments serialise the current rule set into `rule_engine_config` for fast loading.
 - Backtesting tasks reuse the same execution pipeline via Celery.
@@ -185,11 +162,11 @@ def evaluate_event(event_data):
 
 ```
 1. External app submits event
-   POST /evaluate
+   POST /api/v2/evaluate
    {event_id, amount, user_id, ...}
             │
             ▼
-2. Evaluator receives and validates
+2. API service receives and validates
             │
             ▼
 3. Load active rules from database
@@ -237,17 +214,14 @@ def evaluate_event(event_data):
 
 ### Authentication
 
-**Manager Service:**
+**API Service:**
 
-- Session-based authentication
+- Session-based authentication for the web UI
 - Password hashing (bcrypt or similar)
 - Session cookies with secure flags
 - Login/logout endpoints
-
-**Evaluator Service:**
-
-- No built-in authentication (internal service)
-- Should be behind API gateway in production
+- The evaluate endpoint (`/api/v2/evaluate`) does not have built-in authentication (internal service)
+- Should be behind API gateway in production for the evaluate endpoint
 - Network-level access control recommended
 
 ### Authorization
@@ -290,7 +264,7 @@ Stored in `audit_log` table with immutable records.
 
 ### Horizontal Scaling
 
-**Evaluator Service:**
+**API Service:**
 
 - Stateless design allows multiple instances
 - Deploy behind load balancer
@@ -300,19 +274,13 @@ Stored in `audit_log` table with immutable records.
 **Example Deployment:**
 ```
 Load Balancer (HAProxy/nginx)
-    ├─→ Evaluator Instance 1
-    ├─→ Evaluator Instance 2
-    ├─→ Evaluator Instance 3
-    └─→ Evaluator Instance 4
+    ├─→ API Instance 1 (port 8888)
+    ├─→ API Instance 2 (port 8888)
+    ├─→ API Instance 3 (port 8888)
+    └─→ API Instance 4 (port 8888)
          ↓
     PostgreSQL (single or clustered)
 ```
-
-**Manager Service:**
-
-- Typically single instance sufficient
-- Can scale horizontally with session storage in Redis/PostgreSQL
-- Less critical for scaling (admin interface)
 
 ### Database Optimization
 
@@ -353,13 +321,13 @@ Performance varies significantly based on:
 - Hardware resources and network latency
 - Event data size and structure
 
-**Evaluator Service:**
+**API Service (Evaluation):**
 
 - Latency depends heavily on rule complexity (simple rules: ~50ms, complex rules with queries: several seconds)
 - Throughput scales with number of instances (stateless design)
 - Database connection pooling is critical for performance
 
-**Manager Service:**
+**API Service (Web UI):**
 
 - Web interface performance depends on database query optimization
 - Analytics queries can be resource-intensive for large datasets
@@ -394,7 +362,8 @@ Performance varies significantly based on:
 **Backend:**
 
 - Python 3.12+
-- Flask (web framework)
+- FastAPI (API v2)
+- Flask (legacy manager UI)
 - SQLAlchemy (ORM)
 - PostgreSQL (database)
 
