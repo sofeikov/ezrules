@@ -12,6 +12,7 @@
 * **Database initialisation seeds default data**: `uv run ezrules init-db` now seeds default outcomes (RELEASE, HOLD, CANCEL) and default user lists (MiddleAsiaCountries, NACountries, LatamCountries) so rules using `@ListName` notation work out of the box.
 * **Rule test endpoint accepts string outcomes**: The rule test endpoint (`POST /api/v2/rules/test`) now correctly handles rules that return string outcomes like `"HOLD"`, not just booleans.
 * **Dashboard page**: Angular dashboard showing active rules count, transaction volume chart, and rule outcomes over time charts. Includes time range selector (1h, 6h, 12h, 24h, 30d). Accessible from sidebar and is the default landing page.
+* **User Management admin panel**: Angular page at `/management/users` for managing user accounts. Supports creating users with optional role assignment, deleting users, toggling active/inactive status, admin-initiated password reset, and inline role assignment/removal. Accessible from sidebar "Security" link.
 
 ## v0.9
 

@@ -8,6 +8,7 @@ import { OutcomesComponent } from './outcomes/outcomes.component';
 import { LabelAnalyticsComponent } from './label-analytics/label-analytics.component';
 import { UserListsComponent } from './user-lists/user-lists.component';
 import { DashboardComponent } from './dashboard/dashboard.component';
+import { UserManagementComponent } from './user-management/user-management.component';
 
 export const routes: Routes = [
   { path: '', component: DashboardComponent },
@@ -20,5 +21,6 @@ export const routes: Routes = [
   { path: 'labels', component: LabelsComponent },
   { path: 'outcomes', component: OutcomesComponent },
   { path: 'user-lists', component: UserListsComponent },
-  { path: 'label_analytics', component: LabelAnalyticsComponent }
+  { path: 'label_analytics', component: LabelAnalyticsComponent },
+  { path: 'management/users', component: UserManagementComponent }
 ];
