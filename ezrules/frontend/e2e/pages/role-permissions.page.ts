@@ -22,7 +22,7 @@ export class RolePermissionsPage {
     this.cancelLink = page.locator('a:has-text("Cancel")');
     this.loadingSpinner = page.locator('.animate-spin');
     this.errorMessage = page.locator('.bg-red-50.border-red-200');
-    this.successMessage = page.locator('.bg-green-50.border-green-200');
+    this.successMessage = page.locator('text=Changes saved.');
   }
 
   async goto(roleId: number) {

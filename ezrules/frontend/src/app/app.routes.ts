@@ -11,6 +11,7 @@ import { DashboardComponent } from './dashboard/dashboard.component';
 import { UserManagementComponent } from './user-management/user-management.component';
 import { RoleManagementComponent } from './role-management/role-management.component';
 import { RolePermissionsComponent } from './role-permissions/role-permissions.component';
+import { AuditTrailComponent } from './audit-trail/audit-trail.component';
 
 export const routes: Routes = [
   { path: '', component: DashboardComponent },
@@ -26,5 +27,6 @@ export const routes: Routes = [
   { path: 'label_analytics', component: LabelAnalyticsComponent },
   { path: 'management/users', component: UserManagementComponent },
   { path: 'role_management', component: RoleManagementComponent },
-  { path: 'role_management/:id/permissions', component: RolePermissionsComponent }
+  { path: 'role_management/:id/permissions', component: RolePermissionsComponent },
+  { path: 'audit', component: AuditTrailComponent }
 ];

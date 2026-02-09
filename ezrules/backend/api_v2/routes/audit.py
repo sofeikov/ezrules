@@ -61,7 +61,7 @@ def config_history_to_response(history: RuleEngineConfigHistory) -> RuleEngineCo
         re_id=int(history.re_id),
         label=str(history.label),
         version=int(history.version),
-        config=dict(history.config) if history.config else {},
+        config=history.config if history.config else {},
         changed=changed,  # type: ignore[arg-type]
     )
 

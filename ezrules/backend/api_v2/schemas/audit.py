@@ -7,6 +7,7 @@ The audit trail tracks changes to rules and rule engine configurations.
 
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -46,7 +47,7 @@ class RuleEngineConfigHistoryEntry(BaseModel):
     re_id: int = Field(..., description="Config ID")
     label: str = Field(..., description="Config label")
     version: int = Field(..., description="Version number")
-    config: dict = Field(..., description="Configuration at this version")
+    config: Any = Field(..., description="Configuration at this version")
     changed: datetime | None = Field(default=None, description="When this version was created")
 
     model_config = {"from_attributes": True}

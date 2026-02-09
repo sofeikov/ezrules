@@ -200,6 +200,16 @@ def init_db(auto_delete):
 
         Base.metadata.create_all(bind=engine)
 
+        # Create default organisation
+        logger.info("Creating default organisation...")
+        existing_org = db_session.query(Organisation).filter_by(name="base").first()
+        if not existing_org:
+            db_session.add(Organisation(name="base"))
+            db_session.commit()
+            logger.info("Default organisation created")
+        else:
+            logger.info("Default organisation already exists")
+
         # Initialize default permissions
         logger.info("Initializing default permissions...")
         PermissionManager.db_session = db_session

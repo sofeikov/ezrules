@@ -26,7 +26,7 @@ export class UserListsPage {
     this.loadingSpinner = page.locator('.animate-spin');
     this.errorMessage = page.locator('.bg-red-50.border-red-200');
     this.listCountText = page.locator('text=/\\d+ lists? total/');
-    this.entryCountText = page.locator('text=/\\d+ entr(y|ies)/');
+    this.entryCountText = page.locator('.w-2\\/3 .bg-gray-50 p');
   }
 
   /**
