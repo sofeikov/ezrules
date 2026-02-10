@@ -160,8 +160,8 @@ class TestRequirePermission:
             assert response.status_code == 403
             assert "Permission denied" in response.json()["detail"]
 
-    def test_permission_backward_compatibility_no_actions(self, permission_test_client, session):
-        """When no actions exist in DB, should allow access (backward compatibility)."""
+    def test_permission_no_actions_denies_access(self, permission_test_client, session):
+        """When no actions exist in DB, should deny access (fail secure)."""
         # Don't call setup_permissions - no actions in DB
         viewer_user = permission_test_client.test_data["viewer_user"]
 
@@ -189,8 +189,8 @@ class TestRequirePermission:
                 headers={"Authorization": f"Bearer {token}"},
             )
 
-            # Should be allowed because no actions exist (backward compatibility)
-            assert response.status_code == 200
+            # Should be denied because the action doesn't exist in DB
+            assert response.status_code == 403
 
     def test_permission_with_global_permission(self, permission_test_client, setup_permissions):
         """Global permission (no resource_id) should grant access to any resource."""
@@ -367,8 +367,8 @@ class TestRequireAnyPermission:
             assert response.status_code == 403
             assert "Permission denied" in response.json()["detail"]
 
-    def test_any_permission_backward_compatibility(self, permission_test_client, session):
-        """When no actions exist, should allow access."""
+    def test_any_permission_no_actions_denies_access(self, permission_test_client, session):
+        """When no actions exist in DB, should deny access (fail secure)."""
         # Don't initialize actions
         viewer_user = permission_test_client.test_data["viewer_user"]
 
@@ -394,8 +394,8 @@ class TestRequireAnyPermission:
                 headers={"Authorization": f"Bearer {token}"},
             )
 
-            # Should be allowed due to backward compatibility
-            assert response.status_code == 200
+            # Should be denied because actions don't exist in DB
+            assert response.status_code == 403
 
 
 # =============================================================================

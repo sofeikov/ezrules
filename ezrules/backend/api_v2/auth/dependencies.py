@@ -116,11 +116,7 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # If no token provided, use first active user
     if token is None:
-        first_user = db.query(User).filter(User.active.is_(True)).first()
-        if first_user:
-            return first_user
         raise credentials_exception
 
     # Decode the token - this verifies signature and expiration
@@ -299,12 +295,6 @@ def require_permission(
 
         This function is called by FastAPI for each request to a protected route.
         """
-        # Check if permissions have been initialized in the database
-        # If no actions exist, we're in backward-compatibility mode - allow all
-        actions_exist = db.query(Action).first() is not None
-        if not actions_exist:
-            return None
-
         # Convert enum to string for database lookup
         action_str = action.value if isinstance(action, PermissionAction) else action
 
@@ -370,11 +360,6 @@ def require_any_permission(*actions: PermissionAction) -> Callable[..., None]:
         db: Any = Depends(get_db),
     ) -> None:
         """Check if user has any of the specified permissions."""
-        # Check if permissions have been initialized
-        actions_exist = db.query(Action).first() is not None
-        if not actions_exist:
-            return None
-
         # Check each permission
         for action in actions:
             action_str = action.value if isinstance(action, PermissionAction) else action
