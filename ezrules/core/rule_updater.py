@@ -51,7 +51,7 @@ def save_config_history(db, config: RuleEngineConfig, changed_by: str | None = N
 class RuleManager(ABC):
     """Abstract class for managing rules' lifecycle."""
 
-    def save_rule(self, rule: Rule, changed_by: str | None = None) -> None:
+    def save_rule(self, rule: Rule) -> None:
         """
         A wrapper around an abstract method :meth:`_save_rule`. The general flow is to lock the storage, \
         save the changes, and unlock the storage. By default, locking storage does nothing. It may be useful for \
@@ -59,13 +59,12 @@ class RuleManager(ABC):
         important when using a database as a target storage, but still may be useful in certain conditions.
 
         :param rule: an instance of `core.rule.Rule`
-        :param changed_by: identifier of the user making the change
         :return:
         """
-        self._save_rule(rule, changed_by=changed_by)
+        self._save_rule(rule)
 
     @abstractmethod
-    def _save_rule(self, rule: Rule, changed_by: str | None = None) -> None:
+    def _save_rule(self, rule: Rule) -> None:
         """Storage specific saving mechanism."""
 
     @abstractmethod
@@ -89,12 +88,11 @@ class RDBRuleManager(RuleManager):
         self.db = db
         self.o_id = o_id
 
-    def _save_rule(self, rule: RuleModel, changed_by: str | None = None) -> None:
+    def _save_rule(self, rule: RuleModel) -> None:
         if rule.r_id is None:
             rule.o_id = self.o_id
             self.db.add(rule)
         else:
-            save_rule_history(self.db, rule, changed_by=changed_by)
             rule.version += 1
         self.db.commit()
 
@@ -155,6 +153,7 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
                 )
                 .one()
             )
+            # Snapshot before mutation
             save_config_history(self.db, config_obj, changed_by=changed_by)
             config_obj.config = rules_json
             config_obj.version += 1

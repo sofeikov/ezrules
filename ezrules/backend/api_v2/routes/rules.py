@@ -37,6 +37,7 @@ from ezrules.core.rule import Rule, RuleFactory
 from ezrules.core.rule_updater import (
     RDBRuleEngineConfigProducer,
     RDBRuleManager,
+    save_rule_history,
 )
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.backend_core import User
@@ -303,7 +304,7 @@ def create_rule(
         logic=rule_data.logic,
         description=rule_data.description,
     )
-    rule_manager.save_rule(new_rule, changed_by=str(user.email))
+    rule_manager.save_rule(new_rule)
 
     # Update rule engine config
     config_producer.save_config(rule_manager, changed_by=str(user.email))
@@ -363,10 +364,13 @@ def update_rule(
             error=f"Invalid rule logic: {e!s}",
         )
 
-    # Update the rule
+    # Snapshot current state before mutation
+    save_rule_history(db, rule, changed_by=str(user.email))
+
+    # Apply the mutation and save (version bump handled by rule manager)
     rule.description = new_description
     rule.logic = new_logic
-    rule_manager.save_rule(rule, changed_by=str(user.email))
+    rule_manager.save_rule(rule)
 
     # Update rule engine config
     config_producer.save_config(rule_manager, changed_by=str(user.email))
