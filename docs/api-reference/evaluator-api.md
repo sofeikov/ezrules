@@ -5,7 +5,7 @@ The evaluate endpoint is part of the main API service and provides REST APIs for
 **Base URL:** `http://localhost:8888/api/v2` (default)
 
 !!! note "Unified API Service"
-    The evaluator is now part of the main FastAPI API service (port 8888). The legacy standalone `evaluator` CLI command (port 9999) is deprecated. Use `uv run ezrules api --port 8888` instead.
+    The evaluator is part of the main FastAPI API service (port 8888). Start it with `uv run ezrules api --port 8888`.
 
 ---
 
@@ -167,6 +167,5 @@ print(f"Outcomes: {result['outcomes']}")
 
 ## Next Steps
 
-- **[Manager API](manager-api.md)** - Web interface and analytics API reference
 - **[Analyst Guide](../user-guide/analyst-guide.md)** - Using APIs for analysis
 - **[Architecture](../architecture/overview.md)** - System design details

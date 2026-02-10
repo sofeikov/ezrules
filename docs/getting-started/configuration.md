@@ -122,28 +122,8 @@ uv run ezrules api [OPTIONS]
 uv run ezrules api --port 8888
 ```
 
-!!! note "Deprecated: Evaluator Command"
-    The standalone `uv run ezrules evaluator` command is deprecated. The evaluation endpoint is now available at `/api/v2/evaluate` on the main API service. Use `uv run ezrules api` instead.
-
-### Manager Service Options (Legacy)
-
-The legacy Flask manager web interface:
-
-```bash
-uv run ezrules manager [OPTIONS]
-```
-
-**Options:**
-
-- `--port PORT` - Server port (default: 8888)
-
-**Example:**
-```bash
-uv run ezrules manager --port 8080
-```
-
-!!! note "Additional Configuration"
-    Both services use gunicorn with 1 worker and 4 threads by default. To modify these settings, you'll need to run gunicorn directly instead of using the CLI commands.
+!!! note "Removed Commands"
+    The `ezrules manager` and `ezrules evaluator` CLI commands have been removed. The evaluation endpoint is available at `/api/v2/evaluate` on the main API service. Use `uv run ezrules api` for all services.
 
 ---
 

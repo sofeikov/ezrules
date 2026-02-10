@@ -155,11 +155,11 @@ uv run ezrules add-user --user-email admin@example.com --password admin
 Start the services to verify everything is working:
 
 ```bash
-# Start the manager service
-uv run ezrules manager --port 8888
+# Start the API service
+uv run ezrules api --port 8888
 ```
 
-Open your browser to [http://localhost:8888](http://localhost:8888) and log in with your credentials.
+Open the Angular frontend at [http://localhost:4200](http://localhost:4200) (development) or configure a web server to serve the built Angular app in production.
 
 ---
 

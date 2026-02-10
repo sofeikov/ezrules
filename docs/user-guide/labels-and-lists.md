@@ -53,7 +53,7 @@ txn_004,FRAUD
 
 #### Via Web Interface
 
-The manager UI supports bulk uploads today. Use the **Upload Labels** workflow above to apply labels from CSV.
+Use the REST API to apply labels from CSV via the `/api/v2/labels/upload` endpoint.
 
 ---
 

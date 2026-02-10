@@ -1,6 +1,6 @@
 # Monitoring & Analytics
 
-Monitor rule activity and labeling trends through the manager application and REST APIs.
+Monitor rule activity and labeling trends through the Angular frontend and REST APIs.
 
 ---
 

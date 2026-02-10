@@ -1,8 +1,3 @@
-from functools import wraps
-
-from flask import abort, current_app
-from flask_security import current_user
-
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Action, RoleActions
 from ezrules.models.database import db_session
@@ -90,24 +85,3 @@ class PermissionManager:
         if role_action:
             PermissionManager.db_session.delete(role_action)
             PermissionManager.db_session.commit()
-
-
-def requires_permission(action_name: PermissionAction | str, resource_id_param: str | None = None):
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if current_app.config.get("TESTING", False):
-                return f(*args, **kwargs)
-
-            resource_id = None
-            if resource_id_param:
-                resource_id = kwargs.get(resource_id_param)
-
-            if not PermissionManager.user_has_permission(current_user, action_name, resource_id):
-                abort(403)
-
-            return f(*args, **kwargs)
-
-        return decorated_function
-
-    return decorator

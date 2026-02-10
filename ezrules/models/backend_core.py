@@ -1,6 +1,5 @@
 import datetime
 
-from flask_security import AsaList, RoleMixin, UserMixin
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -9,12 +8,70 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    UnicodeText,
+    types,
 )
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
 from ezrules.models.database import Base
 from ezrules.models.history_meta import Versioned
+
+
+class AsaList(types.TypeDecorator):
+    """Store a Python list as a comma-separated UnicodeText column.
+
+    Replaces flask_security.AsaList with an identical implementation.
+    """
+
+    impl = UnicodeText
+
+    def process_bind_param(self, value, dialect):
+        try:
+            return ",".join(value)
+        except TypeError:
+            return value
+
+    def process_result_value(self, value, dialect):
+        if value:
+            return value.split(",")
+        return []
+
+
+class RoleMixin:
+    """Mixin for Role model definitions.
+
+    Replaces flask_security.RoleMixin with the subset used by this application.
+    """
+
+    def __eq__(self, other):
+        return self.name == other or self.name == getattr(other, "name", None)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self.name)
+
+
+class UserMixin:
+    """Mixin for User model definitions.
+
+    Replaces flask_security.UserMixin with the subset used by this application.
+    """
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_active(self):
+        return self.active
+
+    def has_role(self, role):
+        if isinstance(role, str):
+            return role in (r.name for r in self.roles)
+        return role in self.roles
 
 
 class RolesUsers(Base):

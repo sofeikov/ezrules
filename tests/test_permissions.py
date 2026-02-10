@@ -1,8 +1,8 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
-from ezrules.core.permissions import PermissionManager, requires_permission
+from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction, RoleType
 from ezrules.models.backend_core import Action, Role, RoleActions, User
 
@@ -70,73 +70,6 @@ class TestRoleType:
     def test_get_role_permissions_unknown(self):
         permissions = RoleType.get_role_permissions("unknown_role")
         assert permissions == []
-
-
-class TestRequiresPermissionDecorator:
-    def test_decorator_allows_access_in_testing_mode(self):
-        mock_app = Mock()
-        mock_app.config.get.return_value = True  # TESTING = True
-
-        @requires_permission("test_action")
-        def test_function():
-            return "success"
-
-        with patch("ezrules.core.permissions.current_app", mock_app):
-            result = test_function()
-            assert result == "success"
-
-    def test_decorator_checks_permission_in_non_testing_mode(self):
-        mock_app = Mock()
-        mock_app.config.get.return_value = False  # TESTING = False
-        mock_user = Mock()
-
-        @requires_permission("test_action")
-        def test_function():
-            return "success"
-
-        with (
-            patch("ezrules.core.permissions.current_app", mock_app),
-            patch("ezrules.core.permissions.current_user", mock_user),
-            patch.object(PermissionManager, "user_has_permission", return_value=True),
-        ):
-            result = test_function()
-            assert result == "success"
-
-    def test_decorator_aborts_without_permission(self):
-        mock_app = Mock()
-        mock_app.config.get.return_value = False  # TESTING = False
-        mock_user = Mock()
-
-        @requires_permission("test_action")
-        def test_function():
-            return "success"
-
-        with (
-            patch("ezrules.core.permissions.current_app", mock_app),
-            patch("ezrules.core.permissions.current_user", mock_user),
-            patch.object(PermissionManager, "user_has_permission", return_value=False),
-            patch("ezrules.core.permissions.abort") as mock_abort,
-        ):
-            test_function()
-            mock_abort.assert_called_once_with(403)
-
-    def test_decorator_with_resource_id_param(self):
-        mock_app = Mock()
-        mock_app.config.get.return_value = False  # TESTING = False
-        mock_user = Mock()
-
-        @requires_permission("test_action", resource_id_param="rule_id")
-        def test_function(rule_id=123):
-            return "success"
-
-        with (
-            patch("ezrules.core.permissions.current_app", mock_app),
-            patch("ezrules.core.permissions.current_user", mock_user),
-            patch.object(PermissionManager, "user_has_permission", return_value=True) as mock_permission,
-        ):
-            result = test_function(rule_id=123)
-            assert result == "success"
-            mock_permission.assert_called_once_with(mock_user, "test_action", 123)
 
 
 class TestPermissionManager:

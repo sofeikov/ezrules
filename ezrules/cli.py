@@ -292,55 +292,6 @@ def init_permissions():
 
 @cli.command()
 @click.option("--port", default="8888")
-def manager(port):
-    env = os.environ.copy()
-    cmd = [
-        "gunicorn",
-        "-w",
-        "1",
-        "--threads",
-        "4",
-        "--bind",
-        f"0.0.0.0:{port}",
-        "ezrules.backend.ezruleapp:app",
-    ]
-    subprocess.run(
-        cmd,
-        env=env,
-    )
-
-
-@cli.command()
-@click.option("--port", default="8888")
-@click.option("--reload", is_flag=True, help="Enable auto-reload for development")
-def evaluator(port, reload):
-    """Start the API server (evaluator is now merged into the main API).
-
-    This command is kept for backward compatibility. It starts the same
-    FastAPI application as 'ezrules api'.
-    """
-    logger.warning(
-        "The 'evaluator' command is deprecated. The evaluator is now part of the main API. Use 'ezrules api' instead."
-    )
-    env = os.environ.copy()
-    cmd = [
-        "uvicorn",
-        "ezrules.backend.api_v2.main:app",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        port,
-    ]
-    if reload:
-        cmd.append("--reload")
-    subprocess.run(
-        cmd,
-        env=env,
-    )
-
-
-@cli.command()
-@click.option("--port", default="8888")
 @click.option("--reload", is_flag=True, help="Enable auto-reload for development")
 def api(port, reload):
     """Start the FastAPI v2 API server (default port 8888 for Angular frontend)."""

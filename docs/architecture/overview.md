@@ -16,11 +16,10 @@ ezrules uses a unified service architecture where the API service handles both t
                     ▼
 ┌──────────────────────────────────────────────────────────┐
 │                   API Service (8888)                      │
-│  - Web UI for rule management (Manager)                  │
-│  - REST API for event evaluation (/api/v2/evaluate)      │
-│  - User authentication                                    │
-│  - Analytics dashboards                                   │
-│  - Label upload interface                                 │
+│  - FastAPI REST API (/api/v2/*)                           │
+│  - Event evaluation (/api/v2/evaluate)                    │
+│  - JWT authentication                                     │
+│  - Angular frontend served separately (port 4200 dev)    │
 └───────────────────┬──────────────────────────────────────┘
                     │
                     │ PostgreSQL
@@ -67,11 +66,9 @@ ezrules uses a unified service architecture where the API service handles both t
 
 **Technology:**
 
-- FastAPI web framework (API v2)
-- Flask (legacy manager UI)
-- Jinja2 templates
+- FastAPI web framework
 - SQLAlchemy ORM
-- Session-based authentication
+- JWT authentication
 
 **Port:** 8888 (default)
 
@@ -113,7 +110,7 @@ ezrules uses a unified service architecture where the API service handles both t
 
 **Access Control**
 
-- `user` -- Accounts managed by Flask-Security
+- `user` -- User accounts
 - `role` -- Role definitions
 - `roles_users` -- Relationship table between users and roles
 - `actions` -- Permission action catalog
@@ -362,8 +359,7 @@ Performance varies significantly based on:
 **Backend:**
 
 - Python 3.12+
-- FastAPI (API v2)
-- Flask (legacy manager UI)
+- FastAPI
 - SQLAlchemy (ORM)
 - PostgreSQL (database)
 

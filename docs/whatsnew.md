@@ -1,5 +1,13 @@
 # What's New
 
+## v0.11
+
+* **Flask removal**: The legacy Flask manager service (`ezrules manager`) has been fully removed. The Angular frontend with FastAPI API v2 is now the sole interface.
+* **Removed CLI commands**: `ezrules manager` and `ezrules evaluator` commands have been removed. Use `ezrules api` to start the service.
+* **Removed dependencies**: Flask, Flask-Security-Too, Flask-WTF, Flask-CORS, Bootstrap-Flask, and pytz have been removed from the project dependencies. Gunicorn is retained for production deployments with uvicorn workers.
+* **Standalone model mixins**: `AsaList`, `RoleMixin`, and `UserMixin` previously imported from flask_security are now defined directly in `ezrules.models.backend_core`, removing the flask_security dependency from the data model layer.
+* **Removed Flask decorator**: The `requires_permission` Flask decorator in `ezrules.core.permissions` has been removed. The FastAPI API v2 uses its own `require_permission` dependency in `ezrules.backend.api_v2.auth.dependencies`.
+
 ## v0.10
 
 * **FastAPI Migration (In Progress)**: New API v2 service built on FastAPI for improved performance and modern async support

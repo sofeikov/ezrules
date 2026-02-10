@@ -7,7 +7,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 ## ✨ Features
 
 - **Rule Engine**: Flexible Python-based rule execution with custom logic support
-- **Web Management Interface**: Flask-based UI for creating and managing rules
+- **Angular Management Interface**: Modern web UI for creating and managing rules
 - **Enterprise Security**: Granular role-based access control with 13 permission types
 - **Transaction Labeling**: Comprehensive fraud analytics with API and bulk CSV upload capabilities
 - **Analytics Dashboard**: Real-time transaction volume charts with configurable time ranges (1h, 6h, 12h, 24h, 30d)
@@ -22,9 +22,8 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 ezrules consists of several core components:
 
 - **Rule Engine**: Evaluates events against defined rules and aggregates outcomes
-- **Manager Service**: Flask backend providing REST API for rule management (default port 8888)
 - **API Service**: FastAPI-based API with JWT authentication, including real-time rule evaluation at `/api/v2/evaluate` (default port 8888)
-- **Angular Frontend**: Modern standalone UI for rule management (optional, under development)
+- **Angular Frontend**: Modern standalone UI for rule management, analytics, and administration
 - **Database Layer**: PostgreSQL storage for rules, events, and execution logs
 
 ### Data Flow
@@ -72,9 +71,6 @@ The `init-db` command automatically handles database creation and provides optio
 ### Start Services
 
 ```bash
-# Start the manager service (web interface - Flask/Jinja)
-uv run ezrules manager --port 8888
-
 # Start the API service (FastAPI - includes rule evaluation and Angular frontend API)
 uv run ezrules api --port 8888
 # With auto-reload for development:
@@ -86,7 +82,7 @@ uv run celery -A ezrules.backend.tasks worker -l INFO
 
 ### Angular Frontend
 
-ezrules now includes a modern Angular frontend as a standalone application that communicates with the Flask backend via REST API.
+ezrules includes a modern Angular frontend as a standalone application that communicates with the FastAPI backend via REST API.
 
 #### Features
 
@@ -117,7 +113,7 @@ cd ezrules/frontend
 npm start
 ```
 
-The Angular app will be available at `http://localhost:4200` and will connect to the Flask backend API at `http://localhost:8888` by default.
+The Angular app will be available at `http://localhost:4200` and will connect to the FastAPI backend at `http://localhost:8888` by default.
 
 #### Production Deployment
 
@@ -208,7 +204,7 @@ txn_789,CHARGEBACK
 
 ### Label Analytics Dashboard
 
-Access comprehensive analytics for labeled transactions at `/label_analytics`:
+Access comprehensive analytics for labeled transactions via the Angular frontend:
 
 **Key Metrics:**
 - **Total Labeled Events**: Track overall labeling coverage
@@ -217,8 +213,8 @@ Access comprehensive analytics for labeled transactions at `/label_analytics`:
 **Time Range Options**: View analytics over 1h, 6h, 12h, 24h, or 30d periods
 
 **API Endpoints:**
-- `/api/labels_summary` - Summary statistics (total labeled events count)
-- `/api/labels_distribution` - Distribution of individual labels by time period
+- `/api/v2/analytics/labels-summary` - Summary statistics (total labeled events count)
+- `/api/v2/analytics/labels-distribution` - Distribution of individual labels by time period
 
 ### Test Data Generation
 
@@ -279,10 +275,11 @@ The documentation is also available online at [ReadTheDocs](https://ezrules.read
 
 ### Tech Stack
 
-- **Backend**: Python 3.12+, Flask (legacy), FastAPI (new API v2), SQLAlchemy, Celery
+- **Backend**: Python 3.12+, FastAPI, SQLAlchemy, Celery
+- **Frontend**: Angular (standalone components), Tailwind CSS, Chart.js
 - **Database**: PostgreSQL
 - **Task Queue**: Celery with Redis/PostgreSQL backend (for backtesting)
-- **Authentication**: JWT tokens (API v2), Flask-Security (legacy)
+- **Authentication**: JWT tokens (API v2)
 
 ### Code Quality
 
@@ -320,7 +317,7 @@ uv run ezrules delete-test-data
 The Angular frontend includes comprehensive end-to-end tests using Playwright.
 
 **Prerequisites:**
-- Backend services running (Manager on port 8888, API service on port 8888)
+- API service running on port 8888
 - Angular dev server running (port 4200)
 - Playwright browsers installed (first time only): `npx playwright install chromium`
 

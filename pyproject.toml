@@ -13,18 +13,12 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "flask>=3.0.3",
-    "flask-wtf",
-    "bootstrap-flask",
     "pyyaml",
     "ruamel.yaml",
-    "gunicorn",
     "sphinx",
     "pyparsing",
     "sqlalchemy",
-    "flask-security-too[common]",
     "psycopg2-binary",
-    "pytz",
     "email-validator",
     "sqlalchemy-utils",
     "click>=8.0.0",
@@ -33,10 +27,10 @@ dependencies = [
     "celery>=5.4.0",
     "pandas>=2.2.2",
     "redis>=6.4.0",
-    "flask-cors>=6.0.2",
     # FastAPI stack
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
+    "gunicorn",
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
     "python-multipart>=0.0.9",  # Required for form data (OAuth2 login)
