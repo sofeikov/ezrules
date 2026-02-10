@@ -75,9 +75,7 @@ ignore = [
 known-first-party = ["ezrules"]
 
 [tool.ty.src]
-exclude = [
-    "ezrules/models/history_meta.py"
-]
+exclude = []
 
 [tool.ty.terminal]
 output-format = "concise"

@@ -303,10 +303,10 @@ def create_rule(
         logic=rule_data.logic,
         description=rule_data.description,
     )
-    rule_manager.save_rule(new_rule)
+    rule_manager.save_rule(new_rule, changed_by=str(user.email))
 
     # Update rule engine config
-    config_producer.save_config(rule_manager)
+    config_producer.save_config(rule_manager, changed_by=str(user.email))
 
     return RuleMutationResponse(
         success=True,
@@ -366,10 +366,10 @@ def update_rule(
     # Update the rule
     rule.description = new_description
     rule.logic = new_logic
-    rule_manager.save_rule(rule)
+    rule_manager.save_rule(rule, changed_by=str(user.email))
 
     # Update rule engine config
-    config_producer.save_config(rule_manager)
+    config_producer.save_config(rule_manager, changed_by=str(user.email))
 
     # Get updated revision list
     revision_list = rule_manager.get_rule_revision_list(rule)

@@ -118,7 +118,7 @@ ezrules uses a unified service architecture where the API service handles both t
 
 **Audit**
 
-- Versioned tables in `history_meta.py` capture rule and config changes
+- Explicit `RuleHistory` and `RuleEngineConfigHistory` tables capture rule and config changes with `changed_by` attribution
 
 ---
 

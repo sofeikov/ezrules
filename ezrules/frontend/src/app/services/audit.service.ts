@@ -10,6 +10,7 @@ export interface RuleHistoryEntry {
   logic: string;
   description: string;
   changed: string | null;
+  changed_by: string | null;
 }
 
 export interface ConfigHistoryEntry {
@@ -18,6 +19,7 @@ export interface ConfigHistoryEntry {
   version: number;
   config: unknown;
   changed: string | null;
+  changed_by: string | null;
 }
 
 export interface RulesAuditListResponse {

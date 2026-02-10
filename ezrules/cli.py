@@ -26,7 +26,6 @@ from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import Label, Organisation, Role, TestingRecordLog, User
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import Base, db_session
-from ezrules.models.history_meta import versioned_session
 from ezrules.settings import app_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -78,7 +77,6 @@ def add_user(user_email, password, admin):
     db_endpoint = app_settings.DB_ENDPOINT
     engine = create_engine(db_endpoint)
     db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-    versioned_session(db_session)
     Base.query = db_session.query_property()
 
     user = None
@@ -195,7 +193,6 @@ def init_db(auto_delete):
     try:
         engine = create_engine(db_endpoint)
         db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-        versioned_session(db_session)
         Base.query = db_session.query_property()
 
         Base.metadata.create_all(bind=engine)
@@ -241,7 +238,6 @@ def init_permissions():
     logger.info(f"Initializing permissions at {db_endpoint}")
     engine = create_engine(db_endpoint)
     db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-    versioned_session(db_session)
     Base.query = db_session.query_property()
 
     PermissionManager.init_default_actions()
@@ -363,7 +359,7 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
 
         lre = LocalRuleExecutorSQL(db=db_session, o_id=1)
 
-    rule_engine_config_producer.save_config(fsrm)
+    rule_engine_config_producer.save_config(fsrm, changed_by="cli")
     # Generate and evaluate events
     for e_ind in range(n_events):
         event_data = {}

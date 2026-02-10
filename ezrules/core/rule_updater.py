@@ -1,3 +1,4 @@
+import datetime
 from abc import ABC, abstractmethod
 from collections import namedtuple
 
@@ -7,6 +8,7 @@ from ezrules.core.rule import Rule, RuleConverter, RuleFactory
 from ezrules.models.backend_core import (
     Organisation,
     RuleEngineConfig,
+    RuleEngineConfigHistory,
     RuleHistory,
 )
 from ezrules.models.backend_core import (
@@ -16,10 +18,40 @@ from ezrules.models.backend_core import (
 RuleRevision = namedtuple("RuleRevision", ["revision_number", "created"])
 
 
+def save_rule_history(db, rule: "RuleModel", changed_by: str | None = None) -> None:
+    """Snapshot the current state of a rule into the history table before mutation."""
+    history = RuleHistory(
+        r_id=rule.r_id,
+        version=rule.version,
+        rid=rule.rid,
+        logic=rule.logic,
+        description=rule.description,
+        created_at=rule.created_at,
+        o_id=rule.o_id,
+        changed=datetime.datetime.now(datetime.UTC),
+        changed_by=changed_by,
+    )
+    db.add(history)
+
+
+def save_config_history(db, config: RuleEngineConfig, changed_by: str | None = None) -> None:
+    """Snapshot the current state of a config into the history table before mutation."""
+    history = RuleEngineConfigHistory(
+        re_id=config.re_id,
+        version=config.version,
+        label=config.label,
+        config=config.config,
+        o_id=config.o_id,
+        changed=datetime.datetime.now(datetime.UTC),
+        changed_by=changed_by,
+    )
+    db.add(history)
+
+
 class RuleManager(ABC):
     """Abstract class for managing rules' lifecycle."""
 
-    def save_rule(self, rule: Rule) -> None:
+    def save_rule(self, rule: Rule, changed_by: str | None = None) -> None:
         """
         A wrapper around an abstract method :meth:`_save_rule`. The general flow is to lock the storage, \
         save the changes, and unlock the storage. By default, locking storage does nothing. It may be useful for \
@@ -27,12 +59,13 @@ class RuleManager(ABC):
         important when using a database as a target storage, but still may be useful in certain conditions.
 
         :param rule: an instance of `core.rule.Rule`
+        :param changed_by: identifier of the user making the change
         :return:
         """
-        self._save_rule(rule)
+        self._save_rule(rule, changed_by=changed_by)
 
     @abstractmethod
-    def _save_rule(self, rule: Rule) -> None:
+    def _save_rule(self, rule: Rule, changed_by: str | None = None) -> None:
         """Storage specific saving mechanism."""
 
     @abstractmethod
@@ -56,10 +89,13 @@ class RDBRuleManager(RuleManager):
         self.db = db
         self.o_id = o_id
 
-    def _save_rule(self, rule: RuleModel) -> None:
+    def _save_rule(self, rule: RuleModel, changed_by: str | None = None) -> None:
         if rule.r_id is None:
             rule.o_id = self.o_id
             self.db.add(rule)
+        else:
+            save_rule_history(self.db, rule, changed_by=changed_by)
+            rule.version += 1
         self.db.commit()
 
     def get_rule_revision_list(self, rule: Rule, return_dates=False) -> list[RuleRevision]:
@@ -97,7 +133,7 @@ class RDBRuleManager(RuleManager):
 
 class AbstractRuleEngineConfigProducer(ABC):
     @abstractmethod
-    def save_config(self, rule_manager: RuleManager) -> None:
+    def save_config(self, rule_manager: RuleManager, changed_by: str | None = None) -> None:
         """Save config to a target location(disk, db, etc)."""
 
 
@@ -106,7 +142,7 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
         self.db = db
         self.o_id = o_id
 
-    def save_config(self, rule_manager: RuleManager) -> None:
+    def save_config(self, rule_manager: RuleManager, changed_by: str | None = None) -> None:
         all_rules = rule_manager.load_all_rules()
         all_rules = [RuleFactory.from_json(r.__dict__) for r in all_rules]
         rules_json = [RuleConverter.to_json(r) for r in all_rules]
@@ -119,7 +155,9 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
                 )
                 .one()
             )
+            save_config_history(self.db, config_obj, changed_by=changed_by)
             config_obj.config = rules_json
+            config_obj.version += 1
         except NoResultFound:
             new_config = RuleEngineConfig(label="production", config=rules_json, o_id=self.o_id)
             self.db.add(new_config)

@@ -13,7 +13,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Analytics Dashboard**: Real-time transaction volume charts with configurable time ranges (1h, 6h, 12h, 24h, 30d)
 - **Scalable Architecture**: Unified API service with integrated rule evaluation
 - **Database Integration**: PostgreSQL backend with SQLAlchemy ORM and full audit history
-- **Audit Trail**: Complete access control and change tracking for compliance
+- **Audit Trail**: Complete access control and change tracking for compliance, with per-change user attribution
 - **Backtesting**: Test rule changes against historical data before deployment
 - **CLI Tools**: Command-line interface for database management and realistic test data generation
 

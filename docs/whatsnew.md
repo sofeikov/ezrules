@@ -7,6 +7,9 @@
 * **Removed dependencies**: Flask, Flask-Security-Too, Flask-WTF, Flask-CORS, Bootstrap-Flask, and pytz have been removed from the project dependencies. Gunicorn is retained for production deployments with uvicorn workers.
 * **Standalone model mixins**: `AsaList`, `RoleMixin`, and `UserMixin` previously imported from flask_security are now defined directly in `ezrules.models.backend_core`, removing the flask_security dependency from the data model layer.
 * **Removed Flask decorator**: The `requires_permission` Flask decorator in `ezrules.core.permissions` has been removed. The FastAPI API v2 uses its own `require_permission` dependency in `ezrules.backend.api_v2.auth.dependencies`.
+* **Explicit versioning**: Replaced `history_meta.py` auto-versioning system with explicit `RuleHistory` and `RuleEngineConfigHistory` models. History snapshots are now created by helper functions (`save_rule_history`, `save_config_history`) before mutations, giving full control over when and how history is recorded.
+* **Changed-by tracking**: Rule and configuration history entries now include a `changed_by` column that records who made each change (user email from API, `"cli"` from CLI commands). The Audit Trail page in the Angular frontend displays this in a new "Changed By" column.
+* **Removed history_meta.py**: The SQLAlchemy event-listener-based `history_meta.py` module and all `versioned_session()` calls have been removed. Database tables must be recreated with `uv run ezrules init-db --auto-delete`.
 
 ## v0.10
 

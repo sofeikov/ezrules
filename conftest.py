@@ -4,7 +4,6 @@ from sqlalchemy_utils import create_database, database_exists, drop_database
 
 from ezrules.models.backend_core import Organisation, User
 from ezrules.models.database import Base, engine
-from ezrules.models.history_meta import versioned_session
 
 
 @pytest.fixture(scope="session")
@@ -40,7 +39,6 @@ def session(connection):
     transaction = connection.begin()
     Session = sessionmaker(bind=connection)
     session = Session()
-    versioned_session(session)
 
     org = Organisation(name="test_org")
     session.add(org)

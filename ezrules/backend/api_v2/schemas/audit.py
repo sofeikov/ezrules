@@ -37,6 +37,7 @@ class RuleHistoryEntry(BaseModel):
     logic: str = Field(..., description="Rule logic at this version")
     description: str = Field(..., description="Rule description at this version")
     changed: datetime | None = Field(default=None, description="When this version was created")
+    changed_by: str | None = Field(default=None, description="Who made this change")
 
     model_config = {"from_attributes": True}
 
@@ -49,6 +50,7 @@ class RuleEngineConfigHistoryEntry(BaseModel):
     version: int = Field(..., description="Version number")
     config: Any = Field(..., description="Configuration at this version")
     changed: datetime | None = Field(default=None, description="When this version was created")
+    changed_by: str | None = Field(default=None, description="Who made this change")
 
     model_config = {"from_attributes": True}
 

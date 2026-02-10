@@ -50,6 +50,7 @@ def rule_history_to_response(history: RuleHistory) -> RuleHistoryEntry:
         logic=str(history.logic),
         description=str(history.description),
         changed=changed,  # type: ignore[arg-type]
+        changed_by=str(history.changed_by) if history.changed_by else None,
     )
 
 
@@ -63,6 +64,7 @@ def config_history_to_response(history: RuleEngineConfigHistory) -> RuleEngineCo
         version=int(history.version),
         config=history.config if history.config else {},
         changed=changed,  # type: ignore[arg-type]
+        changed_by=str(history.changed_by) if history.changed_by else None,
     )
 
 

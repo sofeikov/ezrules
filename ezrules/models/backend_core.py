@@ -15,7 +15,6 @@ from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
 from ezrules.models.database import Base
-from ezrules.models.history_meta import Versioned
 
 
 class AsaList(types.TypeDecorator):
@@ -149,18 +148,19 @@ class Organisation(Base):
         return f"ID:{self.o_id}, {self.name=}, {len(self.rules)=}"
 
 
-class RuleEngineConfig(Versioned, Base):
+class RuleEngineConfig(Base):
     __tablename__ = "rule_engine_config"
 
     re_id = Column(Integer, unique=True, primary_key=True)
     label = Column(String, nullable=False)
     config = Column(JSON, nullable=False)
+    version = Column(Integer, default=1, nullable=False)
 
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
     org: Mapped["Organisation"] = relationship(back_populates="re_configs")
 
 
-class Rule(Versioned, Base):
+class Rule(Base):
     __tablename__ = "rules"
 
     r_id: Mapped[int] = mapped_column(unique=True, primary_key=True)
@@ -168,6 +168,7 @@ class Rule(Versioned, Base):
     rid: Mapped[str] = mapped_column()
     logic: Mapped[str] = mapped_column()
     description: Mapped[str] = mapped_column()
+    version = Column(Integer, default=1, nullable=False)
 
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
     org: Mapped["Organisation"] = relationship(back_populates="rules")
@@ -283,5 +284,27 @@ class RuleBackTestingResult(Base):
     rule: Mapped["Rule"] = relationship(back_populates="backtesting_results")
 
 
-RuleHistory = Rule.__history_mapper__.class_
-RuleEngineConfigHistory = RuleEngineConfig.__history_mapper__.class_
+class RuleHistory(Base):
+    __tablename__ = "rules_history"
+
+    r_id = Column(Integer, primary_key=True)
+    version = Column(Integer, primary_key=True)
+    rid = Column(String, nullable=False)
+    logic = Column(String, nullable=False)
+    description = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=True)
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
+
+
+class RuleEngineConfigHistory(Base):
+    __tablename__ = "rule_engine_config_history"
+
+    re_id = Column(Integer, primary_key=True)
+    version = Column(Integer, primary_key=True)
+    label = Column(String, nullable=False)
+    config = Column(JSON, nullable=False)
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
