@@ -12,21 +12,25 @@ import { UserManagementComponent } from './user-management/user-management.compo
 import { RoleManagementComponent } from './role-management/role-management.component';
 import { RolePermissionsComponent } from './role-permissions/role-permissions.component';
 import { AuditTrailComponent } from './audit-trail/audit-trail.component';
+import { LoginComponent } from './login/login.component';
+import { authGuard } from './auth/auth.guard';
 
 export const routes: Routes = [
-  { path: '', component: DashboardComponent },
-  { path: 'dashboard', component: DashboardComponent },
-  { path: 'rules', component: RuleListComponent },
-  { path: 'rules/create', component: RuleCreateComponent },
-  { path: 'rules/:id/history', component: RuleHistoryComponent },
-  { path: 'rules/:id/revisions/:revision', component: RuleDetailComponent },
-  { path: 'rules/:id', component: RuleDetailComponent },
-  { path: 'labels', component: LabelsComponent },
-  { path: 'outcomes', component: OutcomesComponent },
-  { path: 'user-lists', component: UserListsComponent },
-  { path: 'label_analytics', component: LabelAnalyticsComponent },
-  { path: 'management/users', component: UserManagementComponent },
-  { path: 'role_management', component: RoleManagementComponent },
-  { path: 'role_management/:id/permissions', component: RolePermissionsComponent },
-  { path: 'audit', component: AuditTrailComponent }
+  { path: 'login', component: LoginComponent },
+  { path: '', component: DashboardComponent, canActivate: [authGuard] },
+  { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
+  { path: 'rules', component: RuleListComponent, canActivate: [authGuard] },
+  { path: 'rules/create', component: RuleCreateComponent, canActivate: [authGuard] },
+  { path: 'rules/:id/history', component: RuleHistoryComponent, canActivate: [authGuard] },
+  { path: 'rules/:id/revisions/:revision', component: RuleDetailComponent, canActivate: [authGuard] },
+  { path: 'rules/:id', component: RuleDetailComponent, canActivate: [authGuard] },
+  { path: 'labels', component: LabelsComponent, canActivate: [authGuard] },
+  { path: 'outcomes', component: OutcomesComponent, canActivate: [authGuard] },
+  { path: 'user-lists', component: UserListsComponent, canActivate: [authGuard] },
+  { path: 'label_analytics', component: LabelAnalyticsComponent, canActivate: [authGuard] },
+  { path: 'management/users', component: UserManagementComponent, canActivate: [authGuard] },
+  { path: 'role_management', component: RoleManagementComponent, canActivate: [authGuard] },
+  { path: 'role_management/:id/permissions', component: RolePermissionsComponent, canActivate: [authGuard] },
+  { path: 'audit', component: AuditTrailComponent, canActivate: [authGuard] },
+  { path: '**', redirectTo: '/login' }
 ];

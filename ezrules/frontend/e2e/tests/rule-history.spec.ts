@@ -176,44 +176,6 @@ test.describe('Rule History Diff Timeline', () => {
     });
   });
 
-  test.describe('API Integration', () => {
-    test('should fetch history from /api/v2/rules/:id/history endpoint', async ({ page }) => {
-      await ensureMultipleRevisions(page);
-
-      const response = await page.request.get(`http://localhost:8888/api/v2/rules/${testRuleId}/history`);
-      expect(response.ok()).toBe(true);
-
-      const data = await response.json();
-      expect(data.r_id).toBe(testRuleId);
-      expect(data.rid).toBeTruthy();
-      expect(Array.isArray(data.history)).toBe(true);
-      expect(data.history.length).toBeGreaterThan(0);
-
-      // Last entry should be current
-      const lastEntry = data.history[data.history.length - 1];
-      expect(lastEntry.is_current).toBe(true);
-    });
-
-    test('should return 404 for non-existent rule via history API', async ({ page }) => {
-      const response = await page.request.get('http://localhost:8888/api/v2/rules/999999/history');
-      expect(response.ok()).toBe(false);
-      expect(response.status()).toBe(404);
-    });
-
-    test('should respect limit parameter on history API', async ({ page }) => {
-      await ensureMultipleRevisions(page);
-
-      const response = await page.request.get(`http://localhost:8888/api/v2/rules/${testRuleId}/history?limit=1`);
-      expect(response.ok()).toBe(true);
-
-      const data = await response.json();
-      // With limit=1, at most 1 revision + current = 2 entries
-      expect(data.history.length).toBeLessThanOrEqual(2);
-      // Last entry is always current
-      expect(data.history[data.history.length - 1].is_current).toBe(true);
-    });
-  });
-
   test.describe('Error Handling', () => {
     test('should show error for non-existent rule history page', async ({ page }) => {
       await historyPage.goto(999999);

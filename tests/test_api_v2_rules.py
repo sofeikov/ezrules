@@ -16,6 +16,7 @@ from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
+from ezrules.core.rule_updater import RDBRuleManager, save_rule_history
 from ezrules.models.backend_core import Organisation, Role, User
 from ezrules.models.backend_core import Rule as RuleModel
 
@@ -530,6 +531,45 @@ class TestRuleHistory:
 
         response = rules_test_client.get(
             "/api/v2/rules/99999/history",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 404
+
+
+class TestRuleRevision:
+    """Tests for GET /api/v2/rules/{id}/revisions/{revision_number}."""
+
+    def test_get_revision_success(self, rules_test_client, sample_rule):
+        """Should return a historical revision of a rule."""
+        token = rules_test_client.test_data["token"]
+        session = rules_test_client.test_data["session"]
+
+        # Create a history entry (version 1 snapshot) then bump the rule
+        rm = RDBRuleManager(db=session, o_id=sample_rule.o_id)
+        save_rule_history(session, sample_rule, changed_by="test")
+        sample_rule.description = "Updated description"
+        rm.save_rule(sample_rule)
+
+        response = rules_test_client.get(
+            f"/api/v2/rules/{sample_rule.r_id}/revisions/1",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["r_id"] == sample_rule.r_id
+        assert data["revision_number"] == 1
+        assert data["rid"] == "test_rule_001"
+        assert data["description"] == "Test rule for amounts over 100"
+        assert data["revisions"] == []
+
+    def test_get_revision_not_found(self, rules_test_client, sample_rule):
+        """Should return 404 for non-existent revision number."""
+        token = rules_test_client.test_data["token"]
+
+        response = rules_test_client.get(
+            f"/api/v2/rules/{sample_rule.r_id}/revisions/99999",
             headers={"Authorization": f"Bearer {token}"},
         )
 

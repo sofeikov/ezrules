@@ -228,27 +228,4 @@ test.describe('Rule Revision Navigation', () => {
       await expect(ruleDetailPage.errorMessage).toBeVisible({ timeout: 10000 });
     });
   });
-
-  test.describe('API Integration', () => {
-    test('should fetch revision data from /api/v2/rules/:id/revisions/:rev endpoint', async ({ page }) => {
-      await ensureRevisionExists(page);
-
-      // Verify the API endpoint directly
-      const response = await page.request.get(`http://localhost:8888/api/v2/rules/${testRuleId}/revisions/1`);
-      expect(response.ok()).toBe(true);
-
-      const data = await response.json();
-      expect(data.r_id).toBe(testRuleId);
-      expect(data.revision_number).toBe(1);
-      expect(data.rid).toBeTruthy();
-      expect(data.logic).toBeTruthy();
-      expect(data.revisions).toEqual([]);
-    });
-
-    test('should return 404 for non-existent revision via API', async ({ page }) => {
-      const response = await page.request.get(`http://localhost:8888/api/v2/rules/${testRuleId}/revisions/99999`);
-      expect(response.ok()).toBe(false);
-      expect(response.status()).toBe(404);
-    });
-  });
 });

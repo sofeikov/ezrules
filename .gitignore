@@ -185,3 +185,4 @@ package-lock.json
 ezrules/frontend/playwright-report/
 ezrules/frontend/test-results/
 ezrules/frontend/playwright/.cache/
+ezrules/frontend/e2e/.auth/

@@ -113,7 +113,7 @@ cd ezrules/frontend
 npm start
 ```
 
-The Angular app will be available at `http://localhost:4200` and will connect to the FastAPI backend at `http://localhost:8888` by default.
+The Angular app will be available at `http://localhost:4200` and will connect to the FastAPI backend at `http://localhost:8888` by default. You will be prompted to log in with your email and password (created via `uv run ezrules add-user`).
 
 #### Production Deployment
 

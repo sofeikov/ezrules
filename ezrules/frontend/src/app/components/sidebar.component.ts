@@ -1,6 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -78,11 +79,37 @@ import { Router } from '@angular/router';
           <span>Settings</span>
         </a>
       </nav>
+
+      <div class="absolute bottom-0 left-0 w-64 p-4 border-t border-gray-700">
+        <p class="text-xs text-gray-400 truncate mb-2">{{ userEmail }}</p>
+        <button
+          (click)="onLogout()"
+          class="flex items-center text-gray-300 hover:text-white transition-colors text-sm"
+        >
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          Sign Out
+        </button>
+      </div>
     </div>
   `
 })
-export class SidebarComponent {
-  constructor(private router: Router) {}
+export class SidebarComponent implements OnInit {
+  userEmail = '';
+
+  constructor(private router: Router, private authService: AuthService) {}
+
+  ngOnInit(): void {
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => { this.userEmail = user.email; },
+      error: () => { this.userEmail = ''; }
+    });
+  }
+
+  onLogout(): void {
+    this.authService.logout();
+  }
 
   linkClasses(path: string): Record<string, boolean> {
     const isActive = this.router.url === path || this.router.url.startsWith(path + '/');

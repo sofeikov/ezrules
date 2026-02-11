@@ -2,6 +2,7 @@
 
 ## v0.11
 
+* **Frontend authentication**: The Angular frontend now has full JWT authentication. Users must log in with email/password before accessing any page. Includes a login page, automatic token refresh, HTTP interceptor for attaching tokens to API requests, route guards that redirect unauthenticated users to login, and a Sign Out button in the sidebar. E2E tests use Playwright's global setup to authenticate once and share auth state across all tests.
 * **Flask removal**: The legacy Flask manager service (`ezrules manager`) has been fully removed. The Angular frontend with FastAPI API v2 is now the sole interface.
 * **Removed CLI commands**: `ezrules manager` and `ezrules evaluator` commands have been removed. Use `ezrules api` to start the service.
 * **Removed dependencies**: Flask, Flask-Security-Too, Flask-WTF, Flask-CORS, Bootstrap-Flask, and pytz have been removed from the project dependencies. Gunicorn is retained for production deployments with uvicorn workers.
