@@ -550,6 +550,35 @@ def export_test_csv(output_file: str, n_events: int, unlabeled_only: bool):
 
 
 @cli.command()
+@click.option("--user-email", default="admin@test_org.com", help="Admin email (default: admin@test_org.com)")
+@click.option("--password", default="12345678", help="Admin password (default: 12345678)")
+@click.option("--n-rules", default=10, help="Number of rules to generate (default: 10)")
+@click.option("--n-events", default=1000, help="Number of events to generate (default: 1000)")
+@click.pass_context
+def reset_dev(ctx, user_email, password, n_rules, n_events):
+    """Reset the dev database: init-db --auto-delete + add admin user + generate fake data.
+
+    One command to get a fresh development environment ready to use.
+    """
+    logger.info("=== Resetting development environment ===")
+
+    # Step 1: init-db --auto-delete
+    logger.info("Step 1/3: Initializing database...")
+    ctx.invoke(init_db, auto_delete=True)
+
+    # Step 2: add admin user
+    logger.info(f"Step 2/3: Creating admin user {user_email}...")
+    ctx.invoke(add_user, user_email=user_email, password=password, admin=True)
+
+    # Step 3: generate fake data
+    logger.info(f"Step 3/3: Generating fake data ({n_rules} rules, {n_events} events)...")
+    ctx.invoke(generate_random_data, n_rules=n_rules, n_events=n_events, label_ratio=0.3, export_csv=None)
+
+    logger.info("=== Development environment ready ===")
+    logger.info(f"Login with: {user_email} / {password}")
+
+
+@cli.command()
 def delete_test_data():
     db_session.query(TestingRecordLog).filter(TestingRecordLog.event_id.ilike("TestEvent_%")).delete(
         synchronize_session=False

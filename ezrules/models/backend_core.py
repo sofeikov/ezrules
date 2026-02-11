@@ -308,3 +308,39 @@ class RuleEngineConfigHistory(Base):
     o_id = Column(Integer, nullable=False)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
+
+
+class UserListHistory(Base):
+    __tablename__ = "user_list_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ul_id = Column(Integer, nullable=False)
+    list_name = Column(String, nullable=False)
+    action = Column(String, nullable=False)  # created, renamed, deleted, entry_added, entry_removed, entries_bulk_added
+    details = Column(String, nullable=True)  # e.g. old name, entry value, count
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
+
+
+class OutcomeHistory(Base):
+    __tablename__ = "outcome_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ao_id = Column(Integer, nullable=False)
+    outcome_name = Column(String, nullable=False)
+    action = Column(String, nullable=False)  # created, deleted
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
+
+
+class LabelHistory(Base):
+    __tablename__ = "label_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    el_id = Column(Integer, nullable=False)
+    label = Column(String, nullable=False)
+    action = Column(String, nullable=False)  # created, deleted
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)

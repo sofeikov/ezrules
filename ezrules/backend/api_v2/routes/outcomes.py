@@ -21,6 +21,7 @@ from ezrules.backend.api_v2.schemas.outcomes import (
     OutcomeResponse,
     OutcomesListResponse,
 )
+from ezrules.core.audit_helpers import save_outcome_history
 from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import AllowedOutcome, User
@@ -120,6 +121,17 @@ def create_outcome(
         .first()
     )
 
+    if new_outcome:
+        save_outcome_history(
+            db,
+            ao_id=new_outcome.ao_id,
+            outcome_name=outcome_name,
+            action="created",
+            o_id=o_id,
+            changed_by=str(user.email) if user.email else None,
+        )
+        db.commit()
+
     return OutcomeMutationResponse(
         success=True,
         message="Outcome created successfully",
@@ -153,6 +165,24 @@ def delete_outcome(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Outcome '{outcome_name}' not found",
         )
+
+    # Get outcome ID before deletion
+    o_id = 1
+    outcome_obj = (
+        db.query(AllowedOutcome)
+        .filter(AllowedOutcome.outcome_name == outcome_name, AllowedOutcome.o_id == o_id)
+        .first()
+    )
+    ao_id = outcome_obj.ao_id if outcome_obj else 0
+
+    save_outcome_history(
+        db,
+        ao_id=ao_id,
+        outcome_name=outcome_name,
+        action="deleted",
+        o_id=o_id,
+        changed_by=str(user.email) if user.email else None,
+    )
 
     # Delete the outcome
     outcome_manager.remove_outcome(outcome_name)

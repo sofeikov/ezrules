@@ -82,6 +82,75 @@ class ConfigAuditListResponse(BaseModel):
     offset: int = Field(..., description="Current offset")
 
 
+class UserListHistoryEntry(BaseModel):
+    """A single entry in user list history."""
+
+    id: int = Field(..., description="History entry ID")
+    ul_id: int = Field(..., description="User list ID")
+    list_name: str = Field(..., description="List name at the time of the action")
+    action: str = Field(
+        ..., description="Action type (created, renamed, deleted, entry_added, entry_removed, entries_bulk_added)"
+    )
+    details: str | None = Field(default=None, description="Additional details about the action")
+    changed: datetime | None = Field(default=None, description="When this action occurred")
+    changed_by: str | None = Field(default=None, description="Who performed this action")
+
+    model_config = {"from_attributes": True}
+
+
+class UserListAuditListResponse(BaseModel):
+    """Paginated list of user list audit entries."""
+
+    total: int = Field(..., description="Total number of history entries")
+    items: list[UserListHistoryEntry] = Field(default_factory=list)
+    limit: int = Field(..., description="Page size")
+    offset: int = Field(..., description="Current offset")
+
+
+class OutcomeHistoryEntry(BaseModel):
+    """A single entry in outcome history."""
+
+    id: int = Field(..., description="History entry ID")
+    ao_id: int = Field(..., description="Outcome ID")
+    outcome_name: str = Field(..., description="Outcome name")
+    action: str = Field(..., description="Action type (created, deleted)")
+    changed: datetime | None = Field(default=None, description="When this action occurred")
+    changed_by: str | None = Field(default=None, description="Who performed this action")
+
+    model_config = {"from_attributes": True}
+
+
+class OutcomeAuditListResponse(BaseModel):
+    """Paginated list of outcome audit entries."""
+
+    total: int = Field(..., description="Total number of history entries")
+    items: list[OutcomeHistoryEntry] = Field(default_factory=list)
+    limit: int = Field(..., description="Page size")
+    offset: int = Field(..., description="Current offset")
+
+
+class LabelHistoryEntry(BaseModel):
+    """A single entry in label history."""
+
+    id: int = Field(..., description="History entry ID")
+    el_id: int = Field(..., description="Label ID")
+    label: str = Field(..., description="Label name")
+    action: str = Field(..., description="Action type (created, deleted)")
+    changed: datetime | None = Field(default=None, description="When this action occurred")
+    changed_by: str | None = Field(default=None, description="Who performed this action")
+
+    model_config = {"from_attributes": True}
+
+
+class LabelAuditListResponse(BaseModel):
+    """Paginated list of label audit entries."""
+
+    total: int = Field(..., description="Total number of history entries")
+    items: list[LabelHistoryEntry] = Field(default_factory=list)
+    limit: int = Field(..., description="Page size")
+    offset: int = Field(..., description="Current offset")
+
+
 class AuditSummaryResponse(BaseModel):
     """Summary of audit trail data."""
 
@@ -89,3 +158,6 @@ class AuditSummaryResponse(BaseModel):
     total_config_versions: int = Field(..., description="Total config history entries")
     rules_with_changes: int = Field(..., description="Number of rules with history")
     configs_with_changes: int = Field(..., description="Number of configs with history")
+    total_user_list_actions: int = Field(default=0, description="Total user list history entries")
+    total_outcome_actions: int = Field(default=0, description="Total outcome history entries")
+    total_label_actions: int = Field(default=0, description="Total label history entries")

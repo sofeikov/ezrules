@@ -24,78 +24,278 @@
         </div>
       </div>
 
-      <div *ngIf="!loading && !error">
-        <!-- Rule History -->
-        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden mb-8">
-          <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">Rule History</h2>
-            <p class="text-sm text-gray-500 mt-1">{{ ruleTotal }} total entries</p>
-          </div>
+      <div *ngIf="!loading && !error" class="space-y-4">
 
-          <div *ngIf="ruleHistory.length === 0" class="p-6 text-center text-gray-500">
-            No rule history entries found.
-          </div>
-
-          <div *ngIf="ruleHistory.length > 0" class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rule ID</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed By</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                <tr *ngFor="let entry of ruleHistory" class="hover:bg-gray-50">
-                  <td class="px-6 py-4 whitespace-nowrap text-sm">
-                    <a [routerLink]="['/rules', entry.r_id, 'revisions', entry.version]" class="text-blue-600 hover:text-blue-800 hover:underline">{{ entry.version }}</a>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-mono">
-                    <a [routerLink]="['/rules', entry.r_id]" class="text-blue-600 hover:text-blue-800 hover:underline">{{ entry.rid }}</a>
-                  </td>
-                  <td class="px-6 py-4 text-sm text-gray-600" [title]="entry.description">{{ truncateDescription(entry.description) }}</td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ entry.changed_by || '—' }}</td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(entry.changed) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Configuration History -->
+        <!-- Rule History Accordion -->
         <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">Configuration History</h2>
-            <p class="text-sm text-gray-500 mt-1">{{ configTotal }} total entries</p>
-          </div>
+          <button
+            (click)="toggleSection('rules')"
+            class="w-full px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between hover:bg-gray-100 transition-colors"
+            data-testid="accordion-rules"
+          >
+            <div class="text-left">
+              <h2 class="text-lg font-semibold text-gray-900">Rule History</h2>
+              <p class="text-sm text-gray-500 mt-1">{{ ruleTotal }} total entries</p>
+            </div>
+            <svg
+              class="w-5 h-5 text-gray-500 transition-transform"
+              [class.rotate-180]="sections['rules']"
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
 
-          <div *ngIf="configHistory.length === 0" class="p-6 text-center text-gray-500">
-            No configuration history entries found.
-          </div>
+          <div *ngIf="sections['rules']">
+            <div *ngIf="ruleHistory.length === 0" class="p-6 text-center text-gray-500">
+              No rule history entries found.
+            </div>
 
-          <div *ngIf="configHistory.length > 0" class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Label</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed By</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                <tr *ngFor="let entry of configHistory" class="hover:bg-gray-50">
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ entry.version }}</td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ entry.label }}</td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ entry.changed_by || '—' }}</td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(entry.changed) }}</td>
-                </tr>
-              </tbody>
-            </table>
+            <div *ngIf="ruleHistory.length > 0" class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rule ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed By</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr *ngFor="let entry of ruleHistory" class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                      <a [routerLink]="['/rules', entry.r_id, 'revisions', entry.version]" class="text-blue-600 hover:text-blue-800 hover:underline">{{ entry.version }}</a>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-mono">
+                      <a [routerLink]="['/rules', entry.r_id]" class="text-blue-600 hover:text-blue-800 hover:underline">{{ entry.rid }}</a>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600" [title]="entry.description">{{ truncateDescription(entry.description) }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ entry.changed_by || '—' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(entry.changed) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
+
+        <!-- Configuration History Accordion -->
+        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <button
+            (click)="toggleSection('config')"
+            class="w-full px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between hover:bg-gray-100 transition-colors"
+            data-testid="accordion-config"
+          >
+            <div class="text-left">
+              <h2 class="text-lg font-semibold text-gray-900">Configuration History</h2>
+              <p class="text-sm text-gray-500 mt-1">{{ configTotal }} total entries</p>
+            </div>
+            <svg
+              class="w-5 h-5 text-gray-500 transition-transform"
+              [class.rotate-180]="sections['config']"
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <div *ngIf="sections['config']">
+            <div *ngIf="configHistory.length === 0" class="p-6 text-center text-gray-500">
+              No configuration history entries found.
+            </div>
+
+            <div *ngIf="configHistory.length > 0" class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Label</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed By</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr *ngFor="let entry of configHistory" class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ entry.version }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ entry.label }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ entry.changed_by || '—' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(entry.changed) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- User List History Accordion -->
+        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <button
+            (click)="toggleSection('userLists')"
+            class="w-full px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between hover:bg-gray-100 transition-colors"
+            data-testid="accordion-user-lists"
+          >
+            <div class="text-left">
+              <h2 class="text-lg font-semibold text-gray-900">User List History</h2>
+              <p class="text-sm text-gray-500 mt-1">{{ userListTotal }} total entries</p>
+            </div>
+            <svg
+              class="w-5 h-5 text-gray-500 transition-transform"
+              [class.rotate-180]="sections['userLists']"
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <div *ngIf="sections['userLists']">
+            <div *ngIf="userListHistory.length === 0" class="p-6 text-center text-gray-500">
+              No user list history entries found.
+            </div>
+
+            <div *ngIf="userListHistory.length > 0" class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">List Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed By</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr *ngFor="let entry of userListHistory" class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ entry.list_name }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                        [ngClass]="{
+                          'bg-green-100 text-green-800': entry.action === 'created' || entry.action === 'entry_added' || entry.action === 'entries_bulk_added',
+                          'bg-red-100 text-red-800': entry.action === 'deleted' || entry.action === 'entry_removed',
+                          'bg-blue-100 text-blue-800': entry.action === 'renamed'
+                        }"
+                      >{{ formatAction(entry.action) }}</span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600">{{ entry.details || '—' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ entry.changed_by || '—' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(entry.changed) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Outcome History Accordion -->
+        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <button
+            (click)="toggleSection('outcomes')"
+            class="w-full px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between hover:bg-gray-100 transition-colors"
+            data-testid="accordion-outcomes"
+          >
+            <div class="text-left">
+              <h2 class="text-lg font-semibold text-gray-900">Outcome History</h2>
+              <p class="text-sm text-gray-500 mt-1">{{ outcomeTotal }} total entries</p>
+            </div>
+            <svg
+              class="w-5 h-5 text-gray-500 transition-transform"
+              [class.rotate-180]="sections['outcomes']"
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <div *ngIf="sections['outcomes']">
+            <div *ngIf="outcomeHistory.length === 0" class="p-6 text-center text-gray-500">
+              No outcome history entries found.
+            </div>
+
+            <div *ngIf="outcomeHistory.length > 0" class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Outcome</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed By</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr *ngFor="let entry of outcomeHistory" class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ entry.outcome_name }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                        [ngClass]="{
+                          'bg-green-100 text-green-800': entry.action === 'created',
+                          'bg-red-100 text-red-800': entry.action === 'deleted'
+                        }"
+                      >{{ formatAction(entry.action) }}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ entry.changed_by || '—' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(entry.changed) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Label History Accordion -->
+        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <button
+            (click)="toggleSection('labels')"
+            class="w-full px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between hover:bg-gray-100 transition-colors"
+            data-testid="accordion-labels"
+          >
+            <div class="text-left">
+              <h2 class="text-lg font-semibold text-gray-900">Label History</h2>
+              <p class="text-sm text-gray-500 mt-1">{{ labelTotal }} total entries</p>
+            </div>
+            <svg
+              class="w-5 h-5 text-gray-500 transition-transform"
+              [class.rotate-180]="sections['labels']"
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <div *ngIf="sections['labels']">
+            <div *ngIf="labelHistory.length === 0" class="p-6 text-center text-gray-500">
+              No label history entries found.
+            </div>
+
+            <div *ngIf="labelHistory.length > 0" class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Label</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed By</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr *ngFor="let entry of labelHistory" class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ entry.label }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                        [ngClass]="{
+                          'bg-green-100 text-green-800': entry.action === 'created',
+                          'bg-red-100 text-red-800': entry.action === 'deleted'
+                        }"
+                      >{{ formatAction(entry.action) }}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ entry.changed_by || '—' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(entry.changed) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>

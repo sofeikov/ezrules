@@ -28,6 +28,7 @@ from ezrules.backend.api_v2.schemas.user_lists import (
     UserListsListResponse,
     UserListUpdate,
 )
+from ezrules.core.audit_helpers import save_user_list_history
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import User, UserList, UserListEntry
 
@@ -190,6 +191,16 @@ def create_user_list(
     db.commit()
     db.refresh(new_list)
 
+    save_user_list_history(
+        db,
+        ul_id=int(new_list.ul_id),
+        list_name=str(new_list.list_name),
+        action="created",
+        o_id=DEFAULT_ORG_ID,
+        changed_by=str(user.email) if user.email else None,
+    )
+    db.commit()
+
     return UserListMutationResponse(
         success=True,
         message="User list created successfully",
@@ -249,7 +260,18 @@ def update_user_list(
                 error=f"A list with name '{list_data.name}' already exists",
             )
 
+        old_name = user_list.list_name
         user_list.list_name = list_data.name
+
+        save_user_list_history(
+            db,
+            ul_id=user_list.ul_id,
+            list_name=list_data.name,
+            action="renamed",
+            o_id=DEFAULT_ORG_ID,
+            changed_by=str(user.email) if user.email else None,
+            details=f"Renamed from '{old_name}' to '{list_data.name}'",
+        )
 
     db.commit()
     db.refresh(user_list)
@@ -295,6 +317,16 @@ def delete_user_list(
         )
 
     list_name = user_list.list_name
+    ul_id = user_list.ul_id
+
+    save_user_list_history(
+        db,
+        ul_id=ul_id,
+        list_name=list_name,
+        action="deleted",
+        o_id=DEFAULT_ORG_ID,
+        changed_by=str(user.email) if user.email else None,
+    )
 
     # Entries will be cascade deleted due to relationship configuration
     db.delete(user_list)
@@ -399,6 +431,17 @@ def add_entry(
     )
 
     db.add(new_entry)
+
+    save_user_list_history(
+        db,
+        ul_id=list_id,
+        list_name=str(user_list.list_name),
+        action="entry_added",
+        o_id=DEFAULT_ORG_ID,
+        changed_by=str(user.email) if user.email else None,
+        details=f"Added entry '{entry_data.value}'",
+    )
+
     db.commit()
     db.refresh(new_entry)
 
@@ -467,6 +510,17 @@ def bulk_add_entries(
             db.add(new_entry)
             added.append(value)
 
+    if added:
+        save_user_list_history(
+            db,
+            ul_id=list_id,
+            list_name=str(user_list.list_name),
+            action="entries_bulk_added",
+            o_id=DEFAULT_ORG_ID,
+            changed_by=str(user.email) if user.email else None,
+            details=f"Added {len(added)} entries, skipped {len(skipped)}",
+        )
+
     db.commit()
 
     return UserListEntryBulkResponse(
@@ -528,6 +582,17 @@ def delete_entry(
         )
 
     entry_value = entry.entry_value
+
+    save_user_list_history(
+        db,
+        ul_id=list_id,
+        list_name=str(user_list.list_name),
+        action="entry_removed",
+        o_id=DEFAULT_ORG_ID,
+        changed_by=str(user.email) if user.email else None,
+        details=f"Removed entry '{entry_value}'",
+    )
+
     db.delete(entry)
     db.commit()
 

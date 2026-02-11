@@ -11,6 +11,8 @@
 * **Explicit versioning**: Replaced `history_meta.py` auto-versioning system with explicit `RuleHistory` and `RuleEngineConfigHistory` models. History snapshots are now created by helper functions (`save_rule_history`, `save_config_history`) before mutations, giving full control over when and how history is recorded.
 * **Changed-by tracking**: Rule and configuration history entries now include a `changed_by` column that records who made each change (user email from API, `"cli"` from CLI commands). The Audit Trail page in the Angular frontend displays this in a new "Changed By" column.
 * **Removed history_meta.py**: The SQLAlchemy event-listener-based `history_meta.py` module and all `versioned_session()` calls have been removed. Database tables must be recreated with `uv run ezrules init-db --auto-delete`.
+* **Enhanced audit trail**: The audit trail now tracks changes to user lists (create, rename, delete, add/remove entries), outcomes (create, delete), and labels (create, delete) in addition to rules and configurations. Each audit entry records who performed the action and when. New API endpoints: `GET /api/v2/audit/user-lists`, `GET /api/v2/audit/outcomes`, `GET /api/v2/audit/labels`.
+* **Accordion audit page**: The Audit Trail page has been redesigned with collapsible accordion sections for Rule History, Configuration History, User List History, Outcome History, and Label History. Sections are collapsed by default to reduce visual clutter. Action types are shown with color-coded badges (green for creates, red for deletes, blue for renames).
 
 ## v0.10
 

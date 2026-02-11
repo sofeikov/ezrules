@@ -29,6 +29,7 @@ from ezrules.backend.api_v2.schemas.labels import (
     UploadResultError,
 )
 from ezrules.backend.label_upload_service import LabelUploadService
+from ezrules.core.audit_helpers import save_label_history
 from ezrules.core.labels import DatabaseLabelManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Label, TestingRecordLog, User
@@ -120,6 +121,16 @@ def create_label(
     # Fetch the newly created label for the response
     new_label = db.query(Label).filter(Label.label == label_name).first()
 
+    if new_label:
+        save_label_history(
+            db,
+            el_id=new_label.el_id,
+            label=label_name,
+            action="created",
+            changed_by=str(user.email) if user.email else None,
+        )
+        db.commit()
+
     return LabelMutationResponse(
         success=True,
         message="Label created successfully",
@@ -157,6 +168,20 @@ def create_labels_bulk(
             label_manager.add_label(label_name)
             created.append(label_name)
 
+    # Record audit entries for each created label
+    for label_name in created:
+        label_obj = db.query(Label).filter(Label.label == label_name).first()
+        if label_obj:
+            save_label_history(
+                db,
+                el_id=label_obj.el_id,
+                label=label_name,
+                action="created",
+                changed_by=str(user.email) if user.email else None,
+            )
+    if created:
+        db.commit()
+
     return LabelBulkCreateResponse(
         success=len(failed) == 0,
         message=f"Created {len(created)} labels, {len(failed)} failed",
@@ -191,6 +216,18 @@ def delete_label(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Label '{label_name}' not found",
         )
+
+    # Get label ID before deletion
+    label_obj = db.query(Label).filter(Label.label == label_name).first()
+    el_id = label_obj.el_id if label_obj else 0
+
+    save_label_history(
+        db,
+        el_id=el_id,
+        label=label_name,
+        action="deleted",
+        changed_by=str(user.email) if user.email else None,
+    )
 
     # Delete the label
     label_manager.remove_label(label_name)

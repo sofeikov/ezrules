@@ -22,6 +22,34 @@ export interface ConfigHistoryEntry {
   changed_by: string | null;
 }
 
+export interface UserListHistoryEntry {
+  id: number;
+  ul_id: number;
+  list_name: string;
+  action: string;
+  details: string | null;
+  changed: string | null;
+  changed_by: string | null;
+}
+
+export interface OutcomeHistoryEntry {
+  id: number;
+  ao_id: number;
+  outcome_name: string;
+  action: string;
+  changed: string | null;
+  changed_by: string | null;
+}
+
+export interface LabelHistoryEntry {
+  id: number;
+  el_id: number;
+  label: string;
+  action: string;
+  changed: string | null;
+  changed_by: string | null;
+}
+
 export interface RulesAuditListResponse {
   total: number;
   items: RuleHistoryEntry[];
@@ -32,6 +60,27 @@ export interface RulesAuditListResponse {
 export interface ConfigAuditListResponse {
   total: number;
   items: ConfigHistoryEntry[];
+  limit: number;
+  offset: number;
+}
+
+export interface UserListAuditListResponse {
+  total: number;
+  items: UserListHistoryEntry[];
+  limit: number;
+  offset: number;
+}
+
+export interface OutcomeAuditListResponse {
+  total: number;
+  items: OutcomeHistoryEntry[];
+  limit: number;
+  offset: number;
+}
+
+export interface LabelAuditListResponse {
+  total: number;
+  items: LabelHistoryEntry[];
   limit: number;
   offset: number;
 }
@@ -54,5 +103,26 @@ export class AuditService {
       .set('limit', limit.toString())
       .set('offset', offset.toString());
     return this.http.get<ConfigAuditListResponse>(`${this.auditUrl}/config`, { params });
+  }
+
+  getUserListHistory(limit: number = 100, offset: number = 0): Observable<UserListAuditListResponse> {
+    const params = new HttpParams()
+      .set('limit', limit.toString())
+      .set('offset', offset.toString());
+    return this.http.get<UserListAuditListResponse>(`${this.auditUrl}/user-lists`, { params });
+  }
+
+  getOutcomeHistory(limit: number = 100, offset: number = 0): Observable<OutcomeAuditListResponse> {
+    const params = new HttpParams()
+      .set('limit', limit.toString())
+      .set('offset', offset.toString());
+    return this.http.get<OutcomeAuditListResponse>(`${this.auditUrl}/outcomes`, { params });
+  }
+
+  getLabelHistory(limit: number = 100, offset: number = 0): Observable<LabelAuditListResponse> {
+    const params = new HttpParams()
+      .set('limit', limit.toString())
+      .set('offset', offset.toString());
+    return this.http.get<LabelAuditListResponse>(`${this.auditUrl}/labels`, { params });
   }
 }

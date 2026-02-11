@@ -3,6 +3,7 @@ import { AuditTrailPage } from '../pages/audit-trail.page';
 
 /**
  * E2E tests for the Audit Trail page.
+ * The page uses an accordion layout with collapsible sections.
  */
 test.describe('Audit Trail Page', () => {
   let auditTrailPage: AuditTrailPage;
@@ -39,6 +40,66 @@ test.describe('Audit Trail Page', () => {
     });
   });
 
+  test.describe('Accordion Sections', () => {
+    test('should display all five accordion sections', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await expect(auditTrailPage.ruleHistoryHeading).toBeVisible();
+      await expect(auditTrailPage.configHistoryHeading).toBeVisible();
+      await expect(auditTrailPage.userListHistoryHeading).toBeVisible();
+      await expect(auditTrailPage.outcomeHistoryHeading).toBeVisible();
+      await expect(auditTrailPage.labelHistoryHeading).toBeVisible();
+    });
+
+    test('should toggle Rule History section on click', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      // Initially collapsed - no table visible
+      await expect(auditTrailPage.ruleHistoryTable).not.toBeVisible();
+      // Expand
+      await auditTrailPage.expandSection('rules');
+      // Section content should now be visible (table or empty message)
+      const ruleContent = auditTrailPage.ruleHistoryAccordion.locator('..').locator('div').last();
+      await expect(ruleContent).toBeVisible();
+    });
+
+    test('should toggle Configuration History section on click', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await expect(auditTrailPage.configHistoryTable).not.toBeVisible();
+      await auditTrailPage.expandSection('config');
+      const configContent = auditTrailPage.configHistoryAccordion.locator('..').locator('div').last();
+      await expect(configContent).toBeVisible();
+    });
+
+    test('should toggle User List History section on click', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await expect(auditTrailPage.userListHistoryTable).not.toBeVisible();
+      await auditTrailPage.expandSection('userLists');
+      const ulContent = auditTrailPage.userListHistoryAccordion.locator('..').locator('div').last();
+      await expect(ulContent).toBeVisible();
+    });
+
+    test('should toggle Outcome History section on click', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await expect(auditTrailPage.outcomeHistoryTable).not.toBeVisible();
+      await auditTrailPage.expandSection('outcomes');
+      const outcomeContent = auditTrailPage.outcomeHistoryAccordion.locator('..').locator('div').last();
+      await expect(outcomeContent).toBeVisible();
+    });
+
+    test('should toggle Label History section on click', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await expect(auditTrailPage.labelHistoryTable).not.toBeVisible();
+      await auditTrailPage.expandSection('labels');
+      const labelContent = auditTrailPage.labelHistoryAccordion.locator('..').locator('div').last();
+      await expect(labelContent).toBeVisible();
+    });
+  });
+
   test.describe('Rule History Section', () => {
     test('should display the Rule History heading', async () => {
       await auditTrailPage.goto();
@@ -49,6 +110,7 @@ test.describe('Audit Trail Page', () => {
     test('should display correct column headers for rule history', async () => {
       await auditTrailPage.goto();
       await auditTrailPage.waitForPageToLoad();
+      await auditTrailPage.expandSection('rules');
       // Table only renders when there is history data
       const rowCount = await auditTrailPage.getRuleHistoryRowCount();
       if (rowCount > 0) {
@@ -66,6 +128,7 @@ test.describe('Audit Trail Page', () => {
     test('should have clickable links in Rule ID and Version columns', async ({ page }) => {
       await auditTrailPage.goto();
       await auditTrailPage.waitForPageToLoad();
+      await auditTrailPage.expandSection('rules');
       const rowCount = await auditTrailPage.getRuleHistoryRowCount();
       if (rowCount > 0) {
         // Rule ID column should link to the rule detail page
@@ -85,6 +148,7 @@ test.describe('Audit Trail Page', () => {
     test('should navigate to rule detail page when clicking Rule ID', async ({ page }) => {
       await auditTrailPage.goto();
       await auditTrailPage.waitForPageToLoad();
+      await auditTrailPage.expandSection('rules');
       const rowCount = await auditTrailPage.getRuleHistoryRowCount();
       if (rowCount > 0) {
         const ruleIdLink = auditTrailPage.ruleHistoryTable.locator('tbody tr').first().locator('td').nth(1).locator('a');
@@ -104,12 +168,80 @@ test.describe('Audit Trail Page', () => {
     test('should display correct column headers for config history', async () => {
       await auditTrailPage.goto();
       await auditTrailPage.waitForPageToLoad();
+      await auditTrailPage.expandSection('config');
       // Table only renders when there is history data
       const rowCount = await auditTrailPage.getConfigHistoryRowCount();
       if (rowCount > 0) {
         const headers = await auditTrailPage.getConfigHistoryColumnHeaders();
         expect(headers).toContain('Version');
         expect(headers).toContain('Label');
+        expect(headers).toContain('Changed By');
+        expect(headers).toContain('Changed');
+      }
+    });
+  });
+
+  test.describe('User List History Section', () => {
+    test('should display the User List History heading', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await expect(auditTrailPage.userListHistoryHeading).toBeVisible();
+    });
+
+    test('should display correct column headers for user list history', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await auditTrailPage.expandSection('userLists');
+      const rowCount = await auditTrailPage.getUserListHistoryRowCount();
+      if (rowCount > 0) {
+        const headers = await auditTrailPage.getUserListHistoryColumnHeaders();
+        expect(headers).toContain('List Name');
+        expect(headers).toContain('Action');
+        expect(headers).toContain('Details');
+        expect(headers).toContain('Changed By');
+        expect(headers).toContain('Changed');
+      }
+    });
+  });
+
+  test.describe('Outcome History Section', () => {
+    test('should display the Outcome History heading', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await expect(auditTrailPage.outcomeHistoryHeading).toBeVisible();
+    });
+
+    test('should display correct column headers for outcome history', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await auditTrailPage.expandSection('outcomes');
+      const rowCount = await auditTrailPage.getOutcomeHistoryRowCount();
+      if (rowCount > 0) {
+        const headers = await auditTrailPage.getOutcomeHistoryColumnHeaders();
+        expect(headers).toContain('Outcome');
+        expect(headers).toContain('Action');
+        expect(headers).toContain('Changed By');
+        expect(headers).toContain('Changed');
+      }
+    });
+  });
+
+  test.describe('Label History Section', () => {
+    test('should display the Label History heading', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await expect(auditTrailPage.labelHistoryHeading).toBeVisible();
+    });
+
+    test('should display correct column headers for label history', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await auditTrailPage.expandSection('labels');
+      const rowCount = await auditTrailPage.getLabelHistoryRowCount();
+      if (rowCount > 0) {
+        const headers = await auditTrailPage.getLabelHistoryColumnHeaders();
+        expect(headers).toContain('Label');
+        expect(headers).toContain('Action');
         expect(headers).toContain('Changed By');
         expect(headers).toContain('Changed');
       }
