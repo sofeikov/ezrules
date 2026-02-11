@@ -62,6 +62,38 @@ test.describe('Audit Trail Page', () => {
     });
   });
 
+  test.describe('Rule History Links', () => {
+    test('should have clickable links in Rule ID and Version columns', async ({ page }) => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      const rowCount = await auditTrailPage.getRuleHistoryRowCount();
+      if (rowCount > 0) {
+        // Rule ID column should link to the rule detail page
+        const ruleIdLink = auditTrailPage.ruleHistoryTable.locator('tbody tr').first().locator('td').nth(1).locator('a');
+        await expect(ruleIdLink).toBeVisible();
+        const ruleIdHref = await ruleIdLink.getAttribute('href');
+        expect(ruleIdHref).toMatch(/\/rules\/\d+/);
+
+        // Version column should link to the specific revision
+        const versionLink = auditTrailPage.ruleHistoryTable.locator('tbody tr').first().locator('td').first().locator('a');
+        await expect(versionLink).toBeVisible();
+        const versionHref = await versionLink.getAttribute('href');
+        expect(versionHref).toMatch(/\/rules\/\d+\/revisions\/\d+/);
+      }
+    });
+
+    test('should navigate to rule detail page when clicking Rule ID', async ({ page }) => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      const rowCount = await auditTrailPage.getRuleHistoryRowCount();
+      if (rowCount > 0) {
+        const ruleIdLink = auditTrailPage.ruleHistoryTable.locator('tbody tr').first().locator('td').nth(1).locator('a');
+        await ruleIdLink.click();
+        await expect(page).toHaveURL(/\/rules\/\d+$/);
+      }
+    });
+  });
+
   test.describe('Configuration History Section', () => {
     test('should display the Configuration History heading', async () => {
       await auditTrailPage.goto();

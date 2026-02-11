@@ -1,12 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
 import { SidebarComponent } from '../components/sidebar.component';
 import { AuditService, RuleHistoryEntry, ConfigHistoryEntry } from '../services/audit.service';
 
 @Component({
   selector: 'app-audit-trail',
   standalone: true,
-  imports: [CommonModule, SidebarComponent],
+  imports: [CommonModule, RouterModule, SidebarComponent],
   templateUrl: './audit-trail.component.html'
 })
 export class AuditTrailComponent implements OnInit {

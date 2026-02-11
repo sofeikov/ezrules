@@ -49,8 +49,12 @@
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
                 <tr *ngFor="let entry of ruleHistory" class="hover:bg-gray-50">
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ entry.version }}</td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">{{ entry.rid }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    <a [routerLink]="['/rules', entry.r_id, 'revisions', entry.version]" class="text-blue-600 hover:text-blue-800 hover:underline">{{ entry.version }}</a>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-mono">
+                    <a [routerLink]="['/rules', entry.r_id]" class="text-blue-600 hover:text-blue-800 hover:underline">{{ entry.rid }}</a>
+                  </td>
                   <td class="px-6 py-4 text-sm text-gray-600" [title]="entry.description">{{ truncateDescription(entry.description) }}</td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ entry.changed_by || '—' }}</td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(entry.changed) }}</td>
