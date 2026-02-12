@@ -49,7 +49,6 @@ nav:
       - For Analysts: user-guide/analyst-guide.md
       - For Administrators: user-guide/admin-guide.md
       - Creating Rules: user-guide/creating-rules.md
-      - Managing Outcomes: user-guide/managing-outcomes.md
       - Labels and Lists: user-guide/labels-and-lists.md
       - Monitoring & Analytics: user-guide/monitoring.md
   - API Reference:

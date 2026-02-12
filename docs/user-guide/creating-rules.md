@@ -6,13 +6,11 @@ Learn how to write effective business rules in ezrules.
 
 ## Rule Structure
 
-Rules are Python functions that evaluate events and return outcome strings. If no action is needed, do not return anything:
+Rules are Python-like snippets that evaluate events and return outcome strings. If no action is needed, do not return anything:
 
 ```python
-def evaluate_event(event):
-    # Your logic here
-    if condition:
-        return 'HOLD'  # or 'RELEASE' / 'CANCEL' etc.
+if $amount > 10000:
+    return 'HOLD'  # or 'RELEASE' / 'CANCEL' etc.
 ```
 
 ---
@@ -94,19 +92,18 @@ if risk_score >= 4:
 ### Performance
 
 !!! tip "Avoid Heavy Queries"
-    Keep rules fast - aim for under 100ms execution time. Cache frequently accessed data.
+    Keep rules simple and fast. Avoid expensive per-event database lookups when possible.
 
 ```python
 # Bad: Queries database every time
 def slow_rule(event):
-    all_users = session.query(User).all()  # Loads entire table!
-    blocked = [u.id for u in all_users if u.is_blocked]
-    if event['user_id'] in blocked:
+    blocked_users = load_blocked_users()
+    if event['user_id'] in blocked_users:
         return 'CANCEL'
 
 # Good: Uses list notation
 def fast_rule(event):
-    if $user_id in @CACHED_BLOCKLIST:
+    if $user_id in @blocked_users:
         return 'CANCEL'
 ```
 
@@ -129,15 +126,8 @@ if not isinstance($user_id, str):
 Test rules before deployment:
 
 ```python
-# Test cases
-test_events = [
-    {'amount': 15000, 'user_id': 'u1'},  # Should trigger
-    {'amount': 500, 'user_id': 'u2'},    # Should not trigger
-]
-
-for test_event in test_events:
-    result = evaluate_event(test_event)
-    print(f"Event {test_event}: {result}")
+# Use the rule test panel in the UI or call /api/v2/evaluate
+# with realistic payloads to validate behavior.
 ```
 
 ---
@@ -196,8 +186,7 @@ Rules are stored with version history:
 
 1. Edit rule in web interface
 2. Save creates new version
-3. View history in **Rule Details → History**
-4. Rollback to previous version if needed
+3. View history in **Rule Details -> History**
 
 ### Testing Changes
 
@@ -247,18 +236,7 @@ if $account_age_days < 7 and $amount > 2000:
 
 ### Add Logging
 
-```python
-import logging
-
-logger = logging.getLogger(__name__)
-
-def my_rule(event):
-    logger.info(f"Evaluating amount: {$amount}")
-
-    if $amount > 10000:
-        logger.warning(f"High amount detected: {$amount}")
-        return 'HOLD'
-```
+Use the rule test panel and API responses (`rule_results`, `outcome_counters`, `outcome_set`) for debugging rule behavior.
 
 ### Use Test Data
 
@@ -274,6 +252,5 @@ uv run ezrules generate-random-data --n-events 100
 
 ## Next Steps
 
-- **[Managing Outcomes](managing-outcomes.md)** - Configure allowed outcomes
+- **[Labels and Lists](labels-and-lists.md)** - Configure outcomes, labels, and lists
 - **[Analyst Guide](analyst-guide.md)** - Comprehensive analyst workflows
-- **[Labels and Lists](labels-and-lists.md)** - Work with user lists

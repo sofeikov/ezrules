@@ -1,34 +1,32 @@
-# Labels and Lists
+# Labels, Lists, and Outcomes
 
-Learn how to use transaction labels for analytics and user lists for rule execution.
+Labels, lists, and outcomes work together:
+
+- **Outcomes** are the decisions your rules return (`HOLD`, `RELEASE`, `CANCEL`, and others you define).
+- **Labels** are the ground truth you apply later (`FRAUD`, `NORMAL`, `CHARGEBACK`).
+- **Lists** are reusable groups referenced in rules (`@blocked_users`, `@trusted_users`, etc.).
+
+If you keep these three clean, your rules become much easier to operate and tune.
 
 ---
 
 ## Transaction Labels
 
-### Overview
-
-Labels help you:
-
-- Measure rule performance (false positives/negatives)
-- Build training datasets for ML models
-- Analyze fraud patterns over time
-- Validate rule changes
+Labels tell you what actually happened after investigation. They are essential for measuring false positives and false negatives.
 
 ### Built-in Labels
 
-ezrules includes three standard labels:
-
-- **FRAUD** - Confirmed or suspected fraudulent transactions
-- **CHARGEBACK** - Disputed transactions resulting in chargebacks
-- **NORMAL** - Legitimate transactions
+- `FRAUD`
+- `CHARGEBACK`
+- `NORMAL`
 
 ### Labeling Methods
 
 #### Single Event via API
 
 ```bash
-curl -X POST http://localhost:8888/mark-event \
+curl -X POST http://localhost:8888/api/v2/labels/mark-event \
+  -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "txn_123",
@@ -38,231 +36,131 @@ curl -X POST http://localhost:8888/mark-event \
 
 #### Bulk Upload via CSV
 
-1. Navigate to **Labels → Upload Labels**
-2. Upload CSV file (no header row, 2 columns: event_id, label_name):
+1. Open **Labels -> Upload Labels**.
+2. Upload a CSV file with no header row and exactly two columns (`event_id,label_name`).
+
+Example:
 
 ```csv
 txn_001,FRAUD
 txn_002,NORMAL
 txn_003,CHARGEBACK
-txn_004,FRAUD
 ```
-
-3. Review upload summary
-4. Labels are applied immediately
-
-#### Via Web Interface
-
-Use the REST API to apply labels from CSV via the `/api/v2/labels/upload` endpoint.
 
 ---
 
 ## Label Analytics
 
-### Viewing Analytics
+Open **Label Analytics** to view:
 
-Navigate to **Label Analytics** to view:
+- Total labeled events
+- Label distribution summary
+- Label trends over time
+- Aggregation windows (`1h`, `6h`, `12h`, `24h`, `30d`)
 
-- **Total Labeled Events**: Coverage metric
-- **Labels Over Time**: Individual time-series for each label
-- **Distribution**: Breakdown by label type
-- **Time Ranges**: 1h, 6h, 12h, 24h, 30d views
+---
 
-### Performance Analysis
+## Outcomes
 
-#### False Positive Rate
+Outcomes are your operational decisions. Rules can only return values that exist in the allowed outcomes set.
 
-Measure how many legitimate transactions are flagged:
+Common outcomes include:
 
+- `HOLD` for manual review
+- `RELEASE` for approve/allow
+- `CANCEL` for decline/block
+
+### Why Outcomes Matter
+
+- They standardize decisioning across rules.
+- They make outcome trends measurable in analytics.
+- They let teams align on operational actions.
+
+### Manage Outcomes in UI
+
+1. Open **Outcomes**.
+2. Add outcome names you want rules to return.
+3. Remove unused outcomes to keep the set clear.
+
+Example rule snippet:
+
+```python
+if $user_id in @blocked_users:
+    return 'CANCEL'
 ```
-False Positives = NORMAL labels in triggered outcomes
-False Positive Rate = FP / Total triggered events
-```
 
-**Example:**
-- 100 events triggered outcome
-- 30 labeled as NORMAL
-- FP Rate = 30%
+### Monitor Outcome Trends
 
-#### False Negative Rate
+Use the Dashboard to track outcome volume over time.
 
-Measure how much fraud is missed:
+Key analytics endpoint:
 
-```
-False Negatives = FRAUD labels NOT in outcomes
-False Negative Rate = FN / Total FRAUD labels
-```
+- `GET /api/v2/analytics/outcomes-distribution?aggregation=24h`
 
-**Example:**
-- 50 total FRAUD labels
-- 45 triggered outcomes
-- 5 missed
-- FN Rate = 10%
+Supported `aggregation` values: `1h`, `6h`, `12h`, `24h`, `30d`.
 
-### Using Labels for Tuning
+### Outcome Best Practices
 
-1. **Baseline**: Run rule for 7 days, label outcomes
-2. **Measure**: Calculate FP and FN rates
-3. **Adjust**: Modify rule thresholds
-4. **Validate**: Test with historical labeled data
-5. **Deploy**: Update rule
-6. **Monitor**: Track for another 7 days
+- Keep outcome names short and stable.
+- Reuse existing outcomes where possible.
+- Remove unused outcomes during periodic cleanup.
+- Validate your outcome set before major rule rollouts.
 
 ---
 
 ## User Lists
 
-### Overview
+User lists are reusable sets of values referenced from rules with `@ListName`.
 
-User lists store collections of IDs for use in rules:
-
-- **Blocklists** - Known bad actors
-- **Allowlists** - Trusted users
-- **Watchlists** - Users requiring extra scrutiny
-- **VIP Lists** - High-value customers with different thresholds
-
-### Creating Lists
-
-Via web interface:
-
-1. Navigate to **Lists**
-2. Click **Create New List**
-3. Enter a list name (for example `HighRiskUsers`)
-4. Save — the list starts empty
-5. Use the “Add entry” form to add individual identifiers one at a time
-
-### Using Lists in Rules
+Example:
 
 ```python
-# Check membership using @ notation
-if $user_id in @high_risk_users:
-    return 'HOLD'
+if $user_id in @blocked_users:
+    return 'CANCEL'
 ```
 
-### Managing Lists
+### Manage Lists in UI
 
-#### Adding or Removing Members
+1. Open **Lists**.
+2. Create a list.
+3. Add or remove entries.
 
-- Use the **Add** button in the list card to append a single value.
-- Use the inline remove button next to each entry to delete it.
-- For automation, interact with `PersistentUserListManager` from application code.
+Use clear names and keep list ownership explicit (for example, who updates the list and how often).
 
 ---
 
-## Best Practices
+## How They Work Together
 
-### Labeling
+Typical analyst loop:
 
-!!! tip "Label Quickly"
-    Label transactions within 24-48 hours for best context.
+1. Rule evaluates event and returns an outcome (for example `HOLD`).
+2. Analyst reviews flagged transactions.
+3. Analyst labels reviewed transactions (`FRAUD` or `NORMAL`).
+4. Analytics shows whether current outcomes are too broad or too narrow.
+5. Analyst updates list membership and/or rule logic.
 
-!!! tip "Be Consistent"
-    Establish clear criteria for each label type and document them.
-
-!!! tip "Label Everything"
-    Label both true positives and false positives for complete analysis.
-
-### Lists
-
-!!! tip "Regular Maintenance"
-    Review and update lists weekly to remove stale entries.
-
-!!! tip "Document Purpose"
-    Clearly describe each list's purpose and criteria for inclusion.
-
-!!! tip "Version Control"
-    Keep history of list changes for audit purposes.
+This loop is where most quality improvement happens.
 
 ---
 
-## Common Workflows
+## API Endpoints
 
-### Fraud Investigation
+- `POST /api/v2/labels/mark-event`
+- `POST /api/v2/labels/upload`
+- `GET /api/v2/labels`
+- `GET /api/v2/analytics/labels-summary`
+- `GET /api/v2/analytics/labels-distribution?aggregation=24h`
+- `GET /api/v2/user-lists`
+- `GET /api/v2/outcomes`
+- `POST /api/v2/outcomes`
+- `DELETE /api/v2/outcomes/{outcome_name}`
 
-1. Rule triggers outcome
-2. Analyst reviews transaction
-3. If fraud: Label as FRAUD, add to blocklist
-4. If legitimate: Label as NORMAL, review rule
-5. Update rules based on patterns
-
-### Allowlist Management
-
-1. VIP customer reports false positive
-2. Verify customer legitimacy
-3. Add to VIP allowlist
-4. Update rules to check allowlist
-5. Monitor for abuse
-
-### Chargeback Analysis
-
-1. Receive chargeback notification
-2. Find original transaction
-3. Label as CHARGEBACK
-4. Check if rule triggered
-5. If missed: Adjust rules
-6. Add patterns to detection rules
-
----
-
-## API Reference
-
-### Label Endpoints
-
-**Mark Single Event:**
-```http
-POST /mark-event
-Content-Type: application/json
-
-{
-  "event_id": "txn_123",
-  "label_name": "FRAUD"
-}
-```
-
-**Get Labels Summary:**
-```http
-GET /api/labels_summary
-
-Response:
-{
-  "total_labeled": 1500,
-  "pie_chart": {
-    "labels": ["FRAUD", "NORMAL", "CHARGEBACK"],
-    "data": [450, 900, 150],
-    "backgroundColor": ["rgb(255, 99, 132)", "..."]
-  }
-}
-```
-
-**Get Labels Distribution:**
-```http
-GET /api/labels_distribution?aggregation=24h
-
-Response:
-{
-  "labels": ["2025-01-09 10:00", "2025-01-09 11:00"],
-  "datasets": [
-    {
-      "label": "FRAUD",
-      "data": [12, 8],
-      "borderColor": "rgb(255, 99, 132)",
-      "backgroundColor": "rgba(255, 99, 132, 0.1)"
-    },
-    {
-      "label": "NORMAL",
-      "data": [20, 15],
-      "borderColor": "rgb(54, 162, 235)",
-      "backgroundColor": "rgba(54, 162, 235, 0.1)"
-    }
-  ],
-  "aggregation": "24h"
-}
-```
+See OpenAPI docs at `http://localhost:8888/docs` for schemas and auth requirements.
 
 ---
 
 ## Next Steps
 
-- **[Analyst Guide](analyst-guide.md)** - Complete analyst workflows
-- **[Monitoring & Analytics](monitoring.md)** - Analytics dashboard
-- **[API Reference](../api-reference/evaluator-api.md)** - Full API documentation
+- **[Analyst Guide](analyst-guide.md)** - Analyst workflows
+- **[Monitoring & Analytics](monitoring.md)** - Dashboard and metrics
+- **[API Reference](../api-reference/manager-api.md)** - API overview
