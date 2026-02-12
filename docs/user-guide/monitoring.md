@@ -1,40 +1,43 @@
 # Monitoring & Analytics
 
-Monitoring is where rule quality becomes visible. This page helps you answer three questions quickly:
+Monitoring is where rule quality becomes visible. Use this page for a fast operational check.
+
+You should be able to answer three questions quickly:
 
 - Are events flowing as expected?
-- Which outcomes are firing the most?
-- Are labels confirming or contradicting your current rule behavior?
+- Which outcomes are firing most often?
+- Do labels confirm or contradict current rule behavior?
 
 ---
 
-## Dashboard
+## 1) Check Event Flow (Dashboard)
 
-The dashboard provides:
+Open **Dashboard** in the sidebar and verify:
 
-- Active rules count
-- Transaction volume over time
-- Outcome trends over time
-- Aggregation selector (`1h`, `6h`, `12h`, `24h`, `30d`)
+- Active rules count is non-zero when rules are deployed
+- Transaction volume chart has data in the selected window
+- Outcome charts move as you submit test or live events
+
+Use aggregation windows: `1h`, `6h`, `12h`, `24h`, `30d`.
 
 ---
 
-## Label Analytics
+## 2) Check Label Feedback (Analytics)
 
-The label analytics view provides:
+Open **Analytics** in the sidebar and verify:
 
 - Total labeled events
 - Label distribution
 - Label trends over time
 
-Feed these views by labeling events through:
+If charts are empty, feed labels through:
 
 - `POST /api/v2/labels/mark-event`
 - `POST /api/v2/labels/upload`
 
 ---
 
-## Analytics API Endpoints
+## 3) Drill Down via API
 
 - `GET /api/v2/analytics/transaction-volume?aggregation=6h`
 - `GET /api/v2/analytics/outcomes-distribution?aggregation=24h`
@@ -67,11 +70,13 @@ GROUP BY el.label;
 
 ---
 
-## Troubleshooting
+## 4) If Something Looks Wrong
 
-- No charts: verify events are being stored in `testing_record_log`.
-- Empty outcome series: verify rules are returning allowed outcomes.
-- Empty label charts: verify labels exist and events are labeled.
-- API `400` on analytics: check `aggregation` value is one of `1h`, `6h`, `12h`, `24h`, `30d`.
+Use the central [Troubleshooting Guide](../troubleshooting.md) for symptom -> cause -> fix entries, including:
 
-For complete request/response schemas, use OpenAPI docs at `http://localhost:8888/docs`.
+- API does not start
+- Rule does not fire
+- Analytics charts are empty
+- Backtests stay `PENDING`
+
+For request/response schemas, use OpenAPI docs at `http://localhost:8888/docs`.

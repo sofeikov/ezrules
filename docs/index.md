@@ -15,7 +15,7 @@ ezrules is designed for organizations that need to monitor transactions, detect 
 - **Flexible Rule Engine** - Write business rules in a Python-like language with expressive syntax for transaction logic
 - **Web Management Interface** - Create and manage rules through an intuitive web UI
 - **Role-Based Access Control** - Granular permissions with 27 distinct actions that can be assigned per role
-- **Transaction Labeling** - Label events through the Angular UI or REST API for analytics
+- **Transaction Labeling** - Label events through REST API flows and analyze label trends in the UI
 - **Analytics Dashboard** - Monitor transaction volume and outcome trends with configurable time ranges
 - **Audit Trail** - Track rule revisions plus user list, outcome, label, and configuration history for compliance requirements
 

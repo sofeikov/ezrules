@@ -22,7 +22,14 @@ Labels tell you what actually happened after investigation. They are essential f
 
 ### Labeling Methods
 
-#### Single Event via API
+#### UI-first workflow (recommended for analysts)
+
+1. Open **Labels**.
+2. Ensure the label names you use operationally exist (`FRAUD`, `NORMAL`, `CHARGEBACK`, etc.).
+3. If your deployment includes CSV upload in the Labels UI, upload `event_id,label_name` rows.
+4. Confirm changes in **Analytics**.
+
+#### Single Event via API (integration)
 
 ```bash
 curl -X POST http://localhost:8888/api/v2/labels/mark-event \
@@ -34,10 +41,17 @@ curl -X POST http://localhost:8888/api/v2/labels/mark-event \
   }'
 ```
 
-#### Bulk Upload via CSV
+#### Bulk Upload via CSV (API fallback)
 
-1. Open **Labels -> Upload Labels**.
-2. Upload a CSV file with no header row and exactly two columns (`event_id,label_name`).
+Use the bulk upload API endpoint:
+
+```bash
+curl -X POST http://localhost:8888/api/v2/labels/upload \
+  -H "Authorization: Bearer <access_token>" \
+  -F "file=@labels.csv"
+```
+
+Create `labels.csv` with no header row and exactly two columns (`event_id,label_name`).
 
 Example:
 
@@ -49,9 +63,9 @@ txn_003,CHARGEBACK
 
 ---
 
-## Label Analytics
+## Analytics
 
-Open **Label Analytics** to view:
+Open **Analytics** (sidebar label) to view:
 
 - Total labeled events
 - Label distribution summary

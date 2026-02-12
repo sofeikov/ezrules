@@ -87,7 +87,23 @@ Focus on these response fields:
 
 ## Label Transactions (This Is Where Quality Comes From)
 
-### API labeling
+For most analyst teams, labeling should be a UI workflow first.
+Use API labeling only for integrations or batch automation.
+
+### UI workflow (recommended)
+
+1. Open **Labels**.
+2. Confirm label names exist (for example `FRAUD`, `NORMAL`, `CHARGEBACK`).
+3. If your deployment exposes CSV upload in the UI, upload rows like:
+
+```csv
+txn_001,FRAUD
+txn_002,NORMAL
+```
+
+4. Open **Analytics** and confirm labeled counts/trends update.
+
+### API labeling (automation/integration)
 
 ```bash
 curl -X POST http://localhost:8888/api/v2/labels/mark-event \
@@ -99,9 +115,17 @@ curl -X POST http://localhost:8888/api/v2/labels/mark-event \
   }'
 ```
 
-### CSV labeling
+### CSV labeling via API (fallback)
 
-Use **Labels -> Upload Labels** with rows like:
+Use this when UI upload is not available in your deployment:
+
+```bash
+curl -X POST http://localhost:8888/api/v2/labels/upload \
+  -H "Authorization: Bearer <access_token>" \
+  -F "file=@labels.csv"
+```
+
+Use rows like:
 
 ```csv
 txn_001,FRAUD
@@ -128,7 +152,7 @@ Tip: consistent labeling standards are more important than perfect speed.
 
 ## Use Dashboard + Analytics Together
 
-Use dashboard and label analytics together for full context:
+Use **Dashboard** and **Analytics** (sidebar label) together for full context:
 
 - transaction volume trends
 - outcome trends

@@ -8,11 +8,7 @@ The evaluator endpoint is part of the unified FastAPI service.
 
 ## Run Locally
 
-```bash
-uv run ezrules api --port 8888
-```
-
-Then open `http://localhost:8888/docs`.
+--8<-- "snippets/start-api.md"
 
 ## Endpoint
 
@@ -30,8 +26,6 @@ Request and response schemas are defined in OpenAPI and available in the interac
 
 ## Live API Documentation (Recommended)
 
-- Swagger UI: `http://localhost:8888/docs`
-- ReDoc: `http://localhost:8888/redoc`
-- OpenAPI JSON: `http://localhost:8888/openapi.json`
+--8<-- "snippets/openapi-links.md"
 
 Use these as the source of truth for request/response models and status codes.

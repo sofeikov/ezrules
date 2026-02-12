@@ -70,9 +70,7 @@ uv run ezrules add-user --user-email admin@example.com --password admin
 
 ## 4. Run API Service
 
-```bash
-uv run ezrules api --port 8888
-```
+--8<-- "snippets/start-api.md"
 
 Optional (development reload):
 
@@ -108,9 +106,10 @@ Build output is written to `ezrules/frontend/dist/`.
 
 - API root: `http://localhost:8888/`
 - Health check: `http://localhost:8888/ping`
-- OpenAPI docs (Swagger UI): `http://localhost:8888/docs`
-- ReDoc: `http://localhost:8888/redoc`
-- OpenAPI JSON: `http://localhost:8888/openapi.json`
+- OpenAPI docs:
+  - Swagger UI: `http://localhost:8888/docs`
+  - ReDoc: `http://localhost:8888/redoc`
+  - OpenAPI JSON: `http://localhost:8888/openapi.json`
 - Frontend UI (dev): `http://localhost:4200`
 
 ---
@@ -125,16 +124,26 @@ Build output is written to `ezrules/frontend/dist/`.
 
 ## Common Local Commands
 
+Start infrastructure:
+
 ```bash
-# Start infra
 docker compose up -d
+```
 
-# Run API
+Run API:
+
+```bash
 uv run ezrules api --port 8888
+```
 
-# Run checks
+Run checks:
+
+```bash
 uv run poe check
+```
 
-# Run backend tests
+Run backend tests:
+
+```bash
 uv run pytest --cov=ezrules.backend --cov=ezrules.core --cov-report=term-missing --cov-report=xml tests
 ```

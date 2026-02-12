@@ -42,16 +42,14 @@ git checkout -b feature/your-feature-name
 
 ### Running Tests
 
+Run all tests with coverage:
+
+--8<-- "snippets/backend-test-command.md"
+
+For targeted debugging only:
+
 ```bash
-# Run all tests with coverage
-PYTHONPATH="$PWD" EZRULES_DB_ENDPOINT="postgresql://postgres:root@localhost:5432/tests" \
-EZRULES_TESTING="true" uv run pytest --cov=ezrules.backend --cov=ezrules.core \
---cov-report=term-missing --cov-report=xml tests
-
-# Run specific test file
 uv run pytest tests/test_api_v2_rules.py -v
-
-# Run specific test
 uv run pytest tests/test_api_v2_rules.py::test_create_rule_success -v
 ```
 
@@ -119,7 +117,7 @@ git commit -m "Update code"
 2. **Run code quality checks**: `uv run poe check` must pass
 3. **Update documentation**: Add/update docs for new features
 4. **Update README**: Document user-facing changes
-5. **Update whatsnew.rst**: Add entry for your changes
+5. **Update whatsnew.md**: Add entry for your changes
 
 ### Submitting
 
@@ -152,7 +150,7 @@ Brief description of changes
 - [ ] Code quality checks pass
 - [ ] Documentation updated
 - [ ] README updated (if needed)
-- [ ] whatsnew.rst updated
+- [ ] whatsnew.md updated
 ```
 
 ---

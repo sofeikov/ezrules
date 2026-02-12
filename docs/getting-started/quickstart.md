@@ -17,15 +17,16 @@ docker compose up -d
 
 Start the API service for API endpoints and rule evaluation:
 
-```bash
-uv run ezrules api --port 8888
-```
+--8<-- "snippets/start-api.md"
 
 The API service provides:
 
 - API root at [http://localhost:8888](http://localhost:8888)
 - REST API endpoints under the `/api/v2` path prefix (for example, `http://localhost:8888/api/v2/rules`)
-- OpenAPI docs at [http://localhost:8888/docs](http://localhost:8888/docs)
+
+OpenAPI docs:
+
+--8<-- "snippets/openapi-links.md"
 
 ---
 
@@ -52,7 +53,7 @@ Let's create a simple rule to detect high-value transactions.
 ### Via Web Interface
 
 1. Navigate to **Rules** in the sidebar
-2. Click **Create New Rule**
+2. Click **New Rule**
 3. Fill in the form:
    - **Name**: `High Value Transaction`
    - **Description**: `Flag transactions over $10,000`
@@ -165,9 +166,22 @@ Look at the `rule_results`, `outcome_counters`, and `outcome_set` fields in the 
 
 Let's label a transaction as fraud for analytics.
 
-### Via API
+### Option A: UI Workflow (Recommended for Analysts)
 
-Use an access token from your logged-in session (or obtain one via `/api/v2/auth/login`).
+If `FRAUD`, `NORMAL`, and `CHARGEBACK` labels are already present, skip this step.
+
+1. Navigate to **Labels** in the sidebar.
+2. Add missing label names so analysts can use a consistent label set.
+3. If your deployment includes CSV upload in the Labels area, upload a file like:
+   ```csv
+   txn_002,FRAUD
+   txn_003,NORMAL
+   ```
+
+### Option B: API Workflow (For Integrations/Automation)
+
+Use this option when labels come from another system or scripted pipeline.
+It requires an access token from `/api/v2/auth/login`.
 
 ```bash
 curl -X POST http://localhost:8888/api/v2/labels/mark-event \
@@ -179,19 +193,9 @@ curl -X POST http://localhost:8888/api/v2/labels/mark-event \
   }'
 ```
 
-### Via Web Interface
+### View Label Metrics
 
-1. Navigate to **Labels** in the sidebar
-2. Click **Upload Labels**
-3. Upload a CSV file with format:
-   ```csv
-   txn_002,FRAUD
-   txn_003,NORMAL
-   ```
-
-### View Label Analytics
-
-1. Navigate to **Label Analytics** in the sidebar
+1. Navigate to **Analytics** in the sidebar
 2. Review the total labeled count and individual label charts
 3. Select different time ranges (1h, 6h, 12h, 24h, 30d)
 
@@ -214,65 +218,4 @@ Congratulations! You've successfully:
 - **[API Reference](../api-reference/manager-api.md)** - Integrate ezrules with your applications
 - **[Architecture Overview](../architecture/overview.md)** - Understand how ezrules works
 
----
-
-## Common Patterns
-
-
-### Geographic Rules
-
-Flag transactions from unusual locations:
-
-```python
-if $user_country in @LatinAmericanCountries:
-    return 'HOLD'  # Review LATAM traffic
-```
-
-### List-Based Rules
-
-Check against watchlists or blocklists:
-
-```python
-if $user_id in @blocklist:
-    return 'CANCEL'  # Block known bad actors
-```
-
----
-
-## Tips for Success
-
-!!! tip "Start Simple"
-    Begin with simple rules and gradually add complexity as you understand your data patterns.
-
-!!! tip "Test with Historical Data"
-    Use the `generate-random-data` command to create realistic test scenarios before deploying rules.
-
-!!! tip "Monitor Performance"
-    Check the analytics dashboard regularly to tune your rules and reduce false positives.
-
-!!! tip "Use Labels"
-    Label transactions consistently to build a dataset for measuring rule effectiveness.
-
----
-
-## Troubleshooting
-
-### Rule Not Firing
-
-1. Check the rule syntax in the web interface
-2. Verify the event data contains the expected fields
-3. Add logging to your rule code for debugging
-
-### Events Not Appearing
-
-1. Ensure the API service is running
-2. Check the API response for errors
-3. Verify database connectivity
-
-### Slow Performance
-
-1. Add indexes to frequently queried fields
-2. Optimize rule code to avoid expensive operations
-3. Consider caching for repeated lookups
-
-For more help, see our [GitHub Issues](https://github.com/sofeikov/ezrules/issues).
+If something fails during setup, use the [Troubleshooting Guide](../troubleshooting.md).

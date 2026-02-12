@@ -180,12 +180,11 @@ uv run ezrules add-user --user-email admin@example.com --password admin --admin
 
 Start the API service:
 
-```bash
-# Start the API service
-uv run ezrules api --port 8888
-```
+--8<-- "snippets/start-api.md"
 
-Open API docs at [http://localhost:8888/docs](http://localhost:8888/docs).
+API documentation links:
+
+--8<-- "snippets/openapi-links.md"
 
 To run the frontend in development:
 
@@ -226,4 +225,5 @@ Now that you have ezrules installed, proceed to the [Quick Start Guide](quicksta
 
 ## Troubleshooting
 
-For issues, check our [GitHub Issues](https://github.com/sofeikov/ezrules/issues) or file a new one.
+Start with the [Troubleshooting Guide](../troubleshooting.md).
+If the issue is not covered, check [GitHub Issues](https://github.com/sofeikov/ezrules/issues) or file a new one.

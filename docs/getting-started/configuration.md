@@ -2,6 +2,10 @@
 
 ezrules uses environment variables for configuration. This guide covers all available options and best practices.
 
+!!! tip "Fast Path (Local Development)"
+    If you are running locally, set only `EZRULES_DB_ENDPOINT`, `EZRULES_APP_SECRET`, and `EZRULES_ORG_ID` first.
+    You can ignore staging/production examples until your local stack works.
+
 ---
 
 ## Environment Variables
@@ -270,6 +274,8 @@ volumes:
 ---
 
 ## Troubleshooting
+
+For a symptom-based troubleshooting flow, start with the [Troubleshooting Guide](../troubleshooting.md).
 
 ### Configuration Not Loading
 
