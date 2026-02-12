@@ -29,13 +29,13 @@ export EZRULES_DB_ENDPOINT="postgresql://postgres:root@localhost:5432/tests"
 
 ---
 
-### Optional Configuration
+### Core Configuration
 
 #### `EZRULES_APP_SECRET`
 
-Secret key for session management and security features.
+Secret key used for security features (including JWT token signing).
 
-**Default:** Auto-generated random string
+**Default:** No code default (must be provided)
 
 **Example:**
 ```bash
@@ -49,12 +49,14 @@ export EZRULES_APP_SECRET="your-secret-key-here-change-in-production"
 
 Organization ID for multi-tenant deployments.
 
-**Default:** `1`
+**Default:** No code default (must be provided)
 
 **Example:**
 ```bash
 export EZRULES_ORG_ID="5"
 ```
+
+### Optional Configuration
 
 #### `EZRULES_TESTING`
 
@@ -67,37 +69,36 @@ Enable testing mode with additional debugging features.
 export EZRULES_TESTING="true"
 ```
 
+#### `EZRULES_CELERY_BROKER_URL`
+
+Broker URL for Celery backtesting tasks.
+
+**Default:** `redis://localhost:6379`
+
+**Example:**
+```bash
+export EZRULES_CELERY_BROKER_URL="redis://localhost:6379/0"
+```
+
 ---
 
 ## Configuration Files
 
-### Using .env Files
+### Using settings.env (Recommended)
 
-Create a `.env` file in your project root for local development:
+Create or update `settings.env` in your project root for local development:
 
 ```bash
-# .env file
+# settings.env
 EZRULES_DB_ENDPOINT=postgresql://postgres:password@localhost:5432/ezrules
 EZRULES_APP_SECRET=dev-secret-key-change-me
 EZRULES_ORG_ID=1
 ```
 
-Load the file before running commands:
+The application loads `settings.env` automatically. You can run:
 
 ```bash
-source .env
 uv run ezrules api
-```
-
-Or use a tool like `direnv` to auto-load:
-
-```bash
-# Install direnv
-brew install direnv  # macOS
-
-# Add to .envrc
-echo "source .env" > .envrc
-direnv allow
 ```
 
 ---
@@ -106,7 +107,7 @@ direnv allow
 
 ### API Service Options
 
-The API service provides both the web interface and the evaluation API. It accepts these command-line arguments:
+The API service exposes REST endpoints and rule evaluation. It accepts these command-line arguments:
 
 ```bash
 uv run ezrules api [OPTIONS]
@@ -209,8 +210,8 @@ The project relies on Python's standard logging module. Adjust handlers or level
 If using background workers:
 
 - The Celery app lives in `ezrules/backend/tasks.py`.
-- The broker is currently fixed to `redis://localhost:6379` and the result backend uses the primary database URL.
-- Adjust those settings in code before deploying to production.
+- The broker is configurable via `EZRULES_CELERY_BROKER_URL` (default: `redis://localhost:6379`).
+- The result backend uses the primary database URL (`EZRULES_DB_ENDPOINT`).
 
 ---
 
@@ -249,9 +250,10 @@ services:
     environment:
       - EZRULES_DB_ENDPOINT=postgresql://postgres:password@db:5432/ezrules
       - EZRULES_APP_SECRET=${SECRET_KEY}
+      - EZRULES_ORG_ID=1
     ports:
       - "8888:8888"
-    command: api --port 8888
+    command: ["uv", "run", "ezrules", "api", "--port", "8888"]
 
   db:
     image: postgres:16

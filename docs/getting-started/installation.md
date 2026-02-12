@@ -7,9 +7,11 @@ This guide will walk you through installing ezrules and its dependencies.
 Before installing ezrules, ensure you have the following:
 
 - **Python 3.12 or higher**
-- **PostgreSQL 12 or higher**
+- **PostgreSQL**
+- **Redis** (required for backtesting worker)
 - **uv** (Python package manager) - [Installation guide](https://github.com/astral-sh/uv)
 - **Git** (for cloning the repository)
+- **Docker & Docker Compose** (recommended for local infrastructure)
 
 ### Installing uv
 
@@ -33,7 +35,17 @@ If you don't have uv installed:
     pip install uv
     ```
 
-### PostgreSQL Setup
+### Infrastructure Setup (Recommended: Docker Compose)
+
+From the repository root:
+
+```bash
+docker compose up -d
+```
+
+This starts PostgreSQL, Redis, and a Celery worker.
+
+### PostgreSQL Setup (Manual)
 
 ezrules requires a PostgreSQL database. You can install PostgreSQL using:
 
@@ -88,22 +100,36 @@ This command will:
 - Install all Python dependencies
 - Set up the development environment
 
-### 3. Configure Database Connection
+### 3. Configure Environment Variables
 
-Set the database connection environment variable:
+ezrules reads configuration from `settings.env` by default.
+
+Edit `settings.env` in the project root:
+
+```bash
+EZRULES_DB_ENDPOINT="postgresql://postgres:root@localhost:5432/ezrules"
+EZRULES_APP_SECRET="put_your_own_secret_here"
+EZRULES_ORG_ID=1
+```
+
+Or export variables in your shell:
 
 === "Bash/Zsh"
 
     ```bash
     export EZRULES_DB_ENDPOINT="postgresql://postgres:yourpassword@localhost:5432/ezrules"
+    export EZRULES_APP_SECRET="put_your_own_secret_here"
+    export EZRULES_ORG_ID=1
     ```
 
-=== ".env file"
+=== "settings.env"
 
-    Create a `.env` file in the project root:
+    Update `settings.env` in the project root:
 
     ```bash
     EZRULES_DB_ENDPOINT=postgresql://postgres:yourpassword@localhost:5432/ezrules
+    EZRULES_APP_SECRET=put_your_own_secret_here
+    EZRULES_ORG_ID=1
     ```
 
 !!! tip "Configuration"
@@ -123,7 +149,7 @@ The `init-db` command will:
 
 - Create the database if it doesn't exist
 - Set up all required tables
-- Initialize the schema
+- Seed default organization, outcomes, and user lists
 
 ### 5. Set Up Permissions
 
@@ -142,7 +168,7 @@ This creates the default roles:
 ### 6. Create Your First User
 
 ```bash
-uv run ezrules add-user --user-email admin@example.com --password admin
+uv run ezrules add-user --user-email admin@example.com --password admin --admin
 ```
 
 !!! warning "Security"
@@ -152,14 +178,24 @@ uv run ezrules add-user --user-email admin@example.com --password admin
 
 ## Verify Installation
 
-Start the services to verify everything is working:
+Start the API service:
 
 ```bash
 # Start the API service
 uv run ezrules api --port 8888
 ```
 
-Open the Angular frontend at [http://localhost:4200](http://localhost:4200) (development) or configure a web server to serve the built Angular app in production.
+Open API docs at [http://localhost:8888/docs](http://localhost:8888/docs).
+
+To run the frontend in development:
+
+```bash
+cd ezrules/frontend
+npm install
+npm start
+```
+
+Then open [http://localhost:4200](http://localhost:4200).
 
 ---
 
@@ -175,8 +211,10 @@ brew install redis  # macOS
 sudo apt install redis-server  # Ubuntu
 
 # Start Celery workers
-uv run celery -A ezrules.backend.tasks worker -l INFO
+uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo
 ```
+
+If you used `docker compose up -d`, the worker is already running.
 
 ---
 

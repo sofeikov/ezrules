@@ -7,9 +7,15 @@ This guide will get you up and running with ezrules in under 10 minutes. You'll 
 
 ---
 
-## Step 1: Start the Service
+## Step 1: Start Infrastructure and API
 
-Start the API service which provides both the web interface and the evaluation API:
+Start local infrastructure (PostgreSQL, Redis, Celery worker):
+
+```bash
+docker compose up -d
+```
+
+Start the API service for API endpoints and rule evaluation:
 
 ```bash
 uv run ezrules api --port 8888
@@ -17,15 +23,23 @@ uv run ezrules api --port 8888
 
 The API service provides:
 
-- The web interface at [http://localhost:8888](http://localhost:8888)
+- API root at [http://localhost:8888](http://localhost:8888)
 - The REST API at `http://localhost:8888/api/v2`
 - OpenAPI docs at [http://localhost:8888/docs](http://localhost:8888/docs)
 
 ---
 
-## Step 2: Log In
+## Step 2: Start Frontend and Log In
 
-1. Open your browser to [http://localhost:8888](http://localhost:8888)
+Run the frontend dev server:
+
+```bash
+cd ezrules/frontend
+npm install
+npm start
+```
+
+1. Open your browser to [http://localhost:4200](http://localhost:4200)
 2. Log in with the credentials you created during installation
 3. You should see the ezrules dashboard
 
@@ -57,30 +71,17 @@ Let's create a simple rule to detect high-value transactions.
 
 ---
 
-## Step 4: Create an Outcome
-
-Outcomes define what happens when a rule fires.
-
-1. Navigate to **Outcomes** in the sidebar
-2. Click **Create New Outcome**
-3. Fill in the form:
-   - **Name**: `High Value Alert`
-   - **Description**: `Alert for high-value transactions`
-4. Click **Save**
-
----
-
-## Step 5: Ensure Outcome Exists
+## Step 4: Ensure Outcome Exists
 
 ezrules validates that any literal returned by your rule is an allowed outcome.
 
 1. Navigate to **Outcomes** in the sidebar
-2. Ensure `'HOLD'` exists (create it if it doesn't)
-3. Save. Your rule now passes the allowed outcomes check
+2. Ensure `HOLD` exists (create it if it doesn't)
+3. Save
 
 ---
 
-## Step 6: Submit Test Events
+## Step 5: Submit Test Events
 
 Now let's send some transactions to see the rule in action.
 
@@ -104,8 +105,11 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "txn_001",
-    "amount": 500,
-    "user_id": "user_123"
+    "event_timestamp": 1704801000,
+    "event_data": {
+      "amount": 500,
+      "user_id": "user_123"
+    }
   }'
 
 # High-value transaction (will trigger rule)
@@ -113,14 +117,17 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "txn_002",
-    "amount": 15000,
-    "user_id": "user_456"
+    "event_timestamp": 1704801000,
+    "event_data": {
+      "amount": 15000,
+      "user_id": "user_456"
+    }
   }'
 ```
 
 ---
 
-## Step 7: View Results
+## Step 6: View Results
 
 ### In the Web Interface
 
@@ -154,14 +161,17 @@ Look at the `rule_results`, `outcome_counters`, and `outcome_set` fields in the 
 
 ---
 
-## Step 8: Label a Transaction
+## Step 7: Label a Transaction
 
 Let's label a transaction as fraud for analytics.
 
 ### Via API
 
+Use an access token from your logged-in session (or obtain one via `/api/v2/auth/login`).
+
 ```bash
-curl -X POST http://localhost:8888/mark-event \
+curl -X POST http://localhost:8888/api/v2/labels/mark-event \
+  -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "txn_002",
@@ -175,7 +185,6 @@ curl -X POST http://localhost:8888/mark-event \
 2. Click **Upload Labels**
 3. Upload a CSV file with format:
    ```csv
-   event_id,label_name
    txn_002,FRAUD
    txn_003,NORMAL
    ```
@@ -202,7 +211,7 @@ Congratulations! You've successfully:
 
 - **[Analyst Guide](../user-guide/analyst-guide.md)** - Learn how to create complex rules and analyze results
 - **[Admin Guide](../user-guide/admin-guide.md)** - Manage users, permissions, and system configuration
-- **[API Reference](../api-reference/evaluator-api.md)** - Integrate ezrules with your applications
+- **[API Reference](../api-reference/manager-api.md)** - Integrate ezrules with your applications
 - **[Architecture Overview](../architecture/overview.md)** - Understand how ezrules works
 
 ---
