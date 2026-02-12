@@ -35,6 +35,46 @@ ezrules consists of several core components:
 
 ## 🚀 Quick Start
 
+### Prerequisites
+
+- **Python 3.12+**
+- **PostgreSQL** — used for rule storage, audit logs, and Celery result backend
+- **Redis** — used as the Celery message broker for backtesting tasks
+- **Docker & Docker Compose** (recommended) — to run PostgreSQL and Redis with a single command
+
+#### Start infrastructure with Docker Compose (recommended)
+
+```bash
+docker compose up -d
+```
+
+This starts PostgreSQL (port 5432) and Redis (port 6379) in the background. Data is persisted in a Docker volume. To stop:
+
+```bash
+docker compose down        # stop containers, keep data
+docker compose down -v     # stop containers and delete data
+```
+
+#### Or install services manually
+
+<details>
+<summary>Manual installation instructions</summary>
+
+**Redis:**
+```bash
+# macOS
+brew install redis && brew services start redis
+
+# Ubuntu/Debian
+sudo apt install redis-server && sudo systemctl start redis
+```
+
+**PostgreSQL:** Install via your system package manager or use the standalone Docker script in `scripts/run_postgres_locally.sh`.
+
+</details>
+
+Redis must be running on `localhost:6379` (default). To use a different URL, set the `EZRULES_CELERY_BROKER_URL` environment variable (e.g. `redis://myhost:6380/0`).
+
 ### Installation
 
 ```bash
@@ -75,10 +115,30 @@ The `init-db` command automatically handles database creation and provides optio
 uv run ezrules api --port 8888
 # With auto-reload for development:
 uv run ezrules api --port 8888 --reload
-
-# Run the Celery workers
-uv run celery -A ezrules.backend.tasks worker -l INFO
 ```
+
+#### Celery Worker (required for backtesting)
+
+The backtesting feature runs rule comparisons asynchronously via Celery. A Celery worker must be running for backtest tasks to execute.
+
+```bash
+# Start a Celery worker (requires Redis running on localhost:6379)
+# On macOS, use --pool=solo to avoid fork-related crashes (SIGSEGV)
+uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo
+
+# On Linux, the default prefork pool works fine:
+uv run celery -A ezrules.backend.tasks worker -l INFO
+
+# Or with a custom broker URL:
+EZRULES_CELERY_BROKER_URL=redis://myhost:6380/0 uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo
+```
+
+A VS Code launch configuration named **"Celery Worker"** is also available in `.vscode/launch.json` for debugging the worker with breakpoints.
+
+**Architecture notes:**
+- **Broker** (Redis): Delivers task messages from the API to the worker
+- **Result backend** (PostgreSQL): Stores task results in the same database as the application, using the `EZRULES_DB_ENDPOINT` connection string
+- Without a running worker, backtest requests will remain in `PENDING` state indefinitely
 
 ### Angular Frontend
 
@@ -278,7 +338,7 @@ The documentation is also available online at [ReadTheDocs](https://ezrules.read
 - **Backend**: Python 3.12+, FastAPI, SQLAlchemy, Celery
 - **Frontend**: Angular (standalone components), Tailwind CSS, Chart.js
 - **Database**: PostgreSQL
-- **Task Queue**: Celery with Redis/PostgreSQL backend (for backtesting)
+- **Task Queue**: Celery with Redis broker and PostgreSQL result backend (for backtesting)
 - **Authentication**: JWT tokens (API v2)
 
 ### Code Quality

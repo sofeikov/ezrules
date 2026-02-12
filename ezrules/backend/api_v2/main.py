@@ -11,6 +11,7 @@ from ezrules.backend.api_v2.routes import (
     analytics,
     audit,
     auth,
+    backtesting,
     evaluator,
     labels,
     outcomes,
@@ -105,3 +106,6 @@ app.include_router(audit.router)
 
 # Evaluator routes: /api/v2/evaluate, /api/v2/ping (merged from evaluator service)
 app.include_router(evaluator.router)
+
+# Backtesting routes: /api/v2/backtesting/*
+app.include_router(backtesting.router)

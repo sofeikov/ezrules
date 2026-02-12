@@ -1,8 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { diffLines, Change } from 'diff';
 import { RuleDetail, RuleRevisionDetail, RuleService, UpdateRuleRequest } from '../services/rule.service';
+import { BacktestingService, BacktestResultItem, BacktestTaskResult } from '../services/backtesting.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -11,7 +13,7 @@ import { SidebarComponent } from '../components/sidebar.component';
   imports: [CommonModule, RouterModule, FormsModule, SidebarComponent],
   templateUrl: './rule-detail.component.html'
 })
-export class RuleDetailComponent implements OnInit {
+export class RuleDetailComponent implements OnInit, OnDestroy {
   rule: RuleDetail | null = null;
   loading: boolean = true;
   error: string | null = null;
@@ -32,10 +34,20 @@ export class RuleDetailComponent implements OnInit {
   saveError: string | null = null;
   saveSuccess: boolean = false;
 
+  // Backtesting properties
+  backtestResults: BacktestResultItem[] = [];
+  backtestTaskResults: Map<string, BacktestTaskResult> = new Map();
+  expandedBacktests: Set<string> = new Set();
+  backtesting: boolean = false;
+  backtestError: string | null = null;
+  backtestDiffs: Map<string, Change[]> = new Map();
+  private pollingIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private ruleService: RuleService
+    private ruleService: RuleService,
+    private backtestingService: BacktestingService
   ) { }
 
   ngOnInit(): void {
@@ -47,7 +59,13 @@ export class RuleDetailComponent implements OnInit {
       this.loadRevision(parseInt(ruleId, 10), this.revisionNumber);
     } else if (ruleId) {
       this.loadRule(parseInt(ruleId, 10));
+      this.loadBacktestResults(parseInt(ruleId, 10));
     }
+  }
+
+  ngOnDestroy(): void {
+    this.pollingIntervals.forEach(interval => clearInterval(interval));
+    this.pollingIntervals.clear();
   }
 
   loadRule(ruleId: number): void {
@@ -203,5 +221,129 @@ export class RuleDetailComponent implements OnInit {
         console.error('Error saving rule:', error);
       }
     });
+  }
+
+  // Backtesting methods
+
+  triggerBacktest(): void {
+    if (!this.rule || !this.editedLogic) return;
+
+    this.backtesting = true;
+    this.backtestError = null;
+
+    this.backtestingService.triggerBacktest(this.rule.r_id, this.editedLogic).subscribe({
+      next: (response) => {
+        this.backtesting = false;
+        if (response.success) {
+          this.loadBacktestResults(this.rule!.r_id);
+        } else {
+          this.backtestError = response.error || 'Failed to start backtest';
+        }
+      },
+      error: (error) => {
+        this.backtesting = false;
+        this.backtestError = error.error?.detail || 'Failed to start backtest. Please try again.';
+        console.error('Error triggering backtest:', error);
+      }
+    });
+  }
+
+  loadBacktestResults(ruleId: number): void {
+    this.backtestingService.getBacktestResults(ruleId).subscribe({
+      next: (response) => {
+        this.backtestResults = response.results;
+      },
+      error: (error) => {
+        console.error('Error loading backtest results:', error);
+      }
+    });
+  }
+
+  loadTaskResult(taskId: string): void {
+    this.backtestingService.getTaskResult(taskId).subscribe({
+      next: (result) => {
+        this.backtestTaskResults.set(taskId, result);
+        if (result.status === 'PENDING') {
+          this.startPolling(taskId);
+        } else {
+          this.stopPolling(taskId);
+        }
+      },
+      error: (error) => {
+        console.error('Error loading task result:', error);
+        this.stopPolling(taskId);
+      }
+    });
+  }
+
+  toggleBacktestResult(taskId: string): void {
+    if (this.expandedBacktests.has(taskId)) {
+      this.expandedBacktests.delete(taskId);
+      this.stopPolling(taskId);
+    } else {
+      this.expandedBacktests.add(taskId);
+      if (!this.backtestTaskResults.has(taskId)) {
+        this.loadTaskResult(taskId);
+      }
+    }
+  }
+
+  isBacktestExpanded(taskId: string): boolean {
+    return this.expandedBacktests.has(taskId);
+  }
+
+  getTaskResult(taskId: string): BacktestTaskResult | undefined {
+    return this.backtestTaskResults.get(taskId);
+  }
+
+  computeBacktestDiff(stored: string | null, proposed: string | null): Change[] {
+    const key = `${stored}|||${proposed}`;
+    if (!this.backtestDiffs.has(key)) {
+      this.backtestDiffs.set(key, diffLines(stored || '', proposed || ''));
+    }
+    return this.backtestDiffs.get(key)!;
+  }
+
+  getBacktestStatus(taskId: string): string {
+    const result = this.backtestTaskResults.get(taskId);
+    if (!result) return 'PENDING';
+    return result.status;
+  }
+
+  getOutcomeKeys(taskResult: BacktestTaskResult): string[] {
+    const keys = new Set<string>();
+    if (taskResult.stored_result) {
+      Object.keys(taskResult.stored_result).forEach(k => keys.add(k));
+    }
+    if (taskResult.proposed_result) {
+      Object.keys(taskResult.proposed_result).forEach(k => keys.add(k));
+    }
+    return Array.from(keys).sort();
+  }
+
+  private startPolling(taskId: string): void {
+    if (this.pollingIntervals.has(taskId)) return;
+    const interval = setInterval(() => {
+      this.backtestingService.getTaskResult(taskId).subscribe({
+        next: (result) => {
+          this.backtestTaskResults.set(taskId, result);
+          if (result.status !== 'PENDING') {
+            this.stopPolling(taskId);
+          }
+        },
+        error: () => {
+          this.stopPolling(taskId);
+        }
+      });
+    }, 3000);
+    this.pollingIntervals.set(taskId, interval);
+  }
+
+  private stopPolling(taskId: string): void {
+    const interval = this.pollingIntervals.get(taskId);
+    if (interval) {
+      clearInterval(interval);
+      this.pollingIntervals.delete(taskId);
+    }
   }
 }

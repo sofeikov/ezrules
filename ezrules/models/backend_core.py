@@ -279,6 +279,8 @@ class RuleBackTestingResult(Base):
     bt_id = Column(Integer, unique=True, primary_key=True)
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id", ondelete="CASCADE"))
     task_id = Column(String, nullable=False)
+    stored_logic = Column(String, nullable=True)
+    proposed_logic = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     rule: Mapped["Rule"] = relationship(back_populates="backtesting_results")

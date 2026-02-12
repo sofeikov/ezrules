@@ -257,6 +257,147 @@
               </div>
             </div>
           </div>
+
+          <!-- Backtest Changes Button (edit mode only) -->
+          <div *ngIf="isEditMode && !isRevisionView" class="bg-white border border-gray-200 rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Backtest Changes</h2>
+            <p class="text-sm text-gray-600 mb-4">Compare the current rule logic against your proposed changes using recent event data.</p>
+
+            <button
+              (click)="triggerBacktest()"
+              [disabled]="backtesting || !editedLogic"
+              class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+              data-testid="backtest-button"
+            >
+              <span *ngIf="!backtesting">Backtest Changes</span>
+              <span *ngIf="backtesting" class="flex items-center justify-center">
+                <svg class="animate-spin h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Starting backtest...
+              </span>
+            </button>
+
+            <!-- Backtest Error -->
+            <div *ngIf="backtestError" class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div class="flex items-center">
+                <svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p class="text-sm font-medium text-red-800">{{ backtestError }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Backtest Results Card -->
+          <div *ngIf="backtestResults.length > 0" class="bg-white border border-gray-200 rounded-lg p-6" data-testid="backtest-results-card">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Backtest Results</h2>
+
+            <div class="space-y-3">
+              <div *ngFor="let bt of backtestResults; let i = index" class="border border-gray-200 rounded-lg" [attr.data-testid]="'backtest-item-' + i">
+                <!-- Accordion Header -->
+                <button
+                  (click)="toggleBacktestResult(bt.task_id)"
+                  class="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                >
+                  <div class="flex items-center space-x-3">
+                    <svg class="w-4 h-4 text-gray-500 transition-transform" [ngClass]="{'rotate-90': isBacktestExpanded(bt.task_id)}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span class="text-sm text-gray-700">{{ formatDate(bt.created_at) }}</span>
+                  </div>
+                  <span
+                    class="px-2 py-1 rounded-full text-xs font-medium"
+                    [attr.data-testid]="'backtest-status-' + i"
+                    [ngClass]="{
+                      'bg-green-100 text-green-800': getBacktestStatus(bt.task_id) === 'SUCCESS',
+                      'bg-yellow-100 text-yellow-800': getBacktestStatus(bt.task_id) === 'PENDING',
+                      'bg-red-100 text-red-800': getBacktestStatus(bt.task_id) === 'FAILURE'
+                    }"
+                  >
+                    {{ getBacktestStatus(bt.task_id) === 'SUCCESS' ? 'Completed' : getBacktestStatus(bt.task_id) === 'PENDING' ? 'In Progress' : 'Failed' }}
+                  </span>
+                </button>
+
+                <!-- Accordion Content -->
+                <div *ngIf="isBacktestExpanded(bt.task_id)" class="border-t border-gray-200 px-4 py-4" data-testid="backtest-expanded-content">
+                  <!-- Loading state -->
+                  <div *ngIf="!getTaskResult(bt.task_id)" class="flex justify-center py-4">
+                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                  </div>
+
+                  <!-- PENDING state -->
+                  <div *ngIf="getTaskResult(bt.task_id)?.status === 'PENDING'" class="text-center py-4">
+                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-500 mx-auto mb-2"></div>
+                    <p class="text-sm text-gray-600">Backtest is running...</p>
+                  </div>
+
+                  <!-- FAILURE state -->
+                  <div *ngIf="getTaskResult(bt.task_id)?.status === 'FAILURE'" class="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p class="text-sm text-red-800">{{ getTaskResult(bt.task_id)?.error || 'Backtest failed' }}</p>
+                  </div>
+
+                  <!-- SUCCESS state -->
+                  <div *ngIf="getTaskResult(bt.task_id)?.status === 'SUCCESS'">
+                    <!-- Logic Diff -->
+                    <div *ngIf="bt.stored_logic || bt.proposed_logic" class="mb-4">
+                      <h4 class="text-sm font-medium text-gray-700 mb-2">Logic Changes</h4>
+                      <div class="border border-gray-200 rounded-lg overflow-hidden">
+                        <pre class="text-sm font-mono whitespace-pre-wrap break-all p-3" data-testid="backtest-diff"><span *ngFor="let change of computeBacktestDiff(bt.stored_logic, bt.proposed_logic)"
+                          [ngClass]="{
+                            'bg-green-100 text-green-900': change.added,
+                            'bg-red-100 text-red-900 line-through': change.removed
+                          }"
+                        >{{ change.value }}</span></pre>
+                      </div>
+                    </div>
+
+                    <!-- Results Table -->
+                    <div>
+                      <h4 class="text-sm font-medium text-gray-700 mb-2">Outcome Comparison</h4>
+                      <table class="w-full text-sm" data-testid="backtest-outcome-table">
+                        <thead>
+                          <tr class="border-b border-gray-200">
+                            <th class="text-left py-2 pr-3 font-medium text-gray-700">Outcome</th>
+                            <th class="text-right py-2 px-3 font-medium text-gray-700">Current</th>
+                            <th class="text-right py-2 px-3 font-medium text-gray-700">Proposed</th>
+                            <th class="text-right py-2 pl-3 font-medium text-gray-700">Delta</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr *ngFor="let outcome of getOutcomeKeys(getTaskResult(bt.task_id)!)" class="border-b border-gray-100">
+                            <td class="py-2 pr-3 font-medium text-gray-900">{{ outcome }}</td>
+                            <td class="text-right py-2 px-3 text-gray-700">
+                              {{ getTaskResult(bt.task_id)!.stored_result?.[outcome] || 0 }}
+                              <span class="text-gray-400 ml-1">({{ (getTaskResult(bt.task_id)!.stored_result_rate?.[outcome] || 0) | number:'1.1-1' }}%)</span>
+                            </td>
+                            <td class="text-right py-2 px-3 text-gray-700">
+                              {{ getTaskResult(bt.task_id)!.proposed_result?.[outcome] || 0 }}
+                              <span class="text-gray-400 ml-1">({{ (getTaskResult(bt.task_id)!.proposed_result_rate?.[outcome] || 0) | number:'1.1-1' }}%)</span>
+                            </td>
+                            <td class="text-right py-2 pl-3" [ngClass]="{
+                              'text-green-600': (getTaskResult(bt.task_id)!.proposed_result?.[outcome] || 0) - (getTaskResult(bt.task_id)!.stored_result?.[outcome] || 0) > 0,
+                              'text-red-600': (getTaskResult(bt.task_id)!.proposed_result?.[outcome] || 0) - (getTaskResult(bt.task_id)!.stored_result?.[outcome] || 0) < 0,
+                              'text-gray-500': (getTaskResult(bt.task_id)!.proposed_result?.[outcome] || 0) - (getTaskResult(bt.task_id)!.stored_result?.[outcome] || 0) === 0
+                            }">
+                              {{ (getTaskResult(bt.task_id)!.proposed_result?.[outcome] || 0) - (getTaskResult(bt.task_id)!.stored_result?.[outcome] || 0) > 0 ? '+' : '' }}{{ (getTaskResult(bt.task_id)!.proposed_result?.[outcome] || 0) - (getTaskResult(bt.task_id)!.stored_result?.[outcome] || 0) }}
+                            </td>
+                          </tr>
+                        </tbody>
+                        <tfoot>
+                          <tr class="border-t border-gray-300">
+                            <td class="py-2 pr-3 font-medium text-gray-900" colspan="3">Total records evaluated</td>
+                            <td class="text-right py-2 pl-3 font-medium text-gray-900">{{ getTaskResult(bt.task_id)!.total_records }}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
