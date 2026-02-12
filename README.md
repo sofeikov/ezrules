@@ -40,7 +40,7 @@ ezrules consists of several core components:
 - **Python 3.12+**
 - **PostgreSQL** — used for rule storage, audit logs, and Celery result backend
 - **Redis** — used as the Celery message broker for backtesting tasks
-- **Docker & Docker Compose** (recommended) — to run PostgreSQL and Redis with a single command
+- **Docker & Docker Compose** (recommended) — to run PostgreSQL, Redis, and the Celery worker with a single command
 
 #### Start infrastructure with Docker Compose (recommended)
 
@@ -48,11 +48,23 @@ ezrules consists of several core components:
 docker compose up -d
 ```
 
-This starts PostgreSQL (port 5432) and Redis (port 6379) in the background. Data is persisted in a Docker volume. To stop:
+This starts three services in the background:
+- **PostgreSQL** on port 5432 — database (data persisted in a Docker volume)
+- **Redis** on port 6379 — Celery message broker
+- **Celery worker** — processes backtest tasks (built from the project `Dockerfile`)
+
+The worker waits for PostgreSQL and Redis to be healthy before starting.
+
+To stop:
 
 ```bash
 docker compose down        # stop containers, keep data
 docker compose down -v     # stop containers and delete data
+```
+
+After `docker compose up -d`, you only need to run the API locally:
+```bash
+uv run ezrules api --port 8888
 ```
 
 #### Or install services manually
@@ -121,16 +133,16 @@ uv run ezrules api --port 8888 --reload
 
 The backtesting feature runs rule comparisons asynchronously via Celery. A Celery worker must be running for backtest tasks to execute.
 
+If you're using `docker compose up -d`, the worker is **already running** — no extra steps needed.
+
+To run the worker manually instead (e.g. for debugging):
+
 ```bash
-# Start a Celery worker (requires Redis running on localhost:6379)
 # On macOS, use --pool=solo to avoid fork-related crashes (SIGSEGV)
 uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo
 
 # On Linux, the default prefork pool works fine:
 uv run celery -A ezrules.backend.tasks worker -l INFO
-
-# Or with a custom broker URL:
-EZRULES_CELERY_BROKER_URL=redis://myhost:6380/0 uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo
 ```
 
 A VS Code launch configuration named **"Celery Worker"** is also available in `.vscode/launch.json` for debugging the worker with breakpoints.
