@@ -93,7 +93,7 @@ ezrules uses a unified service architecture where the API service handles both t
 - `rule_engine_config` -- Serialized rule engine payloads
 - `rule_engine_config_history` -- Versioned history of the configs
 - `rules` -- Rule definitions and logic
-- `rule_history` -- Change log produced via SQLAlchemy versioning
+- `rules_history` -- Versioned rule history
 - `rule_backtesting_results` -- Records of Celery backtests
 
 **Events & Outcomes**
@@ -179,17 +179,17 @@ def evaluate_event(event_data):
             │
             ▼
 7. Return response to caller
-   {rules_triggered, outcomes, execution_time}
+   {outcome_counters, outcome_set, rule_results}
 ```
 
 ### Label Upload Flow
 
 ```
 1. User uploads CSV via web interface
-   POST /upload_labels (file)
+   POST /api/v2/labels/upload (file)
             │
             ▼
-2. Manager service parses CSV
+2. API service parses CSV
             │
             ▼
 3. Validate event IDs exist
@@ -213,10 +213,10 @@ def evaluate_event(event_data):
 
 **API Service:**
 
-- Session-based authentication for the web UI
-- Password hashing (bcrypt or similar)
-- Session cookies with secure flags
-- Login/logout endpoints
+- JWT-based authentication for API endpoints
+- Access + refresh token flow (`/api/v2/auth/login`, `/api/v2/auth/refresh`)
+- Password hashing with bcrypt
+- Login/me endpoints for user identity and session state in clients
 - The evaluate endpoint (`/api/v2/evaluate`) does not have built-in authentication (internal service)
 - Should be behind API gateway in production for the evaluate endpoint
 - Network-level access control recommended
@@ -233,7 +233,7 @@ Example:
     ↓
   Roles: [Rule Editor]
     ↓
-  Permissions: [create_rule, modify_rule, view_rules, view_outcomes]
+  Permissions: [create_rule, modify_rule, view_rules, view_outcomes, ...]
     ↓
   Can: Create/edit rules, view outcomes
   Cannot: Delete rules, access audit trail
@@ -242,18 +242,19 @@ Example:
 **Permission Enforcement:**
 
 - Checked at endpoint level
-- Database queries filtered by user permissions
-- Audit trail records all actions
+- Permission mappings stored in `actions` and `role_actions`
+- Audit endpoints expose history for rules, config, user lists, outcomes, and labels
 
 ### Audit Trail
 
-All actions are logged:
-- Who performed the action
-- What was changed
-- When it occurred
-- Previous and new values (for modifications)
+History is recorded for:
+- Rule revisions (`rules_history`)
+- Rule engine config revisions (`rule_engine_config_history`)
+- User list actions (`user_list_history`)
+- Outcome actions (`outcome_history`)
+- Label actions (`label_history`)
 
-Stored in `audit_log` table with immutable records.
+Many history records include `changed_by` attribution.
 
 ---
 
@@ -367,14 +368,14 @@ Performance varies significantly based on:
 
 - Celery (background tasks)
 - Redis (caching, Celery broker)
-- Next.js (frontend dashboard)
+- Frontend web application (TypeScript, Tailwind CSS, Chart.js)
 
 **Development Tools:**
 
 - uv (package management)
 - pytest (testing)
 - ruff (linting)
-- mypy (type checking)
+- ty (type checking)
 
 ---
 
