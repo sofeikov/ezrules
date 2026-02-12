@@ -23,7 +23,7 @@ ezrules consists of several core components:
 
 - **Rule Engine**: Evaluates events against defined rules and aggregates outcomes
 - **API Service**: FastAPI-based API with JWT authentication, including real-time rule evaluation at `/api/v2/evaluate` (default port 8888)
-- **Angular Frontend**: Modern standalone UI for rule management, analytics, and administration
+- **Web Frontend**: Modern UI for rule management, analytics, and administration
 - **Database Layer**: PostgreSQL storage for rules, events, and execution logs
 
 ### Data Flow
@@ -123,7 +123,7 @@ The `init-db` command automatically handles database creation and provides optio
 ### Start Services
 
 ```bash
-# Start the API service (FastAPI - includes rule evaluation and Angular frontend API)
+# Start the API service (FastAPI - includes rule evaluation and frontend API)
 uv run ezrules api --port 8888
 # With auto-reload for development:
 uv run ezrules api --port 8888 --reload
@@ -152,13 +152,13 @@ A VS Code launch configuration named **"Celery Worker"** is also available in `.
 - **Result backend** (PostgreSQL): Stores task results in the same database as the application, using the `EZRULES_DB_ENDPOINT` connection string
 - Without a running worker, backtest requests will remain in `PENDING` state indefinitely
 
-### Angular Frontend
+### Web Frontend
 
-ezrules includes a modern Angular frontend as a standalone application that communicates with the FastAPI backend via REST API.
+ezrules includes a web frontend that communicates with the FastAPI backend.
 
 #### Features
 
-The Angular frontend provides:
+The frontend provides:
 - **Rule List View**: Browse all rules with a modern, responsive interface
 - **Rule Detail View**: View comprehensive rule details including:
   - Rule ID, description, and logic
@@ -168,36 +168,17 @@ The Angular frontend provides:
   - Revision history browsing with read-only historical revision views
 - **Labels Management**: Full CRUD for transaction labels — list, create, and delete labels (with confirmation), plus a link to bulk CSV upload
 - **Label Analytics**: View labeled transaction analytics — total labeled events metric card, per-label time-series charts with Chart.js, and a time range selector (1h, 6h, 12h, 24h, 30d)
-- **Seamless Navigation**: Navigate between rule list, detail, labels, and analytics pages with Angular routing
+- **Seamless Navigation**: Navigate between rule list, detail, labels, and analytics pages
 
-#### Build the Angular App
+#### Build Frontend (optional)
 
 ```bash
 cd ezrules/frontend
-npm install --cache /tmp/npm-cache-ezrules
+npm install
 npm run build
 ```
 
-#### Run the Angular Development Server
-
-```bash
-cd ezrules/frontend
-npm start
-```
-
-The Angular app will be available at `http://localhost:4200` and will connect to the FastAPI backend at `http://localhost:8888` by default. You will be prompted to log in with your email and password (created via `uv run ezrules add-user`).
-
-#### Production Deployment
-
-For production, build the Angular app and serve the `dist` directory using a web server (nginx, Apache, etc.):
-
-```bash
-cd ezrules/frontend
-npm run build
-# The built files will be in ezrules/frontend/dist/
-```
-
-Configure the API URL by editing `ezrules/frontend/src/environments/environment.ts` before building.
+Build output will be generated in `ezrules/frontend/dist/`.
 
 ### Generate Test Data
 
@@ -296,7 +277,7 @@ txn_789,CHARGEBACK
 
 ### Label Analytics Dashboard
 
-Access comprehensive analytics for labeled transactions via the Angular frontend:
+Access comprehensive analytics for labeled transactions via the web interface:
 
 **Key Metrics:**
 - **Total Labeled Events**: Track overall labeling coverage
@@ -367,7 +348,7 @@ The documentation is also available online at [ReadTheDocs](https://ezrules.read
 ### Tech Stack
 
 - **Backend**: Python 3.12+, FastAPI, SQLAlchemy, Celery
-- **Frontend**: Angular (standalone components), Tailwind CSS, Chart.js
+- **Frontend**: Angular, Tailwind CSS, Chart.js
 - **Database**: PostgreSQL
 - **Task Queue**: Celery with Redis broker and PostgreSQL result backend (for backtesting)
 - **Authentication**: JWT tokens (API v2)
@@ -403,7 +384,7 @@ uv run ezrules generate-random-data
 uv run ezrules delete-test-data
 ```
 
-#### Frontend E2E Tests
+#### Frontend Tests
 
 The Angular frontend includes comprehensive end-to-end tests using Playwright.
 
@@ -411,25 +392,10 @@ The Angular frontend includes comprehensive end-to-end tests using Playwright.
 - API service running on port 8888
 - Angular dev server running (port 4200)
 - Playwright browsers installed (first time only): `npx playwright install chromium`
-
-**Running tests:**
 ```bash
 cd ezrules/frontend
-
-# Run all E2E tests
 npm run test:e2e
-
-# Run with UI mode (interactive debugging)
-npm run test:e2e:ui
-
-# Run with visible browser
-npx playwright test --headed
-
-# View test report
-npm run test:e2e:report
 ```
-
-See [ezrules/frontend/e2e/README.md](ezrules/frontend/e2e/README.md) for detailed E2E testing documentation.
 
 ## 📄 License
 
