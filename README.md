@@ -7,13 +7,13 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 ## ✨ Features
 
 - **Rule Engine**: Flexible Python-based rule execution with custom logic support
-- **Angular Management Interface**: Modern web UI for creating and managing rules
-- **Enterprise Security**: Granular role-based access control with 13 permission types
+- **Management Interface**: Modern web UI for creating and managing rules
+- **Enterprise Security**: Granular role-based access control with 27 permission types
 - **Transaction Labeling**: Comprehensive fraud analytics with API and bulk CSV upload capabilities
 - **Analytics Dashboard**: Real-time transaction volume charts with configurable time ranges (1h, 6h, 12h, 24h, 30d)
 - **Scalable Architecture**: Unified API service with integrated rule evaluation
 - **Database Integration**: PostgreSQL backend with SQLAlchemy ORM and full audit history
-- **Audit Trail**: Complete access control and change tracking for compliance, with per-change user attribution
+- **Audit Trail**: Change tracking for rules, user lists, outcomes, and labels, with per-change user attribution
 - **Backtesting**: Test rule changes against historical data before deployment
 - **CLI Tools**: Command-line interface for database management and realistic test data generation
 
@@ -194,7 +194,7 @@ For production, build the Angular app and serve the `dist` directory using a web
 ```bash
 cd ezrules/frontend
 npm run build
-# The built files will be in ezrules/frontend/dist/browser/
+# The built files will be in ezrules/frontend/dist/
 ```
 
 Configure the API URL by editing `ezrules/frontend/src/environments/environment.ts` before building.
@@ -215,7 +215,7 @@ ezrules includes a comprehensive role-based access control system designed for e
 
 ### Permission Types
 
-The system supports 13 granular permission types:
+The system supports 27 granular permission types:
 
 **Rule Management:**
 - `create_rule` - Create new business rules
@@ -235,8 +235,28 @@ The system supports 13 granular permission types:
 - `delete_list` - Delete entire lists
 - `view_lists` - View user lists
 
+**Label Management:**
+- `create_label` - Create transaction labels
+- `modify_label` - Modify transaction labels
+- `delete_label` - Delete transaction labels
+- `view_labels` - View transaction labels
+
 **Audit Access:**
 - `access_audit_trail` - View system audit logs and change history
+
+**User Management:**
+- `view_users` - View users
+- `create_user` - Create users
+- `modify_user` - Modify users
+- `delete_user` - Delete users
+- `manage_user_roles` - Assign/remove user roles
+
+**Role & Permission Management:**
+- `view_roles` - View roles
+- `create_role` - Create roles
+- `modify_role` - Modify roles
+- `delete_role` - Delete roles
+- `manage_permissions` - Manage role permissions
 
 ### Default Roles
 
@@ -251,9 +271,8 @@ Three pre-configured roles are available:
 Users can be assigned to roles through the database or programmatically. The permission system supports:
 
 - Multiple roles per user
-- Resource-level permissions (coming soon)
-- Department isolation capabilities
-- Complete audit trail of permission changes
+- Organization-scoped data model (`o_id`) used by core entities
+- Audit history for rules, user lists, outcomes, and labels
 
 ## 🏷️ Transaction Labeling & Analytics
 
@@ -263,7 +282,8 @@ ezrules includes comprehensive transaction labeling capabilities for fraud detec
 
 **Single Event API**: Programmatically mark individual transactions
 ```bash
-curl -X POST http://localhost:8888/api/v2/mark-event \
+curl -X POST http://localhost:8888/api/v2/labels/mark-event \
+  -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{"event_id": "txn_123", "label_name": "FRAUD"}'
 ```
@@ -320,7 +340,6 @@ uv run ezrules export-test-csv --n-events 50 --unlabeled-only --output-file test
 - **Enterprise Compliance**: Role-based access control with audit trails for regulatory requirements
 - **Business Rule Automation**: Automated decision making based on configurable business logic
 - **Event-Driven Processing**: Rule-based responses to system events and data changes
-- **Multi-Department Organizations**: Isolated rule management with granular permissions
 - **Fraud Analytics**: Comprehensive transaction labeling for performance analysis and model improvement
 
 ## 📖 Documentation
@@ -404,7 +423,7 @@ npm run test:e2e
 npm run test:e2e:ui
 
 # Run with visible browser
-npm run test:e2e:headed
+npx playwright test --headed
 
 # View test report
 npm run test:e2e:report
