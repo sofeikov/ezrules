@@ -121,7 +121,7 @@ if $user_id in @blocked_users:
 
 ### Manage Lists in UI
 
-1. Open **Lists**.
+1. Open **User Lists**.
 2. Create a list.
 3. Add or remove entries.
 

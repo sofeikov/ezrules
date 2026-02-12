@@ -24,7 +24,7 @@ uv run ezrules api --port 8888
 The API service provides:
 
 - API root at [http://localhost:8888](http://localhost:8888)
-- The REST API at `http://localhost:8888/api/v2`
+- REST API endpoints under the `/api/v2` path prefix (for example, `http://localhost:8888/api/v2/rules`)
 - OpenAPI docs at [http://localhost:8888/docs](http://localhost:8888/docs)
 
 ---

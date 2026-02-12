@@ -49,10 +49,10 @@ EZRULES_TESTING="true" uv run pytest --cov=ezrules.backend --cov=ezrules.core \
 --cov-report=term-missing --cov-report=xml tests
 
 # Run specific test file
-uv run pytest tests/test_ezruleapp.py -v
+uv run pytest tests/test_api_v2_rules.py -v
 
 # Run specific test
-uv run pytest tests/test_ezruleapp.py::test_can_load_root_page -v
+uv run pytest tests/test_api_v2_rules.py::test_create_rule_success -v
 ```
 
 ### Code Quality
@@ -63,7 +63,7 @@ uv run poe check
 
 # This runs:
 # - ruff format --check (formatting)
-# - mypy (type checking)
+# - ty check (type checking)
 # - ruff check (linting)
 ```
 

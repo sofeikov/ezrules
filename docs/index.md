@@ -98,8 +98,8 @@ ezrules uses a unified service architecture where the API service handles both t
          │
 ┌─────────────────┐
 │ External Apps   │
-│ POST /api/v2/   │
-│   evaluate      │
+│ POST            │
+│ /api/v2/evaluate│
 └─────────────────┘
 ```
 
