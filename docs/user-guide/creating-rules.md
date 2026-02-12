@@ -1,256 +1,171 @@
 # Creating Rules
 
-Learn how to write effective business rules in ezrules.
+Use this guide when you want to add or tune production rules safely.
+
+## Goal
+
+You will:
+
+1. write a rule that returns an allowed outcome
+2. test it with realistic payloads
+3. validate it before rollout
+
+## Before You Start
+
+- You can access **Rules** and **Outcomes**
+- The outcome names you plan to return already exist (for example `HOLD`, `RELEASE`, `CANCEL`)
+- You have sample payloads that represent normal and suspicious behavior
 
 ---
 
-## Rule Structure
+## Step 1: Start With a Minimal Rule
 
-Rules are Python-like snippets that evaluate events and return outcome strings. If no action is needed, do not return anything:
-
-```python
-if $amount > 10000:
-    return 'HOLD'  # or 'RELEASE' / 'CANCEL' etc.
-```
-
----
-
-## Accessing Event Data
-
-Access event attributes using the `$` notation:
+Rules are Python-like snippets.
+If a condition is met, return an allowed outcome string.
 
 ```python
-# Access transaction attributes
-if $amount > 10000:
-    return 'HOLD'
-
-# Use in assignments
-user_country = $country
-is_high_risk = $amount > 5000 and $country in @high_risk_countries
-```
-
----
-
-## Common Rule Patterns
-
-### Threshold Rules
-
-```python
-# Simple threshold
 if $amount > 10000:
     return 'HOLD'
 ```
 
-### List-Based Rules
+Notes:
+
+- Use `$field_name` to read event fields (for example `$amount`, `$country`)
+- If no condition matches, return nothing
+
+Checkpoint:
+
+- The rule saves without syntax errors
+- The returned outcome exists in **Outcomes**
+
+---
+
+## Step 2: Test in the UI First
+
+1. Open the rule in **Rules**
+2. Use the **Test Rule** panel
+3. Paste realistic JSON payloads
+4. Run at least:
+   - one payload that should trigger
+   - one payload that should not trigger
+
+Example payload:
+
+```json
+{
+  "event_id": "txn_101",
+  "event_timestamp": 1700000000,
+  "event_data": {
+    "amount": 15000,
+    "user_id": "user_42"
+  }
+}
+```
+
+Checkpoint:
+
+- Triggering cases produce expected outcome
+- Non-triggering cases produce no outcome
+
+---
+
+## Step 3: Pick the Right Pattern
+
+### Threshold pattern
+
+Use when one field is enough to make a decision.
 
 ```python
-# Check against blocklist
+if $amount > 10000:
+    return 'HOLD'
+```
+
+### List-based pattern
+
+Use when decisioning depends on maintained allow/block lists.
+
+```python
 if $user_id in @blocked_users:
     return 'CANCEL'
 ```
 
-### Velocity Rules
+### Multi-signal score pattern
+
+Use when no single field is reliable enough.
 
 ```python
-# Count recent transactions
-from datetime import datetime, timedelta
-
-cutoff = datetime.now() - timedelta(hours=1)
-
-# Implement `count_events_since` in your own helper module.
-recent_count = count_events_since($user_id, since=cutoff)
-
-if recent_count > 10:
-    return 'HOLD'
-```
-
-### Multi-Factor Rules
-
-```python
-# Combine multiple signals
 risk_score = 0
-
 if $amount > 5000:
     risk_score += 2
-
-if $is_international:
+if $country in @high_risk_countries:
+    risk_score += 2
+if $account_age_days < 30:
     risk_score += 1
 
-if $account_age_days < 30:
-    risk_score += 2
-
-# Trigger if total risk is high
 if risk_score >= 4:
     return 'HOLD'
 ```
 
----
+### Time-window pattern
 
-
-## Best Practices
-
-### Performance
-
-!!! tip "Avoid Heavy Queries"
-    Keep rules simple and fast. Avoid expensive per-event database lookups when possible.
+Use when behavior is suspicious only in specific periods.
 
 ```python
-# Bad: Queries database every time
-def slow_rule(event):
-    blocked_users = load_blocked_users()
-    if event['user_id'] in blocked_users:
-        return 'CANCEL'
-
-# Good: Uses list notation
-def fast_rule(event):
-    if $user_id in @blocked_users:
-        return 'CANCEL'
-```
-
-### Error Handling
-
-```python
-# Handle missing fields gracefully
-try:
-    amount = float($amount)
-except (ValueError, TypeError):
-    amount = 0
-
-# Validate data types
-if not isinstance($user_id, str):
-    pass  # Invalid data → no decision
-```
-
-### Testing
-
-Test rules before deployment:
-
-```python
-# Use the rule test panel in the UI or call /api/v2/evaluate
-# with realistic payloads to validate behavior.
-```
-
----
-
-## Advanced Techniques
-
-### Time-Based Rules
-
-```python
-# Flag unusual transaction times
-# Night transactions (2 AM - 5 AM)
 if 2 <= $hour <= 5 and $amount > 1000:
     return 'HOLD'
 ```
 
-### Pattern Matching
+---
 
-```python
-import re
+## Step 4: Avoid Common Mistakes
 
-# Flag suspicious descriptions
-suspicious_patterns = [
-    r'test',
-    r'fake',
-    r'\b(wire|transfer)\b.*urgnet',  # Typos common in fraud
-]
+- Returning an outcome that is not configured in **Outcomes**
+- Using field names that do not exist in event payloads
+- Packing too many unrelated conditions into one rule
+- Running expensive lookups per event inside rule logic
 
-description = $description.lower()
-
-for pattern in suspicious_patterns:
-    if re.search(pattern, description):
-        return 'HOLD'
-```
-
-### Statistical Rules
-
-```python
-# Flag outliers (Z-score > 3).
-# Provide `get_user_avg_amount` and `get_user_std_amount` from your analytics layer.
-user_avg = get_user_avg_amount($user_id)
-user_std = get_user_std_amount($user_id)
-
-z_score = ($amount - user_avg) / user_std if user_std > 0 else 0
-
-if abs(z_score) > 3:
-    return 'HOLD'
-```
+Use lists (`@list_name`) and precomputed signals where possible.
 
 ---
 
-## Rule Management
+## Step 5: Pre-Deployment Validation
 
-### Version Control
+Before enabling major rule changes:
 
-Rules are stored with version history:
-
-1. Edit rule in web interface
-2. Save creates new version
-3. View history in **Rule Details -> History**
-
-### Testing Changes
-
-Before deploying rule changes:
-
-1. Use **Backtest** feature with historical data
-2. Review results for false positives
-3. Compare performance vs. current version
-4. Deploy only if improvement is clear
+1. Run UI tests with realistic payloads
+2. Compare triggered vs non-triggered examples
+3. Backtest against historical traffic if available
+4. Review potential false-positive impact with analysts
+5. Confirm observability:
+   - outcome trends visible in **Dashboard**
+   - label feedback visible in **Analytics**
 
 ---
 
-## Examples
+## Debugging
 
-### Geographic Risk
+If a rule is not behaving as expected:
 
-```python
-# High risk countries: always flag if > $1000
-if $country in @HIGH_RISK_COUNTRIES and $amount > 1000:
-    return 'HOLD'
+1. Re-test using the exact payload that failed
+2. Verify outcome exists in **Outcomes**
+3. Confirm list names/entries referenced in the rule exist
+4. Inspect evaluator API response fields:
+   - `rule_results`
+   - `outcome_counters`
+   - `outcome_set`
 
-# Medium risk: flag if > $5000
-if $country in @MEDIUM_RISK_COUNTRIES and $amount > 5000:
-    return 'HOLD'
-```
-
-### Merchant Category Risk
-
-```python
-if $merchant_category_code in @HIGH_RISK_MCCS:
-    # Additional checks for high-risk merchants
-    if not $card_present:
-        return 'HOLD'  # Card-not-present in risky MCC
-```
-
-### First-Time User
-
-```python
-# New users with large first transaction
-if $account_age_days < 7 and $amount > 2000:
-    return 'HOLD'
-```
-
----
-
-## Debugging Rules
-
-### Add Logging
-
-Use the rule test panel and API responses (`rule_results`, `outcome_counters`, `outcome_set`) for debugging rule behavior.
-
-### Use Test Data
+You can also generate sample data:
 
 ```bash
-# Generate test events
 uv run ezrules generate-random-data --n-events 100
-
-# Check outcomes
-# View in web interface under Outcomes
 ```
+
+For broader incident diagnostics, use [Troubleshooting](../troubleshooting.md).
 
 ---
 
 ## Next Steps
 
-- **[Labels and Lists](labels-and-lists.md)** - Configure outcomes, labels, and lists
-- **[Analyst Guide](analyst-guide.md)** - Comprehensive analyst workflows
+- **[Labels and Lists](labels-and-lists.md)** - tune decision quality with labels and reusable lists
+- **[Analyst Guide](analyst-guide.md)** - end-to-end analyst workflow
+- **[Monitoring & Analytics](monitoring.md)** - validate production behavior

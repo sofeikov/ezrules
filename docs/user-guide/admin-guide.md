@@ -1,21 +1,31 @@
 # Guide for Administrators
 
-This guide is for people who own ezrules in production or pre-production environments.
-It focuses on practical operations: setup, access control, health checks, and maintenance.
+This guide is for operators responsible for uptime, access control, and recovery.
+
+## Scope
+
+Use this page for:
+
+- initial environment setup
+- user/role administration
+- health checks and incident response
+- backup and restore operations
+
+Use [Deployment Guide](../architecture/deployment.md) for local deployment flow details.
 
 ---
 
-## Admin Responsibilities
+## Assumptions
 
-- Initialize and maintain the database
-- Manage users, roles, and permissions
-- Monitor API and worker health
-- Maintain backups and recovery process
-- Review audit history and access controls
+- You can run CLI commands on the service host
+- You can access PostgreSQL and Redis
+- You have admin credentials for ezrules
 
 ---
 
-## Initial Setup
+## Runbook: Initial Setup
+
+### Action
 
 ```bash
 uv run ezrules init-db
@@ -23,23 +33,28 @@ uv run ezrules init-permissions
 uv run ezrules add-user --user-email admin@example.com --password admin --admin
 ```
 
-Recommended local infrastructure:
+### Verify
 
-```bash
-docker compose up -d
-```
+- `http://localhost:8888/ping` responds
+- Admin user can log in to the UI
+- **Security** and **Settings** pages are visible in sidebar
+
+### Rollback / Recovery
+
+- If initialization was run with wrong DB settings, fix `EZRULES_DB_ENDPOINT` and rerun setup commands
+- If admin login fails, recreate user with `add-user`
 
 ---
 
-## User and Role Management
+## Runbook: User and Role Management
 
-Default roles:
+### UI-first workflow
 
-- `admin`
-- `rule_editor`
-- `readonly`
+1. Open **Security** for user management
+2. Open **Settings** for role/permission management
+3. Apply least-privilege role assignments
 
-Core APIs:
+### API endpoints
 
 - `GET /api/v2/users`
 - `POST /api/v2/users`
@@ -48,54 +63,44 @@ Core APIs:
 - `GET /api/v2/roles`
 - `PUT /api/v2/roles/{role_id}/permissions`
 
-OpenAPI docs: `http://localhost:8888/docs`
+### Verify
+
+- Modified user/role appears in UI
+- Target user can perform expected actions and is blocked from restricted actions
 
 ---
 
-## Permission Model
+## Runbook: Health Checks
 
-ezrules currently defines **27** permission actions, grouped across:
-
-- rules
-- outcomes
-- lists
-- labels
-- audit
-- users
-- roles/permission management
-
-Permissions are stored in:
-
-- `actions`
-- `role_actions`
-
----
-
-## Health and Operations
-
-API checks:
+### Action
 
 ```bash
 curl http://localhost:8888/ping
 curl http://localhost:8888/docs
+docker compose ps
 ```
 
-Backtesting worker:
+### Verify
 
-- tasks are processed by Celery
-- if worker is down, backtests remain `PENDING`
+- API responds successfully
+- OpenAPI docs load
+- Required infra services are `Up` (Postgres, Redis, worker if used)
 
-Run worker manually (macOS-safe):
+### If Backtests Stay `PENDING`
+
+Likely cause: Celery worker is down.
 
 ```bash
 uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo
 ```
 
+Then re-check task status via `/api/v2/backtesting/task/{task_id}`.
+
 ---
 
-## Audit and History
+## Runbook: Audit and Change Tracking
 
-Audit/history endpoints:
+Use audit endpoints during incident review or compliance checks:
 
 - `GET /api/v2/audit`
 - `GET /api/v2/audit/rules`
@@ -104,44 +109,51 @@ Audit/history endpoints:
 - `GET /api/v2/audit/outcomes`
 - `GET /api/v2/audit/labels`
 
-Related tables:
+Operational tip:
 
-- `rules_history`
-- `rule_engine_config_history`
-- `user_list_history`
-- `outcome_history`
-- `label_history`
+- Capture `changed_by` values and timestamps when preparing incident timelines
 
 ---
 
-## Backups
+## Runbook: Backup and Restore
 
-Example PostgreSQL backup:
+### Backup
 
 ```bash
 pg_dump -h localhost -U postgres ezrules | gzip > backup_$(date +%Y%m%d).sql.gz
 ```
 
-Restore:
+### Restore
 
 ```bash
 gunzip -c backup_20250109.sql.gz | psql -h localhost -U postgres ezrules
 ```
+
+### Verify
+
+- API starts cleanly after restore
+- Recent rules, outcomes, and users are present
+- Basic evaluate request succeeds
+
+### Safety Notes
+
+- Test restores in non-production before production use
+- Keep backup retention and encryption policies outside app repo
 
 ---
 
 ## Security Checklist
 
 - Set strong `EZRULES_APP_SECRET`
-- Restrict network access to Postgres/Redis
-- Use HTTPS at reverse proxy/load balancer
+- Restrict network access to Postgres and Redis
+- Use HTTPS at reverse proxy or load balancer
 - Use least-privilege roles for non-admin users
-- Review audit history regularly
+- Review audit history on a fixed cadence
 
 ---
 
 ## Next Steps
 
-- **[Configuration Guide](../getting-started/configuration.md)** - Env and runtime config
-- **[Architecture Overview](../architecture/overview.md)** - System internals
-- **[Deployment Guide](../architecture/deployment.md)** - Local deployment flow
+- **[Configuration Guide](../getting-started/configuration.md)** - environment and runtime config
+- **[Architecture Overview](../architecture/overview.md)** - system boundaries and design decisions
+- **[Troubleshooting](../troubleshooting.md)** - symptom-based diagnostics

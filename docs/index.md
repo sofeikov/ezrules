@@ -41,6 +41,17 @@ Understand how ezrules works under the hood
 
 ---
 
+## Start Here by Role
+
+| Role | Start Here | Then |
+|---|---|---|
+| Analyst | [Quick Start](getting-started/quickstart.md) | [Analyst Guide](user-guide/analyst-guide.md) |
+| Administrator | [Installation](getting-started/installation.md) | [Admin Guide](user-guide/admin-guide.md) |
+| Integrator/Developer | [API v2 Reference](api-reference/manager-api.md) | [Evaluator API](api-reference/evaluator-api.md) |
+| Contributor | [Contributing](contributing.md) | [Architecture Overview](architecture/overview.md) |
+
+---
+
 ## Use Cases
 
 ### Financial Transaction Monitoring

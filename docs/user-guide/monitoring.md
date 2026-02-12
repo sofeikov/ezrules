@@ -20,6 +20,11 @@ Open **Dashboard** in the sidebar and verify:
 
 Use aggregation windows: `1h`, `6h`, `12h`, `24h`, `30d`.
 
+Healthy signal:
+
+- transaction volume is non-zero when your integration is sending events
+- outcome lines change after rule updates or test submissions
+
 ---
 
 ## 2) Check Label Feedback (Analytics)
@@ -34,6 +39,10 @@ If charts are empty, feed labels through:
 
 - `POST /api/v2/labels/mark-event`
 - `POST /api/v2/labels/upload`
+
+Healthy signal:
+
+- `total labeled` increases after marking/uploading labels
 
 ---
 
@@ -70,13 +79,14 @@ GROUP BY el.label;
 
 ---
 
-## 4) If Something Looks Wrong
+## 4) Common Symptoms
 
-Use the central [Troubleshooting Guide](../troubleshooting.md) for symptom -> cause -> fix entries, including:
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| Dashboard charts are empty | No recent events in selected window | Submit new events and switch aggregation to `24h` |
+| Outcome charts empty but volume exists | Rules return no allowed outcomes | Verify rule returns valid outcomes and outcome exists in **Outcomes** |
+| Label charts empty | No labels marked/uploaded | Add labels via UI workflow or `POST /api/v2/labels/mark-event` |
+| API returns `400` for analytics | Invalid `aggregation` value | Use one of `1h`, `6h`, `12h`, `24h`, `30d` |
 
-- API does not start
-- Rule does not fire
-- Analytics charts are empty
-- Backtests stay `PENDING`
-
+For deeper symptom -> cause -> fix entries, use the [Troubleshooting Guide](../troubleshooting.md).
 For request/response schemas, use OpenAPI docs at `http://localhost:8888/docs`.

@@ -1,9 +1,20 @@
 # Quick Start
 
-This guide will get you up and running with ezrules in under 10 minutes. You'll create a rule, submit events, and see the results.
+This guide gets you to first success quickly.
+You will create a rule, evaluate events, and confirm outcomes/labels in the UI.
 
 !!! info "Prerequisites"
     Make sure you've completed the [Installation Guide](installation.md) before proceeding.
+
+## Success Checklist
+
+By the end of this guide, you should have:
+
+- one saved rule
+- one allowed outcome used by that rule
+- at least one evaluated event
+- at least one labeled event
+- visible chart activity in **Dashboard** or **Analytics**
 
 ---
 
@@ -28,6 +39,11 @@ OpenAPI docs:
 
 --8<-- "snippets/openapi-links.md"
 
+Checkpoint:
+
+- `http://localhost:8888/ping` responds
+- `http://localhost:8888/docs` opens
+
 ---
 
 ## Step 2: Start Frontend and Log In
@@ -43,6 +59,10 @@ npm start
 1. Open your browser to [http://localhost:4200](http://localhost:4200)
 2. Log in with the credentials you created during installation
 3. You should see the ezrules dashboard
+
+Checkpoint:
+
+- Sidebar shows **Dashboard**, **Rules**, **Labels**, **Outcomes**, **Analytics**
 
 ---
 
@@ -70,6 +90,11 @@ Let's create a simple rule to detect high-value transactions.
 - Checks if the `amount` field is greater than $10,000
 - Returns an allowed outcome string (here, `'HOLD'`) to signal a decision; otherwise it returns nothing (no decision)
 
+Checkpoint:
+
+- Rule appears in **Rules** list
+- Opening the rule shows the **Test Rule** panel
+
 ---
 
 ## Step 4: Ensure Outcome Exists
@@ -79,6 +104,10 @@ ezrules validates that any literal returned by your rule is an allowed outcome.
 1. Navigate to **Outcomes** in the sidebar
 2. Ensure `HOLD` exists (create it if it doesn't)
 3. Save
+
+Checkpoint:
+
+- `HOLD` is visible in the **Outcomes** list
 
 ---
 
@@ -126,6 +155,10 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
   }'
 ```
 
+Checkpoint:
+
+- The high-value request response contains `HOLD` in `outcome_set`
+
 ---
 
 ## Step 6: View Results
@@ -159,6 +192,10 @@ Look at the `rule_results`, `outcome_counters`, and `outcome_set` fields in the 
 
 1. Navigate to **Dashboard** in the sidebar.
 2. Review the transaction volume chart and the rule outcome trend lines over the selected time range.
+
+Checkpoint:
+
+- At least one chart updates after test/evaluate calls
 
 ---
 
@@ -198,6 +235,10 @@ curl -X POST http://localhost:8888/api/v2/labels/mark-event \
 1. Navigate to **Analytics** in the sidebar
 2. Review the total labeled count and individual label charts
 3. Select different time ranges (1h, 6h, 12h, 24h, 30d)
+
+Checkpoint:
+
+- Labeled counts/charts reflect your new label within the selected window
 
 ---
 
