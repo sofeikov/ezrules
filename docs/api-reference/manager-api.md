@@ -47,7 +47,9 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 | `GET` | `/api/v2/rules` | Bearer + permission | List rules |
 | `POST` | `/api/v2/rules` | Bearer + permission | Create rule |
 | `GET` | `/api/v2/rules/{rule_id}` | Bearer + permission | Rule details |
+| `GET` | `/api/v2/rules/{rule_id}/revisions/{revision_number}` | Bearer + permission | Specific historical revision |
 | `PUT` | `/api/v2/rules/{rule_id}` | Bearer + permission | Update rule |
+| `POST` | `/api/v2/rules/verify` | Bearer + permission | Verify rule source and extracted params |
 | `POST` | `/api/v2/rules/test` | Bearer + permission | Test rule payload |
 | `GET` | `/api/v2/rules/{rule_id}/history` | Bearer + permission | Revision list |
 
@@ -65,6 +67,7 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 |---|---|---|---|
 | `GET` | `/api/v2/labels` | Bearer + permission | List labels |
 | `POST` | `/api/v2/labels` | Bearer + permission | Create label |
+| `POST` | `/api/v2/labels/bulk` | Bearer + permission | Create labels in bulk |
 | `POST` | `/api/v2/labels/mark-event` | Bearer + permission | Mark single event |
 | `POST` | `/api/v2/labels/upload` | Bearer + permission | CSV upload (`multipart/form-data`) |
 | `DELETE` | `/api/v2/labels/{label_name}` | Bearer + permission | Delete label |
@@ -77,16 +80,26 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 | `GET` | `/api/v2/analytics/outcomes-distribution` | Bearer + permission | Outcome trends |
 | `GET` | `/api/v2/analytics/labels-summary` | Bearer + permission | Total labeled summary |
 | `GET` | `/api/v2/analytics/labels-distribution` | Bearer + permission | Label trends |
+| `GET` | `/api/v2/analytics/labeled-transaction-volume` | Bearer + permission | Time-series labeled event volume |
 
 ### Users and Roles
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | `GET` | `/api/v2/users` | Bearer + permission | List users |
+| `GET` | `/api/v2/users/{user_id}` | Bearer + permission | Get user details |
 | `POST` | `/api/v2/users` | Bearer + permission | Create user |
 | `PUT` | `/api/v2/users/{user_id}` | Bearer + permission | Update user |
 | `DELETE` | `/api/v2/users/{user_id}` | Bearer + permission | Delete user |
+| `POST` | `/api/v2/users/{user_id}/roles` | Bearer + permission | Assign role to user |
+| `DELETE` | `/api/v2/users/{user_id}/roles/{role_id}` | Bearer + permission | Remove role from user |
+| `GET` | `/api/v2/roles/permissions` | Bearer + permission | List all available permissions |
 | `GET` | `/api/v2/roles` | Bearer + permission | List roles |
+| `GET` | `/api/v2/roles/{role_id}` | Bearer + permission | Get role details |
+| `POST` | `/api/v2/roles` | Bearer + permission | Create role |
+| `PUT` | `/api/v2/roles/{role_id}` | Bearer + permission | Update role |
+| `DELETE` | `/api/v2/roles/{role_id}` | Bearer + permission | Delete role |
+| `GET` | `/api/v2/roles/{role_id}/permissions` | Bearer + permission | Get role permissions |
 | `PUT` | `/api/v2/roles/{role_id}/permissions` | Bearer + permission | Update role permissions |
 
 ### User Lists
@@ -94,11 +107,14 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | `GET` | `/api/v2/user-lists` | Bearer + permission | List user lists |
+| `GET` | `/api/v2/user-lists/{list_id}` | Bearer + permission | Get user list details |
 | `POST` | `/api/v2/user-lists` | Bearer + permission | Create user list |
 | `PUT` | `/api/v2/user-lists/{list_id}` | Bearer + permission | Update list metadata |
 | `DELETE` | `/api/v2/user-lists/{list_id}` | Bearer + permission | Delete list |
+| `GET` | `/api/v2/user-lists/{list_id}/entries` | Bearer + permission | Get list entries |
 | `POST` | `/api/v2/user-lists/{list_id}/entries` | Bearer + permission | Add one entry |
 | `POST` | `/api/v2/user-lists/{list_id}/entries/bulk` | Bearer + permission | Add entries in bulk |
+| `DELETE` | `/api/v2/user-lists/{list_id}/entries/{entry_id}` | Bearer + permission | Remove one entry |
 
 ### Audit
 
@@ -106,10 +122,13 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 |---|---|---|---|
 | `GET` | `/api/v2/audit` | Bearer + permission | Summary |
 | `GET` | `/api/v2/audit/rules` | Bearer + permission | Rule history (`limit`, `offset`, filters) |
+| `GET` | `/api/v2/audit/rules/{rule_id}` | Bearer + permission | Full history for one rule |
 | `GET` | `/api/v2/audit/config` | Bearer + permission | Config history (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/user-lists` | Bearer + permission | User-list history |
 | `GET` | `/api/v2/audit/outcomes` | Bearer + permission | Outcome history |
 | `GET` | `/api/v2/audit/labels` | Bearer + permission | Label history |
+| `GET` | `/api/v2/audit/users` | Bearer + permission | User-account history (`limit`, `offset`, filters) |
+| `GET` | `/api/v2/audit/roles` | Bearer + permission | Role/permission history (`limit`, `offset`, filters) |
 
 ### Backtesting
 

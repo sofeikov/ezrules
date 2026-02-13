@@ -104,10 +104,13 @@ Use audit endpoints during incident review or compliance checks:
 
 - `GET /api/v2/audit`
 - `GET /api/v2/audit/rules`
+- `GET /api/v2/audit/rules/{rule_id}`
 - `GET /api/v2/audit/config`
 - `GET /api/v2/audit/user-lists`
 - `GET /api/v2/audit/outcomes`
 - `GET /api/v2/audit/labels`
+- `GET /api/v2/audit/users`
+- `GET /api/v2/audit/roles`
 
 Operational tip:
 
