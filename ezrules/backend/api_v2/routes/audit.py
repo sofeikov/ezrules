@@ -22,6 +22,8 @@ from ezrules.backend.api_v2.schemas.audit import (
     LabelHistoryEntry,
     OutcomeAuditListResponse,
     OutcomeHistoryEntry,
+    RolePermissionAuditListResponse,
+    RolePermissionHistoryEntry,
     RuleAuditResponse,
     RuleEngineConfigHistoryEntry,
     RuleHistoryEntry,
@@ -35,6 +37,7 @@ from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
     LabelHistory,
     OutcomeHistory,
+    RolePermissionHistory,
     Rule,
     RuleEngineConfigHistory,
     RuleHistory,
@@ -130,6 +133,19 @@ def config_history_to_response(history: RuleEngineConfigHistory) -> RuleEngineCo
     )
 
 
+def role_permission_history_to_response(history: RolePermissionHistory) -> RolePermissionHistoryEntry:
+    """Convert a role permission history record to API response."""
+    return RolePermissionHistoryEntry(
+        id=int(history.id),
+        role_id=int(history.role_id),
+        role_name=str(history.role_name),
+        action=str(history.action),
+        details=str(history.details) if history.details else None,
+        changed=history.changed if history.changed is not None else None,  # type: ignore[arg-type]
+        changed_by=str(history.changed_by) if history.changed_by else None,
+    )
+
+
 # =============================================================================
 # AUDIT SUMMARY
 # =============================================================================
@@ -158,6 +174,7 @@ def get_audit_summary(
     total_outcome_actions = db.query(OutcomeHistory).count()
     total_label_actions = db.query(LabelHistory).count()
     total_user_account_actions = db.query(UserAccountHistory).count()
+    total_role_permission_actions = db.query(RolePermissionHistory).count()
 
     return AuditSummaryResponse(
         total_rule_versions=total_rule_versions,
@@ -168,6 +185,7 @@ def get_audit_summary(
         total_outcome_actions=total_outcome_actions,
         total_label_actions=total_label_actions,
         total_user_account_actions=total_user_account_actions,
+        total_role_permission_actions=total_role_permission_actions,
     )
 
 
@@ -453,6 +471,48 @@ def list_user_account_history(
     return UserAccountAuditListResponse(
         total=total,
         items=[user_account_history_to_response(h) for h in items],
+        limit=limit,
+        offset=offset,
+    )
+
+
+# =============================================================================
+# ROLE PERMISSION HISTORY
+# =============================================================================
+
+
+@router.get("/roles", response_model=RolePermissionAuditListResponse)
+def list_role_permission_history(
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    db: Any = Depends(get_db),
+    start_date: datetime | None = Query(default=None, description="Filter by start date"),
+    end_date: datetime | None = Query(default=None, description="Filter by end date"),
+    role_id: int | None = Query(default=None, description="Filter by role ID"),
+    limit: int = Query(default=50, ge=1, le=100, description="Page size"),
+    offset: int = Query(default=0, ge=0, description="Offset"),
+) -> RolePermissionAuditListResponse:
+    """
+    Get paginated role permission action history.
+
+    Returns all role and permission changes with optional filtering.
+    Requires ACCESS_AUDIT_TRAIL permission.
+    """
+    query = db.query(RolePermissionHistory)
+
+    if start_date:
+        query = query.filter(RolePermissionHistory.changed >= start_date)
+    if end_date:
+        query = query.filter(RolePermissionHistory.changed <= end_date)
+    if role_id is not None:
+        query = query.filter(RolePermissionHistory.role_id == role_id)
+
+    total = query.count()
+    items = query.order_by(RolePermissionHistory.changed.desc()).offset(offset).limit(limit).all()
+
+    return RolePermissionAuditListResponse(
+        total=total,
+        items=[role_permission_history_to_response(h) for h in items],
         limit=limit,
         offset=offset,
     )

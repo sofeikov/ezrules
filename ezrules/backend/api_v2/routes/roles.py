@@ -26,6 +26,7 @@ from ezrules.backend.api_v2.schemas.roles import (
     RolesListResponse,
     RoleUpdate,
 )
+from ezrules.core.audit_helpers import save_role_history
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Action, Role, RoleActions, User
 
@@ -210,6 +211,11 @@ def create_role(
     db.commit()
     db.refresh(new_role)
 
+    save_role_history(
+        db, role_id=int(new_role.id), role_name=str(new_role.name), action="created", changed_by=str(user.email)
+    )
+    db.commit()
+
     return RoleMutationResponse(
         success=True,
         message="Role created successfully",
@@ -253,6 +259,7 @@ def update_role(
         )
 
     # Check if new name already exists
+    changes: list[str] = []
     if role_data.name is not None:
         existing = db.query(Role).filter(Role.name == role_data.name, Role.id != role_id).first()
         if existing:
@@ -261,14 +268,29 @@ def update_role(
                 message="Role name already exists",
                 error=f"A role with name '{role_data.name}' already exists",
             )
+        if role_data.name != role.name:
+            changes.append(f"name changed to {role_data.name}")
         role.name = role_data.name
 
     # Update description if provided
     if role_data.description is not None:
+        if role_data.description != role.description:
+            changes.append("description updated")
         role.description = role_data.description
 
     db.commit()
     db.refresh(role)
+
+    if changes:
+        save_role_history(
+            db,
+            role_id=int(role.id),
+            role_name=str(role.name),
+            action="updated",
+            changed_by=str(user.email),
+            details="; ".join(changes),
+        )
+        db.commit()
 
     return RoleMutationResponse(
         success=True,
@@ -320,6 +342,9 @@ def delete_role(
             message="Cannot delete role with assigned users",
             error=f"Role '{role.name}' has {user_count} assigned user(s). Remove users from role first.",
         )
+
+    # Record audit before deletion
+    save_role_history(db, role_id=int(role.id), role_name=str(role.name), action="deleted", changed_by=str(user.email))
 
     # Delete role actions first
     db.query(RoleActions).filter(RoleActions.role_id == role_id).delete()
@@ -405,6 +430,11 @@ def update_role_permissions(
                 error=f"Permission IDs not found: {missing_ids}",
             )
 
+    # Capture old permission IDs before replacement
+    old_role_actions = db.query(RoleActions).filter(RoleActions.role_id == role_id).all()
+    old_action_ids = {ra.action_id for ra in old_role_actions}
+    new_action_ids = set(permissions_data.permission_ids)
+
     # Remove all existing permissions for this role
     db.query(RoleActions).filter(RoleActions.role_id == role_id).delete()
 
@@ -415,6 +445,36 @@ def update_role_permissions(
 
     db.commit()
     db.refresh(role)
+
+    # Build added/removed summary
+    added_ids = new_action_ids - old_action_ids
+    removed_ids = old_action_ids - new_action_ids
+    all_relevant_ids = added_ids | removed_ids
+    action_name_map: dict[int, str] = {}
+    if all_relevant_ids:
+        actions_list = db.query(Action).filter(Action.id.in_(all_relevant_ids)).all()
+        action_name_map = {int(a.id): str(a.name) for a in actions_list}
+
+    detail_parts: list[str] = []
+    if added_ids:
+        added_names = ", ".join(action_name_map.get(aid, str(aid)) for aid in sorted(added_ids))
+        detail_parts.append(f"added: {added_names}")
+    if removed_ids:
+        removed_names = ", ".join(action_name_map.get(rid, str(rid)) for rid in sorted(removed_ids))
+        detail_parts.append(f"removed: {removed_names}")
+    if not detail_parts:
+        detail_parts.append("no changes")
+    details = "; ".join(detail_parts)
+
+    save_role_history(
+        db,
+        role_id=int(role.id),
+        role_name=str(role.name),
+        action="permissions_updated",
+        changed_by=str(user.email),
+        details=details,
+    )
+    db.commit()
 
     return RolePermissionsResponse(
         success=True,

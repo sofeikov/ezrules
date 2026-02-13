@@ -102,6 +102,23 @@ export interface UserAccountAuditListResponse {
   offset: number;
 }
 
+export interface RolePermissionHistoryEntry {
+  id: number;
+  role_id: number;
+  role_name: string;
+  action: string;
+  details: string | null;
+  changed: string | null;
+  changed_by: string | null;
+}
+
+export interface RolePermissionAuditListResponse {
+  total: number;
+  items: RolePermissionHistoryEntry[];
+  limit: number;
+  offset: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuditService {
   private auditUrl = `${environment.apiUrl}/api/v2/audit`;
@@ -148,5 +165,12 @@ export class AuditService {
       .set('limit', limit.toString())
       .set('offset', offset.toString());
     return this.http.get<UserAccountAuditListResponse>(`${this.auditUrl}/users`, { params });
+  }
+
+  getRolePermissionHistory(limit: number = 100, offset: number = 0): Observable<RolePermissionAuditListResponse> {
+    const params = new HttpParams()
+      .set('limit', limit.toString())
+      .set('offset', offset.toString());
+    return this.http.get<RolePermissionAuditListResponse>(`${this.auditUrl}/roles`, { params });
   }
 }

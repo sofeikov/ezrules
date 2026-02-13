@@ -360,3 +360,15 @@ class UserAccountHistory(Base):
     details = Column(String, nullable=True)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
+
+
+class RolePermissionHistory(Base):
+    __tablename__ = "role_permission_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    role_id = Column(Integer, nullable=False)
+    role_name = Column(String, nullable=False)
+    action = Column(String, nullable=False)  # created, updated, deleted, permissions_updated
+    details = Column(String, nullable=True)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)

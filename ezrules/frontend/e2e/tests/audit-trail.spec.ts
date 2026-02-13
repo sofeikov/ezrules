@@ -41,7 +41,7 @@ test.describe('Audit Trail Page', () => {
   });
 
   test.describe('Accordion Sections', () => {
-    test('should display all six accordion sections', async () => {
+    test('should display all seven accordion sections', async () => {
       await auditTrailPage.goto();
       await auditTrailPage.waitForPageToLoad();
       await expect(auditTrailPage.ruleHistoryHeading).toBeVisible();
@@ -50,6 +50,7 @@ test.describe('Audit Trail Page', () => {
       await expect(auditTrailPage.outcomeHistoryHeading).toBeVisible();
       await expect(auditTrailPage.labelHistoryHeading).toBeVisible();
       await expect(auditTrailPage.userAccountHistoryHeading).toBeVisible();
+      await expect(auditTrailPage.rolePermissionHistoryHeading).toBeVisible();
     });
 
     test('should toggle Rule History section on click', async () => {
@@ -273,6 +274,38 @@ test.describe('Audit Trail Page', () => {
       if (rowCount > 0) {
         const headers = await auditTrailPage.getUserAccountHistoryColumnHeaders();
         expect(headers).toContain('Email');
+        expect(headers).toContain('Action');
+        expect(headers).toContain('Details');
+        expect(headers).toContain('Changed By');
+        expect(headers).toContain('Changed');
+      }
+    });
+  });
+
+  test.describe('Role & Permission History Section', () => {
+    test('should display the Role & Permission History heading', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await expect(auditTrailPage.rolePermissionHistoryHeading).toBeVisible();
+    });
+
+    test('should toggle Role & Permission History section on click', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await expect(auditTrailPage.rolePermissionHistoryTable).not.toBeVisible();
+      await auditTrailPage.expandSection('rolePermissions');
+      const rpContent = auditTrailPage.rolePermissionHistoryAccordion.locator('..').locator('div').last();
+      await expect(rpContent).toBeVisible();
+    });
+
+    test('should display correct column headers for role permission history', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await auditTrailPage.expandSection('rolePermissions');
+      const rowCount = await auditTrailPage.getRolePermissionHistoryRowCount();
+      if (rowCount > 0) {
+        const headers = await auditTrailPage.getRolePermissionHistoryColumnHeaders();
+        expect(headers).toContain('Role Name');
         expect(headers).toContain('Action');
         expect(headers).toContain('Details');
         expect(headers).toContain('Changed By');

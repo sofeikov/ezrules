@@ -9,7 +9,8 @@ import {
   UserListHistoryEntry,
   OutcomeHistoryEntry,
   LabelHistoryEntry,
-  UserAccountHistoryEntry
+  UserAccountHistoryEntry,
+  RolePermissionHistoryEntry
 } from '../services/audit.service';
 
 @Component({
@@ -25,6 +26,7 @@ export class AuditTrailComponent implements OnInit {
   outcomeHistory: OutcomeHistoryEntry[] = [];
   labelHistory: LabelHistoryEntry[] = [];
   userAccountHistory: UserAccountHistoryEntry[] = [];
+  rolePermissionHistory: RolePermissionHistoryEntry[] = [];
 
   ruleTotal: number = 0;
   configTotal: number = 0;
@@ -32,6 +34,7 @@ export class AuditTrailComponent implements OnInit {
   outcomeTotal: number = 0;
   labelTotal: number = 0;
   userAccountTotal: number = 0;
+  rolePermissionTotal: number = 0;
 
   loading: boolean = true;
   error: string | null = null;
@@ -43,7 +46,8 @@ export class AuditTrailComponent implements OnInit {
     userLists: false,
     outcomes: false,
     labels: false,
-    userAccounts: false
+    userAccounts: false,
+    rolePermissions: false
   };
 
   constructor(private auditService: AuditService) {}
@@ -61,7 +65,7 @@ export class AuditTrailComponent implements OnInit {
     this.error = null;
 
     let loadCount = 0;
-    const totalLoads = 6;
+    const totalLoads = 7;
 
     const checkDone = () => {
       loadCount++;
@@ -138,6 +142,18 @@ export class AuditTrailComponent implements OnInit {
       },
       error: () => {
         this.error = 'Failed to load user account history.';
+        this.loading = false;
+      }
+    });
+
+    this.auditService.getRolePermissionHistory(100, 0).subscribe({
+      next: (response) => {
+        this.rolePermissionHistory = response.items;
+        this.rolePermissionTotal = response.total;
+        checkDone();
+      },
+      error: () => {
+        this.error = 'Failed to load role permission history.';
         this.loading = false;
       }
     });

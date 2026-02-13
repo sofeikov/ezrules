@@ -177,6 +177,29 @@ class UserAccountAuditListResponse(BaseModel):
     offset: int = Field(..., description="Current offset")
 
 
+class RolePermissionHistoryEntry(BaseModel):
+    """A single entry in role permission history."""
+
+    id: int = Field(..., description="History entry ID")
+    role_id: int = Field(..., description="Role ID")
+    role_name: str = Field(..., description="Role name at the time of the action")
+    action: str = Field(..., description="Action type (created, updated, deleted, permissions_updated)")
+    details: str | None = Field(default=None, description="Additional details about the action")
+    changed: datetime | None = Field(default=None, description="When this action occurred")
+    changed_by: str | None = Field(default=None, description="Who performed this action")
+
+    model_config = {"from_attributes": True}
+
+
+class RolePermissionAuditListResponse(BaseModel):
+    """Paginated list of role permission audit entries."""
+
+    total: int = Field(..., description="Total number of history entries")
+    items: list[RolePermissionHistoryEntry] = Field(default_factory=list)
+    limit: int = Field(..., description="Page size")
+    offset: int = Field(..., description="Current offset")
+
+
 class AuditSummaryResponse(BaseModel):
     """Summary of audit trail data."""
 
@@ -188,3 +211,4 @@ class AuditSummaryResponse(BaseModel):
     total_outcome_actions: int = Field(default=0, description="Total outcome history entries")
     total_label_actions: int = Field(default=0, description="Total label history entries")
     total_user_account_actions: int = Field(default=0, description="Total user account history entries")
+    total_role_permission_actions: int = Field(default=0, description="Total role permission history entries")

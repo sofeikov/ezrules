@@ -8,7 +8,13 @@ or after the mutation, depending on the action type.
 
 import datetime
 
-from ezrules.models.backend_core import LabelHistory, OutcomeHistory, UserAccountHistory, UserListHistory
+from ezrules.models.backend_core import (
+    LabelHistory,
+    OutcomeHistory,
+    RolePermissionHistory,
+    UserAccountHistory,
+    UserListHistory,
+)
 
 
 def save_user_list_history(
@@ -83,6 +89,26 @@ def save_user_account_history(
     history = UserAccountHistory(
         user_id=user_id,
         user_email=user_email,
+        action=action,
+        details=details,
+        changed=datetime.datetime.now(datetime.UTC),
+        changed_by=changed_by,
+    )
+    db.add(history)
+
+
+def save_role_history(
+    db,
+    role_id: int,
+    role_name: str,
+    action: str,
+    changed_by: str | None = None,
+    details: str | None = None,
+) -> None:
+    """Record an audit entry for a role or permission action."""
+    history = RolePermissionHistory(
+        role_id=role_id,
+        role_name=role_name,
         action=action,
         details=details,
         changed=datetime.datetime.now(datetime.UTC),

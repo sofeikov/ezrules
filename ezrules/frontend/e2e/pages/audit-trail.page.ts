@@ -19,6 +19,7 @@ export class AuditTrailPage {
   readonly outcomeHistoryAccordion: Locator;
   readonly labelHistoryAccordion: Locator;
   readonly userAccountHistoryAccordion: Locator;
+  readonly rolePermissionHistoryAccordion: Locator;
 
   // Section headings (inside accordion buttons)
   readonly ruleHistoryHeading: Locator;
@@ -27,6 +28,7 @@ export class AuditTrailPage {
   readonly outcomeHistoryHeading: Locator;
   readonly labelHistoryHeading: Locator;
   readonly userAccountHistoryHeading: Locator;
+  readonly rolePermissionHistoryHeading: Locator;
 
   // Tables (visible only when sections are expanded)
   readonly ruleHistoryTable: Locator;
@@ -35,6 +37,7 @@ export class AuditTrailPage {
   readonly outcomeHistoryTable: Locator;
   readonly labelHistoryTable: Locator;
   readonly userAccountHistoryTable: Locator;
+  readonly rolePermissionHistoryTable: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -50,6 +53,7 @@ export class AuditTrailPage {
     this.outcomeHistoryAccordion = page.locator('[data-testid="accordion-outcomes"]');
     this.labelHistoryAccordion = page.locator('[data-testid="accordion-labels"]');
     this.userAccountHistoryAccordion = page.locator('[data-testid="accordion-user-accounts"]');
+    this.rolePermissionHistoryAccordion = page.locator('[data-testid="accordion-role-permissions"]');
 
     // Section headings
     this.ruleHistoryHeading = page.locator('h2:has-text("Rule History")');
@@ -58,6 +62,7 @@ export class AuditTrailPage {
     this.outcomeHistoryHeading = page.locator('h2:has-text("Outcome History")');
     this.labelHistoryHeading = page.locator('h2:has-text("Label History")');
     this.userAccountHistoryHeading = page.locator('h2:has-text("User Account History")');
+    this.rolePermissionHistoryHeading = page.locator('h2:has-text("Role & Permission History")');
 
     // Tables - scoped to parent sections via data-testid
     this.ruleHistoryTable = this.ruleHistoryAccordion.locator('..').locator('table');
@@ -66,6 +71,7 @@ export class AuditTrailPage {
     this.outcomeHistoryTable = this.outcomeHistoryAccordion.locator('..').locator('table');
     this.labelHistoryTable = this.labelHistoryAccordion.locator('..').locator('table');
     this.userAccountHistoryTable = this.userAccountHistoryAccordion.locator('..').locator('table');
+    this.rolePermissionHistoryTable = this.rolePermissionHistoryAccordion.locator('..').locator('table');
   }
 
   async goto() {
@@ -78,7 +84,7 @@ export class AuditTrailPage {
     await this.loadingSpinner.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
   }
 
-  async expandSection(section: 'rules' | 'config' | 'userLists' | 'outcomes' | 'labels' | 'userAccounts') {
+  async expandSection(section: 'rules' | 'config' | 'userLists' | 'outcomes' | 'labels' | 'userAccounts' | 'rolePermissions') {
     const accordionMap = {
       rules: this.ruleHistoryAccordion,
       config: this.configHistoryAccordion,
@@ -86,6 +92,7 @@ export class AuditTrailPage {
       outcomes: this.outcomeHistoryAccordion,
       labels: this.labelHistoryAccordion,
       userAccounts: this.userAccountHistoryAccordion,
+      rolePermissions: this.rolePermissionHistoryAccordion,
     };
     await accordionMap[section].click();
   }
@@ -171,6 +178,21 @@ export class AuditTrailPage {
 
   async getUserAccountHistoryColumnHeaders(): Promise<string[]> {
     const headers = this.userAccountHistoryTable.locator('thead th');
+    const count = await headers.count();
+    const result: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const text = await headers.nth(i).textContent();
+      if (text) result.push(text.trim());
+    }
+    return result;
+  }
+
+  async getRolePermissionHistoryRowCount(): Promise<number> {
+    return await this.rolePermissionHistoryTable.locator('tbody tr').count();
+  }
+
+  async getRolePermissionHistoryColumnHeaders(): Promise<string[]> {
+    const headers = this.rolePermissionHistoryTable.locator('thead th');
     const count = await headers.count();
     const result: string[] = [];
     for (let i = 0; i < count; i++) {
