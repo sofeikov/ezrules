@@ -97,6 +97,12 @@ High-level storage domains:
 
 ---
 
+## Decision Log
+
+For rationale history and consolidated decision records, see [Architecture Decisions](decisions.md).
+
+---
+
 ## Security Model (High Level)
 
 - JWT auth for most API v2 endpoints

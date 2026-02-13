@@ -44,6 +44,7 @@ nav:
   - Getting Started:
       - Installation: getting-started/installation.md
       - Quick Start: getting-started/quickstart.md
+      - Integration Quickstart: getting-started/integration-quickstart.md
       - Configuration: getting-started/configuration.md
       - Troubleshooting: troubleshooting.md
   - User Guide:
@@ -57,6 +58,7 @@ nav:
       - Manager API: api-reference/manager-api.md
   - Architecture:
       - Overview: architecture/overview.md
+      - Decisions: architecture/decisions.md
       - Deployment: architecture/deployment.md
   - What's New: whatsnew.md
   - Contributing: contributing.md

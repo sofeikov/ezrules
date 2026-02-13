@@ -29,29 +29,9 @@ Labels tell you what actually happened after investigation. They are essential f
 3. If your deployment includes CSV upload in the Labels UI, upload `event_id,label_name` rows.
 4. Confirm changes in **Analytics**.
 
-#### Single Event via API (integration)
+API alternatives are listed in **Automation Appendix** below.
 
-```bash
-curl -X POST http://localhost:8888/api/v2/labels/mark-event \
-  -H "Authorization: Bearer <access_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "txn_123",
-    "label_name": "FRAUD"
-  }'
-```
-
-#### Bulk Upload via CSV (API fallback)
-
-Use the bulk upload API endpoint:
-
-```bash
-curl -X POST http://localhost:8888/api/v2/labels/upload \
-  -H "Authorization: Bearer <access_token>" \
-  -F "file=@labels.csv"
-```
-
-Create `labels.csv` with no header row and exactly two columns (`event_id,label_name`).
+Create `labels.csv` with no header row and exactly two columns (`event_id,label_name`) when using CSV workflows.
 
 Example:
 
@@ -178,3 +158,29 @@ See OpenAPI docs at `http://localhost:8888/docs` for schemas and auth requiremen
 - **[Analyst Guide](analyst-guide.md)** - Analyst workflows
 - **[Monitoring & Analytics](monitoring.md)** - Dashboard and metrics
 - **[API Reference](../api-reference/manager-api.md)** - API overview
+
+---
+
+## Automation Appendix
+
+Use this section when labels/lists are managed by scripts or external systems.
+
+### Mark one event via API
+
+```bash
+curl -X POST http://localhost:8888/api/v2/labels/mark-event \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id": "txn_123",
+    "label_name": "FRAUD"
+  }'
+```
+
+### Upload labels CSV via API
+
+```bash
+curl -X POST http://localhost:8888/api/v2/labels/upload \
+  -H "Authorization: Bearer <access_token>" \
+  -F "file=@labels.csv"
+```

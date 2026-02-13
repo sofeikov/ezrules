@@ -1,54 +1,35 @@
-# Quick Start
+# Quick Start (UI First)
 
-This guide gets you to first success quickly.
-You will create a rule, evaluate events, and confirm outcomes/labels in the UI.
+This quickstart is optimized for first success in the web UI.
+For service-to-service flows, use [Integration Quickstart](integration-quickstart.md).
 
 !!! info "Prerequisites"
-    Make sure you've completed the [Installation Guide](installation.md) before proceeding.
+    Complete [Installation](installation.md) first.
 
 ## Success Checklist
 
-By the end of this guide, you should have:
+By the end of this page, you should have:
 
 - one saved rule
 - one allowed outcome used by that rule
-- at least one evaluated event
-- at least one labeled event
-- visible chart activity in **Dashboard** or **Analytics**
+- one successful rule test in UI
+- chart activity in **Dashboard** or **Analytics**
 
 ---
 
-## Step 1: Start Infrastructure and API
+## Step 1: Start Services
 
-Start local infrastructure (PostgreSQL, Redis, Celery worker):
+Start infrastructure:
 
 ```bash
 docker compose up -d
 ```
 
-Start the API service for API endpoints and rule evaluation:
+Start API:
 
 --8<-- "snippets/start-api.md"
 
-The API service provides:
-
-- API root at [http://localhost:8888](http://localhost:8888)
-- REST API endpoints under the `/api/v2` path prefix (for example, `http://localhost:8888/api/v2/rules`)
-
-OpenAPI docs:
-
---8<-- "snippets/openapi-links.md"
-
-Checkpoint:
-
-- `http://localhost:8888/ping` responds
-- `http://localhost:8888/docs` opens
-
----
-
-## Step 2: Start Frontend and Log In
-
-Run the frontend dev server:
+Start frontend:
 
 ```bash
 cd ezrules/frontend
@@ -56,207 +37,88 @@ npm install
 npm start
 ```
 
-1. Open your browser to [http://localhost:4200](http://localhost:4200)
-2. Log in with the credentials you created during installation
-3. You should see the ezrules dashboard
-
 Checkpoint:
 
-- Sidebar shows **Dashboard**, **Rules**, **Labels**, **Outcomes**, **Analytics**
+- `http://localhost:8888/ping` responds
+- `http://localhost:4200` loads login page
 
 ---
 
-## Step 3: Create Your First Rule
+## Step 2: Log In
 
-Let's create a simple rule to detect high-value transactions.
+1. Open [http://localhost:4200](http://localhost:4200)
+2. Sign in with your created user
+3. Confirm sidebar shows: **Dashboard**, **Rules**, **Labels**, **Outcomes**, **Analytics**
 
-### Via Web Interface
+---
 
-1. Navigate to **Rules** in the sidebar
+## Step 3: Create a Rule
+
+1. Open **Rules**
 2. Click **New Rule**
-3. Fill in the form:
-   - **Name**: `High Value Transaction`
-   - **Description**: `Flag transactions over $10,000`
-   - **Code**:
-     ```python
-     if $amount > 10000:
-         return 'HOLD'  # Send to manual review
-     ```
-4. Click **Save**
+3. Create:
 
-### What This Rule Does
+```python
+if $amount > 10000:
+    return 'HOLD'
+```
 
-- Takes an event (transaction) as input
-- Checks if the `amount` field is greater than $10,000
-- Returns an allowed outcome string (here, `'HOLD'`) to signal a decision; otherwise it returns nothing (no decision)
+4. Save
 
 Checkpoint:
 
-- Rule appears in **Rules** list
-- Opening the rule shows the **Test Rule** panel
+- Rule appears in rules list
+- Rule detail page opens with **Test Rule** panel
 
 ---
 
 ## Step 4: Ensure Outcome Exists
 
-ezrules validates that any literal returned by your rule is an allowed outcome.
-
-1. Navigate to **Outcomes** in the sidebar
-2. Ensure `HOLD` exists (create it if it doesn't)
-3. Save
-
-Checkpoint:
-
-- `HOLD` is visible in the **Outcomes** list
+1. Open **Outcomes**
+2. Ensure `HOLD` exists
+3. Save any changes
 
 ---
 
-## Step 5: Submit Test Events
+## Step 5: Test the Rule in UI
 
-Now let's send some transactions to see the rule in action.
+1. Return to the rule detail page
+2. In **Test Rule**, paste:
 
-### Generate Test Data
-
-The easiest way to test is with the built-in data generator:
-
-```bash
-uv run ezrules generate-random-data --n-rules 0 --n-events 10
+```json
+{
+  "event_id": "txn_001",
+  "event_timestamp": 1700000000,
+  "event_data": {
+    "amount": 15000,
+    "user_id": "user_42"
+  }
+}
 ```
 
-This creates 10 random events in the database.
-
-### Or Submit via API
-
-You can also submit events directly via the evaluate API:
-
-```bash
-# Low-value transaction (won't trigger rule)
-curl -X POST http://localhost:8888/api/v2/evaluate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "txn_001",
-    "event_timestamp": 1704801000,
-    "event_data": {
-      "amount": 500,
-      "user_id": "user_123"
-    }
-  }'
-
-# High-value transaction (will trigger rule)
-curl -X POST http://localhost:8888/api/v2/evaluate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "txn_002",
-    "event_timestamp": 1704801000,
-    "event_data": {
-      "amount": 15000,
-      "user_id": "user_456"
-    }
-  }'
-```
+3. Run test
 
 Checkpoint:
 
-- The high-value request response contains `HOLD` in `outcome_set`
+- Test indicates outcome `HOLD`
 
 ---
 
-## Step 6: View Results
+## Step 6: Add Labels and Verify Analytics
 
-### In the Web Interface
+1. Open **Labels**
+2. Confirm `FRAUD`, `NORMAL`, `CHARGEBACK` labels exist
+3. Open **Analytics**
+4. Check total labeled count and trend charts
 
-1. Navigate to **Rules** in the sidebar and open your **High Value Transaction** rule.
-2. Use the **Test Rule** panel to replay sample payloads or submit a backtest if Celery is configured.
-3. The Outcomes page lists the allowed outcome names; outcome counts and transaction lists are not displayed in the UI yet.
-
-### Inspect the API Response
-
-The evaluate response already tells you which rule fired and what outcomes were produced. Re-run the high-value transaction call:
-
-```bash
-curl -X POST http://localhost:8888/api/v2/evaluate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "txn_002",
-    "event_timestamp": 1704801000,
-    "event_data": {
-      "amount": 15000,
-      "user_id": "user_456"
-    }
-  }'
-```
-
-Look at the `rule_results`, `outcome_counters`, and `outcome_set` fields in the JSON response to confirm the rule triggered.
-
-### Via Analytics Dashboard
-
-1. Navigate to **Dashboard** in the sidebar.
-2. Review the transaction volume chart and the rule outcome trend lines over the selected time range.
-
-Checkpoint:
-
-- At least one chart updates after test/evaluate calls
-
----
-
-## Step 7: Label a Transaction
-
-Let's label a transaction as fraud for analytics.
-
-### Option A: UI Workflow (Recommended for Analysts)
-
-If `FRAUD`, `NORMAL`, and `CHARGEBACK` labels are already present, skip this step.
-
-1. Navigate to **Labels** in the sidebar.
-2. Add missing label names so analysts can use a consistent label set.
-3. If your deployment includes CSV upload in the Labels area, upload a file like:
-   ```csv
-   txn_002,FRAUD
-   txn_003,NORMAL
-   ```
-
-### Option B: API Workflow (For Integrations/Automation)
-
-Use this option when labels come from another system or scripted pipeline.
-It requires an access token from `/api/v2/auth/login`.
-
-```bash
-curl -X POST http://localhost:8888/api/v2/labels/mark-event \
-  -H "Authorization: Bearer <access_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "txn_002",
-    "label_name": "FRAUD"
-  }'
-```
-
-### View Label Metrics
-
-1. Navigate to **Analytics** in the sidebar
-2. Review the total labeled count and individual label charts
-3. Select different time ranges (1h, 6h, 12h, 24h, 30d)
-
-Checkpoint:
-
-- Labeled counts/charts reflect your new label within the selected window
+If your deployment supports CSV upload in the Labels UI, upload a small label file and recheck charts.
 
 ---
 
 ## Next Steps
 
-Congratulations! You've successfully:
-
-- Created a business rule
-- Defined an outcome
-- Submitted events
-- Labeled transactions
-- Viewed analytics
-
-### Learn More
-
-- **[Analyst Guide](../user-guide/analyst-guide.md)** - Learn how to create complex rules and analyze results
-- **[Admin Guide](../user-guide/admin-guide.md)** - Manage users, permissions, and system configuration
-- **[API Reference](../api-reference/manager-api.md)** - Integrate ezrules with your applications
-- **[Architecture Overview](../architecture/overview.md)** - Understand how ezrules works
-
-If something fails during setup, use the [Troubleshooting Guide](../troubleshooting.md).
+- [Analyst Guide](../user-guide/analyst-guide.md)
+- [Creating Rules](../user-guide/creating-rules.md)
+- [Monitoring & Analytics](../user-guide/monitoring.md)
+- [Integration Quickstart](integration-quickstart.md)
+- [Troubleshooting](../troubleshooting.md)

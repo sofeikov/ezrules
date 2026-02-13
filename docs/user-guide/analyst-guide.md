@@ -62,26 +62,7 @@ For most analysts, the easiest way is to test directly in the UI:
 3. Click **Test Rule**.
 4. Review the returned reason and rule outcome immediately.
 
-If you prefer, you can also validate behavior through the evaluator API:
-
-```bash
-curl -X POST http://localhost:8888/api/v2/evaluate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "txn_001",
-    "event_timestamp": 1704801000,
-    "event_data": {
-      "amount": 15000,
-      "user_id": "user_123"
-    }
-  }'
-```
-
-Focus on these response fields:
-
-- `rule_results` for which rule matched
-- `outcome_counters` for outcome frequency
-- `outcome_set` for unique decisions
+If you need API-based testing for automation, see **Automation Appendix** below.
 
 ---
 
@@ -103,34 +84,7 @@ txn_002,NORMAL
 
 4. Open **Analytics** and confirm labeled counts/trends update.
 
-### API labeling (automation/integration)
-
-```bash
-curl -X POST http://localhost:8888/api/v2/labels/mark-event \
-  -H "Authorization: Bearer <access_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "txn_001",
-    "label_name": "FRAUD"
-  }'
-```
-
-### CSV labeling via API (fallback)
-
-Use this when UI upload is not available in your deployment:
-
-```bash
-curl -X POST http://localhost:8888/api/v2/labels/upload \
-  -H "Authorization: Bearer <access_token>" \
-  -F "file=@labels.csv"
-```
-
-Use rows like:
-
-```csv
-txn_001,FRAUD
-txn_002,NORMAL
-```
+API-based labeling options are in **Automation Appendix** below.
 
 Tip: consistent labeling standards are more important than perfect speed.
 
@@ -218,3 +172,50 @@ if $user_id not in @trusted_users:
 - **[Creating Rules](creating-rules.md)** - Rule syntax and patterns
 - **[Labels and Lists](labels-and-lists.md)** - Labels, lists, and outcomes in one workflow
 - **[Monitoring & Analytics](monitoring.md)** - Dashboard metrics
+
+---
+
+## Automation Appendix
+
+Use these API examples only when labeling/testing is integrated into another system.
+
+### Evaluate via API
+
+```bash
+curl -X POST http://localhost:8888/api/v2/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id": "txn_001",
+    "event_timestamp": 1704801000,
+    "event_data": {
+      "amount": 15000,
+      "user_id": "user_123"
+    }
+  }'
+```
+
+Review:
+
+- `rule_results`
+- `outcome_counters`
+- `outcome_set`
+
+### Mark one event via API
+
+```bash
+curl -X POST http://localhost:8888/api/v2/labels/mark-event \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id": "txn_001",
+    "label_name": "FRAUD"
+  }'
+```
+
+### Upload labels via API
+
+```bash
+curl -X POST http://localhost:8888/api/v2/labels/upload \
+  -H "Authorization: Bearer <access_token>" \
+  -F "file=@labels.csv"
+```

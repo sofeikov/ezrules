@@ -48,6 +48,61 @@ lsof -i :8888
 2. Restart API service
 3. Retry login on `http://localhost:4200/login`
 
+## API returns `401` Unauthorized
+
+**Likely causes**
+
+- Missing `Authorization: Bearer <access_token>` header
+- Expired access token
+- Invalid credentials used during login
+
+**Diagnose**
+
+1. Re-run login and confirm token is returned
+2. Confirm header format includes `Bearer` prefix
+3. Check whether token refresh/login flow is still valid
+
+**Fix**
+
+1. Obtain a fresh access token from `/api/v2/auth/login`
+2. Retry request with updated bearer token
+3. If login itself fails, verify email/password and user active status
+
+## API returns `403` Forbidden
+
+**Likely causes**
+
+- User is authenticated but lacks required permission
+- Role does not include action needed by endpoint
+
+**Diagnose**
+
+1. Confirm endpoint being called (for example users, roles, audit)
+2. Verify user role assignment in **Security** / **Settings**
+3. Check role permissions for the relevant resource
+
+**Fix**
+
+1. Assign role with required permission
+2. Or update role permissions for the target action
+3. Retry with user account that has expected privileges
+
+## Login request returns `422`
+
+**Likely causes**
+
+- Login payload sent as JSON instead of OAuth2 form fields
+
+**Fix**
+
+Use form-encoded payload:
+
+```bash
+curl -X POST http://localhost:8888/api/v2/auth/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin@example.com&password=admin"
+```
+
 ## Rule does not fire
 
 **Likely causes**
@@ -120,4 +175,3 @@ docker compose ps
 - [Configuration](getting-started/configuration.md)
 - [Quick Start](getting-started/quickstart.md)
 - [Deployment Guide](architecture/deployment.md)
-

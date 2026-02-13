@@ -67,6 +67,34 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
 | `422` | Invalid request payload (schema/validation error) |
 | `500` | Evaluation failed during execution/storage |
 
+#### Example Error Bodies
+
+Validation error (`422`):
+
+```json
+{
+  "detail": [
+    {
+      "type": "missing",
+      "loc": ["body", "event_id"],
+      "msg": "Field required",
+      "input": {
+        "event_timestamp": 1700000000,
+        "event_data": {"amount": 100}
+      }
+    }
+  ]
+}
+```
+
+Evaluation/storage error (`500`):
+
+```json
+{
+  "detail": "Evaluation failed: <error details>"
+}
+```
+
 ## Authentication
 
 `/api/v2/evaluate` is currently intended for internal/service use and does not require user authentication.

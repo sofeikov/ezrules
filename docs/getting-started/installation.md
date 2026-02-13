@@ -1,21 +1,95 @@
 # Installation
 
-This guide will walk you through installing ezrules and its dependencies.
+This page has one recommended path first.
+Alternative/manual setup options are in appendices at the end.
 
-## Prerequisites
+## Recommended Path (Most Users)
 
-Before installing ezrules, ensure you have the following:
+### Prerequisites
 
-- **Python 3.12 or higher**
-- **PostgreSQL**
-- **Redis** (required for backtesting worker)
-- **uv** (Python package manager) - [Installation guide](https://github.com/astral-sh/uv)
-- **Git** (for cloning the repository)
-- **Docker & Docker Compose** (recommended for local infrastructure)
+- Python 3.12+
+- Docker + Docker Compose
+- `uv`
+- Git
 
-### Installing uv
+### 1) Clone and install dependencies
 
-If you don't have uv installed:
+```bash
+git clone https://github.com/sofeikov/ezrules.git
+cd ezrules
+uv sync
+```
+
+### 2) Start infrastructure
+
+```bash
+docker compose up -d
+```
+
+Expected:
+
+- PostgreSQL, Redis, and worker containers are up
+
+### 3) Configure `settings.env`
+
+```bash
+EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules
+EZRULES_APP_SECRET=put_your_own_secret_here
+EZRULES_ORG_ID=1
+```
+
+### 4) Initialize database and permissions
+
+```bash
+uv run ezrules init-db
+uv run ezrules init-permissions
+```
+
+### 5) Create first user
+
+```bash
+uv run ezrules add-user --user-email admin@example.com --password admin --admin
+```
+
+### 6) Verify backend and frontend
+
+Start backend:
+
+--8<-- "snippets/start-api.md"
+
+API docs:
+
+--8<-- "snippets/openapi-links.md"
+
+Start frontend:
+
+```bash
+cd ezrules/frontend
+npm install
+npm start
+```
+
+Open [http://localhost:4200](http://localhost:4200).
+
+---
+
+## Next Steps
+
+- UI-first setup validation: [Quick Start](quickstart.md)
+- Service/integration validation: [Integration Quickstart](integration-quickstart.md)
+- Runtime tuning: [Configuration](configuration.md)
+
+---
+
+## Troubleshooting
+
+Start with [Troubleshooting](../troubleshooting.md).
+
+---
+
+## Appendix A: Install uv
+
+If `uv` is missing:
 
 === "macOS/Linux"
 
@@ -35,19 +109,9 @@ If you don't have uv installed:
     pip install uv
     ```
 
-### Infrastructure Setup (Recommended: Docker Compose)
+---
 
-From the repository root:
-
-```bash
-docker compose up -d
-```
-
-This starts PostgreSQL, Redis, and a Celery worker.
-
-### PostgreSQL Setup (Manual)
-
-ezrules requires a PostgreSQL database. You can install PostgreSQL using:
+## Appendix B: Manual PostgreSQL Setup (Without Docker)
 
 === "macOS"
 
@@ -64,7 +128,7 @@ ezrules requires a PostgreSQL database. You can install PostgreSQL using:
     sudo systemctl start postgresql
     ```
 
-=== "Docker"
+=== "Docker single container"
 
     ```bash
     docker run -d \
@@ -75,155 +139,14 @@ ezrules requires a PostgreSQL database. You can install PostgreSQL using:
       postgres:16
     ```
 
----
-
-## Installation Steps
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/sofeikov/ezrules.git
-cd ezrules
-```
-
-### 2. Install Dependencies
-
-ezrules uses `uv` for dependency management:
-
-```bash
-uv sync
-```
-
-This command will:
-
-- Create a virtual environment
-- Install all Python dependencies
-- Set up the development environment
-
-### 3. Configure Environment Variables
-
-ezrules reads configuration from `settings.env` by default.
-
-Edit `settings.env` in the project root:
-
-```bash
-EZRULES_DB_ENDPOINT="postgresql://postgres:root@localhost:5432/ezrules"
-EZRULES_APP_SECRET="put_your_own_secret_here"
-EZRULES_ORG_ID=1
-```
-
-Or export variables in your shell:
-
-=== "Bash/Zsh"
-
-    ```bash
-    export EZRULES_DB_ENDPOINT="postgresql://postgres:yourpassword@localhost:5432/ezrules"
-    export EZRULES_APP_SECRET="put_your_own_secret_here"
-    export EZRULES_ORG_ID=1
-    ```
-
-=== "settings.env"
-
-    Update `settings.env` in the project root:
-
-    ```bash
-    EZRULES_DB_ENDPOINT=postgresql://postgres:yourpassword@localhost:5432/ezrules
-    EZRULES_APP_SECRET=put_your_own_secret_here
-    EZRULES_ORG_ID=1
-    ```
-
-!!! tip "Configuration"
-    For more configuration options, see the [Configuration Guide](configuration.md).
-
-### 4. Initialize the Database
-
-```bash
-# Initialize database (interactive mode)
-uv run ezrules init-db
-
-# Or skip prompts with auto-delete
-uv run ezrules init-db --auto-delete
-```
-
-The `init-db` command will:
-
-- Create the database if it doesn't exist
-- Set up all required tables
-- Seed default organization, outcomes, and user lists
-
-### 5. Set Up Permissions
-
-Initialize the role-based access control system:
-
-```bash
-uv run ezrules init-permissions
-```
-
-This creates the default roles:
-
-- **Admin** - Full system access
-- **Rule Editor** - Can create/modify rules
-- **Read-only** - View-only access
-
-### 6. Create Your First User
-
-```bash
-uv run ezrules add-user --user-email admin@example.com --password admin --admin
-```
-
-!!! warning "Security"
-    Change the default password immediately in production environments!
+If you run manual PostgreSQL, also ensure Redis and worker processes are available if backtesting is required.
 
 ---
 
-## Verify Installation
+## Appendix C: Optional Worker Setup
 
-Start the API service:
-
---8<-- "snippets/start-api.md"
-
-API documentation links:
-
---8<-- "snippets/openapi-links.md"
-
-To run the frontend in development:
+If you do not use Docker Compose for worker management:
 
 ```bash
-cd ezrules/frontend
-npm install
-npm start
-```
-
-Then open [http://localhost:4200](http://localhost:4200).
-
----
-
-## Optional Components
-
-### Celery Workers (for Background Tasks)
-
-If you need background task processing for rule backtesting:
-
-```bash
-# Install Redis (for Celery broker)
-brew install redis  # macOS
-sudo apt install redis-server  # Ubuntu
-
-# Start Celery workers
 uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo
 ```
-
-If you used `docker compose up -d`, the worker is already running.
-
----
-
-## Next Steps
-
-Now that you have ezrules installed, proceed to the [Quick Start Guide](quickstart.md) to learn how to create your first rule and evaluate events.
-
----
-
-## Troubleshooting
-
-Start with the [Troubleshooting Guide](../troubleshooting.md).
-If the issue is not covered, check [GitHub Issues](https://github.com/sofeikov/ezrules/issues) or file a new one.
