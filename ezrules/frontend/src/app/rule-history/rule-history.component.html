@@ -1,0 +1,112 @@
+<div class="flex min-h-screen bg-gray-50">
+  <!-- Sidebar -->
+  <app-sidebar></app-sidebar>
+
+  <!-- Main Content -->
+  <div class="ml-64 flex-1">
+    <div class="p-8">
+      <!-- Breadcrumb -->
+      <nav class="mb-6">
+        <ol class="flex items-center space-x-2 text-sm text-gray-600">
+          <li>
+            <a routerLink="/rules" class="hover:text-blue-600 transition-colors">All Rules</a>
+          </li>
+          <li>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </li>
+          <li>
+            <a [routerLink]="['/rules', ruleId]" class="hover:text-blue-600 transition-colors">{{ rid || '...' }}</a>
+          </li>
+          <li>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </li>
+          <li class="text-gray-900 font-medium">History</li>
+        </ol>
+      </nav>
+
+      <!-- Loading State -->
+      <div *ngIf="loading" class="flex justify-center items-center py-20">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+
+      <!-- Error State -->
+      <div *ngIf="error && !loading" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="text-sm font-medium text-red-800">{{ error }}</p>
+        </div>
+      </div>
+
+      <!-- No history (single version, no diffs) -->
+      <div *ngIf="!loading && !error && diffPairs.length === 0 && history.length > 0" class="bg-white border border-gray-200 rounded-lg p-6">
+        <p class="text-gray-600">This rule has only one version. No history to display.</p>
+        <a [routerLink]="['/rules', ruleId]" class="text-blue-600 hover:text-blue-800 text-sm mt-2 inline-block">Back to rule</a>
+      </div>
+
+      <!-- Diff Timeline -->
+      <div *ngIf="!loading && !error && diffPairs.length > 0">
+        <div class="flex justify-between items-center mb-6">
+          <h1 class="text-2xl font-bold text-gray-900">Revision history for {{ rid }}</h1>
+          <a [routerLink]="['/rules', ruleId]" class="text-sm text-blue-600 hover:text-blue-800 font-medium">Back to rule</a>
+        </div>
+
+        <!-- Legend -->
+        <div class="flex gap-4 mb-6">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-4 h-4 bg-green-100 border border-green-300 rounded"></span>
+            <span class="text-sm text-gray-600">Added</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-4 h-4 bg-red-100 border border-red-300 rounded"></span>
+            <span class="text-sm text-gray-600">Removed</span>
+          </div>
+        </div>
+
+        <!-- Timeline entries (newest first) -->
+        <div class="space-y-8">
+          <div *ngFor="let pair of diffPairs" class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <!-- Diff header -->
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <span class="text-sm font-semibold text-gray-900">
+                  Revision {{ pair.fromEntry.revision_number }}
+                  <span class="text-gray-400 mx-2">&rarr;</span>
+                  <span [ngClass]="pair.toEntry.is_current ? 'text-blue-600' : ''">
+                    {{ pair.toEntry.is_current ? 'Current' : 'Revision ' + pair.toEntry.revision_number }}
+                  </span>
+                </span>
+              </div>
+              <span class="text-xs text-gray-500">{{ formatDate(pair.toEntry.created_at) }}</span>
+            </div>
+
+            <!-- Description change indicator -->
+            <div *ngIf="pair.fromEntry.description !== pair.toEntry.description" class="px-6 py-2 bg-yellow-50 border-b border-yellow-200">
+              <p class="text-xs text-yellow-800">
+                <strong>Description changed:</strong>
+                <span class="line-through text-red-700 ml-2">{{ pair.fromEntry.description }}</span>
+                <span class="text-green-700 ml-2">&rarr; {{ pair.toEntry.description }}</span>
+              </p>
+            </div>
+
+            <!-- Diff body -->
+            <div class="p-4">
+              <div *ngIf="!hasChanges(pair.changes)" class="text-sm text-gray-500 italic">No changes in logic.</div>
+              <pre class="text-sm font-mono whitespace-pre-wrap break-all"><span *ngFor="let change of pair.changes"
+                [ngClass]="{
+                  'bg-green-100 text-green-900': change.added,
+                  'bg-red-100 text-red-900 line-through': change.removed
+                }"
+              >{{ change.value }}</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

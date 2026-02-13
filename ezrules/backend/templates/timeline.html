@@ -1,7 +1,0 @@
-{% include "user_header.html" %}
-<a href="/rule/{{rule}}">Back to {{ rule }}</a><br>
-Oldest revision
-{% for diff in timeline%}
-{{ diff | safe }}
-{% endfor %}
-<a href="/rule/{{rule}}">Back to {{ rule }}</a><br>

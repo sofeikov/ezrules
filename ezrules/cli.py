@@ -14,6 +14,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 
 from ezrules.backend.data_utils import Event, eval_and_store
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
+from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import RoleType
 from ezrules.core.rule_updater import (
@@ -21,10 +22,10 @@ from ezrules.core.rule_updater import (
     RuleManager,
     RuleManagerFactory,
 )
+from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import Label, Organisation, Role, TestingRecordLog, User
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import Base, db_session
-from ezrules.models.history_meta import versioned_session
 from ezrules.settings import app_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -71,33 +72,71 @@ def cli():
 @cli.command()
 @click.option("--user-email")
 @click.option("--password")
-def add_user(user_email, password):
+@click.option("--admin", is_flag=True, help="Grant admin role with all permissions to the user")
+def add_user(user_email, password, admin):
     db_endpoint = app_settings.DB_ENDPOINT
     engine = create_engine(db_endpoint)
     db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-    versioned_session(db_session)
+    Base.query = db_session.query_property()
 
+    user = None
     try:
         hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-        db_session.add(
-            User(
-                email=user_email,
-                password=hashed_password,
-                active=True,
-                fs_uniquifier=user_email,
-            )
+        user = User(
+            email=user_email,
+            password=hashed_password,
+            active=True,
+            fs_uniquifier=user_email,
         )
+        db_session.add(user)
         db_session.commit()
         logger.info(f"Done adding {user_email} to {db_endpoint}")
     except Exception as e:
         db_session.rollback()
         logger.error(e)
         logger.info("User already exists")
+        # Try to get existing user
+        user = db_session.query(User).filter_by(email=user_email).first()
+
     try:
         db_session.add(Organisation(name="base"))
         db_session.commit()
     except Exception:
         db_session.rollback()
+
+    # Grant admin permissions if --admin flag is set
+    if admin and user:
+        logger.info("Granting admin permissions...")
+
+        # Initialize default actions
+        PermissionManager.db_session = db_session
+        PermissionManager.init_default_actions()
+
+        # Create or get admin role
+        admin_role = db_session.query(Role).filter_by(name="admin").first()
+        if not admin_role:
+            admin_role = Role(name="admin", description="Full system administrator")
+            db_session.add(admin_role)
+            db_session.commit()
+            logger.info("Created admin role")
+
+        # Grant all permissions to admin role
+        admin_permissions = RoleType.get_role_permissions(RoleType.ADMIN)
+        for permission in admin_permissions:
+            try:
+                PermissionManager.grant_permission(int(admin_role.id), permission)
+            except ValueError:
+                logger.warning(f"Permission {permission.value} not found, skipping")
+
+        # Assign admin role to user
+        if admin_role not in user.roles:
+            user.roles.append(admin_role)
+            db_session.commit()
+            logger.info(f"Assigned admin role to {user_email}")
+        else:
+            logger.info(f"User {user_email} already has admin role")
+
+        logger.info(f"User {user_email} now has full admin permissions")
 
 
 @cli.command()
@@ -154,16 +193,37 @@ def init_db(auto_delete):
     try:
         engine = create_engine(db_endpoint)
         db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-        versioned_session(db_session)
         Base.query = db_session.query_property()
 
         Base.metadata.create_all(bind=engine)
+
+        # Create default organisation
+        logger.info("Creating default organisation...")
+        existing_org = db_session.query(Organisation).filter_by(name="base").first()
+        if not existing_org:
+            db_session.add(Organisation(name="base"))
+            db_session.commit()
+            logger.info("Default organisation created")
+        else:
+            logger.info("Default organisation already exists")
 
         # Initialize default permissions
         logger.info("Initializing default permissions...")
         PermissionManager.db_session = db_session
         PermissionManager.init_default_actions()
         logger.info("Default permissions initialized")
+
+        # Seed default outcomes (RELEASE, HOLD, CANCEL)
+        logger.info("Seeding default outcomes...")
+        outcome_manager = DatabaseOutcome(db_session=db_session, o_id=1)
+        outcome_manager._ensure_default_outcomes()
+        logger.info("Default outcomes seeded")
+
+        # Seed default user lists (MiddleAsiaCountries, NACountries, LatamCountries)
+        logger.info("Seeding default user lists...")
+        user_list_manager = PersistentUserListManager(db_session=db_session, o_id=1)
+        user_list_manager._ensure_default_lists()
+        logger.info("Default user lists seeded")
 
         logger.info(f"Done initializing the DB at {db_endpoint}")
 
@@ -178,7 +238,6 @@ def init_permissions():
     logger.info(f"Initializing permissions at {db_endpoint}")
     engine = create_engine(db_endpoint)
     db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-    versioned_session(db_session)
     Base.query = db_session.query_property()
 
     PermissionManager.init_default_actions()
@@ -229,38 +288,20 @@ def init_permissions():
 
 @cli.command()
 @click.option("--port", default="8888")
-def manager(port):
+@click.option("--reload", is_flag=True, help="Enable auto-reload for development")
+def api(port, reload):
+    """Start the FastAPI v2 API server (default port 8888 for Angular frontend)."""
     env = os.environ.copy()
     cmd = [
-        "gunicorn",
-        "-w",
-        "1",
-        "--threads",
-        "4",
-        "--bind",
-        f"0.0.0.0:{port}",
-        "ezrules.backend.ezruleapp:app",
+        "uvicorn",
+        "ezrules.backend.api_v2.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        port,
     ]
-    subprocess.run(
-        cmd,
-        env=env,
-    )
-
-
-@cli.command()
-@click.option("--port", default="9999")
-def evaluator(port):
-    env = os.environ.copy()
-    cmd = [
-        "gunicorn",
-        "-w",
-        "1",
-        "--threads",
-        "4",
-        "--bind",
-        f"0.0.0.0:{port}",
-        "ezrules.backend.ezrulevalapp:app",
-    ]
+    if reload:
+        cmd.append("--reload")
     subprocess.run(
         cmd,
         env=env,
@@ -318,7 +359,7 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
 
         lre = LocalRuleExecutorSQL(db=db_session, o_id=1)
 
-    rule_engine_config_producer.save_config(fsrm)
+    rule_engine_config_producer.save_config(fsrm, changed_by="cli")
     # Generate and evaluate events
     for e_ind in range(n_events):
         event_data = {}
@@ -506,6 +547,35 @@ def export_test_csv(output_file: str, n_events: int, unlabeled_only: bool):
         logger.info("Use this file to test the CSV upload functionality in the web interface")
     else:
         logger.warning("No valid labels could be generated")
+
+
+@cli.command()
+@click.option("--user-email", default="admin@test_org.com", help="Admin email (default: admin@test_org.com)")
+@click.option("--password", default="12345678", help="Admin password (default: 12345678)")
+@click.option("--n-rules", default=10, help="Number of rules to generate (default: 10)")
+@click.option("--n-events", default=1000, help="Number of events to generate (default: 1000)")
+@click.pass_context
+def reset_dev(ctx, user_email, password, n_rules, n_events):
+    """Reset the dev database: init-db --auto-delete + add admin user + generate fake data.
+
+    One command to get a fresh development environment ready to use.
+    """
+    logger.info("=== Resetting development environment ===")
+
+    # Step 1: init-db --auto-delete
+    logger.info("Step 1/3: Initializing database...")
+    ctx.invoke(init_db, auto_delete=True)
+
+    # Step 2: add admin user
+    logger.info(f"Step 2/3: Creating admin user {user_email}...")
+    ctx.invoke(add_user, user_email=user_email, password=password, admin=True)
+
+    # Step 3: generate fake data
+    logger.info(f"Step 3/3: Generating fake data ({n_rules} rules, {n_events} events)...")
+    ctx.invoke(generate_random_data, n_rules=n_rules, n_events=n_events, label_ratio=0.3, export_csv=None)
+
+    logger.info("=== Development environment ready ===")
+    logger.info(f"Login with: {user_email} / {password}")
 
 
 @cli.command()

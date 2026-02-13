@@ -1,160 +1,157 @@
-# Manager Service Reference
+# API v2 Reference
 
-The manager service powers the web console and exposes a small set of JSON endpoints used by the dashboard views.
+This page provides a scannable endpoint map.
+Use OpenAPI docs as the canonical request/response schema source.
 
-**Base URL:** `http://localhost:8888`
+## Run Locally
 
----
+--8<-- "snippets/start-api.md"
 
-## Authentication
+## Authentication Contract
 
-The manager uses Flask-Security session-based authentication.
+### Login endpoint format (important)
 
-### Login
+- Endpoint: `POST /api/v2/auth/login`
+- Payload type: `application/x-www-form-urlencoded`
+- Required fields:
+  - `username` (email)
+  - `password`
 
-- **Endpoint:** `POST /login`
-- **Body:** form-encoded parameters `email` and `password`
-- **Response:** redirect to `/rules` on success; sets a session cookie
+Example:
 
-For scripted use, perform the login request with a client that preserves cookies (for example, `requests.Session`).
+```bash
+curl -X POST http://localhost:8888/api/v2/auth/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin@example.com&password=admin"
+```
 
----
+### Token usage
 
-## Web Interface Pages
+- Send access token as `Authorization: Bearer <access_token>`
+- `POST /api/v2/evaluate` is internal/service oriented and currently does not require user auth
 
-| Page | Endpoint | Description |
-|------|----------|-------------|
-| Rules list | `GET /rules` | View all rules and navigate to rule details |
-| Create rule | `GET /create_rule` | Form for creating a new rule |
-| Rule detail | `GET /rule/<int:rule_id>` | Edit a rule, test logic, view revision history |
-| Dashboard | `GET /dashboard` | Active rule count, transaction volume, and outcome trend charts |
-| Outcomes | `GET /management/outcomes` | Manage allowed outcome names |
-| Labels | `GET /management/labels` | Manage available label values |
-| Upload labels | `GET /upload_labels` | Bulk label upload via CSV form |
-| Label analytics | `GET /label_analytics` | Charts summarising labels over time |
-| User lists | `GET /management/lists` | Manage allow/block/watch list entries |
-| Audit trail | `GET /audit` | Recent rule and configuration history |
-| User management | `GET /user_management` | Manage user accounts |
-| Role management | `GET /role_management` | Manage roles and permissions |
+## Endpoint Map
 
-All GET routes render HTML templates. Form submissions respond with redirects and flash messages rather than JSON payloads.
+### Authentication
 
----
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `POST` | `/api/v2/auth/login` | No | OAuth2 form login |
+| `POST` | `/api/v2/auth/refresh` | No (refresh token in body) | Exchanges refresh token |
+| `GET` | `/api/v2/auth/me` | Bearer | Current user profile |
 
-## JSON APIs
+### Rules
 
-These endpoints back the dashboard charts. Authentication is required (session cookie from `/login`).
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/rules` | Bearer + permission | List rules |
+| `POST` | `/api/v2/rules` | Bearer + permission | Create rule |
+| `GET` | `/api/v2/rules/{rule_id}` | Bearer + permission | Rule details |
+| `GET` | `/api/v2/rules/{rule_id}/revisions/{revision_number}` | Bearer + permission | Specific historical revision |
+| `PUT` | `/api/v2/rules/{rule_id}` | Bearer + permission | Update rule |
+| `POST` | `/api/v2/rules/verify` | Bearer + permission | Verify rule source and extracted params |
+| `POST` | `/api/v2/rules/test` | Bearer + permission | Test rule payload |
+| `GET` | `/api/v2/rules/{rule_id}/history` | Bearer + permission | Revision list |
 
-### Transaction Volume
+### Outcomes
 
-- **Endpoint:** `GET /api/transaction_volume`
-- **Query Parameters:** `aggregation` (`1h`, `6h`, `12h`, `24h`, `30d`)
-- **Response:**
-  ```json
-  {
-    "aggregation": "6h",
-    "labels": ["2025-01-09 10:00", "2025-01-09 16:00"],
-    "data": [120, 135]
-  }
-  ```
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/outcomes` | Bearer + permission | List allowed outcomes |
+| `POST` | `/api/v2/outcomes` | Bearer + permission | Create allowed outcome |
+| `DELETE` | `/api/v2/outcomes/{outcome_name}` | Bearer + permission | Delete outcome |
 
-### Outcome Distribution
+### Labels
 
-- **Endpoint:** `GET /api/outcomes_distribution`
-- **Query Parameters:** `aggregation` (`1h`, `6h`, `12h`, `24h`, `30d`)
-- **Response:**
-  ```json
-  {
-    "aggregation": "24h",
-    "labels": ["2025-01-09 10:00"],
-    "datasets": [
-      {
-        "label": "APPROVE",
-        "data": [8],
-        "borderColor": "rgb(54, 162, 235)",
-        "backgroundColor": "rgba(54, 162, 235, 0.1)"
-      },
-      {
-        "label": "REVIEW",
-        "data": [3],
-        "borderColor": "rgb(255, 99, 132)",
-        "backgroundColor": "rgba(255, 99, 132, 0.1)"
-      }
-    ]
-  }
-  ```
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/labels` | Bearer + permission | List labels |
+| `POST` | `/api/v2/labels` | Bearer + permission | Create label |
+| `POST` | `/api/v2/labels/bulk` | Bearer + permission | Create labels in bulk |
+| `POST` | `/api/v2/labels/mark-event` | Bearer + permission | Mark single event |
+| `POST` | `/api/v2/labels/upload` | Bearer + permission | CSV upload (`multipart/form-data`) |
+| `DELETE` | `/api/v2/labels/{label_name}` | Bearer + permission | Delete label |
 
-### Labels Summary
+### Analytics
 
-- **Endpoint:** `GET /api/labels_summary`
-- **Response:**
-  ```json
-  {
-    "total_labeled": 42,
-    "pie_chart": {
-      "labels": ["FRAUD", "NORMAL"],
-      "data": [12, 30],
-      "backgroundColor": ["rgb(255, 99, 132)", "rgb(54, 162, 235)"]
-    }
-  }
-  ```
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/analytics/transaction-volume` | Bearer + permission | Time-series event volume |
+| `GET` | `/api/v2/analytics/outcomes-distribution` | Bearer + permission | Outcome trends |
+| `GET` | `/api/v2/analytics/labels-summary` | Bearer + permission | Total labeled summary |
+| `GET` | `/api/v2/analytics/labels-distribution` | Bearer + permission | Label trends |
+| `GET` | `/api/v2/analytics/labeled-transaction-volume` | Bearer + permission | Time-series labeled event volume |
 
-### Labels Distribution
+### Users and Roles
 
-- **Endpoint:** `GET /api/labels_distribution`
-- **Query Parameters:** `aggregation` (`1h`, `6h`, `12h`, `24h`, `30d`)
-- **Response:** same structure as `/api/outcomes_distribution`, but for labels instead of rule outcomes.
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/users` | Bearer + permission | List users |
+| `GET` | `/api/v2/users/{user_id}` | Bearer + permission | Get user details |
+| `POST` | `/api/v2/users` | Bearer + permission | Create user |
+| `PUT` | `/api/v2/users/{user_id}` | Bearer + permission | Update user |
+| `DELETE` | `/api/v2/users/{user_id}` | Bearer + permission | Delete user |
+| `POST` | `/api/v2/users/{user_id}/roles` | Bearer + permission | Assign role to user |
+| `DELETE` | `/api/v2/users/{user_id}/roles/{role_id}` | Bearer + permission | Remove role from user |
+| `GET` | `/api/v2/roles/permissions` | Bearer + permission | List all available permissions |
+| `GET` | `/api/v2/roles` | Bearer + permission | List roles |
+| `GET` | `/api/v2/roles/{role_id}` | Bearer + permission | Get role details |
+| `POST` | `/api/v2/roles` | Bearer + permission | Create role |
+| `PUT` | `/api/v2/roles/{role_id}` | Bearer + permission | Update role |
+| `DELETE` | `/api/v2/roles/{role_id}` | Bearer + permission | Delete role |
+| `GET` | `/api/v2/roles/{role_id}/permissions` | Bearer + permission | Get role permissions |
+| `PUT` | `/api/v2/roles/{role_id}/permissions` | Bearer + permission | Update role permissions |
 
----
+### User Lists
 
-## Labeling Endpoint
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/user-lists` | Bearer + permission | List user lists |
+| `GET` | `/api/v2/user-lists/{list_id}` | Bearer + permission | Get user list details |
+| `POST` | `/api/v2/user-lists` | Bearer + permission | Create user list |
+| `PUT` | `/api/v2/user-lists/{list_id}` | Bearer + permission | Update list metadata |
+| `DELETE` | `/api/v2/user-lists/{list_id}` | Bearer + permission | Delete list |
+| `GET` | `/api/v2/user-lists/{list_id}/entries` | Bearer + permission | Get list entries |
+| `POST` | `/api/v2/user-lists/{list_id}/entries` | Bearer + permission | Add one entry |
+| `POST` | `/api/v2/user-lists/{list_id}/entries/bulk` | Bearer + permission | Add entries in bulk |
+| `DELETE` | `/api/v2/user-lists/{list_id}/entries/{entry_id}` | Bearer + permission | Remove one entry |
 
-Use the manager API to assign labels to stored events.
+### Audit
 
-- **Endpoint:** `POST /mark-event`
-- **Body:** JSON with `event_id` and `label_name`
-- **Response:**
-  ```json
-  {
-    "message": "Event 'txn_002' successfully marked with label 'FRAUD'",
-    "event_id": "txn_002",
-    "label_name": "FRAUD"
-  }
-  ```
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/audit` | Bearer + permission | Summary |
+| `GET` | `/api/v2/audit/rules` | Bearer + permission | Rule history (`limit`, `offset`, filters) |
+| `GET` | `/api/v2/audit/rules/{rule_id}` | Bearer + permission | Full history for one rule |
+| `GET` | `/api/v2/audit/config` | Bearer + permission | Config history (`limit`, `offset`, filters) |
+| `GET` | `/api/v2/audit/user-lists` | Bearer + permission | User-list history |
+| `GET` | `/api/v2/audit/outcomes` | Bearer + permission | Outcome history |
+| `GET` | `/api/v2/audit/labels` | Bearer + permission | Label history |
+| `GET` | `/api/v2/audit/users` | Bearer + permission | User-account history (`limit`, `offset`, filters) |
+| `GET` | `/api/v2/audit/roles` | Bearer + permission | Role/permission history (`limit`, `offset`, filters) |
 
-Validation errors return `400` (missing fields), `404` (unknown event or label), or `500` (database error).
+### Backtesting
 
----
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `POST` | `/api/v2/backtesting` | Bearer + permission | Trigger async backtest |
+| `GET` | `/api/v2/backtesting/task/{task_id}` | Bearer + permission | Task status/result |
+| `GET` | `/api/v2/backtesting/{rule_id}` | Bearer + permission | Backtest history for rule |
 
-## Permissions
+### Evaluator
 
-Access to each endpoint is governed by `PermissionAction` values. The table below summarises the defaults:
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `POST` | `/api/v2/evaluate` | Internal/service | Evaluate one event against active rules |
 
-| Endpoint | Permission |
-|----------|------------|
-| `GET /rules`, `GET /dashboard`, `GET /rule/<id>` | `view_rules` |
-| `POST /create_rule` | `create_rule` |
-| `POST /rule/<id>` | `modify_rule` |
-| `GET /management/outcomes` | `view_outcomes` |
-| `POST /management/outcomes` | `create_outcome` / `delete_outcome` (per action) |
-| `GET /management/labels` | `view_labels` |
-| `POST /management/labels` | `create_label` / `delete_label` (per action) |
-| `GET /upload_labels` | `view_labels` |
-| `POST /upload_labels` | `create_label` (used to upload assignments) |
-| `GET /label_analytics` | `view_labels` |
-| `GET /management/lists` | `view_lists` |
-| `POST /management/lists` | `create_list`, `modify_list`, or `delete_list` based on the submitted action |
-| `GET /audit` | `access_audit_trail` |
-| `GET /user_management` | `view_users` |
-| `POST /user_management` | `create_user` |
-| `GET /role_management` | `view_roles` |
-| `POST /role_management` | `create_role`, `modify_role`, `delete_role`, or `manage_permissions` |
-| `/mark-event` | Accessible without additional permission checks (CSRF exempt) |
+## API Conventions
 
----
+- JSON endpoints use `application/json`
+- CSV upload endpoint uses `multipart/form-data`
+- Analytics `aggregation` must be one of: `1h`, `6h`, `12h`, `24h`, `30d`
+- Audit endpoints support pagination via `limit` and `offset`
+- Validation errors use HTTP `422` with `detail`
 
-## Notes
+## Live API Documentation (Canonical)
 
-- There are no REST endpoints for creating rules or outcomes programmatically; use the web forms or extend the application.
-- The upload forms (`/upload_labels`, `/management/outcomes`, `/management/lists`) respond with HTML redirects, so automated integrations should interact with the JSON APIs listed above instead.
-- Webhooks and additional management APIs are not implemented at this time.
+--8<-- "snippets/openapi-links.md"

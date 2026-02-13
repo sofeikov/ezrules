@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16.0-alpine3.18
+    container_name: ezrules-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: root
+      POSTGRES_HOST_AUTH_METHOD: trust
+      LC_CTYPE: en_US.UTF-8
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ezrules-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  worker:
+    build: .
+    container_name: ezrules-worker
+    command: uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
+      EZRULES_APP_SECRET: put_your_own_secret_here
+      EZRULES_ORG_ID: 1
+      EZRULES_CELERY_BROKER_URL: redis://redis:6379
+
+volumes:
+  pgdata:

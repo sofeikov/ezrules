@@ -1,0 +1,84 @@
+<div class="flex min-h-screen bg-gray-50">
+  <!-- Sidebar -->
+  <app-sidebar></app-sidebar>
+
+  <!-- Main Content -->
+  <div class="ml-64 flex-1">
+    <div class="p-8">
+      <!-- Header -->
+      <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Labels</h1>
+        <p class="text-gray-600 mt-1">Manage labels for transaction categorization and analysis</p>
+      </div>
+
+      <!-- Loading State -->
+      <div *ngIf="loading" class="flex justify-center items-center py-20">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+
+      <!-- Error State -->
+      <div *ngIf="error && !loading" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="text-sm font-medium text-red-800">{{ error }}</p>
+        </div>
+      </div>
+
+      <div *ngIf="!loading && !error">
+        <!-- Create Label Form -->
+        <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Add New Label</h2>
+          <div class="flex gap-3">
+            <input
+              type="text"
+              [(ngModel)]="newLabel"
+              placeholder="Enter label name"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <button
+              (click)="createLabel()"
+              class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Add Label
+            </button>
+          </div>
+          <div *ngIf="createError" class="mt-3 text-sm text-red-600">{{ createError }}</div>
+        </div>
+
+        <!-- Delete Error -->
+        <div *ngIf="deleteError" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p class="text-sm font-medium text-red-800">{{ deleteError }}</p>
+        </div>
+
+        <!-- Labels List -->
+        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <p class="text-sm text-gray-600">
+              <span class="font-semibold text-gray-900">{{ labels.length }}</span> label{{ labels.length !== 1 ? 's' : '' }} total
+            </p>
+          </div>
+
+          <!-- Empty State -->
+          <div *ngIf="labels.length === 0" class="text-center py-12">
+            <p class="text-sm text-gray-500">No labels exist yet. Add one above.</p>
+          </div>
+
+          <!-- Label Items -->
+          <ul *ngIf="labels.length > 0" class="divide-y divide-gray-200">
+            <li *ngFor="let label of labels" class="flex items-center justify-between px-6 py-4">
+              <span class="text-sm font-medium text-gray-900">{{ label }}</span>
+              <button
+                (click)="deleteLabel(label)"
+                class="px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
+              >
+                Delete
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

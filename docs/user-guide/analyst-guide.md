@@ -1,10 +1,6 @@
 # Guide for Analysts
 
-This guide is for fraud analysts, compliance officers, and data analysts who use ezrules to monitor transactions and analyze patterns.
-
----
-
-## Your Role
+If your job is to review suspicious transactions, tune fraud rules, and explain why a decision was made, this page is for you.
 
 As an analyst, you'll:
 
@@ -12,52 +8,38 @@ As an analyst, you'll:
 - Monitor outcomes and review flagged transactions
 - Label transactions for performance measurement
 - Analyze rule effectiveness and reduce false positives
-- Generate reports on transaction patterns
+- Build a repeatable workflow your team can trust
 
 ---
 
-## Creating Effective Rules
+## The Practical Workflow
 
-### Rule Basics
+Most analyst work in ezrules follows this loop:
 
-Rules in ezrules are Python functions that evaluate transaction data. Each rule:
+1. Create or update a rule.
+2. Make sure the outcome your rule returns exists (for example `HOLD`).
+3. Test with realistic events.
+4. Label results (`FRAUD`, `NORMAL`, `CHARGEBACK`).
+5. Check analytics for false positives and missed fraud.
+6. Backtest before promoting major rule changes.
 
-- Receives an event (transaction) as input
-- Returns an allowed outcome string (e.g., `'HOLD'`, `'RELEASE'`, `'CANCEL'`)
-- If no action is needed, simply do not return a value (no decision)
+This process is simple, but doing it consistently is what improves model quality over time.
 
-### Simple Amount-Based Rule
+---
+
+## Write Rules That Are Easy To Operate
+
+A rule returns an allowed outcome string:
 
 ```python
-# Flag high-value transactions
 if $amount > 10000:
     return 'HOLD'
 ```
 
-### Geographic Risk Rule
+You will usually get better results by combining multiple signals:
 
 ```python
-# Flag transactions from high-risk countries
-if $country in @high_risk_countries:
-    return 'HOLD'
-```
-
-### Velocity Rule
-
-```python
-# Flag users with too many transactions in a short time.
-# Implement `count_events_for_user` in your own helper module.
-
-if $transactions_last_hour > 10:
-    return 'HOLD'
-```
-
-### Multi-Factor Rule
-
-```python
-# Combine multiple risk factors
 risk_score = 0
-
 if $amount > 5000:
     risk_score += 2
 if $country in @high_risk_countries:
@@ -65,210 +47,92 @@ if $country in @high_risk_countries:
 if $account_age_days < 30:
     risk_score += 1
 
-# Trigger if risk score exceeds threshold
 if risk_score >= 4:
     return 'HOLD'
 ```
 
 ---
 
-## Working with Outcomes
+## Test With Realistic Events
 
-### What Are Outcomes?
+For most analysts, the easiest way is to test directly in the UI:
 
-Outcomes represent actions taken when rules fire:
+1. Open **Rules** and select your rule.
+2. In the right-side **Test Rule** panel, paste a JSON payload in **Test JSON**.
+3. Click **Test Rule**.
+4. Review the returned reason and rule outcome immediately.
 
-- **Alerts** - Notify the fraud team
-- **Blocks** - Automatically decline transactions
-- **Reviews** - Queue for manual review
-- **Reports** - Log for compliance
-
-### Creating Outcomes
-
-1. Navigate to **Outcomes** in the sidebar
-2. Click **Create New Outcome**
-3. Provide:
-   - **Name**: Clear, descriptive name (e.g., "High Risk Alert")
-   - **Description**: When this outcome should trigger
-
-### Linking Rules to Outcomes
-
-Ensure the names you return in your rules exist in the **Outcomes** list:
-
-1. Open **Outcomes** in the sidebar and add names you plan to return (e.g., `HOLD`, `RELEASE`, `CANCEL`).
-2. In your rules, return those strings directly.
-3. Multiple rules can produce multiple outcomes for the same event; a single rule should return at most one outcome.
+If you need API-based testing for automation, see **Automation Appendix** below.
 
 ---
 
-## Analyzing Results
+## Label Transactions (This Is Where Quality Comes From)
 
-### Reviewing Flagged Transactions
+For most analyst teams, labeling should be a UI workflow first.
+Use API labeling only for integrations or batch automation.
 
-1. Capture evaluator responses (`/evaluate`) or run SQL against `testing_results_log` joined with `testing_record_log` to list the events a rule triggered.
-2. Inspect those stored payloads to understand why the rule matched and whether it should have.
-3. Use the rule detail page to experiment with new logic and, if Celery is configured, submit a backtest for historical comparisons.
+### UI workflow (recommended)
 
-### Using the Analytics Dashboard
+1. Open **Labels**.
+2. Confirm label names exist (for example `FRAUD`, `NORMAL`, `CHARGEBACK`).
+3. If your deployment exposes CSV upload in the UI, upload rows like:
 
-Open **Dashboard** to view:
+```csv
+txn_001,FRAUD
+txn_002,NORMAL
+```
 
-- **Active Rules** – Count of deployed rules.
-- **Transaction Volume** – Time-series chart of processed events.
-- **Outcome Trends** – Per-outcome lines showing how often each decision was produced.
-- **Time Range Selection** – 1h, 6h, 12h, 24h, 30d views.
+4. Open **Analytics** and confirm labeled counts/trends update.
 
-### Interpreting Charts
+API-based labeling options are in **Automation Appendix** below.
 
-**High Volume Spikes**: May indicate:
-- Normal business patterns (end of month, holidays)
-- System issues (duplicate events)
-- Actual fraud attacks
-
-**Low Hit Rates**: Could mean:
-- Rule is too specific (increase sensitivity)
-- Fraud pattern has changed
-- Rule is working (fraud prevention)
-
-**High Hit Rates**: May indicate:
-- Rule is too broad (increase specificity)
-- False positive problem
-- Legitimate business activity being flagged
+Tip: consistent labeling standards are more important than perfect speed.
 
 ---
 
-## Transaction Labeling
+## Measure Analyst Performance Metrics
 
-### Why Label Transactions?
+### False positive rate
 
-Labels help you:
+`NORMAL labels in triggered outcomes / total triggered events`
 
-- Measure false positive rates
-- Identify false negatives (missed fraud)
-- Validate rule changes before deployment
-- Build datasets for machine learning models
+### False negative review
 
-### Labeling via Web Interface
-
-Use the bulk upload workflow:
-
-1. Navigate to **Labels → Upload Labels**
-2. Upload a CSV file (no header row, two columns: `event_id,label_name`)
-3. Review the summary of applied labels and any validation errors
-
-### Labeling via API
-
-```bash
-curl -X POST http://localhost:8888/mark-event \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event_id": "txn_123",
-    "label_name": "FRAUD"
-  }'
-```
-
-### Built-in Labels
-
-- **FRAUD**: Confirmed or suspected fraudulent transactions
-- **CHARGEBACK**: Disputed transactions resulting in chargebacks
-- **NORMAL**: Legitimate transactions
+1. Mark confirmed fraud as `FRAUD`.
+2. Check whether those events produced outcomes.
+3. Update rules for patterns that were missed.
 
 ---
 
-## Performance Analysis
+## Use Dashboard + Analytics Together
 
-### Measuring False Positives
+Use **Dashboard** and **Analytics** (sidebar label) together for full context:
 
-False positives occur when legitimate transactions are flagged.
+- transaction volume trends
+- outcome trends
+- label distribution and label trends
 
-**Steps to measure:**
+Relevant endpoints:
 
-1. Capture the evaluator responses or query `testing_results_log` to list events flagged by the rule or outcome you are assessing.
-2. Label legitimate events as NORMAL using `/mark-event` or the bulk upload page.
-3. View the **Label Analytics** dashboard to compare the NORMAL counts against your triggered volume.
-
-**Calculation:**
-```
-False Positive Rate = NORMAL labels in outcome / Total triggered events
-```
-
-### Measuring False Negatives
-
-False negatives are fraud cases your rules missed.
-
-**Steps to identify:**
-
-1. Label known fraud cases as FRAUD.
-2. Query `testing_results_log` (joined with `testing_record_log`) to verify whether those events triggered an outcome.
-3. Investigate any FRAUD-labelled events that do not appear in the outcome results and adjust rules accordingly.
-
-**To reduce false negatives:**
-- Lower rule thresholds
-- Add more detection rules
-- Analyze missed fraud patterns
-
-### Rule Tuning Workflow
-
-1. **Baseline**: Deploy rule and collect data for 7 days
-2. **Measure**: Calculate false positive and false negative rates
-3. **Analyze**: Review false positives to understand patterns
-4. **Adjust**: Modify rule logic or thresholds
-5. **Backtest**: Test changes against historical data
-6. **Deploy**: Update rule and monitor for 7 days
-7. **Repeat**: Continuously optimize
+- `GET /api/v2/analytics/transaction-volume`
+- `GET /api/v2/analytics/outcomes-distribution`
+- `GET /api/v2/analytics/labels-summary`
+- `GET /api/v2/analytics/labels-distribution`
 
 ---
 
 ## Best Practices
 
-### Rule Design
-
-!!! tip "Start Conservative"
-    Begin with higher thresholds to avoid overwhelming the team. Lower thresholds gradually as you tune.
-
-!!! tip "Combine Signals"
-    Use multiple risk factors rather than single indicators for more accurate detection.
-
-!!! tip "Test Before Deploy"
-    Use historical data to validate rule effectiveness before going live.
-
-### Labeling Strategy
-
-!!! tip "Label Consistently"
-    Establish clear criteria for each label type and document them.
-
-!!! tip "Label Quickly"
-    Label transactions within 24-48 hours while context is fresh.
-
-!!! tip "Review Regularly"
-    Set aside time weekly to review and label flagged transactions.
-
-### Analysis Workflow
-
-!!! tip "Daily Monitoring"
-    Check the analytics dashboard daily for anomalies or spikes.
-
-!!! tip "Weekly Deep Dive"
-    Analyze false positive rates and rule performance weekly.
-
-!!! tip "Monthly Review"
-    Review all rules monthly to identify opportunities for improvement.
+- Start conservative, then tighten thresholds with data.
+- Label quickly and consistently with team-agreed definitions.
+- Use backtesting for meaningful rule edits.
+- Review trends on a fixed cadence (daily/weekly).
 
 ---
 
-## Common Patterns
+## Common Rule Patterns
 
-### Amount-Based Detection
-
-```python
-# Tiered thresholds
-if $amount > 50000:
-    return 'HOLD'  # Always flag
-elif $amount > 10000:
-    # Additional checks for medium amounts
-    if $is_international:
-        return 'HOLD'
-```
+These patterns are good starting points for everyday analyst work.
 
 ### Time-Based Rules
 
@@ -303,31 +167,55 @@ if $user_id not in @trusted_users:
 
 ---
 
-## Troubleshooting
+## Next Steps
 
-### Rule Not Triggering
-
-1. **Check event data**: Ensure the event contains expected fields
-2. **Verify rule logic**: Add print statements for debugging
-3. **Test with sample data**: Use the data generator
-
-### Too Many False Positives
-
-1. **Increase thresholds**: Make rules more specific
-2. **Add exceptions**: Exclude known legitimate patterns
-3. **Combine signals**: Require multiple risk factors
-
-### Missed Fraud Cases
-
-1. **Lower thresholds**: Increase sensitivity
-2. **Add new rules**: Cover patterns you're seeing
-3. **Review false negatives**: Analyze what was missed
+- **[Creating Rules](creating-rules.md)** - Rule syntax and patterns
+- **[Labels and Lists](labels-and-lists.md)** - Labels, lists, and outcomes in one workflow
+- **[Monitoring & Analytics](monitoring.md)** - Dashboard metrics
 
 ---
 
-## Next Steps
+## Automation Appendix
 
-- **[Managing Outcomes](managing-outcomes.md)** - Deep dive into outcome configuration
-- **[Labels and Lists](labels-and-lists.md)** - Advanced labeling and list management
-- **[Monitoring & Analytics](monitoring.md)** - Comprehensive analytics guide
-- **[Admin Guide](admin-guide.md)** - Learn about user management and permissions
+Use these API examples only when labeling/testing is integrated into another system.
+
+### Evaluate via API
+
+```bash
+curl -X POST http://localhost:8888/api/v2/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id": "txn_001",
+    "event_timestamp": 1704801000,
+    "event_data": {
+      "amount": 15000,
+      "user_id": "user_123"
+    }
+  }'
+```
+
+Review:
+
+- `rule_results`
+- `outcome_counters`
+- `outcome_set`
+
+### Mark one event via API
+
+```bash
+curl -X POST http://localhost:8888/api/v2/labels/mark-event \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id": "txn_001",
+    "label_name": "FRAUD"
+  }'
+```
+
+### Upload labels via API
+
+```bash
+curl -X POST http://localhost:8888/api/v2/labels/upload \
+  -H "Authorization: Bearer <access_token>" \
+  -F "file=@labels.csv"
+```

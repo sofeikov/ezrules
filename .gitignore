@@ -170,3 +170,19 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# Angular / Node.js
+node_modules/
+ezrules/backend/static/angular/
+ezrules/frontend/.angular/
+ezrules/frontend/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Playwright
+ezrules/frontend/playwright-report/
+ezrules/frontend/test-results/
+ezrules/frontend/playwright/.cache/
+ezrules/frontend/e2e/.auth/

@@ -1,0 +1,96 @@
+<div class="flex min-h-screen bg-gray-50">
+  <app-sidebar></app-sidebar>
+
+  <div class="ml-64 flex-1">
+    <div class="p-8">
+      <!-- Header -->
+      <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p class="text-gray-500 mt-1">Overview of transaction monitoring activity</p>
+      </div>
+
+      <!-- Error -->
+      <div *ngIf="error" class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6">
+        {{ error }}
+      </div>
+
+      <!-- Active Rules Metric Card -->
+      <div class="bg-white rounded-lg shadow border border-gray-200 p-6 mb-8">
+        <div class="text-center">
+          <div *ngIf="loading" class="flex justify-center">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+          <div *ngIf="!loading">
+            <div class="text-5xl font-bold text-blue-600">{{ activeRulesCount }}</div>
+            <div class="text-lg text-gray-500 mt-1">Active Rules</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Time Range Selector -->
+      <div class="flex justify-end mb-6">
+        <div class="flex items-center gap-2">
+          <label class="text-sm text-gray-600">Time Range:</label>
+          <select
+            class="border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            [value]="selectedAggregation"
+            (change)="onAggregationChange($event)"
+          >
+            <option *ngFor="let agg of aggregations" [value]="agg.value">{{ agg.label }}</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Transaction Volume Section -->
+      <div class="bg-white rounded-lg shadow border border-gray-200 mb-8">
+        <div class="p-6 border-b border-gray-200">
+          <h2 class="text-lg font-semibold text-gray-900">Transaction Volume</h2>
+        </div>
+
+        <div class="p-6">
+          <!-- Charts Loading -->
+          <div *ngIf="chartsLoading" class="flex justify-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+
+          <!-- No Data State -->
+          <div *ngIf="!chartsLoading && transactionVolumeData.length === 0" class="text-center py-12 text-gray-500">
+            No transaction data available for the selected time range.
+          </div>
+
+          <!-- Transaction Volume Chart -->
+          <div *ngIf="!chartsLoading && transactionVolumeData.length > 0">
+            <canvas id="transactionVolumeChart" style="max-height: 400px;"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rule Outcomes Over Time Section -->
+      <div class="bg-white rounded-lg shadow border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+          <h2 class="text-lg font-semibold text-gray-900">Rule Outcomes Over Time</h2>
+        </div>
+
+        <div class="p-6">
+          <!-- Charts Loading -->
+          <div *ngIf="chartsLoading" class="flex justify-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+
+          <!-- No Data State -->
+          <div *ngIf="!chartsLoading && outcomeDatasets.length === 0" class="text-center py-12 text-gray-500">
+            No outcome data available for the selected time range.
+          </div>
+
+          <!-- Outcome Charts Grid -->
+          <div *ngIf="!chartsLoading && outcomeDatasets.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div *ngFor="let dataset of outcomeDatasets; let idx = index" class="bg-gray-50 rounded-lg border border-gray-200 p-4">
+              <h3 class="text-sm font-semibold text-center text-gray-700 mb-3">{{ dataset.label }}</h3>
+              <canvas [id]="'outcomeChart_' + idx" style="max-height: 300px;"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

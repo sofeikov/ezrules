@@ -1,6 +1,5 @@
 import datetime
 
-from flask_security import AsaList, RoleMixin, UserMixin
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -9,12 +8,69 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    UnicodeText,
+    types,
 )
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
 from ezrules.models.database import Base
-from ezrules.models.history_meta import Versioned
+
+
+class AsaList(types.TypeDecorator):
+    """Store a Python list as a comma-separated UnicodeText column.
+
+    Replaces flask_security.AsaList with an identical implementation.
+    """
+
+    impl = UnicodeText
+
+    def process_bind_param(self, value, dialect):
+        try:
+            return ",".join(value)
+        except TypeError:
+            return value
+
+    def process_result_value(self, value, dialect):
+        if value:
+            return value.split(",")
+        return []
+
+
+class RoleMixin:
+    """Mixin for Role model definitions.
+
+    Replaces flask_security.RoleMixin with the subset used by this application.
+    """
+
+    def __eq__(self, other):
+        return self.name == other or self.name == getattr(other, "name", None)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self.name)
+
+
+class UserMixin:
+    """Mixin for User model definitions.
+
+    Replaces flask_security.UserMixin with the subset used by this application.
+    """
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_active(self):
+        return self.active
+
+    def has_role(self, role):
+        if isinstance(role, str):
+            return role in (r.name for r in self.roles)
+        return role in self.roles
 
 
 class RolesUsers(Base):
@@ -92,18 +148,19 @@ class Organisation(Base):
         return f"ID:{self.o_id}, {self.name=}, {len(self.rules)=}"
 
 
-class RuleEngineConfig(Versioned, Base):
+class RuleEngineConfig(Base):
     __tablename__ = "rule_engine_config"
 
     re_id = Column(Integer, unique=True, primary_key=True)
     label = Column(String, nullable=False)
     config = Column(JSON, nullable=False)
+    version = Column(Integer, default=1, nullable=False)
 
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
     org: Mapped["Organisation"] = relationship(back_populates="re_configs")
 
 
-class Rule(Versioned, Base):
+class Rule(Base):
     __tablename__ = "rules"
 
     r_id: Mapped[int] = mapped_column(unique=True, primary_key=True)
@@ -111,6 +168,7 @@ class Rule(Versioned, Base):
     rid: Mapped[str] = mapped_column()
     logic: Mapped[str] = mapped_column()
     description: Mapped[str] = mapped_column()
+    version = Column(Integer, default=1, nullable=False)
 
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
     org: Mapped["Organisation"] = relationship(back_populates="rules")
@@ -221,10 +279,96 @@ class RuleBackTestingResult(Base):
     bt_id = Column(Integer, unique=True, primary_key=True)
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id", ondelete="CASCADE"))
     task_id = Column(String, nullable=False)
+    stored_logic = Column(String, nullable=True)
+    proposed_logic = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     rule: Mapped["Rule"] = relationship(back_populates="backtesting_results")
 
 
-RuleHistory = Rule.__history_mapper__.class_
-RuleEngineConfigHistory = RuleEngineConfig.__history_mapper__.class_
+class RuleHistory(Base):
+    __tablename__ = "rules_history"
+
+    r_id = Column(Integer, primary_key=True)
+    version = Column(Integer, primary_key=True)
+    rid = Column(String, nullable=False)
+    logic = Column(String, nullable=False)
+    description = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=True)
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
+
+
+class RuleEngineConfigHistory(Base):
+    __tablename__ = "rule_engine_config_history"
+
+    re_id = Column(Integer, primary_key=True)
+    version = Column(Integer, primary_key=True)
+    label = Column(String, nullable=False)
+    config = Column(JSON, nullable=False)
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
+
+
+class UserListHistory(Base):
+    __tablename__ = "user_list_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ul_id = Column(Integer, nullable=False)
+    list_name = Column(String, nullable=False)
+    action = Column(String, nullable=False)  # created, renamed, deleted, entry_added, entry_removed, entries_bulk_added
+    details = Column(String, nullable=True)  # e.g. old name, entry value, count
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
+
+
+class OutcomeHistory(Base):
+    __tablename__ = "outcome_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ao_id = Column(Integer, nullable=False)
+    outcome_name = Column(String, nullable=False)
+    action = Column(String, nullable=False)  # created, deleted
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
+
+
+class LabelHistory(Base):
+    __tablename__ = "label_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    el_id = Column(Integer, nullable=False)
+    label = Column(String, nullable=False)
+    action = Column(String, nullable=False)  # created, deleted
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
+
+
+class UserAccountHistory(Base):
+    __tablename__ = "user_account_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False)
+    user_email = Column(String, nullable=False)
+    action = Column(
+        String, nullable=False
+    )  # created, updated, deleted, activated, deactivated, role_assigned, role_removed
+    details = Column(String, nullable=True)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
+
+
+class RolePermissionHistory(Base):
+    __tablename__ = "role_permission_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    role_id = Column(Integer, nullable=False)
+    role_name = Column(String, nullable=False)
+    action = Column(String, nullable=False)  # created, updated, deleted, permissions_updated
+    details = Column(String, nullable=True)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
