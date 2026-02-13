@@ -18,6 +18,7 @@ export class AuditTrailPage {
   readonly userListHistoryAccordion: Locator;
   readonly outcomeHistoryAccordion: Locator;
   readonly labelHistoryAccordion: Locator;
+  readonly userAccountHistoryAccordion: Locator;
 
   // Section headings (inside accordion buttons)
   readonly ruleHistoryHeading: Locator;
@@ -25,6 +26,7 @@ export class AuditTrailPage {
   readonly userListHistoryHeading: Locator;
   readonly outcomeHistoryHeading: Locator;
   readonly labelHistoryHeading: Locator;
+  readonly userAccountHistoryHeading: Locator;
 
   // Tables (visible only when sections are expanded)
   readonly ruleHistoryTable: Locator;
@@ -32,6 +34,7 @@ export class AuditTrailPage {
   readonly userListHistoryTable: Locator;
   readonly outcomeHistoryTable: Locator;
   readonly labelHistoryTable: Locator;
+  readonly userAccountHistoryTable: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -46,6 +49,7 @@ export class AuditTrailPage {
     this.userListHistoryAccordion = page.locator('[data-testid="accordion-user-lists"]');
     this.outcomeHistoryAccordion = page.locator('[data-testid="accordion-outcomes"]');
     this.labelHistoryAccordion = page.locator('[data-testid="accordion-labels"]');
+    this.userAccountHistoryAccordion = page.locator('[data-testid="accordion-user-accounts"]');
 
     // Section headings
     this.ruleHistoryHeading = page.locator('h2:has-text("Rule History")');
@@ -53,6 +57,7 @@ export class AuditTrailPage {
     this.userListHistoryHeading = page.locator('h2:has-text("User List History")');
     this.outcomeHistoryHeading = page.locator('h2:has-text("Outcome History")');
     this.labelHistoryHeading = page.locator('h2:has-text("Label History")');
+    this.userAccountHistoryHeading = page.locator('h2:has-text("User Account History")');
 
     // Tables - scoped to parent sections via data-testid
     this.ruleHistoryTable = this.ruleHistoryAccordion.locator('..').locator('table');
@@ -60,6 +65,7 @@ export class AuditTrailPage {
     this.userListHistoryTable = this.userListHistoryAccordion.locator('..').locator('table');
     this.outcomeHistoryTable = this.outcomeHistoryAccordion.locator('..').locator('table');
     this.labelHistoryTable = this.labelHistoryAccordion.locator('..').locator('table');
+    this.userAccountHistoryTable = this.userAccountHistoryAccordion.locator('..').locator('table');
   }
 
   async goto() {
@@ -72,13 +78,14 @@ export class AuditTrailPage {
     await this.loadingSpinner.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
   }
 
-  async expandSection(section: 'rules' | 'config' | 'userLists' | 'outcomes' | 'labels') {
+  async expandSection(section: 'rules' | 'config' | 'userLists' | 'outcomes' | 'labels' | 'userAccounts') {
     const accordionMap = {
       rules: this.ruleHistoryAccordion,
       config: this.configHistoryAccordion,
       userLists: this.userListHistoryAccordion,
       outcomes: this.outcomeHistoryAccordion,
       labels: this.labelHistoryAccordion,
+      userAccounts: this.userAccountHistoryAccordion,
     };
     await accordionMap[section].click();
   }
@@ -149,6 +156,21 @@ export class AuditTrailPage {
 
   async getLabelHistoryColumnHeaders(): Promise<string[]> {
     const headers = this.labelHistoryTable.locator('thead th');
+    const count = await headers.count();
+    const result: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const text = await headers.nth(i).textContent();
+      if (text) result.push(text.trim());
+    }
+    return result;
+  }
+
+  async getUserAccountHistoryRowCount(): Promise<number> {
+    return await this.userAccountHistoryTable.locator('tbody tr').count();
+  }
+
+  async getUserAccountHistoryColumnHeaders(): Promise<string[]> {
+    const headers = this.userAccountHistoryTable.locator('thead th');
     const count = await headers.count();
     const result: string[] = [];
     for (let i = 0; i < count; i++) {

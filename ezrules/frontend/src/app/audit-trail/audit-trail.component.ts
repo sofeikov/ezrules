@@ -8,7 +8,8 @@ import {
   ConfigHistoryEntry,
   UserListHistoryEntry,
   OutcomeHistoryEntry,
-  LabelHistoryEntry
+  LabelHistoryEntry,
+  UserAccountHistoryEntry
 } from '../services/audit.service';
 
 @Component({
@@ -23,12 +24,14 @@ export class AuditTrailComponent implements OnInit {
   userListHistory: UserListHistoryEntry[] = [];
   outcomeHistory: OutcomeHistoryEntry[] = [];
   labelHistory: LabelHistoryEntry[] = [];
+  userAccountHistory: UserAccountHistoryEntry[] = [];
 
   ruleTotal: number = 0;
   configTotal: number = 0;
   userListTotal: number = 0;
   outcomeTotal: number = 0;
   labelTotal: number = 0;
+  userAccountTotal: number = 0;
 
   loading: boolean = true;
   error: string | null = null;
@@ -39,7 +42,8 @@ export class AuditTrailComponent implements OnInit {
     config: false,
     userLists: false,
     outcomes: false,
-    labels: false
+    labels: false,
+    userAccounts: false
   };
 
   constructor(private auditService: AuditService) {}
@@ -57,7 +61,7 @@ export class AuditTrailComponent implements OnInit {
     this.error = null;
 
     let loadCount = 0;
-    const totalLoads = 5;
+    const totalLoads = 6;
 
     const checkDone = () => {
       loadCount++;
@@ -122,6 +126,18 @@ export class AuditTrailComponent implements OnInit {
       },
       error: () => {
         this.error = 'Failed to load label history.';
+        this.loading = false;
+      }
+    });
+
+    this.auditService.getUserAccountHistory(100, 0).subscribe({
+      next: (response) => {
+        this.userAccountHistory = response.items;
+        this.userAccountTotal = response.total;
+        checkDone();
+      },
+      error: () => {
+        this.error = 'Failed to load user account history.';
         this.loading = false;
       }
     });

@@ -346,3 +346,17 @@ class LabelHistory(Base):
     action = Column(String, nullable=False)  # created, deleted
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
+
+
+class UserAccountHistory(Base):
+    __tablename__ = "user_account_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False)
+    user_email = Column(String, nullable=False)
+    action = Column(
+        String, nullable=False
+    )  # created, updated, deleted, activated, deactivated, role_assigned, role_removed
+    details = Column(String, nullable=True)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)

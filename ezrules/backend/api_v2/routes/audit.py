@@ -26,6 +26,8 @@ from ezrules.backend.api_v2.schemas.audit import (
     RuleEngineConfigHistoryEntry,
     RuleHistoryEntry,
     RulesAuditListResponse,
+    UserAccountAuditListResponse,
+    UserAccountHistoryEntry,
     UserListAuditListResponse,
     UserListHistoryEntry,
 )
@@ -37,6 +39,7 @@ from ezrules.models.backend_core import (
     RuleEngineConfigHistory,
     RuleHistory,
     User,
+    UserAccountHistory,
     UserListHistory,
 )
 
@@ -100,6 +103,19 @@ def label_history_to_response(history: LabelHistory) -> LabelHistoryEntry:
     )
 
 
+def user_account_history_to_response(history: UserAccountHistory) -> UserAccountHistoryEntry:
+    """Convert a user account history record to API response."""
+    return UserAccountHistoryEntry(
+        id=int(history.id),
+        user_id=int(history.user_id),
+        user_email=str(history.user_email),
+        action=str(history.action),
+        details=str(history.details) if history.details else None,
+        changed=history.changed if history.changed is not None else None,  # type: ignore[arg-type]
+        changed_by=str(history.changed_by) if history.changed_by else None,
+    )
+
+
 def config_history_to_response(history: RuleEngineConfigHistory) -> RuleEngineConfigHistoryEntry:
     """Convert a config history record to API response."""
     changed = history.changed if history.changed is not None else None
@@ -141,6 +157,7 @@ def get_audit_summary(
     total_user_list_actions = db.query(UserListHistory).count()
     total_outcome_actions = db.query(OutcomeHistory).count()
     total_label_actions = db.query(LabelHistory).count()
+    total_user_account_actions = db.query(UserAccountHistory).count()
 
     return AuditSummaryResponse(
         total_rule_versions=total_rule_versions,
@@ -150,6 +167,7 @@ def get_audit_summary(
         total_user_list_actions=total_user_list_actions,
         total_outcome_actions=total_outcome_actions,
         total_label_actions=total_label_actions,
+        total_user_account_actions=total_user_account_actions,
     )
 
 
@@ -393,6 +411,48 @@ def list_label_history(
     return LabelAuditListResponse(
         total=total,
         items=[label_history_to_response(h) for h in items],
+        limit=limit,
+        offset=offset,
+    )
+
+
+# =============================================================================
+# USER ACCOUNT HISTORY
+# =============================================================================
+
+
+@router.get("/users", response_model=UserAccountAuditListResponse)
+def list_user_account_history(
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    db: Any = Depends(get_db),
+    start_date: datetime | None = Query(default=None, description="Filter by start date"),
+    end_date: datetime | None = Query(default=None, description="Filter by end date"),
+    user_id: int | None = Query(default=None, description="Filter by target user ID"),
+    limit: int = Query(default=50, ge=1, le=100, description="Page size"),
+    offset: int = Query(default=0, ge=0, description="Offset"),
+) -> UserAccountAuditListResponse:
+    """
+    Get paginated user account action history.
+
+    Returns all user account changes with optional filtering.
+    Requires ACCESS_AUDIT_TRAIL permission.
+    """
+    query = db.query(UserAccountHistory)
+
+    if start_date:
+        query = query.filter(UserAccountHistory.changed >= start_date)
+    if end_date:
+        query = query.filter(UserAccountHistory.changed <= end_date)
+    if user_id is not None:
+        query = query.filter(UserAccountHistory.user_id == user_id)
+
+    total = query.count()
+    items = query.order_by(UserAccountHistory.changed.desc()).offset(offset).limit(limit).all()
+
+    return UserAccountAuditListResponse(
+        total=total,
+        items=[user_account_history_to_response(h) for h in items],
         limit=limit,
         offset=offset,
     )

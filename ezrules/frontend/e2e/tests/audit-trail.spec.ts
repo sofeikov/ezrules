@@ -41,7 +41,7 @@ test.describe('Audit Trail Page', () => {
   });
 
   test.describe('Accordion Sections', () => {
-    test('should display all five accordion sections', async () => {
+    test('should display all six accordion sections', async () => {
       await auditTrailPage.goto();
       await auditTrailPage.waitForPageToLoad();
       await expect(auditTrailPage.ruleHistoryHeading).toBeVisible();
@@ -49,6 +49,7 @@ test.describe('Audit Trail Page', () => {
       await expect(auditTrailPage.userListHistoryHeading).toBeVisible();
       await expect(auditTrailPage.outcomeHistoryHeading).toBeVisible();
       await expect(auditTrailPage.labelHistoryHeading).toBeVisible();
+      await expect(auditTrailPage.userAccountHistoryHeading).toBeVisible();
     });
 
     test('should toggle Rule History section on click', async () => {
@@ -242,6 +243,38 @@ test.describe('Audit Trail Page', () => {
         const headers = await auditTrailPage.getLabelHistoryColumnHeaders();
         expect(headers).toContain('Label');
         expect(headers).toContain('Action');
+        expect(headers).toContain('Changed By');
+        expect(headers).toContain('Changed');
+      }
+    });
+  });
+
+  test.describe('User Account History Section', () => {
+    test('should display the User Account History heading', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await expect(auditTrailPage.userAccountHistoryHeading).toBeVisible();
+    });
+
+    test('should toggle User Account History section on click', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await expect(auditTrailPage.userAccountHistoryTable).not.toBeVisible();
+      await auditTrailPage.expandSection('userAccounts');
+      const uaContent = auditTrailPage.userAccountHistoryAccordion.locator('..').locator('div').last();
+      await expect(uaContent).toBeVisible();
+    });
+
+    test('should display correct column headers for user account history', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await auditTrailPage.expandSection('userAccounts');
+      const rowCount = await auditTrailPage.getUserAccountHistoryRowCount();
+      if (rowCount > 0) {
+        const headers = await auditTrailPage.getUserAccountHistoryColumnHeaders();
+        expect(headers).toContain('Email');
+        expect(headers).toContain('Action');
+        expect(headers).toContain('Details');
         expect(headers).toContain('Changed By');
         expect(headers).toContain('Changed');
       }

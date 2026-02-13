@@ -151,6 +151,32 @@ class LabelAuditListResponse(BaseModel):
     offset: int = Field(..., description="Current offset")
 
 
+class UserAccountHistoryEntry(BaseModel):
+    """A single entry in user account history."""
+
+    id: int = Field(..., description="History entry ID")
+    user_id: int = Field(..., description="User ID")
+    user_email: str = Field(..., description="User email at the time of the action")
+    action: str = Field(
+        ...,
+        description="Action type (created, updated, deleted, activated, deactivated, role_assigned, role_removed)",
+    )
+    details: str | None = Field(default=None, description="Additional details about the action")
+    changed: datetime | None = Field(default=None, description="When this action occurred")
+    changed_by: str | None = Field(default=None, description="Who performed this action")
+
+    model_config = {"from_attributes": True}
+
+
+class UserAccountAuditListResponse(BaseModel):
+    """Paginated list of user account audit entries."""
+
+    total: int = Field(..., description="Total number of history entries")
+    items: list[UserAccountHistoryEntry] = Field(default_factory=list)
+    limit: int = Field(..., description="Page size")
+    offset: int = Field(..., description="Current offset")
+
+
 class AuditSummaryResponse(BaseModel):
     """Summary of audit trail data."""
 
@@ -161,3 +187,4 @@ class AuditSummaryResponse(BaseModel):
     total_user_list_actions: int = Field(default=0, description="Total user list history entries")
     total_outcome_actions: int = Field(default=0, description="Total outcome history entries")
     total_label_actions: int = Field(default=0, description="Total label history entries")
+    total_user_account_actions: int = Field(default=0, description="Total user account history entries")

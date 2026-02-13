@@ -85,6 +85,23 @@ export interface LabelAuditListResponse {
   offset: number;
 }
 
+export interface UserAccountHistoryEntry {
+  id: number;
+  user_id: number;
+  user_email: string;
+  action: string;
+  details: string | null;
+  changed: string | null;
+  changed_by: string | null;
+}
+
+export interface UserAccountAuditListResponse {
+  total: number;
+  items: UserAccountHistoryEntry[];
+  limit: number;
+  offset: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuditService {
   private auditUrl = `${environment.apiUrl}/api/v2/audit`;
@@ -124,5 +141,12 @@ export class AuditService {
       .set('limit', limit.toString())
       .set('offset', offset.toString());
     return this.http.get<LabelAuditListResponse>(`${this.auditUrl}/labels`, { params });
+  }
+
+  getUserAccountHistory(limit: number = 100, offset: number = 0): Observable<UserAccountAuditListResponse> {
+    const params = new HttpParams()
+      .set('limit', limit.toString())
+      .set('offset', offset.toString());
+    return this.http.get<UserAccountAuditListResponse>(`${this.auditUrl}/users`, { params });
   }
 }

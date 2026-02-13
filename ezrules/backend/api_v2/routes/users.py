@@ -27,6 +27,7 @@ from ezrules.backend.api_v2.schemas.users import (
     UsersListResponse,
     UserUpdate,
 )
+from ezrules.core.audit_helpers import save_user_account_history
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Role, User
 
@@ -190,6 +191,15 @@ def create_user(
     db.commit()
     db.refresh(new_user)
 
+    save_user_account_history(
+        db,
+        user_id=int(new_user.id),
+        user_email=str(new_user.email),
+        action="created",
+        changed_by=str(user.email),
+    )
+    db.commit()
+
     return UserMutationResponse(
         success=True,
         message="User created successfully",
@@ -232,6 +242,9 @@ def update_user(
             error="You cannot deactivate your own account",
         )
 
+    # Track changes for audit
+    changes: list[str] = []
+
     # Update email if provided
     if user_data.email is not None:
         # Check if email already exists for another user
@@ -242,18 +255,32 @@ def update_user(
                 message="Email already exists",
                 error=f"A user with email '{user_data.email}' already exists",
             )
+        changes.append(f"email changed to {user_data.email}")
         target_user.email = user_data.email
 
     # Update password if provided
     if user_data.password is not None:
         target_user.password = hash_password(user_data.password)
+        changes.append("password changed")
 
     # Update active status if provided
     if user_data.active is not None:
         target_user.active = user_data.active
+        changes.append(f"active set to {user_data.active}")
 
     db.commit()
     db.refresh(target_user)
+
+    if changes:
+        save_user_account_history(
+            db,
+            user_id=int(target_user.id),
+            user_email=str(target_user.email),
+            action="updated",
+            changed_by=str(user.email),
+            details="; ".join(changes),
+        )
+        db.commit()
 
     return UserMutationResponse(
         success=True,
@@ -295,6 +322,17 @@ def delete_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"User with id {user_id} not found",
         )
+
+    target_email = str(target_user.email)
+    target_id = int(target_user.id)
+
+    save_user_account_history(
+        db,
+        user_id=target_id,
+        user_email=target_email,
+        action="deleted",
+        changed_by=str(user.email),
+    )
 
     db.delete(target_user)
     db.commit()
@@ -352,6 +390,16 @@ def assign_role(
     db.commit()
     db.refresh(target_user)
 
+    save_user_account_history(
+        db,
+        user_id=int(target_user.id),
+        user_email=str(target_user.email),
+        action="role_assigned",
+        changed_by=str(user.email),
+        details=f"role: {role.name}",
+    )
+    db.commit()
+
     return RoleAssignmentResponse(
         success=True,
         message=f"Role '{role.name}' assigned successfully",
@@ -405,6 +453,16 @@ def remove_role(
     target_user.roles.remove(role)
     db.commit()
     db.refresh(target_user)
+
+    save_user_account_history(
+        db,
+        user_id=int(target_user.id),
+        user_email=str(target_user.email),
+        action="role_removed",
+        changed_by=str(user.email),
+        details=f"role: {role.name}",
+    )
+    db.commit()
 
     return RoleAssignmentResponse(
         success=True,
