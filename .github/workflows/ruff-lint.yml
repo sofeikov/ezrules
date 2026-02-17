@@ -22,12 +22,11 @@ jobs:
         enable-cache: true
     - name: Install dependencies
       run: uv sync --dev
+    - name: Check lockfile in sync
+      run: uv lock --locked
     - name: Check ruff formatting
       run: uv run ruff format --check ezrules
-      continue-on-error: true
     - name: Run ruff linter
       run: uv run ruff check ezrules
-      continue-on-error: true
     - name: Run ty type checker
       run: uv run ty check ezrules/
-      continue-on-error: true
