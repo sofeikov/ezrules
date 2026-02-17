@@ -3,8 +3,6 @@ name: Check version not on PyPI
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'pyproject.toml'
 
 jobs:
   check-version:
