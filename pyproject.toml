@@ -1,6 +1,6 @@
 [project]
 name = "ezrules"
-version = "0.11.3"
+version = "0.11.4"
 description = "Open-source transaction monitoring engine for business rules"
 authors = [{name = "Konstantin Sofeikov", email = "sofeykov@gmail.com"}]
 readme = "README.md"
