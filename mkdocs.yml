@@ -47,6 +47,9 @@ nav:
       - Integration Quickstart: getting-started/integration-quickstart.md
       - Configuration: getting-started/configuration.md
       - Troubleshooting: troubleshooting.md
+  - Blog:
+      - Overview: blog/index.md
+      - From Zero to Live Rule Evaluation: blog/zero-to-live-rule-evaluation.md
   - User Guide:
       - For Analysts: user-guide/analyst-guide.md
       - For Administrators: user-guide/admin-guide.md
