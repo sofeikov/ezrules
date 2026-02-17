@@ -1,6 +1,6 @@
 [project]
 name = "ezrules"
-version = "0.7.0"
+version = "0.11.1"
 description = "Open-source transaction monitoring engine for business rules"
 authors = [{name = "Konstantin Sofeikov", email = "sofeykov@gmail.com"}]
 readme = "README.md"
@@ -85,6 +85,7 @@ deprecated = "ignore"
 
 [tool.poe.tasks]
 check = [
+    {cmd = "uv lock --check"},
     {cmd = "ruff format --check ."},
     {cmd = "ty check ezrules"},
     {cmd = "ruff check ezrules"}

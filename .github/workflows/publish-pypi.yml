@@ -1,35 +1,67 @@
-name: Upload Python Package to PyPi
+name: Release and Publish to PyPI
 
 on:
-    release:
-      types: [published]
-
+  push:
+    branches: [main]
+    paths:
+      - 'pyproject.toml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  deploy:
+  release:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Extract version from pyproject.toml
+      id: version
+      run: |
+        VERSION=$(grep '^version = ' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "Detected version: $VERSION"
+
+    - name: Check if tag already exists
+      id: check_tag
+      run: |
+        if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+          echo "Tag v${{ steps.version.outputs.version }} already exists, skipping."
+        else
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+          echo "Tag v${{ steps.version.outputs.version }} does not exist, will create release."
+        fi
+
+
     - name: Set up Python
+      if: steps.check_tag.outputs.exists == 'false'
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
+
     - name: Install UV
+      if: steps.check_tag.outputs.exists == 'false'
       uses: astral-sh/setup-uv@v4
       with:
         enable-cache: true
-    - name: Extract version from tag
-      id: extract_version
-      run: |
-       echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-       echo ${TAG_NAME}
-    - name: Update version in pyproject.toml
-      run: |
-         sed -i "s/^version = .*/version = \"$TAG_NAME\"/" pyproject.toml
+
     - name: Build package
+      if: steps.check_tag.outputs.exists == 'false'
       run: uv build
-    - name: Publish package
+
+    - name: Create tag and GitHub release
+      if: steps.check_tag.outputs.exists == 'false'
+      run: |
+        gh release create "v${{ steps.version.outputs.version }}" \
+          --title "v${{ steps.version.outputs.version }}" \
+          --generate-notes \
+          dist/*
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Publish to PyPI
+      if: steps.check_tag.outputs.exists == 'false'
       run: uv publish --token ${{ secrets.PYPI_PUBLISH_TOKEN }}
