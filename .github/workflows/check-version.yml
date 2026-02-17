@@ -1,0 +1,34 @@
+name: Check version not on PyPI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'pyproject.toml'
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install UV
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: Extract version from pyproject.toml
+      id: version
+      run: |
+        VERSION=$(grep '^version = ' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "Proposed version: $VERSION"
+
+    - name: Fail if version already exists on PyPI
+      run: |
+        if uv pip install --dry-run "ezrules==${{ steps.version.outputs.version }}" 2>/dev/null; then
+          echo "::error::Version ${{ steps.version.outputs.version }} already exists on PyPI. Bump the version in pyproject.toml."
+          exit 1
+        else
+          echo "Version ${{ steps.version.outputs.version }} does not exist on PyPI. Good to go."
+        fi
