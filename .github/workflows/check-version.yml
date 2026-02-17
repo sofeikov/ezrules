@@ -24,7 +24,10 @@ jobs:
 
     - name: Fail if version already exists on PyPI
       run: |
-        if uv pip install --dry-run "ezrules==${{ steps.version.outputs.version }}" 2>/dev/null; then
+        TMPDIR=$(mktemp -d)
+        cd "$TMPDIR"
+        uv init --name check-version
+        if uv add "ezrules==${{ steps.version.outputs.version }}" 2>/dev/null; then
           echo "::error::Version ${{ steps.version.outputs.version }} already exists on PyPI. Bump the version in pyproject.toml."
           exit 1
         else
