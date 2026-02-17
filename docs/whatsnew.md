@@ -1,5 +1,9 @@
 # What's New
 
+## v0.11.2
+
+* **License metadata consolidated**: License declarations in project metadata and documentation are now aligned with the repository's `LICENSE` file. ezrules is documented and published under Apache License 2.0.
+
 ## v0.11
 
 * **Frontend authentication**: The Angular frontend now has full JWT authentication. Users must log in with email/password before accessing any page. Includes a login page, automatic token refresh, HTTP interceptor for attaching tokens to API requests, route guards that redirect unauthenticated users to login, and a Sign Out button in the sidebar. E2E tests use Playwright's global setup to authenticate once and share auth state across all tests.

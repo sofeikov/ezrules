@@ -83,4 +83,4 @@ ezrules provides building blocks to define rule-based decisions, evaluate live e
 
 - **GitHub**: [sofeikov/ezrules](https://github.com/sofeikov/ezrules)
 - **Issues**: [GitHub Issues](https://github.com/sofeikov/ezrules/issues)
-- **License**: [MIT License](https://github.com/sofeikov/ezrules/blob/main/LICENSE)
+- **License**: [Apache License 2.0](https://github.com/sofeikov/ezrules/blob/main/LICENSE)
