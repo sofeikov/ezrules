@@ -64,6 +64,7 @@ class TestRoleType:
             PermissionAction.VIEW_LISTS,
             PermissionAction.CREATE_LABEL,
             PermissionAction.VIEW_LABELS,
+            PermissionAction.VIEW_FIELD_TYPES,
         ]
         assert permissions == expected
 

@@ -398,7 +398,7 @@ class FieldObservation(Base):
     __tablename__ = "field_observation"
 
     field_name = Column(String, primary_key=True)
-    observed_json_type = Column(String, nullable=False)
+    observed_json_type = Column(String, primary_key=True)
     last_seen = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     occurrence_count = Column(Integer, default=1, nullable=False)
 
