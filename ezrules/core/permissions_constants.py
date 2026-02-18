@@ -45,6 +45,11 @@ class PermissionAction(Enum):
     DELETE_ROLE = "delete_role"
     MANAGE_PERMISSIONS = "manage_permissions"
 
+    # Field Type Management
+    VIEW_FIELD_TYPES = "view_field_types"
+    MODIFY_FIELD_TYPES = "modify_field_types"
+    DELETE_FIELD_TYPE = "delete_field_type"
+
     @classmethod
     def get_default_actions(cls):
         """Get list of (action_name, description, resource_type) tuples for initialization."""
@@ -76,6 +81,9 @@ class PermissionAction(Enum):
             (cls.MODIFY_ROLE.value, "Modify existing roles", "role"),
             (cls.DELETE_ROLE.value, "Delete roles", "role"),
             (cls.MANAGE_PERMISSIONS.value, "Manage role permissions", "permission"),
+            (cls.VIEW_FIELD_TYPES.value, "View field type configurations and observations", "field_type"),
+            (cls.MODIFY_FIELD_TYPES.value, "Create and update field type configurations", "field_type"),
+            (cls.DELETE_FIELD_TYPE.value, "Delete field type configurations", "field_type"),
         ]
 
 
@@ -107,6 +115,7 @@ class RoleType(Enum):
                 PermissionAction.VIEW_LISTS,
                 PermissionAction.CREATE_LABEL,
                 PermissionAction.VIEW_LABELS,
+                PermissionAction.VIEW_FIELD_TYPES,
             ]
         else:
             return []
