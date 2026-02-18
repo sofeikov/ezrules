@@ -1,5 +1,14 @@
 # What's New
 
+## v0.12
+
+* **Field type management**: ezrules now auto-discovers the JSON types of event fields by observing traffic through `/api/v2/evaluate` and the **Test Rule** panel. Operators can declare a canonical type for each field (`integer`, `float`, `string`, `boolean`, `datetime`, `compare_as_is`) under **Settings → Field Types**. Values are cast to the declared type before rule execution, so comparisons like `$amount > 500` behave correctly regardless of how values arrive in JSON.
+* **Per-type observation tracking**: field observations are recorded per `(field_name, observed_type)` pair, so if `amount` has been seen as both `int` and `str` you will see two separate rows with individual occurrence counts. This helps identify data quality issues upstream.
+* **Casting at evaluation and test time**: `/api/v2/evaluate` rejects requests with a `400` error when a value cannot be cast to the configured type. The **Test Rule** panel surfaces the same error inline, giving immediate feedback before deployment.
+* **Field type audit trail**: every create, update, and delete of a field type configuration is recorded in the audit trail. Accessible via **Audit Trail → Field Type History** in the UI or `GET /api/v2/audit/field-types`.
+* **New API endpoints**: `GET /api/v2/field-types`, `GET /api/v2/field-types/observations`, `POST /api/v2/field-types`, `PUT /api/v2/field-types/{field_name}`, `DELETE /api/v2/field-types/{field_name}`, `GET /api/v2/audit/field-types`.
+* **Sidebar Settings section**: the sidebar now groups **Role Management** and **Field Types** under a collapsible **Settings** section header.
+
 ## v0.11.2
 
 * **License metadata consolidated**: License declarations in project metadata and documentation are now aligned with the repository's `LICENSE` file. ezrules is documented and published under Apache License 2.0.

@@ -116,6 +116,16 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 | `POST` | `/api/v2/user-lists/{list_id}/entries/bulk` | Bearer + permission | Add entries in bulk |
 | `DELETE` | `/api/v2/user-lists/{list_id}/entries/{entry_id}` | Bearer + permission | Remove one entry |
 
+### Field Types
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/field-types` | Bearer + permission | List all configured field types |
+| `GET` | `/api/v2/field-types/observations` | Bearer + permission | List auto-discovered field observations |
+| `POST` | `/api/v2/field-types` | Bearer + permission | Create or update a field type config (upsert) |
+| `PUT` | `/api/v2/field-types/{field_name}` | Bearer + permission | Update type or datetime format for existing config |
+| `DELETE` | `/api/v2/field-types/{field_name}` | Bearer + permission | Delete a field type config |
+
 ### Audit
 
 | Method | Path | Auth | Notes |
@@ -129,6 +139,7 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 | `GET` | `/api/v2/audit/labels` | Bearer + permission | Label history |
 | `GET` | `/api/v2/audit/users` | Bearer + permission | User-account history (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/roles` | Bearer + permission | Role/permission history (`limit`, `offset`, filters) |
+| `GET` | `/api/v2/audit/field-types` | Bearer + permission | Field type config history (`limit`, `offset`, `field_name` filter) |
 
 ### Backtesting
 
