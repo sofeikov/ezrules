@@ -18,6 +18,8 @@ from ezrules.backend.api_v2.auth.dependencies import (
 from ezrules.backend.api_v2.schemas.audit import (
     AuditSummaryResponse,
     ConfigAuditListResponse,
+    FieldTypeAuditListResponse,
+    FieldTypeHistoryEntry,
     LabelAuditListResponse,
     LabelHistoryEntry,
     OutcomeAuditListResponse,
@@ -35,6 +37,7 @@ from ezrules.backend.api_v2.schemas.audit import (
 )
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
+    FieldTypeHistory,
     LabelHistory,
     OutcomeHistory,
     RolePermissionHistory,
@@ -133,6 +136,20 @@ def config_history_to_response(history: RuleEngineConfigHistory) -> RuleEngineCo
     )
 
 
+def field_type_history_to_response(history: FieldTypeHistory) -> FieldTypeHistoryEntry:
+    """Convert a field type history record to API response."""
+    return FieldTypeHistoryEntry(
+        id=int(history.id),
+        field_name=str(history.field_name),
+        configured_type=str(history.configured_type),
+        datetime_format=str(history.datetime_format) if history.datetime_format else None,
+        action=str(history.action),
+        details=str(history.details) if history.details else None,
+        changed=history.changed if history.changed is not None else None,  # type: ignore[arg-type]
+        changed_by=str(history.changed_by) if history.changed_by else None,
+    )
+
+
 def role_permission_history_to_response(history: RolePermissionHistory) -> RolePermissionHistoryEntry:
     """Convert a role permission history record to API response."""
     return RolePermissionHistoryEntry(
@@ -175,6 +192,7 @@ def get_audit_summary(
     total_label_actions = db.query(LabelHistory).count()
     total_user_account_actions = db.query(UserAccountHistory).count()
     total_role_permission_actions = db.query(RolePermissionHistory).count()
+    total_field_type_actions = db.query(FieldTypeHistory).count()
 
     return AuditSummaryResponse(
         total_rule_versions=total_rule_versions,
@@ -186,6 +204,7 @@ def get_audit_summary(
         total_label_actions=total_label_actions,
         total_user_account_actions=total_user_account_actions,
         total_role_permission_actions=total_role_permission_actions,
+        total_field_type_actions=total_field_type_actions,
     )
 
 
@@ -513,6 +532,48 @@ def list_role_permission_history(
     return RolePermissionAuditListResponse(
         total=total,
         items=[role_permission_history_to_response(h) for h in items],
+        limit=limit,
+        offset=offset,
+    )
+
+
+# =============================================================================
+# FIELD TYPE HISTORY
+# =============================================================================
+
+
+@router.get("/field-types", response_model=FieldTypeAuditListResponse)
+def list_field_type_history(
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    db: Any = Depends(get_db),
+    start_date: datetime | None = Query(default=None, description="Filter by start date"),
+    end_date: datetime | None = Query(default=None, description="Filter by end date"),
+    field_name: str | None = Query(default=None, description="Filter by field name"),
+    limit: int = Query(default=50, ge=1, le=100, description="Page size"),
+    offset: int = Query(default=0, ge=0, description="Offset"),
+) -> FieldTypeAuditListResponse:
+    """
+    Get paginated field type config action history.
+
+    Returns all field type configuration changes with optional filtering.
+    Requires ACCESS_AUDIT_TRAIL permission.
+    """
+    query = db.query(FieldTypeHistory)
+
+    if start_date:
+        query = query.filter(FieldTypeHistory.changed >= start_date)
+    if end_date:
+        query = query.filter(FieldTypeHistory.changed <= end_date)
+    if field_name is not None:
+        query = query.filter(FieldTypeHistory.field_name == field_name)
+
+    total = query.count()
+    items = query.order_by(FieldTypeHistory.changed.desc()).offset(offset).limit(limit).all()
+
+    return FieldTypeAuditListResponse(
+        total=total,
+        items=[field_type_history_to_response(h) for h in items],
         limit=limit,
         offset=offset,
     )

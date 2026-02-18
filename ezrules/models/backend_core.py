@@ -372,3 +372,52 @@ class RolePermissionHistory(Base):
     details = Column(String, nullable=True)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
+
+
+class FieldTypeHistory(Base):
+    __tablename__ = "field_type_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    field_name = Column(String, nullable=False)
+    configured_type = Column(String, nullable=False)
+    datetime_format = Column(String, nullable=True)
+    action = Column(String, nullable=False)  # created, updated, deleted
+    details = Column(String, nullable=True)
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
+
+
+class FieldTypeConfig(Base):
+    __tablename__ = "field_type_config"
+
+    field_name = Column(String, primary_key=True)
+    configured_type = Column(String, nullable=False)
+    datetime_format = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.UTC),
+        onupdate=lambda: datetime.datetime.now(datetime.UTC),
+    )
+
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), primary_key=True)
+    org: Mapped["Organisation"] = relationship()
+
+    def __repr__(self) -> str:
+        return f"FieldTypeConfig({self.field_name!r}, {self.configured_type!r}, o_id={self.o_id})"
+
+
+class FieldObservation(Base):
+    __tablename__ = "field_observation"
+
+    field_name = Column(String, primary_key=True)
+    observed_json_type = Column(String, primary_key=True)
+    last_seen = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    occurrence_count = Column(Integer, default=1, nullable=False)
+
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), primary_key=True)
+    org: Mapped["Organisation"] = relationship()
+
+    def __repr__(self) -> str:
+        return f"FieldObservation({self.field_name!r}, {self.observed_json_type!r}, count={self.occurrence_count}, o_id={self.o_id})"

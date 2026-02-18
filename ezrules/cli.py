@@ -14,6 +14,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 
 from ezrules.backend.data_utils import Event, eval_and_store
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
+from ezrules.backend.utils import record_observations
 from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import RoleType
@@ -384,6 +385,7 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
 
         # Evaluate the event against the rules and store the results
         response = eval_and_store(lre, event)
+        record_observations(db_session, event_data, 1)
         print(f"Evaluated Event {e_ind}: {response}")
 
     # Enhanced labeling logic

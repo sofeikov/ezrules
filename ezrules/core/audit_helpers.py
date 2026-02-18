@@ -9,6 +9,7 @@ or after the mutation, depending on the action type.
 import datetime
 
 from ezrules.models.backend_core import (
+    FieldTypeHistory,
     LabelHistory,
     OutcomeHistory,
     RolePermissionHistory,
@@ -91,6 +92,30 @@ def save_user_account_history(
         user_email=user_email,
         action=action,
         details=details,
+        changed=datetime.datetime.now(datetime.UTC),
+        changed_by=changed_by,
+    )
+    db.add(history)
+
+
+def save_field_type_history(
+    db,
+    field_name: str,
+    configured_type: str,
+    action: str,
+    o_id: int,
+    changed_by: str | None = None,
+    details: str | None = None,
+    datetime_format: str | None = None,
+) -> None:
+    """Record an audit entry for a field type config action."""
+    history = FieldTypeHistory(
+        field_name=field_name,
+        configured_type=configured_type,
+        datetime_format=datetime_format,
+        action=action,
+        details=details,
+        o_id=o_id,
         changed=datetime.datetime.now(datetime.UTC),
         changed_by=changed_by,
     )

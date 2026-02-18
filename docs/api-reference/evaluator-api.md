@@ -59,11 +59,26 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
 }
 ```
 
+#### Field Type Casting
+
+Before rules are executed, `event_data` values are cast to their configured types (see [Field Type Management](../user-guide/field-types.md)). Unconfigured fields pass through unchanged.
+
+If a value cannot be cast to the configured type, the request is rejected with `400`:
+
+```json
+{
+  "detail": "Cannot cast field 'amount' value 'not-a-number' to integer"
+}
+```
+
+Field observations are also recorded on each successful call, contributing to the **Observed Fields** data visible in the UI.
+
 #### Status Codes
 
 | Status | Meaning |
 |---|---|
 | `200` | Evaluation completed |
+| `400` | Field type casting failed (value incompatible with configured type) |
 | `422` | Invalid request payload (schema/validation error) |
 | `500` | Evaluation failed during execution/storage |
 

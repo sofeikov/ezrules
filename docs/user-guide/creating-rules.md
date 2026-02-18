@@ -49,6 +49,10 @@ Checkpoint:
    - one payload that should trigger
    - one payload that should not trigger
 
+!!! tip "Type casting in Test Rule"
+    The **Test Rule** panel applies the same field type casting as live evaluation. If you have configured field types (under **Settings → Field Types**), values will be cast before the rule runs. Test JSON also contributes to field observations, helping you discover which types your fields carry.
+    See [Field Type Management](field-types.md) for details.
+
 Example payload:
 
 ```json
@@ -166,6 +170,7 @@ For broader incident diagnostics, use [Troubleshooting](../troubleshooting.md).
 
 ## Next Steps
 
+- **[Field Type Management](field-types.md)** - ensure fields are compared with the right types
 - **[Labels and Lists](labels-and-lists.md)** - tune decision quality with labels and reusable lists
 - **[Analyst Guide](analyst-guide.md)** - end-to-end analyst workflow
 - **[Monitoring & Analytics](monitoring.md)** - validate production behavior

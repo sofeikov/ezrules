@@ -20,6 +20,7 @@ export class AuditTrailPage {
   readonly labelHistoryAccordion: Locator;
   readonly userAccountHistoryAccordion: Locator;
   readonly rolePermissionHistoryAccordion: Locator;
+  readonly fieldTypeHistoryAccordion: Locator;
 
   // Section headings (inside accordion buttons)
   readonly ruleHistoryHeading: Locator;
@@ -29,6 +30,7 @@ export class AuditTrailPage {
   readonly labelHistoryHeading: Locator;
   readonly userAccountHistoryHeading: Locator;
   readonly rolePermissionHistoryHeading: Locator;
+  readonly fieldTypeHistoryHeading: Locator;
 
   // Tables (visible only when sections are expanded)
   readonly ruleHistoryTable: Locator;
@@ -38,6 +40,7 @@ export class AuditTrailPage {
   readonly labelHistoryTable: Locator;
   readonly userAccountHistoryTable: Locator;
   readonly rolePermissionHistoryTable: Locator;
+  readonly fieldTypeHistoryTable: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -54,6 +57,7 @@ export class AuditTrailPage {
     this.labelHistoryAccordion = page.locator('[data-testid="accordion-labels"]');
     this.userAccountHistoryAccordion = page.locator('[data-testid="accordion-user-accounts"]');
     this.rolePermissionHistoryAccordion = page.locator('[data-testid="accordion-role-permissions"]');
+    this.fieldTypeHistoryAccordion = page.locator('[data-testid="accordion-field-types"]');
 
     // Section headings
     this.ruleHistoryHeading = page.locator('h2:has-text("Rule History")');
@@ -63,6 +67,7 @@ export class AuditTrailPage {
     this.labelHistoryHeading = page.locator('h2:has-text("Label History")');
     this.userAccountHistoryHeading = page.locator('h2:has-text("User Account History")');
     this.rolePermissionHistoryHeading = page.locator('h2:has-text("Role & Permission History")');
+    this.fieldTypeHistoryHeading = page.locator('h2:has-text("Field Type History")');
 
     // Tables - scoped to parent sections via data-testid
     this.ruleHistoryTable = this.ruleHistoryAccordion.locator('..').locator('table');
@@ -72,6 +77,7 @@ export class AuditTrailPage {
     this.labelHistoryTable = this.labelHistoryAccordion.locator('..').locator('table');
     this.userAccountHistoryTable = this.userAccountHistoryAccordion.locator('..').locator('table');
     this.rolePermissionHistoryTable = this.rolePermissionHistoryAccordion.locator('..').locator('table');
+    this.fieldTypeHistoryTable = this.fieldTypeHistoryAccordion.locator('..').locator('table');
   }
 
   async goto() {
@@ -84,7 +90,7 @@ export class AuditTrailPage {
     await this.loadingSpinner.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
   }
 
-  async expandSection(section: 'rules' | 'config' | 'userLists' | 'outcomes' | 'labels' | 'userAccounts' | 'rolePermissions') {
+  async expandSection(section: 'rules' | 'config' | 'userLists' | 'outcomes' | 'labels' | 'userAccounts' | 'rolePermissions' | 'fieldTypes') {
     const accordionMap = {
       rules: this.ruleHistoryAccordion,
       config: this.configHistoryAccordion,
@@ -93,6 +99,7 @@ export class AuditTrailPage {
       labels: this.labelHistoryAccordion,
       userAccounts: this.userAccountHistoryAccordion,
       rolePermissions: this.rolePermissionHistoryAccordion,
+      fieldTypes: this.fieldTypeHistoryAccordion,
     };
     await accordionMap[section].click();
   }
@@ -193,6 +200,21 @@ export class AuditTrailPage {
 
   async getRolePermissionHistoryColumnHeaders(): Promise<string[]> {
     const headers = this.rolePermissionHistoryTable.locator('thead th');
+    const count = await headers.count();
+    const result: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const text = await headers.nth(i).textContent();
+      if (text) result.push(text.trim());
+    }
+    return result;
+  }
+
+  async getFieldTypeHistoryRowCount(): Promise<number> {
+    return await this.fieldTypeHistoryTable.locator('tbody tr').count();
+  }
+
+  async getFieldTypeHistoryColumnHeaders(): Promise<string[]> {
+    const headers = this.fieldTypeHistoryTable.locator('thead th');
     const count = await headers.count();
     const result: string[] = [];
     for (let i = 0; i < count; i++) {

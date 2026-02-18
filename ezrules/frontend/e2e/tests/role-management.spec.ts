@@ -30,7 +30,7 @@ test.describe('Role Management Page', () => {
 
     test('should be reachable from sidebar navigation', async ({ page }) => {
       await page.goto('/rules');
-      const settingsLink = page.locator('a:has-text("Settings")');
+      const settingsLink = page.locator('a:has-text("Role Management")');
       await expect(settingsLink).toBeVisible();
       await settingsLink.click();
       await expect(page).toHaveURL(/.*role_management/);

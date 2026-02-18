@@ -32,6 +32,7 @@ from ezrules.backend.api_v2.schemas.rules import (
     RuleVerifyRequest,
     RuleVerifyResponse,
 )
+from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import Rule, RuleFactory
 from ezrules.core.rule_updater import (
@@ -39,6 +40,7 @@ from ezrules.core.rule_updater import (
     RDBRuleManager,
     save_rule_history,
 )
+from ezrules.core.type_casting import CastError, cast_event
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.backend_core import User
 from ezrules.settings import app_settings
@@ -430,11 +432,13 @@ def test_rule(
     request: RuleTestRequest,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    db: Any = Depends(get_db),
 ) -> RuleTestResponse:
     """
     Test rule execution against sample data.
 
     Compiles the rule and executes it against the provided test JSON.
+    Applies configured field type casting before execution.
     Returns the rule outcome (True/False) if successful, or an error message.
 
     This does NOT save the rule - it's just for testing.
@@ -446,6 +450,20 @@ def test_rule(
         return RuleTestResponse(
             status="error",
             reason="Example is malformed",
+            rule_outcome=None,
+        )
+
+    # Record field observations from the raw test JSON (pre-cast types)
+    record_observations(db, test_object, app_settings.ORG_ID)
+
+    # Apply field type casting
+    configs = load_cast_configs(db, app_settings.ORG_ID)
+    try:
+        test_object = cast_event(test_object, configs)
+    except CastError as exc:
+        return RuleTestResponse(
+            status="error",
+            reason=f"Type casting failed: {exc!s}",
             rule_outcome=None,
         )
 

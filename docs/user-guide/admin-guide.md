@@ -111,10 +111,12 @@ Use audit endpoints during incident review or compliance checks:
 - `GET /api/v2/audit/labels`
 - `GET /api/v2/audit/users`
 - `GET /api/v2/audit/roles`
+- `GET /api/v2/audit/field-types`
 
-Operational tip:
+Operational tips:
 
 - Capture `changed_by` values and timestamps when preparing incident timelines
+- Field type changes affect rule evaluation behavior; review `GET /api/v2/audit/field-types` when investigating unexpected rule outcomes
 
 ---
 

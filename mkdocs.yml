@@ -55,6 +55,7 @@ nav:
       - For Administrators: user-guide/admin-guide.md
       - Creating Rules: user-guide/creating-rules.md
       - Labels and Lists: user-guide/labels-and-lists.md
+      - Field Type Management: user-guide/field-types.md
       - Monitoring & Analytics: user-guide/monitoring.md
   - API Reference:
       - Evaluator API: api-reference/evaluator-api.md

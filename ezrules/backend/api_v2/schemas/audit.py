@@ -200,6 +200,30 @@ class RolePermissionAuditListResponse(BaseModel):
     offset: int = Field(..., description="Current offset")
 
 
+class FieldTypeHistoryEntry(BaseModel):
+    """A single entry in field type config history."""
+
+    id: int = Field(..., description="History entry ID")
+    field_name: str = Field(..., description="Field name")
+    configured_type: str = Field(..., description="The configured type at the time of the action")
+    datetime_format: str | None = Field(default=None, description="Datetime format string, if applicable")
+    action: str = Field(..., description="Action type (created, updated, deleted)")
+    details: str | None = Field(default=None, description="Additional details about the action")
+    changed: datetime | None = Field(default=None, description="When this action occurred")
+    changed_by: str | None = Field(default=None, description="Who performed this action")
+
+    model_config = {"from_attributes": True}
+
+
+class FieldTypeAuditListResponse(BaseModel):
+    """Paginated list of field type config audit entries."""
+
+    total: int = Field(..., description="Total number of history entries")
+    items: list[FieldTypeHistoryEntry] = Field(default_factory=list)
+    limit: int = Field(..., description="Page size")
+    offset: int = Field(..., description="Current offset")
+
+
 class AuditSummaryResponse(BaseModel):
     """Summary of audit trail data."""
 
@@ -212,3 +236,4 @@ class AuditSummaryResponse(BaseModel):
     total_label_actions: int = Field(default=0, description="Total label history entries")
     total_user_account_actions: int = Field(default=0, description="Total user account history entries")
     total_role_permission_actions: int = Field(default=0, description="Total role permission history entries")
+    total_field_type_actions: int = Field(default=0, description="Total field type config history entries")
