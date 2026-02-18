@@ -1,0 +1,186 @@
+<div class="flex min-h-screen bg-gray-50">
+  <!-- Sidebar -->
+  <app-sidebar></app-sidebar>
+
+  <!-- Main Content -->
+  <div class="ml-64 flex-1">
+    <div class="p-8">
+
+      <!-- Header -->
+      <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Field Types</h1>
+        <p class="text-gray-600 mt-1">
+          Configure how event fields are cast before rule evaluation. Observed fields are discovered automatically from incoming events.
+        </p>
+      </div>
+
+      <!-- Loading State -->
+      <div *ngIf="loading" class="flex justify-center items-center py-20">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+
+      <!-- Error State -->
+      <div *ngIf="error && !loading" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="text-sm font-medium text-red-800">{{ error }}</p>
+        </div>
+      </div>
+
+      <div *ngIf="!loading && !error">
+
+        <!-- ================================================================
+             SECTION 1: Configure a field type
+             ================================================================ -->
+        <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Configure Field Type</h2>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+            <div class="md:col-span-1">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Field name</label>
+              <input
+                id="field-name-input"
+                type="text"
+                [(ngModel)]="newFieldName"
+                placeholder="e.g. amount"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div class="md:col-span-1">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Type</label>
+              <select
+                [(ngModel)]="newConfiguredType"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option *ngFor="let t of fieldTypeOptions" [value]="t">{{ t }}</option>
+              </select>
+            </div>
+            <div class="md:col-span-1" *ngIf="newConfiguredType === 'datetime'">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Datetime format (optional)</label>
+              <input
+                type="text"
+                [(ngModel)]="newDatetimeFormat"
+                placeholder="%Y-%m-%d"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div [class.md:col-span-1]="newConfiguredType === 'datetime'" [class.md:col-span-2]="newConfiguredType !== 'datetime'">
+              <button
+                (click)="createConfig()"
+                class="w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+          <div *ngIf="createError" class="mt-3 text-sm text-red-600">{{ createError }}</div>
+        </div>
+
+        <!-- Delete error -->
+        <div *ngIf="deleteError" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p class="text-sm font-medium text-red-800">{{ deleteError }}</p>
+        </div>
+
+        <!-- ================================================================
+             SECTION 2: Configured fields table
+             ================================================================ -->
+        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden mb-8">
+          <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <h2 class="text-base font-semibold text-gray-900">
+              Configured Fields
+              <span class="ml-2 text-sm font-normal text-gray-500">({{ configs.length }})</span>
+            </h2>
+          </div>
+
+          <div *ngIf="configs.length === 0" class="text-center py-12">
+            <p class="text-sm text-gray-500">No fields configured yet. Use the form above to add one.</p>
+          </div>
+
+          <table *ngIf="configs.length > 0" class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Field</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Datetime format</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Updated</th>
+                <th class="px-6 py-3"></th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr *ngFor="let config of configs">
+                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ config.field_name }}</td>
+                <td class="px-6 py-4 text-sm text-gray-700">
+                  <span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-mono">{{ config.configured_type }}</span>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500 font-mono">{{ config.datetime_format || '—' }}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{ formatLastSeen(config.updated_at) }}</td>
+                <td class="px-6 py-4 text-right">
+                  <button
+                    (click)="deleteConfig(config.field_name)"
+                    class="px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ================================================================
+             SECTION 3: Observed fields table
+             ================================================================ -->
+        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <h2 class="text-base font-semibold text-gray-900">
+              Observed Fields
+              <span class="ml-2 text-sm font-normal text-gray-500">({{ observations.length }} type–field combinations)</span>
+            </h2>
+            <p class="text-xs text-gray-500 mt-1">
+              Collected automatically from event payloads. Click <strong>Configure</strong> to pre-fill the form above.
+            </p>
+          </div>
+
+          <div *ngIf="observations.length === 0" class="text-center py-12">
+            <p class="text-sm text-gray-500">No observations yet. Send events to <code>/api/v2/evaluate</code> to populate this list.</p>
+          </div>
+
+          <table *ngIf="observations.length > 0" class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Field</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Observed type</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Occurrences</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last seen</th>
+                <th class="px-6 py-3"></th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr *ngFor="let obs of observations" [class.bg-green-50]="isConfigured(obs.field_name)">
+                <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                  {{ obs.field_name }}
+                  <span *ngIf="isConfigured(obs.field_name)"
+                    class="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded">configured</span>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-700 font-mono">{{ obs.observed_json_type }}</td>
+                <td class="px-6 py-4 text-sm text-gray-700">{{ obs.occurrence_count }}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{ formatLastSeen(obs.last_seen) }}</td>
+                <td class="px-6 py-4 text-right">
+                  <button
+                    (click)="prefillFromObservation(obs)"
+                    class="px-3 py-1 text-sm border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
+                  >
+                    Configure
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div><!-- /!loading && !error -->
+    </div>
+  </div>
+</div>

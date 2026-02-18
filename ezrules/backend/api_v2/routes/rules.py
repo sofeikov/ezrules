@@ -32,7 +32,7 @@ from ezrules.backend.api_v2.schemas.rules import (
     RuleVerifyRequest,
     RuleVerifyResponse,
 )
-from ezrules.backend.utils import load_cast_configs
+from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import Rule, RuleFactory
 from ezrules.core.rule_updater import (
@@ -452,6 +452,9 @@ def test_rule(
             reason="Example is malformed",
             rule_outcome=None,
         )
+
+    # Record field observations from the raw test JSON (pre-cast types)
+    record_observations(db, test_object, app_settings.ORG_ID)
 
     # Apply field type casting
     configs = load_cast_configs(db, app_settings.ORG_ID)
