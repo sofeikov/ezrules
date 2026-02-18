@@ -374,6 +374,20 @@ class RolePermissionHistory(Base):
     changed_by = Column(String, nullable=True)
 
 
+class FieldTypeHistory(Base):
+    __tablename__ = "field_type_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    field_name = Column(String, nullable=False)
+    configured_type = Column(String, nullable=False)
+    datetime_format = Column(String, nullable=True)
+    action = Column(String, nullable=False)  # created, updated, deleted
+    details = Column(String, nullable=True)
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
+
+
 class FieldTypeConfig(Base):
     __tablename__ = "field_type_config"
 

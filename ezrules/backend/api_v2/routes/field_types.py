@@ -24,6 +24,7 @@ from ezrules.backend.api_v2.schemas.field_types import (
     FieldTypeConfigUpdate,
     FieldTypeMutationResponse,
 )
+from ezrules.core.audit_helpers import save_field_type_history
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import FieldObservation, FieldTypeConfig, User
 
@@ -86,6 +87,15 @@ def upsert_field_type_config(
     if existing:
         existing.configured_type = data.configured_type.value
         existing.datetime_format = data.datetime_format
+        save_field_type_history(
+            db,
+            field_name=data.field_name,
+            configured_type=data.configured_type.value,
+            action="updated",
+            o_id=_DEFAULT_O_ID,
+            changed_by=str(user.email),
+            datetime_format=data.datetime_format,
+        )
         db.commit()
         db.refresh(existing)
         return FieldTypeMutationResponse(
@@ -101,6 +111,15 @@ def upsert_field_type_config(
         o_id=_DEFAULT_O_ID,
     )
     db.add(new_config)
+    save_field_type_history(
+        db,
+        field_name=data.field_name,
+        configured_type=data.configured_type.value,
+        action="created",
+        o_id=_DEFAULT_O_ID,
+        changed_by=str(user.email),
+        datetime_format=data.datetime_format,
+    )
     db.commit()
     db.refresh(new_config)
 
@@ -139,6 +158,15 @@ def update_field_type_config(
 
     config.configured_type = data.configured_type.value
     config.datetime_format = data.datetime_format
+    save_field_type_history(
+        db,
+        field_name=field_name,
+        configured_type=data.configured_type.value,
+        action="updated",
+        o_id=_DEFAULT_O_ID,
+        changed_by=str(user.email),
+        datetime_format=data.datetime_format,
+    )
     db.commit()
     db.refresh(config)
 
@@ -174,6 +202,15 @@ def delete_field_type_config(
             detail=f"No config found for field '{field_name}'",
         )
 
+    save_field_type_history(
+        db,
+        field_name=field_name,
+        configured_type=str(config.configured_type),
+        action="deleted",
+        o_id=_DEFAULT_O_ID,
+        changed_by=str(user.email),
+        datetime_format=str(config.datetime_format) if config.datetime_format else None,
+    )
     db.delete(config)
     db.commit()
 

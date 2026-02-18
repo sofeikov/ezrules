@@ -14,6 +14,16 @@ from ezrules.settings import app_settings
 app = Celery("tasks", backend=f"db+{app_settings.DB_ENDPOINT}", broker=app_settings.CELERY_BROKER_URL)
 
 
+def count_rule_outcomes(rule: Rule, test_records: list[TestingRecordLog]) -> dict[str, int]:
+    """Count non-None outcomes produced by rule across a list of test records."""
+    result: Counter[str] = Counter()
+    for record in test_records:
+        outcome = rule(record.event)
+        if outcome is not None:
+            result[str(outcome)] += 1
+    return dict(result)
+
+
 @app.task
 def backtest_rule_change(r_id: int, new_rule_logic: str):
     rule_obj = db_session.get(RuleModel, r_id)

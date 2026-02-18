@@ -119,6 +119,24 @@ export interface RolePermissionAuditListResponse {
   offset: number;
 }
 
+export interface FieldTypeHistoryEntry {
+  id: number;
+  field_name: string;
+  configured_type: string;
+  datetime_format: string | null;
+  action: string;
+  details: string | null;
+  changed: string | null;
+  changed_by: string | null;
+}
+
+export interface FieldTypeAuditListResponse {
+  total: number;
+  items: FieldTypeHistoryEntry[];
+  limit: number;
+  offset: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuditService {
   private auditUrl = `${environment.apiUrl}/api/v2/audit`;
@@ -172,5 +190,12 @@ export class AuditService {
       .set('limit', limit.toString())
       .set('offset', offset.toString());
     return this.http.get<RolePermissionAuditListResponse>(`${this.auditUrl}/roles`, { params });
+  }
+
+  getFieldTypeHistory(limit: number = 100, offset: number = 0): Observable<FieldTypeAuditListResponse> {
+    const params = new HttpParams()
+      .set('limit', limit.toString())
+      .set('offset', offset.toString());
+    return this.http.get<FieldTypeAuditListResponse>(`${this.auditUrl}/field-types`, { params });
   }
 }
