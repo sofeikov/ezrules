@@ -64,8 +64,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: "20"
-        cache: npm
-        cache-dependency-path: ezrules/frontend/package-lock.json
 
     - name: Install frontend dependencies
       working-directory: ezrules/frontend
