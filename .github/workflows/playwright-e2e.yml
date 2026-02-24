@@ -31,6 +31,11 @@ jobs:
         image: redis:7
         ports:
           - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     env:
       EZRULES_DB_ENDPOINT: postgresql://postgres:root@localhost:5432/tests
@@ -74,7 +79,9 @@ jobs:
       run: uv run ezrules reset-dev --n-rules 10 --n-events 100
 
     - name: Start API service
-      run: nohup uv run ezrules api --port 8888 > /tmp/ezrules-api.log 2>&1 &
+      run: |
+        nohup uv run ezrules api --port 8888 > /tmp/ezrules-api.log 2>&1 &
+        echo $! > /tmp/ezrules-api.pid
 
     - name: Wait for API service
       run: |
@@ -90,7 +97,9 @@ jobs:
 
     - name: Start frontend
       working-directory: ezrules/frontend
-      run: nohup npm start -- --host 0.0.0.0 > /tmp/ezrules-frontend.log 2>&1 &
+      run: |
+        nohup npm start -- --host 0.0.0.0 > /tmp/ezrules-frontend.log 2>&1 &
+        echo $! > /tmp/ezrules-frontend.pid
 
     - name: Wait for frontend
       run: |
@@ -116,3 +125,13 @@ jobs:
         path: |
           ezrules/frontend/playwright-report
           ezrules/frontend/test-results
+
+    - name: Stop background services
+      if: always()
+      run: |
+        if [ -f /tmp/ezrules-frontend.pid ]; then
+          kill "$(cat /tmp/ezrules-frontend.pid)" || true
+        fi
+        if [ -f /tmp/ezrules-api.pid ]; then
+          kill "$(cat /tmp/ezrules-api.pid)" || true
+        fi
