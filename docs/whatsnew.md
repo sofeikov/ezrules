@@ -2,7 +2,7 @@
 
 ## v0.13.1
 
-* **Packaging patch release**: bumped project version metadata and lockfile package entry to `0.13.1` to keep package existence checks aligned.
+* **New PR Playwright E2E workflow**: added a dedicated GitHub Actions workflow that runs single-threaded Playwright end-to-end tests for pull requests against `main`, including backend/frontend startup and report artifact upload.
 
 ## v0.12
 
