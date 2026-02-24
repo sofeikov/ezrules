@@ -10,6 +10,7 @@ from ezrules.models.backend_core import (
     RuleEngineConfig,
     RuleEngineConfigHistory,
     RuleHistory,
+    ShadowResultsLog,
 )
 from ezrules.models.backend_core import (
     Rule as RuleModel,
@@ -161,6 +162,121 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
             new_config = RuleEngineConfig(label="production", config=rules_json, o_id=self.o_id)
             self.db.add(new_config)
         self.db.commit()
+
+
+def deploy_rule_to_shadow(
+    db,
+    o_id: int,
+    rule_model: "RuleModel",
+    changed_by: str | None = None,
+    logic_override: str | None = None,
+    description_override: str | None = None,
+) -> None:
+    """Deploy a rule version to the shadow config for the given organisation.
+
+    Creates the shadow RuleEngineConfig if it does not yet exist.
+    Replaces any existing entry for the rule's r_id.
+    If logic_override or description_override are provided they are stored in
+    shadow instead of the values from rule_model (allowing draft logic to be
+    deployed without touching the rules table or production config).
+    """
+    rule_entry = {
+        "r_id": rule_model.r_id,
+        "rid": rule_model.rid,
+        "logic": logic_override if logic_override is not None else rule_model.logic,
+        "description": description_override if description_override is not None else rule_model.description,
+    }
+    try:
+        config_obj = (
+            db.query(RuleEngineConfig)
+            .where(
+                RuleEngineConfig.label == "shadow",
+                RuleEngineConfig.o_id == o_id,
+            )
+            .one()
+        )
+        save_config_history(db, config_obj, changed_by=changed_by)
+        # If this rule was already in shadow, clear its result history so stats
+        # reflect only the new version, not the previous one.
+        if any(r.get("r_id") == rule_model.r_id for r in config_obj.config):
+            db.query(ShadowResultsLog).filter(ShadowResultsLog.r_id == rule_model.r_id).delete()
+        existing = [r for r in config_obj.config if r.get("r_id") != rule_model.r_id]
+        existing.append(rule_entry)
+        config_obj.config = existing
+        config_obj.version += 1
+    except NoResultFound:
+        new_config = RuleEngineConfig(label="shadow", config=[rule_entry], o_id=o_id)
+        db.add(new_config)
+    db.commit()
+
+
+def remove_rule_from_shadow(db, o_id: int, r_id: int, changed_by: str | None = None) -> None:
+    """Remove a rule entry from the shadow config. No-op if not found."""
+    try:
+        config_obj = (
+            db.query(RuleEngineConfig)
+            .where(
+                RuleEngineConfig.label == "shadow",
+                RuleEngineConfig.o_id == o_id,
+            )
+            .one()
+        )
+    except NoResultFound:
+        return
+    save_config_history(db, config_obj, changed_by=changed_by)
+    config_obj.config = [r for r in config_obj.config if r.get("r_id") != r_id]
+    config_obj.version += 1
+    db.commit()
+
+
+def promote_shadow_rule_to_production(db, o_id: int, r_id: int, changed_by: str | None = None) -> None:
+    """Promote a rule from the shadow config into the production config.
+
+    Raises ValueError if the rule is not currently in shadow.
+    """
+    try:
+        shadow_config = (
+            db.query(RuleEngineConfig)
+            .where(
+                RuleEngineConfig.label == "shadow",
+                RuleEngineConfig.o_id == o_id,
+            )
+            .one()
+        )
+    except NoResultFound as exc:
+        raise ValueError(f"Rule {r_id} is not in shadow config (no shadow config exists)") from exc
+
+    shadow_entry = next((r for r in shadow_config.config if r.get("r_id") == r_id), None)
+    if shadow_entry is None:
+        raise ValueError(f"Rule {r_id} is not in shadow config")
+
+    # Update the rules table so the rule detail page reflects the promoted logic
+    rule = db.get(RuleModel, r_id)
+    if rule is not None:
+        save_rule_history(db, rule, changed_by=changed_by)
+        rule.logic = shadow_entry["logic"]
+        rule.description = shadow_entry["description"]
+        rule.version += 1
+
+    try:
+        prod_config = (
+            db.query(RuleEngineConfig)
+            .where(
+                RuleEngineConfig.label == "production",
+                RuleEngineConfig.o_id == o_id,
+            )
+            .one()
+        )
+        save_config_history(db, prod_config, changed_by=changed_by)
+        existing = [r for r in prod_config.config if r.get("r_id") != r_id]
+        existing.append(shadow_entry)
+        prod_config.config = existing
+        prod_config.version += 1
+    except NoResultFound:
+        new_prod = RuleEngineConfig(label="production", config=[shadow_entry], o_id=o_id)
+        db.add(new_prod)
+
+    remove_rule_from_shadow(db, o_id, r_id, changed_by=changed_by)
 
 
 RULE_MANAGERS = {

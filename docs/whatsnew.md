@@ -1,5 +1,15 @@
 # What's New
 
+## v0.13
+
+* **Shadow Rule Deployment**: Rules can now be deployed to a "shadow" environment that evaluates them against every incoming live event without affecting production outcomes. Shadow results are stored in a dedicated `shadow_results_log` table and never returned to callers. This complements backtesting (historical) with continuous live validation.
+* **Deploy to Shadow button**: In the Rule Detail edit panel, a new amber "Deploy to Shadow" button sends the current draft of the rule logic to the shadow config.
+* **Shadow Rules page**: A new **Shadow Rules** page (accessible from the sidebar) lists all rules currently in shadow, shows a summary of recent shadow outcomes, and provides per-rule "Promote to Production" and "Remove" actions.
+* **Promote to production**: Promoting a rule moves its logic from the shadow config into the production config in one atomic step, then clears it from shadow. Both the production and shadow rule executors are invalidated so they pick up the change on the next request.
+* **SHADOW badge**: Rules that have an active shadow version are annotated with an amber `SHADOW` badge in the Rule List and a "Shadow version active" badge in Rule Detail view mode.
+* **New API endpoints**: `POST /api/v2/rules/{id}/shadow`, `DELETE /api/v2/rules/{id}/shadow`, `POST /api/v2/rules/{id}/shadow/promote`, `GET /api/v2/shadow`, `GET /api/v2/shadow/results`.
+* **`in_shadow` field**: The `GET /api/v2/rules` response now includes `in_shadow: bool` on each rule item.
+
 ## v0.12
 
 * **Field type management**: ezrules now auto-discovers the JSON types of event fields by observing traffic through `/api/v2/evaluate` and the **Test Rule** panel. Operators can declare a canonical type for each field (`integer`, `float`, `string`, `boolean`, `datetime`, `compare_as_is`) under **Settings → Field Types**. Values are cast to the declared type before rule execution, so comparisons like `$amount > 500` behave correctly regardless of how values arrive in JSON.

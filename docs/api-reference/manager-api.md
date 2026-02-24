@@ -52,6 +52,16 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 | `POST` | `/api/v2/rules/verify` | Bearer + permission | Verify rule source and extracted params |
 | `POST` | `/api/v2/rules/test` | Bearer + permission | Test rule payload |
 | `GET` | `/api/v2/rules/{rule_id}/history` | Bearer + permission | Revision list |
+| `POST` | `/api/v2/rules/{rule_id}/shadow` | Bearer + `MODIFY_RULE` | Deploy rule to shadow |
+| `DELETE` | `/api/v2/rules/{rule_id}/shadow` | Bearer + `MODIFY_RULE` | Remove rule from shadow |
+| `POST` | `/api/v2/rules/{rule_id}/shadow/promote` | Bearer + `MODIFY_RULE` | Promote shadow rule to production |
+
+### Shadow
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/shadow` | Bearer + `VIEW_RULES` | Current shadow config (rules + version) |
+| `GET` | `/api/v2/shadow/results` | Bearer + `VIEW_RULES` | Recent shadow evaluation results (`?limit=50`) |
 
 ### Outcomes
 

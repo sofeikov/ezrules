@@ -32,17 +32,21 @@ from ezrules.backend.api_v2.schemas.rules import (
     RuleVerifyRequest,
     RuleVerifyResponse,
 )
+from ezrules.backend.api_v2.schemas.shadow import ShadowDeployRequest, ShadowDeployResponse
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import Rule, RuleFactory
 from ezrules.core.rule_updater import (
     RDBRuleEngineConfigProducer,
     RDBRuleManager,
+    deploy_rule_to_shadow,
+    promote_shadow_rule_to_production,
+    remove_rule_from_shadow,
     save_rule_history,
 )
 from ezrules.core.type_casting import CastError, cast_event
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import User
+from ezrules.models.backend_core import RuleEngineConfig, User
 from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/rules", tags=["Rules"])
@@ -102,6 +106,18 @@ def list_rules(
     rule_manager = get_rule_manager(db)
     rules = rule_manager.load_all_rules()
 
+    # Determine which rules are in shadow config
+    shadow_r_ids: set[int] = set()
+    try:
+        shadow_config = (
+            db.query(RuleEngineConfig)
+            .where(RuleEngineConfig.label == "shadow", RuleEngineConfig.o_id == app_settings.ORG_ID)
+            .one()
+        )
+        shadow_r_ids = {int(r["r_id"]) for r in shadow_config.config if "r_id" in r}
+    except Exception:
+        pass
+
     rules_data = [
         RuleListItem(
             r_id=int(rule.r_id),
@@ -109,6 +125,7 @@ def list_rules(
             description=str(rule.description),
             logic=str(rule.logic),
             created_at=rule.created_at,  # type: ignore[arg-type]
+            in_shadow=int(rule.r_id) in shadow_r_ids,
         )
         for rule in rules
     ]
@@ -491,3 +508,88 @@ def test_rule(
             reason=f"Rule execution failed: {e!s}",
             rule_outcome=None,
         )
+
+
+# =============================================================================
+# SHADOW DEPLOYMENT ENDPOINTS
+# =============================================================================
+
+
+@router.post("/{rule_id}/shadow", response_model=ShadowDeployResponse)
+def deploy_to_shadow(
+    rule_id: int,
+    request: ShadowDeployRequest = None,  # type: ignore[assignment]
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    db: Any = Depends(get_db),
+) -> ShadowDeployResponse:
+    """Deploy a rule to the shadow config for live observation.
+
+    If logic/description are provided in the request body they are stored in
+    shadow as-is (the rules table and production config are left unchanged).
+    This allows deploying a draft edit directly to shadow without saving to
+    production first.
+    """
+    from ezrules.backend.api_v2.routes import evaluator as evaluator_module
+
+    if request is None:
+        request = ShadowDeployRequest()
+
+    rule_manager = get_rule_manager(db)
+    rule = rule_manager.load_rule(rule_id)  # type: ignore[arg-type]
+    if rule is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
+
+    deploy_rule_to_shadow(
+        db,
+        o_id=app_settings.ORG_ID,
+        rule_model=rule,
+        changed_by=str(user.email),
+        logic_override=request.logic,
+        description_override=request.description,
+    )
+
+    # Invalidate shadow executor so it reloads on next request
+    evaluator_module._shadow_lre = None
+
+    return ShadowDeployResponse(success=True, message=f"Rule {rule.rid} deployed to shadow")
+
+
+@router.delete("/{rule_id}/shadow", response_model=ShadowDeployResponse)
+def remove_from_shadow(
+    rule_id: int,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    db: Any = Depends(get_db),
+) -> ShadowDeployResponse:
+    """Remove a rule from the shadow config."""
+    from ezrules.backend.api_v2.routes import evaluator as evaluator_module
+
+    remove_rule_from_shadow(db, o_id=app_settings.ORG_ID, r_id=rule_id, changed_by=str(user.email))
+
+    # Invalidate shadow executor so it reloads on next request
+    evaluator_module._shadow_lre = None
+
+    return ShadowDeployResponse(success=True, message=f"Rule {rule_id} removed from shadow")
+
+
+@router.post("/{rule_id}/shadow/promote", response_model=ShadowDeployResponse)
+def promote_to_production(
+    rule_id: int,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    db: Any = Depends(get_db),
+) -> ShadowDeployResponse:
+    """Promote a rule from shadow config into the production config."""
+    from ezrules.backend.api_v2.routes import evaluator as evaluator_module
+
+    try:
+        promote_shadow_rule_to_production(db, o_id=app_settings.ORG_ID, r_id=rule_id, changed_by=str(user.email))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+    # Invalidate both executors so they reload on next request
+    evaluator_module._lre = None
+    evaluator_module._shadow_lre = None
+
+    return ShadowDeployResponse(success=True, message=f"Rule {rule_id} promoted to production")

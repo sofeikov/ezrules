@@ -43,4 +43,4 @@ def eval_and_store(lre, event: Event):
         trl = TestingResultsLog(tl_id=tl.tl_id, r_id=r_id, rule_result=result)
         db_session.add(trl)
     db_session.commit()
-    return response
+    return response, tl.tl_id

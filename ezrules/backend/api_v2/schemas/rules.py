@@ -89,6 +89,7 @@ class RuleListItem(BaseModel):
     description: str
     logic: str
     created_at: datetime | None = None
+    in_shadow: bool = False
 
     model_config = {"from_attributes": True}
 

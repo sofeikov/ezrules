@@ -225,6 +225,16 @@ class TestingResultsLog(Base):
     testing_record: Mapped["TestingRecordLog"] = relationship(back_populates="testing_results")
 
 
+class ShadowResultsLog(Base):
+    __tablename__ = "shadow_results_log"
+
+    sr_id = Column(Integer, unique=True, primary_key=True)
+    tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id", ondelete="CASCADE"))
+    r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
+    rule_result = Column(String, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+
+
 class AllowedOutcome(Base):
     __tablename__ = "allowed_outcomes"
 

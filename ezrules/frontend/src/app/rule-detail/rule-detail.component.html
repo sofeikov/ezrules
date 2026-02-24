@@ -35,6 +35,26 @@
         </div>
       </div>
 
+      <!-- Shadow Deploy Success -->
+      <div *ngIf="shadowDeploySuccess && !loading" class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-amber-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="text-sm font-medium text-amber-800">Rule deployed to shadow successfully!</p>
+        </div>
+      </div>
+
+      <!-- Shadow Deploy Error -->
+      <div *ngIf="shadowDeployError && !loading" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="text-sm font-medium text-red-800">{{ shadowDeployError }}</p>
+        </div>
+      </div>
+
       <!-- Save Success Message -->
       <div *ngIf="saveSuccess && !loading" class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
         <div class="flex items-center">
@@ -65,17 +85,23 @@
           <!-- Rule Details Card -->
           <div class="bg-white border border-gray-200 rounded-lg p-6">
             <div class="flex justify-between items-center mb-4">
-              <h2 class="text-xl font-semibold text-gray-900">Rule Details</h2>
-              <button
-                *ngIf="!isEditMode && !isRevisionView"
-                (click)="toggleEditMode()"
-                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-              >
-                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                Edit Rule
-              </button>
+              <div class="flex items-center gap-3">
+                <h2 class="text-xl font-semibold text-gray-900">Rule Details</h2>
+                <span *ngIf="rule.in_shadow && !isRevisionView" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800" data-testid="shadow-active-badge">
+                  Shadow version active
+                </span>
+              </div>
+              <div *ngIf="!isEditMode && !isRevisionView" class="flex gap-2">
+                <button
+                  (click)="toggleEditMode()"
+                  class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                >
+                  <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit Rule
+                </button>
+              </div>
             </div>
 
             <!-- Save Error Message -->
@@ -142,13 +168,13 @@
               </div>
 
               <!-- Edit Mode Actions -->
-              <div *ngIf="isEditMode" class="flex gap-3 pt-4 border-t border-gray-200">
+              <div *ngIf="isEditMode" class="flex gap-3 pt-4 border-t border-gray-200 flex-wrap">
                 <button
                   (click)="saveRule()"
                   [disabled]="saving"
                   class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  <span *ngIf="!saving">Save Changes</span>
+                  <span *ngIf="!saving">Save to Production</span>
                   <span *ngIf="saving" class="flex items-center">
                     <svg class="animate-spin h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -156,6 +182,14 @@
                     </svg>
                     Saving...
                   </span>
+                </button>
+                <button
+                  (click)="openDeployToShadowDialog()"
+                  [disabled]="saving || deployingToShadow"
+                  class="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  data-testid="deploy-to-shadow-button"
+                >
+                  Deploy to Shadow
                 </button>
                 <button
                   (click)="cancelEdit()"
@@ -413,6 +447,60 @@
           Back to Rules
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Deploy to Shadow Confirmation Dialog -->
+<div *ngIf="showDeployToShadowDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" data-testid="deploy-shadow-dialog">
+  <div class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col">
+    <h3 class="text-lg font-semibold text-gray-900 mb-1">Deploy to Shadow</h3>
+
+    <p *ngIf="!shadowEntry" class="text-sm text-gray-600 mb-4">
+      No shadow version exists for this rule. The following logic will be deployed to shadow:
+    </p>
+    <p *ngIf="shadowEntry" class="text-sm text-gray-600 mb-4">
+      A shadow version is already running. The diff below shows what will change in shadow:
+    </p>
+
+    <!-- Diff / Logic display -->
+    <div class="border border-gray-200 rounded-lg overflow-auto flex-1 mb-6">
+      <!-- No existing shadow — just show full logic -->
+      <pre *ngIf="!shadowEntry" class="text-sm font-mono whitespace-pre-wrap break-all p-3 text-gray-800">{{ editedLogic }}</pre>
+
+      <!-- Existing shadow — show diff -->
+      <div *ngIf="shadowEntry">
+        <div class="px-3 py-2 bg-gray-50 border-b border-gray-200 flex gap-4 text-xs text-gray-500">
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-red-200"></span> Current shadow</span>
+          <span class="inline-flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-green-200"></span> Incoming</span>
+        </div>
+        <pre class="text-sm font-mono whitespace-pre-wrap break-all p-3"><span
+          *ngFor="let change of computeDeployDiff()"
+          [ngClass]="{
+            'bg-green-100 text-green-900 block': change.added,
+            'bg-red-100 text-red-900 line-through block': change.removed
+          }"
+        >{{ change.value }}</span></pre>
+      </div>
+    </div>
+
+    <div class="flex gap-3 justify-end">
+      <button
+        (click)="closeDeployToShadowDialog()"
+        [disabled]="deployingToShadow"
+        class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:cursor-not-allowed"
+      >
+        Cancel
+      </button>
+      <button
+        (click)="confirmDeployToShadow()"
+        [disabled]="deployingToShadow"
+        class="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+        data-testid="confirm-deploy-shadow-button"
+      >
+        <span *ngIf="!deployingToShadow">Deploy to Shadow</span>
+        <span *ngIf="deployingToShadow">Deploying...</span>
+      </button>
     </div>
   </div>
 </div>

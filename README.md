@@ -15,6 +15,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Database Integration**: PostgreSQL backend with SQLAlchemy ORM and full audit history
 - **Audit Trail**: Change tracking for rules, user lists, outcomes, labels, and field type configurations, with per-change user attribution
 - **Field Type Management**: Auto-discovers JSON field types from live traffic and test payloads; configurable type casting (integer, float, string, boolean, datetime) applied before rule evaluation so comparisons behave correctly regardless of how values arrive in JSON
+- **Shadow Deployment**: Deploy rules to a shadow environment that observes live traffic without affecting production outcomes; promote validated shadows to production in one step
 - **Backtesting**: Test rule changes against historical data before deployment
 - **CLI Tools**: Command-line interface for database management and realistic test data generation
 

@@ -29,6 +29,14 @@ import { AuthService } from '../services/auth.service';
           <span>Rules</span>
         </a>
 
+        <a href="/shadow-rules" [ngClass]="linkClasses('/shadow-rules')">
+          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          <span>Shadow Rules</span>
+        </a>
+
         <a href="/labels" [ngClass]="linkClasses('/labels')">
           <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5a2 2 0 012 2v13a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm7.75 4.25a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
