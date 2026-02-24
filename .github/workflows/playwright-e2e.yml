@@ -1,0 +1,135 @@
+name: Playwright E2E Tests
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: tests
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      EZRULES_DB_ENDPOINT: postgresql://postgres:root@localhost:5432/tests
+      EZRULES_TESTING: "true"
+      EZRULES_APP_SECRET: "test-secret"
+      EZRULES_ORG_ID: "1"
+      EZRULES_CELERY_BROKER_URL: redis://localhost:6379
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install UV
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: Install backend dependencies
+      run: uv sync --dev
+
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Install frontend dependencies
+      working-directory: ezrules/frontend
+      run: npm install
+
+    - name: Install Playwright browser
+      working-directory: ezrules/frontend
+      run: npx playwright install --with-deps chromium
+
+    - name: Seed test database
+      run: uv run ezrules reset-dev --n-rules 10 --n-events 100
+
+    - name: Start API service
+      run: |
+        nohup uv run ezrules api --port 8888 > /tmp/ezrules-api.log 2>&1 &
+        echo $! > /tmp/ezrules-api.pid
+
+    - name: Wait for API service
+      run: |
+        for i in {1..30}; do
+          if curl -fsS http://localhost:8888/docs > /dev/null; then
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "API did not become ready in time"
+        cat /tmp/ezrules-api.log || true
+        exit 1
+
+    - name: Start frontend
+      working-directory: ezrules/frontend
+      run: |
+        nohup npm start -- --host 0.0.0.0 > /tmp/ezrules-frontend.log 2>&1 &
+        echo $! > /tmp/ezrules-frontend.pid
+
+    - name: Wait for frontend
+      run: |
+        for i in {1..30}; do
+          if curl -fsS http://localhost:4200 > /dev/null; then
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "Frontend did not become ready in time"
+        cat /tmp/ezrules-frontend.log || true
+        exit 1
+
+    - name: Run Playwright tests (single-threaded)
+      working-directory: ezrules/frontend
+      run: npm run test:e2e -- --workers=1
+
+    - name: Upload Playwright report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-report
+        path: |
+          ezrules/frontend/playwright-report
+          ezrules/frontend/test-results
+
+    - name: Stop background services
+      if: always()
+      run: |
+        if [ -f /tmp/ezrules-frontend.pid ]; then
+          kill "$(cat /tmp/ezrules-frontend.pid)" || true
+        fi
+        if [ -f /tmp/ezrules-api.pid ]; then
+          kill "$(cat /tmp/ezrules-api.pid)" || true
+        fi
