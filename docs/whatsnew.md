@@ -1,5 +1,9 @@
 # What's New
 
+## v0.13.1
+
+* **Packaging patch release**: bumped project version metadata and lockfile package entry to `0.13.1` to keep package existence checks aligned.
+
 ## v0.12
 
 * **Field type management**: ezrules now auto-discovers the JSON types of event fields by observing traffic through `/api/v2/evaluate` and the **Test Rule** panel. Operators can declare a canonical type for each field (`integer`, `float`, `string`, `boolean`, `datetime`, `compare_as_is`) under **Settings → Field Types**. Values are cast to the declared type before rule execution, so comparisons like `$amount > 500` behave correctly regardless of how values arrive in JSON.
