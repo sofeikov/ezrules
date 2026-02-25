@@ -1,37 +1,57 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { test, expect } from '@playwright/test';
-import { RuleListPage } from '../pages/rule-list.page';
 import { RuleDetailPage } from '../pages/rule-detail.page';
 import { BacktestingPage } from '../pages/backtesting.page';
+
+const API_BASE = 'http://localhost:8888';
+
+/** Read the JWT access token from the saved auth state file. */
+function getAuthToken(): string {
+  const state = JSON.parse(readFileSync(join(__dirname, '../.auth/user.json'), 'utf-8'));
+  const origin = state.origins?.find((o: any) => o.origin === 'http://localhost:4200');
+  return origin?.localStorage?.find((e: any) => e.name === 'ezrules_access_token')?.value ?? '';
+}
 
 /**
  * E2E tests for the Backtesting functionality on the Rule Detail page.
  * Tests backtest button visibility, triggering backtests, and viewing results.
+ *
+ * Each test creates its own rule via the API and deletes it in afterEach,
+ * making tests fully independent and safe to run in parallel with other files.
  */
 
 test.describe('Backtesting Functionality', () => {
-  let ruleListPage: RuleListPage;
   let ruleDetailPage: RuleDetailPage;
   let backtestingPage: BacktestingPage;
   let testRuleId: number;
 
-  test.beforeEach(async ({ page }) => {
-    ruleListPage = new RuleListPage(page);
+  test.beforeEach(async ({ page, request }) => {
     ruleDetailPage = new RuleDetailPage(page);
     backtestingPage = new BacktestingPage(page);
 
-    // Get a rule ID from the list to test with
-    await ruleListPage.goto();
-    await ruleListPage.waitForRulesToLoad();
-
-    const ruleCount = await ruleListPage.getRuleCount();
-    if (ruleCount === 0) {
-      throw new Error('No rules available for testing. Please ensure test data exists.');
+    const resp = await request.post(`${API_BASE}/api/v2/rules`, {
+      headers: { Authorization: `Bearer ${getAuthToken()}` },
+      data: {
+        rid: `E2E_BACKTEST_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        description: 'E2E test rule for backtesting tests',
+        logic: "if $amount > 100:\n\treturn 'HOLD'",
+      },
+    });
+    const data = await resp.json();
+    if (!data.success || !data.rule?.r_id) {
+      throw new Error(`Failed to create test rule: ${JSON.stringify(data)}`);
     }
+    testRuleId = data.rule.r_id;
+  });
 
-    const firstRow = page.locator('tbody tr').first();
-    const viewLink = firstRow.locator('a:has-text("View")');
-    const href = await viewLink.getAttribute('href');
-    testRuleId = parseInt(href?.split('/').pop() || '1');
+  test.afterEach(async ({ request }) => {
+    if (testRuleId) {
+      await request.delete(`${API_BASE}/api/v2/rules/${testRuleId}`, {
+        headers: { Authorization: `Bearer ${getAuthToken()}` },
+      });
+      testRuleId = 0;
+    }
   });
 
   test.describe('Backtest Button Visibility', () => {

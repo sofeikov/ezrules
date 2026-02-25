@@ -33,11 +33,14 @@ from typing import Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import joinedload, sessionmaker
 
 from ezrules.backend.api_v2.auth.jwt import decode_token
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Action, RoleActions, User
-from ezrules.models.database import db_session
+from ezrules.models.database import engine
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # =============================================================================
 # OAuth2 SCHEME
@@ -61,13 +64,14 @@ def get_db() -> Any:
     """
     Get a database session.
 
-    This wraps the existing scoped_session from ezrules.
-    In the future, this could be changed to use FastAPI's proper
-    async session management, but for now we reuse the existing setup.
-
-    Returns Any to satisfy type checker - the scoped_session works like a Session.
+    Creates a fresh session per request and closes it when the request
+    completes, ensuring complete isolation between concurrent requests.
     """
-    return db_session
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 # =============================================================================
@@ -129,8 +133,9 @@ def get_current_user(
     if payload.token_type != "access":
         raise credentials_exception
 
-    # Look up the user in the database
-    user = db.query(User).filter(User.id == payload.user_id).first()
+    # Look up the user in the database, eagerly loading roles to avoid
+    # DetachedInstanceError if the session is closed before check_permission runs
+    user = db.query(User).options(joinedload(User.roles)).filter(User.id == payload.user_id).first()
     if user is None:
         raise credentials_exception
 
@@ -205,7 +210,7 @@ def get_current_user_strict(
     if payload.token_type != "access":
         raise credentials_exception
 
-    user = db.query(User).filter(User.id == payload.user_id).first()
+    user = db.query(User).options(joinedload(User.roles)).filter(User.id == payload.user_id).first()
     if user is None:
         raise credentials_exception
 

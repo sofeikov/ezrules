@@ -151,6 +151,7 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
                     RuleEngineConfig.label == "production",
                     RuleEngineConfig.o_id == self.o_id,
                 )
+                .with_for_update()
                 .one()
             )
             # Snapshot before mutation
