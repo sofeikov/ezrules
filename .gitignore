@@ -150,6 +150,9 @@ venv.bak/
 # mkdocs documentation
 /site
 
+# Quarto render artefacts
+docs/**/*_files/
+
 # mypy
 .mypy_cache/
 .dmypy.json

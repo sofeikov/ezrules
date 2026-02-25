@@ -62,6 +62,7 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 |---|---|---|---|
 | `GET` | `/api/v2/shadow` | Bearer + `VIEW_RULES` | Current shadow config (rules + version) |
 | `GET` | `/api/v2/shadow/results` | Bearer + `VIEW_RULES` | Recent shadow evaluation results (`?limit=50`) |
+| `GET` | `/api/v2/shadow/stats` | Bearer + `VIEW_RULES` | Per-rule shadow vs production outcome comparison |
 
 ### Outcomes
 

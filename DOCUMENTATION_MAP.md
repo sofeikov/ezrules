@@ -10,7 +10,7 @@ This file is the quick reference for where documentation lives and what code is 
 - `docs/getting-started/configuration.md`: env vars, runtime options, config matrix.
 - `docs/api-reference/manager-api.md`: complete API v2 endpoint map.
 - `docs/api-reference/evaluator-api.md`: `/api/v2/evaluate` contract and examples.
-- `docs/user-guide/*.md`: operator workflows (analyst/admin/monitoring/rules/labels/lists).
+- `docs/user-guide/*.md`: operator workflows (analyst/admin/monitoring/rules/labels/lists/shadow-deployment).
 - `docs/architecture/overview.md`: system boundaries and flows.
 - `docs/architecture/deployment.md`: local deployment/runtime guide.
 - `docs/troubleshooting.md`: symptom -> diagnosis -> fix.
@@ -33,6 +33,7 @@ This file is the quick reference for where documentation lives and what code is 
    - Update `docs/api-reference/manager-api.md`.
    - Update `docs/api-reference/evaluator-api.md` if evaluate contract changed.
    - Update affected guides (`integration-quickstart`, `troubleshooting`, user guides).
+   - If shadow endpoints or behavior change, update `docs/user-guide/shadow-deployment.md`.
 2. If Angular routes, screen names, sidebar nav, or UI flows change:
    - Update `docs/getting-started/quickstart.md`.
    - Update relevant `docs/user-guide/*.md` pages.

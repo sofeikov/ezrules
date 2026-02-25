@@ -22,6 +22,7 @@ Most analyst work in ezrules follows this loop:
 4. Label results (`FRAUD`, `NORMAL`, `CHARGEBACK`).
 5. Check analytics for false positives and missed fraud.
 6. Backtest before promoting major rule changes.
+7. For higher-stakes changes, shadow deploy to validate on live traffic before promoting.
 
 This process is simple, but doing it consistently is what improves model quality over time.
 
@@ -125,7 +126,7 @@ Relevant endpoints:
 
 - Start conservative, then tighten thresholds with data.
 - Label quickly and consistently with team-agreed definitions.
-- Use backtesting for meaningful rule edits.
+- Backtest for initial calibration on historical data; shadow deploy to validate on current traffic before promoting.
 - Review trends on a fixed cadence (daily/weekly).
 
 ---
@@ -170,6 +171,7 @@ if $user_id not in @trusted_users:
 ## Next Steps
 
 - **[Creating Rules](creating-rules.md)** - Rule syntax and patterns
+- **[Shadow Deployment](shadow-deployment.md)** - Validate rule changes on live traffic before promoting
 - **[Labels and Lists](labels-and-lists.md)** - Labels, lists, and outcomes in one workflow
 - **[Monitoring & Analytics](monitoring.md)** - Dashboard metrics
 
