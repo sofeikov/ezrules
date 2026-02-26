@@ -1,22 +1,47 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { test, expect } from '@playwright/test';
 import { RuleListPage } from '../pages/rule-list.page';
 import { RuleCreatePage } from '../pages/rule-create.page';
 import { RuleDetailPage } from '../pages/rule-detail.page';
 
+const API_BASE = 'http://localhost:8888';
+
+/** Read the JWT access token from the saved auth state file. */
+function getAuthToken(): string {
+  const state = JSON.parse(readFileSync(join(__dirname, '../.auth/user.json'), 'utf-8'));
+  const origin = state.origins?.find((o: any) => o.origin === 'http://localhost:4200');
+  return origin?.localStorage?.find((e: any) => e.name === 'ezrules_access_token')?.value ?? '';
+}
+
 /**
  * E2E tests for the Create Rule page.
  * Tests navigation, form fields, rule testing, and rule creation.
+ *
+ * Tests that create rules via the UI capture the rule ID from the resulting URL
+ * and delete it in afterEach, keeping the DB clean across parallel runs.
  */
 
 test.describe('Rule Create Page', () => {
   let ruleListPage: RuleListPage;
   let ruleCreatePage: RuleCreatePage;
   let ruleDetailPage: RuleDetailPage;
+  let testRuleId: number;
 
   test.beforeEach(async ({ page }) => {
     ruleListPage = new RuleListPage(page);
     ruleCreatePage = new RuleCreatePage(page);
     ruleDetailPage = new RuleDetailPage(page);
+    testRuleId = 0;
+  });
+
+  test.afterEach(async ({ request }) => {
+    if (testRuleId) {
+      await request.delete(`${API_BASE}/api/v2/rules/${testRuleId}`, {
+        headers: { Authorization: `Bearer ${getAuthToken()}` },
+      });
+      testRuleId = 0;
+    }
   });
 
   test.describe('Navigation', () => {
@@ -187,6 +212,10 @@ test.describe('Rule Create Page', () => {
       // Should navigate to the rule detail page
       await expect(page).toHaveURL(/\/rules\/\d+/);
 
+      // Capture the rule ID for cleanup
+      const urlMatch = page.url().match(/\/rules\/(\d+)/);
+      testRuleId = urlMatch ? parseInt(urlMatch[1]) : 0;
+
       // Verify the detail page shows our created rule
       await ruleDetailPage.waitForRuleToLoad();
       const displayedRuleId = await ruleDetailPage.getRuleId();
@@ -248,6 +277,10 @@ test.describe('Rule Create Page', () => {
         page.waitForResponse(resp => resp.url().endsWith('/api/v2/rules') && resp.request().method() === 'POST'),
         ruleCreatePage.clickSubmit()
       ]);
+
+      // Capture the rule ID for cleanup
+      const urlMatch = page.url().match(/\/rules\/(\d+)/);
+      testRuleId = urlMatch ? parseInt(urlMatch[1]) : 0;
 
       expect(postRequestBody).not.toBeNull();
       expect(postRequestBody.rid).toBe(uniqueRid);

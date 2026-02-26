@@ -42,7 +42,7 @@ from ezrules.core.rule_updater import (
 )
 from ezrules.core.type_casting import CastError, cast_event
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import User
+from ezrules.models.backend_core import RuleHistory, User
 from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/rules", tags=["Rules"])
@@ -392,6 +392,38 @@ def update_rule(
         message="Rule updated successfully",
         rule=rule_to_response(rule, revisions),
     )
+
+
+# =============================================================================
+# DELETE RULE
+# =============================================================================
+
+
+@router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_rule(
+    rule_id: int,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.DELETE_RULE)),
+    db: Any = Depends(get_db),
+) -> None:
+    """
+    Delete a rule and its revision history.
+    """
+    rule_manager = get_rule_manager(db)
+    rule = rule_manager.load_rule(rule_id)
+
+    if rule is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Rule not found",
+        )
+
+    # Delete revision history first (no DB-level cascade on this table)
+    db.query(RuleHistory).filter(RuleHistory.r_id == rule_id).delete()
+
+    # Delete the rule (DB cascade handles backtesting results)
+    db.delete(rule)
+    db.commit()
 
 
 # =============================================================================

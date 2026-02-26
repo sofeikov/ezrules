@@ -210,6 +210,13 @@ export class AuditTrailPage {
   }
 
   async getFieldTypeHistoryRowCount(): Promise<number> {
+    // Wait for the accordion content to render after expanding (Angular change
+    // detection is async relative to Playwright's click resolution).
+    const section = this.fieldTypeHistoryAccordion.locator('..');
+    await Promise.race([
+      section.locator('text=No field type history entries found.').waitFor({ state: 'visible', timeout: 10000 }),
+      section.locator('table').waitFor({ state: 'visible', timeout: 10000 }),
+    ]).catch(() => {});
     return await this.fieldTypeHistoryTable.locator('tbody tr').count();
   }
 
