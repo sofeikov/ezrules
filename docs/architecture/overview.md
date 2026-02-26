@@ -53,6 +53,7 @@ High-level storage domains:
 
 - Rules/config history: `rules`, `rules_history`, `rule_engine_config`, `rule_engine_config_history`
 - Event evaluation: `testing_record_log`, `testing_results_log`
+- Shadow evaluation: `shadow_results_log` (parallel results, never returned to callers)
 - Decision controls: `allowed_outcomes`, `event_labels`, user list tables
 - Access control: `user`, `role`, `roles_users`, `actions`, `role_actions`
 - Audit history: rule/config/user-list/outcome/label history tables
@@ -70,14 +71,24 @@ High-level storage domains:
 5. Evaluation data is stored in DB
 6. Response returned to caller
 
-### 2) Rule Lifecycle Flow
+### 2) Shadow Evaluation Flow
+
+1. A rule is deployed to the shadow `RuleEngineConfig` (via UI or API)
+2. Every `POST /api/v2/evaluate` call runs the production evaluation (result returned to caller) and a parallel shadow evaluation (result stored in `shadow_results_log`, never returned)
+3. Shadow results accumulate against the same `tl_id` as production results, enabling direct outcome comparison
+4. Operator observes shadow vs production outcome distribution via `GET /api/v2/shadow/stats`
+5. Operator promotes (atomic: writes shadow logic to rules table + production config, clears shadow entry) or removes
+
+Shadow evaluation errors are silenced — production response is never affected.
+
+### 3) Rule Lifecycle Flow
 
 1. User creates/updates rule via API/UI
 2. Rule change is persisted
 3. Rule/config history entries are captured with `changed_by` attribution
 4. Updated rules become part of subsequent evaluations
 
-### 3) Label Feedback Flow
+### 4) Label Feedback Flow
 
 1. Labels are applied via API (`mark-event` or upload)
 2. Label data is stored
@@ -94,6 +105,7 @@ High-level storage domains:
 | Rule execution in-process | Low integration overhead and direct access to model context | Poorly written rules can impact latency |
 | PostgreSQL as source of truth | Strong relational model and auditability | Requires schema/index care at larger scale |
 | Optional Celery for backtesting | Keeps heavy reprocessing async | Adds Redis/worker operational dependency |
+| Shadow evaluation best-effort (errors silenced) | Production response must never be blocked by shadow path | Shadow result gaps for events where shadow rule errors |
 
 ---
 

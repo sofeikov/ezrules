@@ -144,6 +144,15 @@ Before enabling major rule changes:
    - outcome trends visible in **Dashboard**
    - label feedback visible in **Analytics**
 
+For higher-stakes changes, add a shadow validation step before promoting to production:
+
+6. Deploy the candidate logic to shadow — either the saved rule version or a draft via the edit panel
+7. Allow shadow results to accumulate over a representative traffic window (typically one full business day)
+8. Review the shadow vs production outcome comparison in **Shadow Rules** or via `GET /api/v2/shadow/stats`
+9. Promote if the outcome distribution matches your intent, or remove and revise if not
+
+Shadow deployment gives you live-traffic validation without any production impact. See [Shadow Deployment](shadow-deployment.md) for the full workflow.
+
 ---
 
 ## Debugging

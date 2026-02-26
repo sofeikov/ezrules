@@ -14,6 +14,7 @@ import { RolePermissionsComponent } from './role-permissions/role-permissions.co
 import { AuditTrailComponent } from './audit-trail/audit-trail.component';
 import { LoginComponent } from './login/login.component';
 import { FieldTypesComponent } from './field-types/field-types.component';
+import { ShadowRulesComponent } from './shadow-rules/shadow-rules.component';
 import { authGuard } from './auth/auth.guard';
 
 export const routes: Routes = [
@@ -34,5 +35,6 @@ export const routes: Routes = [
   { path: 'role_management/:id/permissions', component: RolePermissionsComponent, canActivate: [authGuard] },
   { path: 'audit', component: AuditTrailComponent, canActivate: [authGuard] },
   { path: 'field-types', component: FieldTypesComponent, canActivate: [authGuard] },
+  { path: 'shadow-rules', component: ShadowRulesComponent, canActivate: [authGuard] },
   { path: '**', redirectTo: '/login' }
 ];

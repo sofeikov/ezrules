@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { diffLines, Change } from 'diff';
-import { RuleDetail, RuleRevisionDetail, RuleService, UpdateRuleRequest } from '../services/rule.service';
+import { RuleDetail, RuleRevisionDetail, RuleService, ShadowDeployResponse, ShadowRuleItem, UpdateRuleRequest } from '../services/rule.service';
 import { BacktestingService, BacktestResultItem, BacktestTaskResult } from '../services/backtesting.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
@@ -34,6 +34,13 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   saveError: string | null = null;
   saveSuccess: boolean = false;
 
+  // Shadow deployment properties
+  shadowEntry: ShadowRuleItem | null = null;
+  showDeployToShadowDialog: boolean = false;
+  deployingToShadow: boolean = false;
+  shadowDeploySuccess: boolean = false;
+  shadowDeployError: string | null = null;
+
   // Backtesting properties
   backtestResults: BacktestResultItem[] = [];
   backtestTaskResults: Map<string, BacktestTaskResult> = new Map();
@@ -60,6 +67,14 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     } else if (ruleId) {
       this.loadRule(parseInt(ruleId, 10));
       this.loadBacktestResults(parseInt(ruleId, 10));
+
+      // If navigated from the shadow page, enter edit mode pre-seeded with shadow logic
+      const nav = history.state;
+      if (nav?.shadowEditMode) {
+        this.isEditMode = true;
+        this.editedLogic = nav.logic;
+        this.editedDescription = nav.description;
+      }
     }
   }
 
@@ -77,6 +92,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
         this.rule = rule;
         this.loading = false;
         this.fillInExampleParams();
+        this.loadShadowEntry(rule.r_id);
       },
       error: (error) => {
         this.error = 'Failed to load rule. Please try again.';
@@ -219,6 +235,57 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
         this.saving = false;
         this.saveError = error.error?.error || 'Failed to save rule. Please try again.';
         console.error('Error saving rule:', error);
+      }
+    });
+  }
+
+  // Shadow deployment methods
+
+  loadShadowEntry(ruleId: number): void {
+    this.ruleService.getShadowConfig().subscribe({
+      next: (config) => {
+        this.shadowEntry = config.rules.find(r => r.r_id === ruleId) || null;
+      },
+      error: () => {
+        this.shadowEntry = null;
+      }
+    });
+  }
+
+  openDeployToShadowDialog(): void {
+    this.showDeployToShadowDialog = true;
+  }
+
+  closeDeployToShadowDialog(): void {
+    this.showDeployToShadowDialog = false;
+  }
+
+  computeDeployDiff(): Change[] {
+    return diffLines(this.shadowEntry?.logic || '', this.editedLogic);
+  }
+
+  confirmDeployToShadow(): void {
+    if (!this.rule) return;
+
+    this.deployingToShadow = true;
+    this.shadowDeploySuccess = false;
+    this.shadowDeployError = null;
+
+    this.ruleService.deployToShadow(this.rule.r_id, this.editedLogic, this.editedDescription).subscribe({
+      next: (response: ShadowDeployResponse) => {
+        this.deployingToShadow = false;
+        this.closeDeployToShadowDialog();
+        if (response.success) {
+          this.shadowDeploySuccess = true;
+          this.loadRule(this.rule!.r_id);
+        } else {
+          this.shadowDeployError = response.error || 'Failed to deploy to shadow';
+        }
+      },
+      error: (error) => {
+        this.deployingToShadow = false;
+        this.closeDeployToShadowDialog();
+        this.shadowDeployError = error.error?.detail || 'Failed to deploy to shadow. Please try again.';
       }
     });
   }

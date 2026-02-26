@@ -18,6 +18,7 @@ from ezrules.backend.api_v2.routes import (
     outcomes,
     roles,
     rules,
+    shadow,
     user_lists,
     users,
 )
@@ -113,3 +114,6 @@ app.include_router(backtesting.router)
 
 # Field Types routes: /api/v2/field-types/*
 app.include_router(field_types.router)
+
+# Shadow routes: /api/v2/shadow/*
+app.include_router(shadow.router)

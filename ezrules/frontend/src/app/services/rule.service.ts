@@ -9,6 +9,7 @@ export interface Rule {
   description: string;
   logic: string;
   created_at: string | null;
+  in_shadow?: boolean;
 }
 
 export interface RuleRevision {
@@ -78,6 +79,55 @@ export interface CreateRuleResponse {
   rule?: RuleDetail;
 }
 
+export interface ShadowDeployResponse {
+  success: boolean;
+  message: string;
+  error?: string | null;
+}
+
+export interface ShadowRuleItem {
+  r_id: number;
+  rid: string;
+  description: string;
+  logic: string;
+}
+
+export interface ShadowConfigResponse {
+  rules: ShadowRuleItem[];
+  version: number;
+}
+
+export interface ShadowResultItem {
+  sr_id: number;
+  tl_id: number;
+  r_id: number;
+  rule_result: string;
+  event_id: string;
+  event_timestamp: number;
+  created_at: string | null;
+}
+
+export interface ShadowResultsResponse {
+  results: ShadowResultItem[];
+  total: number;
+}
+
+export interface ShadowOutcomeCount {
+  outcome: string;
+  count: number;
+}
+
+export interface ShadowRuleStatsItem {
+  r_id: number;
+  total: number;
+  shadow_outcomes: ShadowOutcomeCount[];
+  prod_outcomes: ShadowOutcomeCount[];
+}
+
+export interface ShadowStatsResponse {
+  rules: ShadowRuleStatsItem[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -121,5 +171,31 @@ export class RuleService {
 
   createRule(data: CreateRuleRequest): Observable<CreateRuleResponse> {
     return this.http.post<CreateRuleResponse>(this.apiUrl, data);
+  }
+
+  deployToShadow(ruleId: number, logic: string, description: string): Observable<ShadowDeployResponse> {
+    return this.http.post<ShadowDeployResponse>(`${this.apiUrl}/${ruleId}/shadow`, { logic, description });
+  }
+
+  removeFromShadow(ruleId: number): Observable<ShadowDeployResponse> {
+    return this.http.delete<ShadowDeployResponse>(`${this.apiUrl}/${ruleId}/shadow`);
+  }
+
+  promoteFromShadow(ruleId: number): Observable<ShadowDeployResponse> {
+    return this.http.post<ShadowDeployResponse>(`${this.apiUrl}/${ruleId}/shadow/promote`, {});
+  }
+
+  getShadowConfig(): Observable<ShadowConfigResponse> {
+    return this.http.get<ShadowConfigResponse>(`${environment.apiUrl}/api/v2/shadow`);
+  }
+
+  getShadowResults(limit: number = 50): Observable<ShadowResultsResponse> {
+    return this.http.get<ShadowResultsResponse>(`${environment.apiUrl}/api/v2/shadow/results`, {
+      params: { limit: limit.toString() }
+    });
+  }
+
+  getShadowStats(): Observable<ShadowStatsResponse> {
+    return this.http.get<ShadowStatsResponse>(`${environment.apiUrl}/api/v2/shadow/stats`);
   }
 }
