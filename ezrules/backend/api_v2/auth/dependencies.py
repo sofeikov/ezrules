@@ -38,7 +38,8 @@ from sqlalchemy.orm import joinedload, sessionmaker
 from ezrules.backend.api_v2.auth.jwt import decode_token
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Action, RoleActions, User
-from ezrules.models.database import engine
+from ezrules.models.database import db_session, engine
+from ezrules.settings import app_settings
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -64,14 +65,19 @@ def get_db() -> Any:
     """
     Get a database session.
 
-    Creates a fresh session per request and closes it when the request
-    completes, ensuring complete isolation between concurrent requests.
+    In testing mode, reuses the scoped db_session (which is configured to the
+    test connection by the test fixtures, allowing tests to see uncommitted data).
+    In production, creates a fresh session per request for isolation between
+    concurrent requests (required for parallel Playwright test workers).
     """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    if app_settings.TESTING:
+        yield db_session
+    else:
+        db = SessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
 
 
 # =============================================================================
