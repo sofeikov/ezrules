@@ -113,7 +113,7 @@ class RDBRuleManager(RuleManager):
             version_list.append(RuleRevision(r.version, created))
         return version_list
 
-    def load_rule(self, rule_id: str, revision_number: int | None = None) -> RuleModel:
+    def load_rule(self, rule_id: int, revision_number: int | None = None) -> RuleModel:
         if revision_number is None:
             latest_records = self.db.get(RuleModel, rule_id)
         else:
@@ -152,6 +152,7 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
                     RuleEngineConfig.label == "production",
                     RuleEngineConfig.o_id == self.o_id,
                 )
+                .with_for_update()
                 .one()
             )
             # Snapshot before mutation

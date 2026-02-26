@@ -1,6 +1,6 @@
 # What's New
 
-## v0.13
+## v0.14
 
 * **Shadow Rule Deployment**: Rules can now be deployed to a "shadow" environment that evaluates them against every incoming live event without affecting production outcomes. Shadow results are stored in a dedicated `shadow_results_log` table and never returned to callers. This complements backtesting (historical) with continuous live validation.
 * **Deploy to Shadow button**: In the Rule Detail edit panel, a new amber "Deploy to Shadow" button sends the current draft of the rule logic to the shadow config.
@@ -9,6 +9,10 @@
 * **SHADOW badge**: Rules that have an active shadow version are annotated with an amber `SHADOW` badge in the Rule List and a "Shadow version active" badge in Rule Detail view mode.
 * **New API endpoints**: `POST /api/v2/rules/{id}/shadow`, `DELETE /api/v2/rules/{id}/shadow`, `POST /api/v2/rules/{id}/shadow/promote`, `GET /api/v2/shadow`, `GET /api/v2/shadow/results`.
 * **`in_shadow` field**: The `GET /api/v2/rules` response now includes `in_shadow: bool` on each rule item.
+
+## v0.13.1
+
+* **New PR Playwright E2E workflow**: added a dedicated GitHub Actions workflow that runs single-threaded Playwright end-to-end tests for pull requests against `main`, including backend/frontend startup and report artifact upload.
 
 ## v0.12
 
