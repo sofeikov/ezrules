@@ -61,7 +61,7 @@ export class RuleDetailPage {
 
     // Edit mode locators
     this.editButton = page.locator('button:has-text("Edit Rule")');
-    this.saveButton = page.locator('button:has-text("Save Changes")');
+    this.saveButton = page.locator('button:has-text("Save to Production")');
     this.cancelButton = page.locator('button:has-text("Cancel")');
     this.descriptionTextarea = page.locator('label:has-text("Description") + textarea');
     this.editableLogicTextarea = page.locator('label:has-text("Logic") + textarea:not([readonly])');
