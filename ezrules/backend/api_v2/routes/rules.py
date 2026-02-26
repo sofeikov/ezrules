@@ -42,8 +42,7 @@ from ezrules.core.rule_updater import (
 )
 from ezrules.core.type_casting import CastError, cast_event
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import RuleHistory
-from ezrules.models.backend_core import User
+from ezrules.models.backend_core import RuleHistory, User
 from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/rules", tags=["Rules"])
