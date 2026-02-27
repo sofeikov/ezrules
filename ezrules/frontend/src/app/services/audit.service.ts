@@ -137,6 +137,22 @@ export interface FieldTypeAuditListResponse {
   offset: number;
 }
 
+export interface ApiKeyHistoryEntry {
+  id: number;
+  api_key_gid: string;
+  label: string;
+  action: string;
+  changed: string | null;
+  changed_by: string | null;
+}
+
+export interface ApiKeyAuditListResponse {
+  total: number;
+  items: ApiKeyHistoryEntry[];
+  limit: number;
+  offset: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuditService {
   private auditUrl = `${environment.apiUrl}/api/v2/audit`;
@@ -197,5 +213,12 @@ export class AuditService {
       .set('limit', limit.toString())
       .set('offset', offset.toString());
     return this.http.get<FieldTypeAuditListResponse>(`${this.auditUrl}/field-types`, { params });
+  }
+
+  getApiKeyHistory(limit: number = 100, offset: number = 0): Observable<ApiKeyAuditListResponse> {
+    const params = new HttpParams()
+      .set('limit', limit.toString())
+      .set('offset', offset.toString());
+    return this.http.get<ApiKeyAuditListResponse>(`${this.auditUrl}/api-keys`, { params });
   }
 }

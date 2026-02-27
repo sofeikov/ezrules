@@ -472,6 +472,63 @@
           </div>
         </div>
 
+        <!-- API Key History Accordion -->
+        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <button
+            (click)="toggleSection('apiKeys')"
+            class="w-full px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between hover:bg-gray-100 transition-colors"
+            data-testid="accordion-api-keys"
+          >
+            <div class="text-left">
+              <h2 class="text-lg font-semibold text-gray-900">API Key History</h2>
+              <p class="text-sm text-gray-500 mt-1">{{ apiKeyTotal }} total entries</p>
+            </div>
+            <svg
+              class="w-5 h-5 text-gray-500 transition-transform"
+              [class.rotate-180]="sections['apiKeys']"
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <div *ngIf="sections['apiKeys']">
+            <div *ngIf="apiKeyHistory.length === 0" class="p-6 text-center text-gray-500">
+              No API key history entries found.
+            </div>
+
+            <div *ngIf="apiKeyHistory.length > 0" class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Label</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Key GID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed By</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr *ngFor="let entry of apiKeyHistory" class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ entry.label }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">{{ entry.api_key_gid }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                        [ngClass]="{
+                          'bg-green-100 text-green-800': entry.action === 'created',
+                          'bg-red-100 text-red-800': entry.action === 'revoked'
+                        }"
+                      >{{ formatAction(entry.action) }}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ entry.changed_by || '—' }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(entry.changed) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>

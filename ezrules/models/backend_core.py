@@ -441,3 +441,29 @@ class UserSession(Base):
     refresh_token = Column(String(2048), nullable=False, unique=True)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id = Column(Integer, primary_key=True)
+    gid = Column(String(36), unique=True, nullable=False, index=True)
+    key_hash = Column(String(64), nullable=False)
+    label = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    revoked_at = Column(DateTime, nullable=True)
+
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
+    org: Mapped["Organisation"] = relationship()
+
+
+class ApiKeyHistory(Base):
+    __tablename__ = "api_key_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    api_key_gid = Column(String(36), nullable=False, index=True)
+    label = Column(String(255), nullable=False)
+    action = Column(String, nullable=False)  # created, revoked
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)

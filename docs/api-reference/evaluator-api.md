@@ -11,6 +11,36 @@ It executes the active rule set against one event payload and stores results.
 
 --8<-- "snippets/start-api.md"
 
+## Authentication
+
+`/api/v2/evaluate` requires credentials on every request.
+Two methods are accepted:
+
+### API Key (recommended for service-to-service)
+
+Pass the raw key in the `X-API-Key` header:
+
+```bash
+curl -X POST http://localhost:8888/api/v2/evaluate \
+  -H "X-API-Key: ezrk_<your-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"event_id": "evt_1", "event_timestamp": 1700000000, "event_data": {}}'
+```
+
+API keys are created via `POST /api/v2/api-keys` (requires `MANAGE_API_KEYS` permission).
+The raw key is shown **once** at creation time and is never retrievable again.
+
+### Bearer token (for existing user sessions)
+
+Pass a valid JWT access token obtained from `POST /api/v2/auth/login`:
+
+```bash
+curl -X POST http://localhost:8888/api/v2/evaluate \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"event_id": "evt_1", "event_timestamp": 1700000000, "event_data": {}}'
+```
+
 ## Endpoint
 
 ### Evaluate Event
@@ -31,6 +61,7 @@ Evaluates an event against the current rule configuration and stores evaluation 
 
 ```bash
 curl -X POST http://localhost:8888/api/v2/evaluate \
+  -H "X-API-Key: ezrk_<your-key>" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "evt_123456",
@@ -79,10 +110,28 @@ Field observations are also recorded on each successful call, contributing to th
 |---|---|
 | `200` | Evaluation completed |
 | `400` | Field type casting failed (value incompatible with configured type) |
+| `401` | Missing, invalid, or revoked credentials |
+| `413` | Request body exceeds the configured size limit (default 1 MB) |
 | `422` | Invalid request payload (schema/validation error) |
 | `500` | Evaluation failed during execution/storage |
 
 #### Example Error Bodies
+
+Unauthenticated (`401`):
+
+```json
+{
+  "detail": "Authentication required"
+}
+```
+
+Body too large (`413`):
+
+```json
+{
+  "detail": "Request body too large"
+}
+```
 
 Validation error (`422`):
 
@@ -106,15 +155,9 @@ Evaluation/storage error (`500`):
 
 ```json
 {
-  "detail": "Evaluation failed: <error details>"
+  "detail": "Evaluation failed"
 }
 ```
-
-## Authentication
-
-`/api/v2/evaluate` is currently intended for internal/service use and does not require user authentication.
-
-For production deployments, restrict this endpoint at the network boundary (API gateway, private network, allowlist, or service mesh policy).
 
 ## Live API Documentation (Recommended)
 

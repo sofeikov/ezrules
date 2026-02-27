@@ -50,6 +50,9 @@ class PermissionAction(Enum):
     MODIFY_FIELD_TYPES = "modify_field_types"
     DELETE_FIELD_TYPE = "delete_field_type"
 
+    # API Key Management
+    MANAGE_API_KEYS = "manage_api_keys"
+
     @classmethod
     def get_default_actions(cls):
         """Get list of (action_name, description, resource_type) tuples for initialization."""
@@ -84,6 +87,7 @@ class PermissionAction(Enum):
             (cls.VIEW_FIELD_TYPES.value, "View field type configurations and observations", "field_type"),
             (cls.MODIFY_FIELD_TYPES.value, "Create and update field type configurations", "field_type"),
             (cls.DELETE_FIELD_TYPE.value, "Delete field type configurations", "field_type"),
+            (cls.MANAGE_API_KEYS.value, "Manage API keys for service integration", "api_key"),
         ]
 
 

@@ -28,7 +28,7 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 ### Token usage
 
 - Send access token as `Authorization: Bearer <access_token>`
-- `POST /api/v2/evaluate` is internal/service oriented and currently does not require user auth
+- `POST /api/v2/evaluate` requires either an `X-API-Key` header (recommended for service-to-service) or a valid Bearer token
 
 ### Session revocation (logout)
 
@@ -178,11 +178,19 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 | `GET` | `/api/v2/backtesting/task/{task_id}` | Bearer + permission | Task status/result |
 | `GET` | `/api/v2/backtesting/{rule_id}` | Bearer + permission | Backtest history for rule |
 
+### API Keys
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `POST` | `/api/v2/api-keys` | Bearer + `MANAGE_API_KEYS` | Create API key (raw key returned once) |
+| `GET` | `/api/v2/api-keys` | Bearer + `MANAGE_API_KEYS` | List active API keys (no raw key) |
+| `DELETE` | `/api/v2/api-keys/{gid}` | Bearer + `MANAGE_API_KEYS` | Revoke API key |
+
 ### Evaluator
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `POST` | `/api/v2/evaluate` | Internal/service | Evaluate one event against active rules |
+| `POST` | `/api/v2/evaluate` | API key or Bearer | Evaluate one event against active rules |
 
 ## API Conventions
 
