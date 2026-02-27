@@ -30,6 +30,23 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 - Send access token as `Authorization: Bearer <access_token>`
 - `POST /api/v2/evaluate` is internal/service oriented and currently does not require user auth
 
+### Session revocation (logout)
+
+Refresh tokens are tracked server-side in the `user_session` table. To revoke a session:
+
+```bash
+curl -X POST http://localhost:8888/api/v2/auth/logout \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "<refresh_token>"}'
+```
+
+After a successful logout, the refresh token is deleted from the database and any subsequent attempt to use it returns `401`. Access tokens remain valid until their 30-minute expiry (stateless JWTs cannot be revoked).
+
+### Refresh token rotation
+
+Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and issues a new one. A refresh token can only be used once. Presenting a previously-used or revoked refresh token returns `401 Session not found or already revoked`.
+
 ## Endpoint Map
 
 ### Authentication
@@ -37,7 +54,8 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | `POST` | `/api/v2/auth/login` | No | OAuth2 form login |
-| `POST` | `/api/v2/auth/refresh` | No (refresh token in body) | Exchanges refresh token |
+| `POST` | `/api/v2/auth/refresh` | No (refresh token in body) | Exchanges refresh token (rotation — one-time use) |
+| `POST` | `/api/v2/auth/logout` | Bearer + refresh token in body | Revokes refresh token server-side |
 | `GET` | `/api/v2/auth/me` | Bearer | Current user profile |
 
 ### Rules

@@ -19,7 +19,7 @@ from ezrules.backend.api_v2.auth.jwt import (
     decode_token,
 )
 from ezrules.backend.api_v2.main import app
-from ezrules.models.backend_core import Role, User
+from ezrules.models.backend_core import Role, User, UserSession
 
 
 @pytest.fixture(scope="function")
@@ -394,3 +394,180 @@ class TestMeEndpoint:
 
         assert len(data["roles"]) > 0
         assert any(role["name"] == "test_admin" for role in data["roles"])
+
+
+# =============================================================================
+# SESSION TRACKING TESTS
+# =============================================================================
+
+
+class TestSessionTracking:
+    """Tests for server-side refresh token session tracking (UserSession table)."""
+
+    def test_login_creates_session(self, api_client, session):
+        """Login should insert a UserSession row for the issued refresh token."""
+        response = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        assert response.status_code == 200
+        tokens = response.json()
+
+        session.expire_all()
+        session_row = session.query(UserSession).filter(UserSession.refresh_token == tokens["refresh_token"]).first()
+        assert session_row is not None
+        assert session_row.expires_at is not None
+        assert session_row.user_id is not None
+
+    def test_refresh_rotation_deletes_old_and_creates_new_session(self, api_client, session):
+        """Refresh should delete the consumed session and insert a new one."""
+        login_response = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        original_tokens = login_response.json()
+        old_refresh_token = original_tokens["refresh_token"]
+
+        refresh_response = api_client.post(
+            "/api/v2/auth/refresh",
+            json={"refresh_token": old_refresh_token},
+        )
+        assert refresh_response.status_code == 200
+        new_tokens = refresh_response.json()
+
+        session.expire_all()
+        # Old session must be gone
+        old_session = session.query(UserSession).filter(UserSession.refresh_token == old_refresh_token).first()
+        assert old_session is None
+
+        # New session must exist
+        new_session = (
+            session.query(UserSession).filter(UserSession.refresh_token == new_tokens["refresh_token"]).first()
+        )
+        assert new_session is not None
+
+    def test_refresh_token_can_only_be_used_once(self, api_client, session):
+        """A refresh token should be invalid after it has been used once (rotation)."""
+        login_response = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        original_refresh_token = login_response.json()["refresh_token"]
+
+        # First use — succeeds and rotates the token
+        first_refresh = api_client.post(
+            "/api/v2/auth/refresh",
+            json={"refresh_token": original_refresh_token},
+        )
+        assert first_refresh.status_code == 200
+
+        # Second use of the same (now-deleted) token — must be rejected
+        second_refresh = api_client.post(
+            "/api/v2/auth/refresh",
+            json={"refresh_token": original_refresh_token},
+        )
+        assert second_refresh.status_code == 401
+
+    def test_refresh_revoked_session_returns_401(self, api_client, session):
+        """Refresh with a token whose DB session was deleted should return 401."""
+        login_response = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        tokens = login_response.json()
+
+        # Manually revoke the session directly in the database
+        session.query(UserSession).filter(UserSession.refresh_token == tokens["refresh_token"]).delete()
+        session.commit()
+
+        response = api_client.post(
+            "/api/v2/auth/refresh",
+            json={"refresh_token": tokens["refresh_token"]},
+        )
+        assert response.status_code == 401
+        assert "revoked" in response.json()["detail"].lower()
+
+
+# =============================================================================
+# LOGOUT ENDPOINT TESTS
+# =============================================================================
+
+
+class TestLogoutEndpoint:
+    """Tests for POST /api/v2/auth/logout."""
+
+    def test_logout_deletes_session(self, api_client, session):
+        """Logout should remove the UserSession row from the database."""
+        login_response = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        tokens = login_response.json()
+
+        logout_response = api_client.post(
+            "/api/v2/auth/logout",
+            json={"refresh_token": tokens["refresh_token"]},
+            headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        )
+        assert logout_response.status_code == 200
+        assert logout_response.json()["message"] == "Logged out successfully"
+
+        session.expire_all()
+        session_row = session.query(UserSession).filter(UserSession.refresh_token == tokens["refresh_token"]).first()
+        assert session_row is None
+
+    def test_refresh_after_logout_returns_401(self, api_client, session):
+        """After logout, using the old refresh token should return 401."""
+        login_response = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        tokens = login_response.json()
+
+        api_client.post(
+            "/api/v2/auth/logout",
+            json={"refresh_token": tokens["refresh_token"]},
+            headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        )
+
+        response = api_client.post(
+            "/api/v2/auth/refresh",
+            json={"refresh_token": tokens["refresh_token"]},
+        )
+        assert response.status_code == 401
+
+    def test_logout_without_access_token_returns_401(self, api_client, session):
+        """Logout with no Bearer token should be rejected."""
+        response = api_client.post(
+            "/api/v2/auth/logout",
+            json={"refresh_token": "sometoken"},
+        )
+        assert response.status_code == 401
+
+    def test_logout_does_not_affect_other_sessions(self, api_client, session):
+        """Logging out one session must not invalidate other active sessions."""
+        login1 = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        tokens1 = login1.json()
+
+        login2 = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        tokens2 = login2.json()
+
+        # Logout the first session only
+        api_client.post(
+            "/api/v2/auth/logout",
+            json={"refresh_token": tokens1["refresh_token"]},
+            headers={"Authorization": f"Bearer {tokens1['access_token']}"},
+        )
+
+        # Second session should still be usable
+        refresh_response = api_client.post(
+            "/api/v2/auth/refresh",
+            json={"refresh_token": tokens2["refresh_token"]},
+        )
+        assert refresh_response.status_code == 200

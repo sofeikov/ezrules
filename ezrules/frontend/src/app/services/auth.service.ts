@@ -83,6 +83,13 @@ export class AuthService {
   }
 
   logout(): void {
+    const refreshToken = this.getRefreshToken();
+    if (refreshToken) {
+      // Fire and forget — clear local state regardless of outcome
+      this.http.post(`${this.AUTH_URL}/logout`, { refresh_token: refreshToken }).subscribe({
+        error: () => {} // Ignore errors — local cleanup always happens
+      });
+    }
     localStorage.removeItem(this.ACCESS_TOKEN_KEY);
     localStorage.removeItem(this.REFRESH_TOKEN_KEY);
     this.loggedIn.next(false);

@@ -7,6 +7,7 @@ This module handles:
 3. Decoding and validating tokens
 """
 
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
@@ -104,6 +105,7 @@ def create_refresh_token(user_id: int) -> str:
     payload = {
         "sub": str(user_id),
         "type": "refresh",
+        "jti": str(uuid.uuid4()),  # Unique token ID — ensures each token is distinct
         "iat": now,
         "exp": expire,
     }
