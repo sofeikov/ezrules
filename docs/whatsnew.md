@@ -1,5 +1,12 @@
 # What's New
 
+## v0.15
+
+* **Server-side session revocation**: Refresh tokens are now tracked in a `user_session` database table. Logging out invalidates the refresh token immediately, preventing reuse even if a token is intercepted after logout.
+* **Refresh token rotation**: Each call to `POST /api/v2/auth/refresh` deletes the presented token and issues a new one. A refresh token can be used exactly once; reuse returns `401 Session not found or already revoked`.
+* **Logout endpoint**: New `POST /api/v2/auth/logout` endpoint accepts the current refresh token (plus a valid access token in the `Authorization` header) and deletes the session server-side. Multiple concurrent sessions (e.g. multiple browsers) are supported — only the presented token is revoked.
+* **Lazy session cleanup**: Expired session rows for a user are deleted automatically on login, refresh, and logout, keeping the `user_session` table small without a background scheduler.
+
 ## v0.14
 
 * **Shadow Rule Deployment**: Rules can now be deployed to a "shadow" environment that evaluates them against every incoming live event without affecting production outcomes. Shadow results are stored in a dedicated `shadow_results_log` table and never returned to callers. This complements backtesting (historical) with continuous live validation.

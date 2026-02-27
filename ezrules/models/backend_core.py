@@ -431,3 +431,13 @@ class FieldObservation(Base):
 
     def __repr__(self) -> str:
         return f"FieldObservation({self.field_name!r}, {self.observed_json_type!r}, count={self.occurrence_count}, o_id={self.o_id})"
+
+
+class UserSession(Base):
+    __tablename__ = "user_session"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    refresh_token = Column(String(2048), nullable=False, unique=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
