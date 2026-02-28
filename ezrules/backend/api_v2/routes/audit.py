@@ -16,6 +16,8 @@ from ezrules.backend.api_v2.auth.dependencies import (
     require_permission,
 )
 from ezrules.backend.api_v2.schemas.audit import (
+    ApiKeyAuditListResponse,
+    ApiKeyHistoryEntry,
     AuditSummaryResponse,
     ConfigAuditListResponse,
     FieldTypeAuditListResponse,
@@ -37,6 +39,7 @@ from ezrules.backend.api_v2.schemas.audit import (
 )
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
+    ApiKeyHistory,
     FieldTypeHistory,
     LabelHistory,
     OutcomeHistory,
@@ -150,6 +153,18 @@ def field_type_history_to_response(history: FieldTypeHistory) -> FieldTypeHistor
     )
 
 
+def api_key_history_to_response(history: ApiKeyHistory) -> ApiKeyHistoryEntry:
+    """Convert an API key history record to API response."""
+    return ApiKeyHistoryEntry(
+        id=int(history.id),
+        api_key_gid=str(history.api_key_gid),
+        label=str(history.label),
+        action=str(history.action),
+        changed=history.changed if history.changed is not None else None,  # type: ignore[arg-type]
+        changed_by=str(history.changed_by) if history.changed_by else None,
+    )
+
+
 def role_permission_history_to_response(history: RolePermissionHistory) -> RolePermissionHistoryEntry:
     """Convert a role permission history record to API response."""
     return RolePermissionHistoryEntry(
@@ -193,6 +208,7 @@ def get_audit_summary(
     total_user_account_actions = db.query(UserAccountHistory).count()
     total_role_permission_actions = db.query(RolePermissionHistory).count()
     total_field_type_actions = db.query(FieldTypeHistory).count()
+    total_api_key_actions = db.query(ApiKeyHistory).count()
 
     return AuditSummaryResponse(
         total_rule_versions=total_rule_versions,
@@ -205,6 +221,7 @@ def get_audit_summary(
         total_user_account_actions=total_user_account_actions,
         total_role_permission_actions=total_role_permission_actions,
         total_field_type_actions=total_field_type_actions,
+        total_api_key_actions=total_api_key_actions,
     )
 
 
@@ -574,6 +591,45 @@ def list_field_type_history(
     return FieldTypeAuditListResponse(
         total=total,
         items=[field_type_history_to_response(h) for h in items],
+        limit=limit,
+        offset=offset,
+    )
+
+
+# =============================================================================
+# API KEY HISTORY
+# =============================================================================
+
+
+@router.get("/api-keys", response_model=ApiKeyAuditListResponse)
+def list_api_key_history(
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    db: Any = Depends(get_db),
+    start_date: datetime | None = Query(default=None, description="Filter by start date"),
+    end_date: datetime | None = Query(default=None, description="Filter by end date"),
+    limit: int = Query(default=50, ge=1, le=100, description="Page size"),
+    offset: int = Query(default=0, ge=0, description="Offset"),
+) -> ApiKeyAuditListResponse:
+    """
+    Get paginated API key action history.
+
+    Returns all API key create and revoke events with optional filtering.
+    Requires ACCESS_AUDIT_TRAIL permission.
+    """
+    query = db.query(ApiKeyHistory)
+
+    if start_date:
+        query = query.filter(ApiKeyHistory.changed >= start_date)
+    if end_date:
+        query = query.filter(ApiKeyHistory.changed <= end_date)
+
+    total = query.count()
+    items = query.order_by(ApiKeyHistory.changed.desc()).offset(offset).limit(limit).all()
+
+    return ApiKeyAuditListResponse(
+        total=total,
+        items=[api_key_history_to_response(h) for h in items],
         limit=limit,
         offset=offset,
     )

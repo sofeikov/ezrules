@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     EVALUATOR_ENDPOINT: str | None = "localhost:9999"
     CELERY_BROKER_URL: str = "redis://localhost:6379"
     TESTING: bool | None = False
+    MAX_BODY_SIZE_KB: int = 1024
 
 
 app_settings = Settings()  # type: ignore[missing-argument]

@@ -11,7 +11,8 @@ import {
   LabelHistoryEntry,
   UserAccountHistoryEntry,
   RolePermissionHistoryEntry,
-  FieldTypeHistoryEntry
+  FieldTypeHistoryEntry,
+  ApiKeyHistoryEntry
 } from '../services/audit.service';
 
 @Component({
@@ -29,6 +30,7 @@ export class AuditTrailComponent implements OnInit {
   userAccountHistory: UserAccountHistoryEntry[] = [];
   rolePermissionHistory: RolePermissionHistoryEntry[] = [];
   fieldTypeHistory: FieldTypeHistoryEntry[] = [];
+  apiKeyHistory: ApiKeyHistoryEntry[] = [];
 
   ruleTotal: number = 0;
   configTotal: number = 0;
@@ -38,6 +40,7 @@ export class AuditTrailComponent implements OnInit {
   userAccountTotal: number = 0;
   rolePermissionTotal: number = 0;
   fieldTypeTotal: number = 0;
+  apiKeyTotal: number = 0;
 
   loading: boolean = true;
   error: string | null = null;
@@ -51,7 +54,8 @@ export class AuditTrailComponent implements OnInit {
     labels: false,
     userAccounts: false,
     rolePermissions: false,
-    fieldTypes: false
+    fieldTypes: false,
+    apiKeys: false
   };
 
   constructor(private auditService: AuditService) {}
@@ -69,7 +73,7 @@ export class AuditTrailComponent implements OnInit {
     this.error = null;
 
     let loadCount = 0;
-    const totalLoads = 8;
+    const totalLoads = 9;
 
     const checkDone = () => {
       loadCount++;
@@ -170,6 +174,18 @@ export class AuditTrailComponent implements OnInit {
       },
       error: () => {
         this.error = 'Failed to load field type history.';
+        this.loading = false;
+      }
+    });
+
+    this.auditService.getApiKeyHistory(100, 0).subscribe({
+      next: (response) => {
+        this.apiKeyHistory = response.items;
+        this.apiKeyTotal = response.total;
+        checkDone();
+      },
+      error: () => {
+        this.error = 'Failed to load API key history.';
         this.loading = false;
       }
     });

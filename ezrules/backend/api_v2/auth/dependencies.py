@@ -28,16 +28,17 @@ For permission checking, use require_permission():
         return {"rules": [...]}
 """
 
+import hashlib
 from collections.abc import Callable
 from typing import Any
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import joinedload, sessionmaker
 
 from ezrules.backend.api_v2.auth.jwt import decode_token
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Action, RoleActions, User
+from ezrules.models.backend_core import Action, ApiKey, RoleActions, User
 from ezrules.models.database import db_session, engine
 from ezrules.settings import app_settings
 
@@ -338,6 +339,45 @@ def require_permission(
         )
 
     return check_permission
+
+
+def get_evaluator_auth(
+    api_key: str | None = Header(default=None, alias="X-API-Key"),
+    token: str | None = Depends(oauth2_scheme),
+    db: Any = Depends(get_db),
+) -> None:
+    """
+    Authentication dependency for the evaluate endpoint.
+
+    Accepts either an X-API-Key header or a Bearer JWT access token.
+    Raises 401 if neither is provided or if the provided credentials are invalid.
+    """
+    if api_key is not None:
+        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        db_key = db.query(ApiKey).filter(ApiKey.key_hash == key_hash, ApiKey.revoked_at.is_(None)).first()
+        if db_key:
+            return None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or revoked API key",
+        )
+
+    if token is not None:
+        payload = decode_token(token)
+        if payload is not None and payload.token_type == "access":
+            user = db.query(User).filter(User.id == payload.user_id).first()
+            if user is not None and user.active:
+                return None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required",
+    )
 
 
 def require_any_permission(*actions: PermissionAction) -> Callable[..., None]:
