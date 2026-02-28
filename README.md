@@ -39,157 +39,102 @@ ezrules consists of several core components:
 
 ### Prerequisites
 
-- **Python 3.12+**
-- **PostgreSQL** — used for rule storage, audit logs, and Celery result backend
-- **Redis** — used as the Celery message broker for backtesting tasks
-- **Docker & Docker Compose** (recommended) — to run PostgreSQL, Redis, and the Celery worker with a single command
+- **Docker & Docker Compose** — the only hard requirement for the full-stack setups below
+- **Python 3.12+ and `uv`** — only needed if you are contributing or running services locally outside Docker
 
-#### Start infrastructure with Docker Compose (recommended)
+---
+
+### Option A — Demo (exploring the product)
+
+One command. No configuration. Pre-loaded with sample rules and events.
 
 ```bash
-docker compose up -d
+git clone https://github.com/sofeikov/ezrules.git
+cd ezrules
+docker compose -f docker-compose.demo.yml up --build
 ```
 
-This starts three services in the background:
-- **PostgreSQL** on port 5432 — database (data persisted in a Docker volume)
-- **Redis** on port 6379 — Celery message broker
-- **Celery worker** — processes backtest tasks (built from the project `Dockerfile`)
+Once all containers are healthy:
 
-The worker waits for PostgreSQL and Redis to be healthy before starting.
+| Service | URL |
+|---|---|
+| Web UI | http://localhost:4200 |
+| API | http://localhost:8888 |
 
-To stop:
+Login: `admin@example.com` / `admin`
+
+To stop and wipe all data:
 
 ```bash
-docker compose down        # stop containers, keep data
-docker compose down -v     # stop containers and delete data
+docker compose -f docker-compose.demo.yml down -v
 ```
 
-After `docker compose up -d`, you only need to run the API locally:
+---
+
+### Option B — Production (real data)
+
+Full stack with an empty database. Credentials come from a `.env` file you control.
+
 ```bash
-uv run ezrules api --port 8888
+git clone https://github.com/sofeikov/ezrules.git
+cd ezrules
+cp .env.example .env          # edit with your own secret and admin credentials
+docker compose -f docker-compose.prod.yml up --build
 ```
 
-#### Or install services manually
+| Service | URL |
+|---|---|
+| Web UI | http://localhost:4200 |
+| API | http://localhost:8888 |
 
-<details>
-<summary>Manual installation instructions</summary>
+Login with the email/password you set in `.env`.
 
-**Redis:**
+To stop (data is preserved in a Docker volume):
+
 ```bash
-# macOS
-brew install redis && brew services start redis
-
-# Ubuntu/Debian
-sudo apt install redis-server && sudo systemctl start redis
+docker compose -f docker-compose.prod.yml down
 ```
 
-**PostgreSQL:** Install via your system package manager or use the standalone Docker script in `scripts/run_postgres_locally.sh`.
+---
 
-</details>
+### Option C — Development (contributing to the project)
 
-Redis must be running on `localhost:6379` (default). To use a different URL, set the `EZRULES_CELERY_BROKER_URL` environment variable (e.g. `redis://myhost:6380/0`).
-
-### Installation
+Runs only the infrastructure (PostgreSQL, Redis, Celery worker) via Docker. The API and frontend run locally for fast iteration.
 
 ```bash
-# Clone the repository
 git clone https://github.com/sofeikov/ezrules.git
 cd ezrules
 
-# Install dependencies
+# Start infrastructure
+docker compose up -d
+
+# Install Python dependencies
 uv sync
-```
 
-### Database Setup
+# Configure settings
+cat > settings.env <<EOF
+EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules
+EZRULES_APP_SECRET=dev_secret
+EZRULES_ORG_ID=1
+EOF
 
-```bash
-# Initialize the database
+# Initialise DB and create an admin user
 uv run ezrules init-db
+uv run ezrules add-user --user-email admin@example.com --password admin --admin
 
-# Initialize database with automatic deletion of existing database (non-interactive)
-uv run ezrules init-db --auto-delete
-
-# Set up permissions and default roles
-uv run ezrules init-permissions
-
-# Add a user
-uv run ezrules add-user --user-email admin@example.com --password admin
-```
-
-The `init-db` command automatically handles database creation and provides options for managing existing databases:
-
-- **Interactive mode** (default): Prompts if you want to delete and recreate existing databases
-- **Auto-delete mode** (`--auto-delete`): Automatically deletes existing databases without prompting
-- **Smart creation**: Only creates the database if it doesn't already exist
-
-### Start Services
-
-```bash
-# Start the API service (FastAPI - includes rule evaluation and frontend API)
+# Start the API
 uv run ezrules api --port 8888
-# With auto-reload for development:
-uv run ezrules api --port 8888 --reload
+
+# In another terminal — start the Angular dev server
+cd ezrules/frontend && npm install && npm start
 ```
 
-#### Celery Worker (required for backtesting)
+Open http://localhost:4200.
 
-The backtesting feature runs rule comparisons asynchronously via Celery. A Celery worker must be running for backtest tasks to execute.
-
-If you're using `docker compose up -d`, the worker is **already running** — no extra steps needed.
-
-To run the worker manually instead (e.g. for debugging):
+To generate sample data for development:
 
 ```bash
-# On macOS, use --pool=solo to avoid fork-related crashes (SIGSEGV)
-uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo
-
-# On Linux, the default prefork pool works fine:
-uv run celery -A ezrules.backend.tasks worker -l INFO
-```
-
-A VS Code launch configuration named **"Celery Worker"** is also available in `.vscode/launch.json` for debugging the worker with breakpoints.
-
-**Architecture notes:**
-- **Broker** (Redis): Delivers task messages from the API to the worker
-- **Result backend** (PostgreSQL): Stores task results in the same database as the application, using the `EZRULES_DB_ENDPOINT` connection string
-- Without a running worker, backtest requests will remain in `PENDING` state indefinitely
-
-### Web Frontend
-
-ezrules includes a web frontend that communicates with the FastAPI backend.
-
-#### Features
-
-The frontend provides:
-- **Rule List View**: Browse all rules with a modern, responsive interface
-- **Rule Detail View**: View comprehensive rule details including:
-  - Rule ID, description, and logic
-  - Created date and version history
-  - Test functionality with dynamic JSON input
-  - Real-time rule testing with sample data
-  - Revision history browsing with read-only historical revision views
-- **Labels Management**: Full CRUD for transaction labels — list, create, and delete labels (with confirmation), plus a link to bulk CSV upload
-- **Label Analytics**: View labeled transaction analytics — total labeled events metric card, per-label time-series charts with Chart.js, and a time range selector (1h, 6h, 12h, 24h, 30d)
-- **Seamless Navigation**: Navigate between rule list, detail, labels, and analytics pages
-
-#### Build Frontend (optional)
-
-```bash
-cd ezrules/frontend
-npm install
-npm run build
-```
-
-Build output will be generated in `ezrules/frontend/dist/`.
-
-### Generate Test Data
-
-```bash
-# Create sample rules and events for testing
 uv run ezrules generate-random-data --n-rules 10 --n-events 100
-
-# Generate events with realistic fraud labeling
-uv run ezrules generate-random-data --n-events 100 --label-ratio 0.3 --export-csv test_labels.csv
 ```
 
 ## 🔐 Enterprise Security

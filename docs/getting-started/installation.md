@@ -1,18 +1,76 @@
 # Installation
 
-This page has one recommended path first.
-Alternative/manual setup options are in appendices at the end.
+Choose the path that fits your goal.
 
-## Recommended Path (Most Users)
+---
 
-### Prerequisites
+## Path 1 — Demo (exploring the product)
 
-- Python 3.12+
-- Docker + Docker Compose
-- `uv`
-- Git
+**Prerequisites:** Docker + Docker Compose, Git.
 
-### 1) Clone and install dependencies
+```bash
+git clone https://github.com/sofeikov/ezrules.git
+cd ezrules
+docker compose -f docker-compose.demo.yml up --build
+```
+
+All services start automatically (PostgreSQL, Redis, Celery worker, API, frontend). The database is seeded with 10 sample rules and 100 events.
+
+| Service | URL |
+|---|---|
+| Web UI | http://localhost:4200 |
+| API | http://localhost:8888 |
+
+Login: `admin@example.com` / `admin`
+
+To reset and re-seed from scratch:
+
+```bash
+docker compose -f docker-compose.demo.yml down -v
+docker compose -f docker-compose.demo.yml up --build
+```
+
+---
+
+## Path 2 — Production (real data)
+
+**Prerequisites:** Docker + Docker Compose, Git.
+
+```bash
+git clone https://github.com/sofeikov/ezrules.git
+cd ezrules
+cp .env.example .env
+```
+
+Edit `.env` with your own values:
+
+```bash
+EZRULES_APP_SECRET=<generate with: python -c "import secrets; print(secrets.token_hex(32))">
+EZRULES_ADMIN_EMAIL=admin@yourorg.com
+EZRULES_ADMIN_PASSWORD=<strong password>
+```
+
+Then start:
+
+```bash
+docker compose -f docker-compose.prod.yml up --build
+```
+
+The database is initialised empty. Login with the credentials you set in `.env`.
+
+Data persists in a Docker volume between restarts. To stop without losing data:
+
+```bash
+docker compose -f docker-compose.prod.yml down
+```
+
+---
+
+## Path 3 — Development (contributing to the project)
+
+**Prerequisites:** Python 3.12+, `uv`, Docker + Docker Compose, Git, Node 20+ (for frontend work).
+
+### 1) Clone and install
 
 ```bash
 git clone https://github.com/sofeikov/ezrules.git
@@ -26,32 +84,24 @@ uv sync
 docker compose up -d
 ```
 
-Expected:
-
-- PostgreSQL, Redis, and worker containers are up
+This starts PostgreSQL, Redis, and the Celery worker. The API and frontend run as local processes.
 
 ### 3) Configure `settings.env`
 
 ```bash
 EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules
-EZRULES_APP_SECRET=put_your_own_secret_here
+EZRULES_APP_SECRET=dev_secret
 EZRULES_ORG_ID=1
 ```
 
-### 4) Initialize database and permissions
+### 4) Initialize database and create first user
 
 ```bash
 uv run ezrules init-db
-uv run ezrules init-permissions
-```
-
-### 5) Create first user
-
-```bash
 uv run ezrules add-user --user-email admin@example.com --password admin --admin
 ```
 
-### 6) Verify backend and frontend
+### 5) Start API and frontend
 
 Start backend:
 

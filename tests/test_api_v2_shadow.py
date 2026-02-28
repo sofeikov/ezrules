@@ -424,7 +424,7 @@ class TestShadowConfigEndpoint:
 class TestShadowEvaluation:
     """Tests for shadow evaluation during POST /api/v2/evaluate."""
 
-    def test_shadow_results_stored_when_shadow_config_exists(self, session):
+    def test_shadow_results_stored_when_shadow_config_exists(self, session, live_api_key):
         """Shadow results log entries should be created when a shadow config exists."""
         org = session.query(Organisation).filter(Organisation.o_id == 1).first()
         if not org:
@@ -458,6 +458,7 @@ class TestShadowEvaluation:
                     "event_timestamp": 1234567890,
                     "event_data": {"amount": 100},
                 },
+                headers={"X-API-Key": live_api_key},
             )
 
         evaluator_module._lre = None
@@ -470,7 +471,7 @@ class TestShadowEvaluation:
         assert len(shadow_logs) >= 1
         assert shadow_logs[-1].rule_result == "HOLD"
 
-    def test_no_failure_when_shadow_config_absent(self, session):
+    def test_no_failure_when_shadow_config_absent(self, session, live_api_key):
         """Main evaluation should succeed even when no shadow config exists."""
         org = session.query(Organisation).filter(Organisation.o_id == 1).first()
         if not org:
@@ -504,6 +505,7 @@ class TestShadowEvaluation:
                     "event_timestamp": 1234567890,
                     "event_data": {},
                 },
+                headers={"X-API-Key": live_api_key},
             )
 
         evaluator_module._lre = None

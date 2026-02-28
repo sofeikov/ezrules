@@ -100,7 +100,7 @@ def rules_client(session):
 class TestEvaluateCasting:
     """Cast configs should be applied before rule execution in /evaluate."""
 
-    def test_evaluate_casts_string_to_integer(self, session):
+    def test_evaluate_casts_string_to_integer(self, session, live_api_key):
         """A string field configured as 'integer' is cast before evaluation."""
         org = _get_or_create_org(session)
         _setup_rule_engine(session, org, "CAST:EVAL:001", 9101)
@@ -117,12 +117,13 @@ class TestEvaluateCasting:
                     "event_timestamp": 1700000000,
                     "event_data": {"amount": "500"},
                 },
+                headers={"X-API-Key": live_api_key},
             )
 
         evaluator_router._lre = None
         assert response.status_code == 200
 
-    def test_evaluate_cast_error_returns_400(self, session):
+    def test_evaluate_cast_error_returns_400(self, session, live_api_key):
         """An unparseable value for an integer config must yield HTTP 400."""
         org = _get_or_create_org(session)
         _setup_rule_engine(session, org, "CAST:EVAL:002", 9102)
@@ -139,13 +140,14 @@ class TestEvaluateCasting:
                     "event_timestamp": 1700000000,
                     "event_data": {"ref": "not-a-number"},
                 },
+                headers={"X-API-Key": live_api_key},
             )
 
         evaluator_router._lre = None
         assert response.status_code == 400
         assert "ref" in response.json()["detail"].lower() or "cast" in response.json()["detail"].lower()
 
-    def test_evaluate_unconfigured_field_passes_through(self, session):
+    def test_evaluate_unconfigured_field_passes_through(self, session, live_api_key):
         """Fields without a config are passed through unchanged."""
         org = _get_or_create_org(session)
         _setup_rule_engine(session, org, "CAST:EVAL:003", 9103)
@@ -158,6 +160,7 @@ class TestEvaluateCasting:
                     "event_timestamp": 1700000000,
                     "event_data": {"raw_field": "some_string"},
                 },
+                headers={"X-API-Key": live_api_key},
             )
 
         evaluator_router._lre = None

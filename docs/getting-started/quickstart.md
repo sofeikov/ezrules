@@ -19,28 +19,39 @@ By the end of this page, you should have:
 
 ## Step 1: Start Services
 
-Start infrastructure:
+=== "Docker (demo or production)"
 
-```bash
-docker compose up -d
-```
+    If you started with `docker-compose.demo.yml` or `docker-compose.prod.yml`, all services are already running — skip to [Step 2](#step-2-log-in).
 
-Start API:
+    Checkpoint:
 
---8<-- "snippets/start-api.md"
+    - `http://localhost:8888/ping` responds
+    - `http://localhost:4200` loads login page
 
-Start frontend:
+=== "Development (local processes)"
 
-```bash
-cd ezrules/frontend
-npm install
-npm start
-```
+    Start infrastructure:
 
-Checkpoint:
+    ```bash
+    docker compose up -d
+    ```
 
-- `http://localhost:8888/ping` responds
-- `http://localhost:4200` loads login page
+    Start API:
+
+    --8<-- "snippets/start-api.md"
+
+    Start frontend:
+
+    ```bash
+    cd ezrules/frontend
+    npm install
+    npm start
+    ```
+
+    Checkpoint:
+
+    - `http://localhost:8888/ping` responds
+    - `http://localhost:4200` loads login page
 
 ---
 

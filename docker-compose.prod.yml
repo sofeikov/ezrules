@@ -1,0 +1,91 @@
+# Production stack: full application with an empty database.
+# Intended for real usage. Credentials are loaded from a .env file.
+#
+# Setup:
+#   cp .env.example .env   # then edit .env with your own values
+#   docker compose -f docker-compose.prod.yml up --build
+#
+# Access:
+#   Frontend: http://localhost:4200
+#   API:      http://localhost:8888
+
+services:
+  postgres:
+    image: postgres:16.0-alpine3.18
+    environment:
+      POSTGRES_PASSWORD: root
+      POSTGRES_HOST_AUTH_METHOD: trust
+      LC_CTYPE: en_US.UTF-8
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Runs once on first boot to initialise the DB and create the admin user.
+  # Safe to re-run: init-db skips existing DB, add-user skips duplicate user.
+  init:
+    build: .
+    command: >
+      sh -c "echo N | uv run ezrules init-db &&
+             uv run ezrules add-user --user-email ${EZRULES_ADMIN_EMAIL} --password ${EZRULES_ADMIN_PASSWORD} --admin"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
+      EZRULES_APP_SECRET: ${EZRULES_APP_SECRET}
+      EZRULES_ORG_ID: 1
+    restart: "no"
+
+  api:
+    build: .
+    command: uv run ezrules api --port 8888
+    ports:
+      - "8888:8888"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
+      EZRULES_APP_SECRET: ${EZRULES_APP_SECRET}
+      EZRULES_ORG_ID: 1
+      EZRULES_CELERY_BROKER_URL: redis://redis:6379
+
+  worker:
+    build: .
+    command: uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
+      EZRULES_APP_SECRET: ${EZRULES_APP_SECRET}
+      EZRULES_ORG_ID: 1
+      EZRULES_CELERY_BROKER_URL: redis://redis:6379
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata_prod:
