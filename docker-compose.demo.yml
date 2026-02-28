@@ -1,0 +1,98 @@
+# Demo stack: full application with seeded test data.
+# Intended for getting familiar with ezrules — not for real data.
+#
+# Usage:
+#   docker compose -f docker-compose.demo.yml up --build
+#
+# Access:
+#   Frontend: http://localhost:4200
+#   API:      http://localhost:8888
+#   Login:    admin@example.com / admin
+#
+# To reset and re-seed from scratch (wipes all data):
+#   docker compose -f docker-compose.demo.yml down -v
+#   docker compose -f docker-compose.demo.yml up --build
+
+services:
+  postgres:
+    image: postgres:16.0-alpine3.18
+    environment:
+      POSTGRES_PASSWORD: root
+      POSTGRES_HOST_AUTH_METHOD: trust
+      LC_CTYPE: en_US.UTF-8
+    volumes:
+      - pgdata_demo:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Runs once on first boot to initialise the DB and seed demo data.
+  # On subsequent `docker compose up` (volumes intact) the commands are
+  # idempotent: init-db skips re-creation, add-user skips duplicate user,
+  # and generate-random-data adds more sample records.
+  init:
+    build: .
+    command: >
+      sh -c "echo N | uv run ezrules init-db &&
+             uv run ezrules add-user --user-email admin@example.com --password admin --admin &&
+             uv run ezrules generate-random-data --n-rules 10 --n-events 100"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
+      EZRULES_APP_SECRET: demo_secret_do_not_use_in_production
+      EZRULES_ORG_ID: 1
+    restart: "no"
+
+  api:
+    build: .
+    command: uv run ezrules api --port 8888
+    ports:
+      - "8888:8888"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
+      EZRULES_APP_SECRET: demo_secret_do_not_use_in_production
+      EZRULES_ORG_ID: 1
+      EZRULES_CELERY_BROKER_URL: redis://redis:6379
+
+  worker:
+    build: .
+    command: uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
+      EZRULES_APP_SECRET: demo_secret_do_not_use_in_production
+      EZRULES_ORG_ID: 1
+      EZRULES_CELERY_BROKER_URL: redis://redis:6379
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata_demo:

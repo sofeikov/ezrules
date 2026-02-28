@@ -1,0 +1,24 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+.ruff_cache
+htmlcov
+.coverage
+coverage.xml
+
+# Frontend build artifacts and deps (rebuilt inside container)
+ezrules/frontend/node_modules
+ezrules/frontend/dist
+ezrules/frontend/playwright-report
+ezrules/frontend/test-results
+
+# Dev files
+.env
+*.env
+settings.env
+.vscode
+docs

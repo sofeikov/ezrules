@@ -1,5 +1,13 @@
 # What's New
 
+## v0.16
+
+* **Full-stack Docker Compose**: Two new compose files replace the previous infrastructure-only setup.
+  * `docker-compose.demo.yml` — starts the complete stack (PostgreSQL, Redis, Celery worker, FastAPI API, Angular frontend) and seeds the database with 10 sample rules and 100 events. One command to a working UI: `docker compose -f docker-compose.demo.yml up --build`.
+  * `docker-compose.prod.yml` — same full stack with an empty database. Credentials are read from a `.env` file (template provided as `.env.example`).
+* **`Dockerfile.frontend`**: New multi-stage Dockerfile (Node 20 build → nginx serve) for the Angular frontend.
+* The original `docker-compose.yml` (PostgreSQL + Redis only) is unchanged and remains the recommended setup for local development.
+
 ## v0.15
 
 * **Server-side session revocation**: Refresh tokens are now tracked in a `user_session` database table. Logging out invalidates the refresh token immediately, preventing reuse even if a token is intercepted after logout.

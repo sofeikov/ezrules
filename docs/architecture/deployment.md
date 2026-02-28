@@ -1,9 +1,8 @@
 # Deployment Guide (Local Runbook)
 
-This runbook covers a practical local deployment model: Docker Compose for infrastructure and local processes for API/frontend.
+This runbook covers local deployment. Three modes are supported.
 
-Use this page for local development and test environments.  
-For system boundaries and design rationale, use [Architecture Overview](overview.md).  
+For system boundaries and design rationale, use [Architecture Overview](overview.md).
 For environment variable details, use [Configuration](../getting-started/configuration.md).
 
 ---
@@ -12,9 +11,8 @@ For environment variable details, use [Configuration](../getting-started/configu
 
 In scope:
 
-- single-host local setup
+- single-host local setup, all three deployment modes
 - API service startup and verification
-- optional frontend startup
 - backtesting worker readiness
 
 Out of scope:
@@ -24,116 +22,111 @@ Out of scope:
 
 ---
 
-## What Runs Where
+## Deployment Modes
 
-- Docker Compose runs:
-  - PostgreSQL (`localhost:5432`)
-  - Redis (`localhost:6379`)
-  - Celery worker (for backtesting tasks)
-- Local process runs:
-  - FastAPI service (`localhost:8888`)
-  - Frontend dev server (`localhost:4200`, optional)
+### Mode 1 — Full Docker (demo or production)
+
+Everything runs inside Docker. No local Python or Node required.
+
+| Container | What it does |
+|---|---|
+| `postgres` | Database (`5432` not exposed to host by default) |
+| `redis` | Celery broker (`6379` not exposed to host by default) |
+| `init` | One-shot: creates DB schema, admin user, optional seed data |
+| `api` | FastAPI service on `localhost:8888` |
+| `worker` | Celery worker for backtesting |
+| `frontend` | nginx serving the Angular SPA on `localhost:4200` |
+
+**Demo** (pre-seeded with sample rules and events):
+
+```bash
+docker compose -f docker-compose.demo.yml up --build
+```
+
+**Production** (empty database, credentials from `.env`):
+
+```bash
+cp .env.example .env   # fill in APP_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
+docker compose -f docker-compose.prod.yml up --build
+```
+
+Verify:
+
+```bash
+curl http://localhost:8888/ping        # → {"status":"ok"}
+# open http://localhost:4200 in a browser
+```
+
+Stop (keep data):
+
+```bash
+docker compose -f docker-compose.demo.yml down
+# or
+docker compose -f docker-compose.prod.yml down
+```
+
+Stop and delete all data:
+
+```bash
+docker compose -f docker-compose.demo.yml down -v
+```
 
 ---
 
-## Preflight Checklist
+### Mode 2 — Development (infrastructure in Docker, services local)
 
-- Docker and Docker Compose installed
-- Python 3.12+ installed
-- `uv` installed
-- Repo cloned and `settings.env` prepared
-- Required ports free: `5432`, `6379`, `8888` (and `4200` for frontend)
+PostgreSQL, Redis, and the Celery worker run in Docker. The API and Angular dev server run as local processes, enabling hot-reload and debugger attachment.
 
----
+**What runs where:**
 
-## 1. Start Infrastructure
+- Docker: PostgreSQL (`localhost:5432`), Redis (`localhost:6379`), Celery worker
+- Local: FastAPI (`localhost:8888`), Angular dev server (`localhost:4200`)
 
-### Action
+**Preflight:** Docker, Python 3.12+, `uv`, Node 20+, ports `5432 6379 8888 4200` free.
+
+#### 1. Start infrastructure
 
 ```bash
 docker compose up -d
 ```
 
-### Expected
+Expected: `docker compose ps` shows postgres, redis, worker as `Up`.
 
-- `docker compose ps` shows PostgreSQL, Redis, and worker containers as `Up`
-
-### Rollback
+Rollback:
 
 ```bash
 docker compose down        # keep volumes
 docker compose down -v     # remove volumes
 ```
 
----
-
-## 2. Install Dependencies
-
-### Action
+#### 2. Install dependencies
 
 ```bash
 uv sync
 ```
 
-### Expected
-
-- `uv` completes without dependency resolution errors
-
-### Rollback
-
-- Re-run `uv sync` after fixing dependency/toolchain errors
-
----
-
-## 3. Initialize Database and Permissions
-
-### Action
+#### 3. Initialize database
 
 ```bash
 uv run ezrules init-db
-uv run ezrules init-permissions
-uv run ezrules add-user --user-email admin@example.com --password admin
+uv run ezrules add-user --user-email admin@example.com --password admin --admin
 ```
 
-### Expected
+Requires `settings.env` with `EZRULES_DB_ENDPOINT`, `EZRULES_APP_SECRET`, `EZRULES_ORG_ID`.
 
-- Commands complete without DB/auth errors
-- Admin user can log in later via UI/API
-
-### Rollback
-
-- Fix DB endpoint/credentials in `settings.env`
-- Re-run initialization commands
-
----
-
-## 4. Run API Service
-
-### Action
+#### 4. Run API
 
 --8<-- "snippets/start-api.md"
 
-Optional (development reload):
+Optional (with auto-reload):
 
 ```bash
 uv run ezrules api --port 8888 --reload
 ```
 
-### Expected
+Expected: `http://localhost:8888/ping` responds.
 
-- `http://localhost:8888/ping` responds
-- OpenAPI docs load at `http://localhost:8888/docs`
-
-### Rollback
-
-- Stop API process
-- Free conflicting port or run on a different port
-
----
-
-## 5. Run Frontend (Optional for UI Work)
-
-### Action
+#### 5. Run frontend
 
 ```bash
 cd ezrules/frontend
@@ -141,27 +134,21 @@ npm install
 npm start
 ```
 
-### Expected
+Expected: `http://localhost:4200` loads login page.
 
-- Frontend loads at `http://localhost:4200`
-- Login flow can reach backend at `http://localhost:8888`
+#### 6. Verify
 
-### Rollback
-
-- Stop frontend process
-- Fix Node/npm dependency issues, then restart
-
----
-
-## 6. Verify Service
-
-- API root: `http://localhost:8888/`
 - Health check: `http://localhost:8888/ping`
-- OpenAPI docs:
-  - Swagger UI: `http://localhost:8888/docs`
-  - ReDoc: `http://localhost:8888/redoc`
-  - OpenAPI JSON: `http://localhost:8888/openapi.json`
-- Frontend UI (dev): `http://localhost:4200` (if started)
+- OpenAPI: `http://localhost:8888/docs`
+- Frontend: `http://localhost:4200`
+
+#### Clean shutdown
+
+Stop local processes, then:
+
+```bash
+docker compose down
+```
 
 ---
 
@@ -169,34 +156,23 @@ npm start
 
 | Symptom | Likely Cause | Action |
 |---|---|---|
+| `init` container exits non-zero | DB not ready or env var missing | Check `docker compose logs init` |
 | API fails to start | DB endpoint invalid or DB down | Check `settings.env`, then `docker compose ps` |
-| API port conflict | Port `8888` already in use | Stop conflicting process or change API port |
-| Backtests stay `PENDING` | Worker or Redis unavailable | Confirm compose services are `Up` |
-| Frontend cannot log in | API not reachable/auth user missing | Verify API health and recreate admin user |
+| Port `8888` or `4200` conflict | Another process holds the port | `lsof -i :8888` to identify, then stop it |
+| Backtests stay `PENDING` | Worker or Redis unavailable | `docker compose ps` — confirm worker is `Up` |
+| Frontend cannot log in | API not reachable or no admin user | Verify `/ping`, re-run `add-user` |
 
 ---
 
 ## Backtesting Notes
 
-- Backtesting endpoints enqueue Celery tasks
-- Worker must be running, or tasks remain `PENDING`
-- `docker compose up -d` already starts worker in this local model
+- Backtesting enqueues Celery tasks via Redis
+- Worker must be running or tasks remain `PENDING` indefinitely
+- All three deployment modes include a running worker
 
 ---
 
-## Clean Shutdown
-
-Stop local frontend/API processes (if running), then:
-
-```bash
-docker compose down
-```
-
-Use `docker compose down -v` only when you intentionally want to remove local volumes/data.
-
----
-
-## Common Local Commands
+## Common Development Commands
 
 ```bash
 docker compose up -d
