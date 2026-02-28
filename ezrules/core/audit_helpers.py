@@ -9,6 +9,7 @@ or after the mutation, depending on the action type.
 import datetime
 
 from ezrules.models.backend_core import (
+    ApiKeyHistory,
     FieldTypeHistory,
     LabelHistory,
     OutcomeHistory,
@@ -115,6 +116,26 @@ def save_field_type_history(
         datetime_format=datetime_format,
         action=action,
         details=details,
+        o_id=o_id,
+        changed=datetime.datetime.now(datetime.UTC),
+        changed_by=changed_by,
+    )
+    db.add(history)
+
+
+def save_api_key_history(
+    db,
+    api_key_gid: str,
+    label: str,
+    action: str,
+    o_id: int,
+    changed_by: str | None = None,
+) -> None:
+    """Record an audit entry for an API key action."""
+    history = ApiKeyHistory(
+        api_key_gid=api_key_gid,
+        label=label,
+        action=action,
         o_id=o_id,
         changed=datetime.datetime.now(datetime.UTC),
         changed_by=changed_by,

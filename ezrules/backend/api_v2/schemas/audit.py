@@ -224,6 +224,28 @@ class FieldTypeAuditListResponse(BaseModel):
     offset: int = Field(..., description="Current offset")
 
 
+class ApiKeyHistoryEntry(BaseModel):
+    """A single entry in API key history."""
+
+    id: int = Field(..., description="History entry ID")
+    api_key_gid: str = Field(..., description="API key GID")
+    label: str = Field(..., description="Label of the API key at the time of the action")
+    action: str = Field(..., description="Action type (created, revoked)")
+    changed: datetime | None = Field(default=None, description="When this action occurred")
+    changed_by: str | None = Field(default=None, description="Who performed this action")
+
+    model_config = {"from_attributes": True}
+
+
+class ApiKeyAuditListResponse(BaseModel):
+    """Paginated list of API key audit entries."""
+
+    total: int = Field(..., description="Total number of history entries")
+    items: list[ApiKeyHistoryEntry] = Field(default_factory=list)
+    limit: int = Field(..., description="Page size")
+    offset: int = Field(..., description="Current offset")
+
+
 class AuditSummaryResponse(BaseModel):
     """Summary of audit trail data."""
 
@@ -237,3 +259,4 @@ class AuditSummaryResponse(BaseModel):
     total_user_account_actions: int = Field(default=0, description="Total user account history entries")
     total_role_permission_actions: int = Field(default=0, description="Total role permission history entries")
     total_field_type_actions: int = Field(default=0, description="Total field type config history entries")
+    total_api_key_actions: int = Field(default=0, description="Total API key history entries")

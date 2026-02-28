@@ -1,5 +1,12 @@
 # What's New
 
+## v0.16
+
+* **API key authentication on evaluate**: `POST /api/v2/evaluate` now requires credentials. Pass an `X-API-Key` header with a key created via `POST /api/v2/api-keys`, or a standard Bearer JWT. Unauthenticated requests receive `401 Authentication required`.
+* **API key management**: New endpoints `POST /api/v2/api-keys`, `GET /api/v2/api-keys`, `DELETE /api/v2/api-keys/{gid}` allow administrators with the `MANAGE_API_KEYS` permission to create, list, and revoke service API keys. The raw key is returned exactly once at creation and is never stored in plain text (only a SHA-256 hash is retained).
+* **Body size limit**: All API requests are now rejected with `413 Request body too large` when the `Content-Length` header exceeds 1 MB (configurable via `EZRULES_MAX_BODY_SIZE_KB`).
+* **Error sanitisation**: Internal errors from evaluate no longer leak exception messages; the response body is always `{"detail": "Evaluation failed"}`.
+
 ## v0.15
 
 * **Server-side session revocation**: Refresh tokens are now tracked in a `user_session` database table. Logging out invalidates the refresh token immediately, preventing reuse even if a token is intercepted after logout.

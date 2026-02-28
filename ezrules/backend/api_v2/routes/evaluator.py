@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from ezrules.backend.api_v2.auth.dependencies import get_db
+from ezrules.backend.api_v2.auth.dependencies import get_db, get_evaluator_auth
 from ezrules.backend.api_v2.schemas.evaluator import EvaluateRequest, EvaluateResponse
 from ezrules.backend.data_utils import Event, eval_and_store
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
@@ -49,6 +49,7 @@ def evaluate(
     lre: LocalRuleExecutorSQL = Depends(_get_rule_executor),
     shadow_lre: LocalRuleExecutorSQL = Depends(_get_shadow_executor),
     db: Any = Depends(get_db),
+    _: None = Depends(get_evaluator_auth),
 ) -> EvaluateResponse:
     """
     Evaluate an event against the current rule engine configuration.
@@ -76,7 +77,7 @@ def evaluate(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Evaluation failed: {exc}",
+            detail="Evaluation failed",
         ) from exc
 
     # Best-effort shadow evaluation — never fails the main request

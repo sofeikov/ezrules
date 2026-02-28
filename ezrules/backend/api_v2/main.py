@@ -6,9 +6,13 @@ This is the main entry point for the new FastAPI-based API.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import JSONResponse
 
 from ezrules.backend.api_v2.routes import (
     analytics,
+    api_keys,
     audit,
     auth,
     backtesting,
@@ -46,6 +50,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class BodySizeLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > app_settings.MAX_BODY_SIZE_KB * 1024:
+            return JSONResponse(status_code=413, content={"detail": "Request body too large"})
+        return await call_next(request)
+
+
+app.add_middleware(BodySizeLimitMiddleware)
 
 
 # =============================================================================
@@ -117,3 +132,6 @@ app.include_router(field_types.router)
 
 # Shadow routes: /api/v2/shadow/*
 app.include_router(shadow.router)
+
+# API Key routes: /api/v2/api-keys/*
+app.include_router(api_keys.router)
