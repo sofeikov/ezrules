@@ -26,7 +26,7 @@ def _setup_rule(session, rid, r_id):
 
 
 class TestFieldObservationCollection:
-    def test_observations_created_after_evaluate(self, session):
+    def test_observations_created_after_evaluate(self, session, live_api_key):
         """Fields in event_data should appear in FieldObservation after /evaluate."""
         org = _setup_rule(session, "OBS:001", 8001)
 
@@ -38,6 +38,7 @@ class TestFieldObservationCollection:
                     "event_timestamp": 1700000000,
                     "event_data": {"amount": 500, "country": "US"},
                 },
+                headers={"X-API-Key": live_api_key},
             )
 
         evaluator_router._lre = None
@@ -61,7 +62,7 @@ class TestFieldObservationCollection:
         assert country_obs.observed_json_type == "str"
         assert country_obs.occurrence_count == 1
 
-    def test_observation_count_increments_on_repeat_evaluate(self, session):
+    def test_observation_count_increments_on_repeat_evaluate(self, session, live_api_key):
         """Repeated /evaluate calls should increment occurrence_count."""
         org = _setup_rule(session, "OBS:002", 8002)
 
@@ -74,6 +75,7 @@ class TestFieldObservationCollection:
                         "event_timestamp": 1700000000,
                         "event_data": {"score": 1.5},
                     },
+                    headers={"X-API-Key": live_api_key},
                 )
 
         evaluator_router._lre = None
@@ -86,7 +88,7 @@ class TestFieldObservationCollection:
         assert obs is not None
         assert obs.occurrence_count == 3
 
-    def test_observation_per_type_on_type_change(self, session):
+    def test_observation_per_type_on_type_change(self, session, live_api_key):
         """Each distinct type for a field gets its own row with its own count."""
         org = _setup_rule(session, "OBS:003", 8003)
 
@@ -98,6 +100,7 @@ class TestFieldObservationCollection:
                     "event_timestamp": 1700000000,
                     "event_data": {"ref": 123},
                 },
+                headers={"X-API-Key": live_api_key},
             )
             client.post(
                 "/api/v2/evaluate",
@@ -106,6 +109,7 @@ class TestFieldObservationCollection:
                     "event_timestamp": 1700000000,
                     "event_data": {"ref": "ABC"},
                 },
+                headers={"X-API-Key": live_api_key},
             )
 
         evaluator_router._lre = None

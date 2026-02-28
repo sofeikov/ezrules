@@ -10,9 +10,10 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from ezrules.backend import data_utils
 from ezrules.backend.api_v2.auth.dependencies import get_db, get_evaluator_auth
 from ezrules.backend.api_v2.schemas.evaluator import EvaluateRequest, EvaluateResponse
-from ezrules.backend.data_utils import Event, eval_and_store
+from ezrules.backend.data_utils import Event
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.type_casting import CastError, cast_event
@@ -73,7 +74,7 @@ def evaluate(
         event_data=event_data,
     )
     try:
-        result, tl_id = eval_and_store(lre, event)
+        result, tl_id = data_utils.eval_and_store(lre, event)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

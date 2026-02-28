@@ -1,8 +1,12 @@
+import hashlib
+import secrets
+import uuid
+
 import pytest
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
-from ezrules.models.backend_core import Organisation, User
+from ezrules.models.backend_core import ApiKey, Organisation, User
 from ezrules.models.database import Base, engine
 
 
@@ -83,3 +87,25 @@ def session(connection):
 
     session.close()
     transaction.rollback()
+
+
+@pytest.fixture(scope="function")
+def live_api_key(session):
+    """Insert an active API key for the test org and return the raw key string.
+
+    This fixture is available to all test files.  Tests that define their own
+    ``live_api_key`` fixture (e.g. test_api_v2_api_keys.py) override this one
+    for their own module, so there is no conflict.
+    """
+    org = session.query(Organisation).first()
+    raw_key = "ezrk_" + secrets.token_hex(32)
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    api_key = ApiKey(
+        gid=str(uuid.uuid4()),
+        key_hash=key_hash,
+        label="conftest-test-key",
+        o_id=org.o_id,
+    )
+    session.add(api_key)
+    session.commit()
+    return raw_key
