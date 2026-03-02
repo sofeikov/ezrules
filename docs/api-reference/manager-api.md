@@ -54,6 +54,9 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | `POST` | `/api/v2/auth/login` | No | OAuth2 form login |
+| `POST` | `/api/v2/auth/accept-invite` | No | Accept invitation token and set password |
+| `POST` | `/api/v2/auth/forgot-password` | No | Send password reset email (always generic response) |
+| `POST` | `/api/v2/auth/reset-password` | No | Reset password using one-time token |
 | `POST` | `/api/v2/auth/refresh` | No (refresh token in body) | Exchanges refresh token (rotation — one-time use) |
 | `POST` | `/api/v2/auth/logout` | Bearer + refresh token in body | Revokes refresh token server-side |
 | `GET` | `/api/v2/auth/me` | Bearer | Current user profile |
@@ -118,6 +121,7 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 | `GET` | `/api/v2/users` | Bearer + permission | List users |
 | `GET` | `/api/v2/users/{user_id}` | Bearer + permission | Get user details |
 | `POST` | `/api/v2/users` | Bearer + permission | Create user |
+| `POST` | `/api/v2/users/invite` | Bearer + permission | Invite user by email and send activation link |
 | `PUT` | `/api/v2/users/{user_id}` | Bearer + permission | Update user |
 | `DELETE` | `/api/v2/users/{user_id}` | Bearer + permission | Delete user |
 | `POST` | `/api/v2/users/{user_id}/roles` | Bearer + permission | Assign role to user |

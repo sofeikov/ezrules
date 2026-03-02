@@ -1,13 +1,13 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   template: `
     <div class="min-h-screen flex items-center justify-center bg-gray-100">
       <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
@@ -47,6 +47,9 @@ import { AuthService } from '../services/auth.service';
               placeholder="Enter your password"
               [disabled]="loading"
             />
+            <div class="mt-2 text-right">
+              <a routerLink="/forgot-password" class="text-sm text-blue-600 hover:underline">Forgot password?</a>
+            </div>
           </div>
 
           <button

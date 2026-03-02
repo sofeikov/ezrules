@@ -38,6 +38,9 @@ uv run ezrules add-user --user-email admin@example.com --password admin --admin
 - `http://localhost:8888/ping` responds
 - Admin user can log in to the UI
 - **Security** and **Settings** pages are visible in sidebar
+- SMTP settings are configured if you plan to use invitation/password reset emails:
+  - `EZRULES_SMTP_HOST`, `EZRULES_SMTP_PORT`, `EZRULES_SMTP_USER`, `EZRULES_SMTP_PASSWORD`, `EZRULES_FROM_EMAIL`
+  - `EZRULES_APP_BASE_URL` points to your frontend URL
 
 ### Rollback / Recovery
 
@@ -52,21 +55,28 @@ uv run ezrules add-user --user-email admin@example.com --password admin --admin
 
 1. Open **Security** for user management
 2. Open **Settings** for role/permission management
-3. Apply least-privilege role assignments
+3. Use **Invite User** for standard onboarding (email + optional role)
+4. Apply least-privilege role assignments
 
 ### API endpoints
 
 - `GET /api/v2/users`
 - `POST /api/v2/users`
+- `POST /api/v2/users/invite`
 - `PUT /api/v2/users/{user_id}`
 - `DELETE /api/v2/users/{user_id}`
 - `GET /api/v2/roles`
 - `PUT /api/v2/roles/{role_id}/permissions`
+- `POST /api/v2/auth/accept-invite`
+- `POST /api/v2/auth/forgot-password`
+- `POST /api/v2/auth/reset-password`
 
 ### Verify
 
 - Modified user/role appears in UI
 - Target user can perform expected actions and is blocked from restricted actions
+- Invitation emails contain links to `/accept-invite?token=...`
+- Password reset emails contain links to `/reset-password?token=...`
 
 ---
 

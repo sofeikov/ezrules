@@ -11,7 +11,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
 
   // Don't attach token to login/refresh requests (avoid loops)
-  if (req.url.includes('/auth/login') || req.url.includes('/auth/refresh')) {
+  if (
+    req.url.includes('/auth/login') ||
+    req.url.includes('/auth/refresh') ||
+    req.url.includes('/auth/accept-invite') ||
+    req.url.includes('/auth/forgot-password') ||
+    req.url.includes('/auth/reset-password')
+  ) {
     return next(req);
   }
 

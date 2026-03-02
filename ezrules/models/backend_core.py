@@ -443,6 +443,33 @@ class UserSession(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
+class Invitation(Base):
+    __tablename__ = "invitations"
+
+    gid = Column(String(36), primary_key=True)
+    email = Column(String(255), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    invited_by = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    accepted_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=False)
+
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    org: Mapped["Organisation"] = relationship()
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+
+
 class ApiKey(Base):
     __tablename__ = "api_keys"
 

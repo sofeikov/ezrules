@@ -17,9 +17,15 @@ import { FieldTypesComponent } from './field-types/field-types.component';
 import { ShadowRulesComponent } from './shadow-rules/shadow-rules.component';
 import { ApiKeysComponent } from './api-keys/api-keys.component';
 import { authGuard } from './auth/auth.guard';
+import { ForgotPasswordComponent } from './forgot-password/forgot-password.component';
+import { ResetPasswordComponent } from './reset-password/reset-password.component';
+import { AcceptInviteComponent } from './accept-invite/accept-invite.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
+  { path: 'forgot-password', component: ForgotPasswordComponent },
+  { path: 'reset-password', component: ResetPasswordComponent },
+  { path: 'accept-invite', component: AcceptInviteComponent },
   { path: '', component: DashboardComponent, canActivate: [authGuard] },
   { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
   { path: 'rules', component: RuleListComponent, canActivate: [authGuard] },

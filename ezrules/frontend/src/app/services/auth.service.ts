@@ -19,6 +19,10 @@ export interface AuthUser {
   last_login_at: string | null;
 }
 
+export interface MessageResponse {
+  message: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -98,5 +102,17 @@ export class AuthService {
 
   getCurrentUser(): Observable<AuthUser> {
     return this.http.get<AuthUser>(`${this.AUTH_URL}/me`);
+  }
+
+  acceptInvite(token: string, password: string): Observable<MessageResponse> {
+    return this.http.post<MessageResponse>(`${this.AUTH_URL}/accept-invite`, { token, password });
+  }
+
+  forgotPassword(email: string): Observable<MessageResponse> {
+    return this.http.post<MessageResponse>(`${this.AUTH_URL}/forgot-password`, { email });
+  }
+
+  resetPassword(token: string, password: string): Observable<MessageResponse> {
+    return this.http.post<MessageResponse>(`${this.AUTH_URL}/reset-password`, { token, password });
   }
 }

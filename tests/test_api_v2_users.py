@@ -11,12 +11,16 @@ These tests verify:
 import bcrypt
 import pytest
 from fastapi.testclient import TestClient
+from datetime import UTC, datetime, timedelta
+import hashlib
+import uuid
 
 from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
+from ezrules.backend.api_v2.routes import users as users_routes
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Organisation, Role, User
+from ezrules.models.backend_core import Invitation, Organisation, PasswordResetToken, Role, User, UserSession
 
 
 @pytest.fixture(scope="function")
@@ -307,6 +311,65 @@ class TestCreateUser:
         assert "not found" in data["error"]
 
 
+class TestInviteUser:
+    """Tests for POST /api/v2/users/invite."""
+
+    def test_invite_user_success(self, users_test_client, monkeypatch):
+        """Should create inactive user and invitation token."""
+        token = users_test_client.test_data["token"]
+        session = users_test_client.test_data["session"]
+        sent_email: dict[str, str] = {}
+
+        def fake_send_invitation_email(email: str, raw_token: str) -> None:
+            sent_email["email"] = email
+            sent_email["token"] = raw_token
+
+        monkeypatch.setattr(users_routes, "send_invitation_email", fake_send_invitation_email)
+
+        response = users_test_client.post(
+            "/api/v2/users/invite",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "email": "invited@example.com",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+
+        invited_user = session.query(User).filter(User.email == "invited@example.com").first()
+        assert invited_user is not None
+        assert invited_user.active is False
+
+        invitation = session.query(Invitation).filter(Invitation.user_id == invited_user.id).first()
+        assert invitation is not None
+        assert invitation.accepted_at is None
+        assert sent_email["email"] == "invited@example.com"
+        assert invitation.token_hash != sent_email["token"]
+        assert len(invitation.token_hash) == 64
+
+    def test_invite_active_user_returns_error(self, users_test_client, sample_user, monkeypatch):
+        """Should reject invitations for already active users."""
+        token = users_test_client.test_data["token"]
+
+        def fake_send_invitation_email(email: str, raw_token: str) -> None:
+            raise AssertionError("email send should not be called")
+
+        monkeypatch.setattr(users_routes, "send_invitation_email", fake_send_invitation_email)
+
+        response = users_test_client.post(
+            "/api/v2/users/invite",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"email": sample_user.email},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert "already exists" in data["message"].lower()
+
+
 # =============================================================================
 # UPDATE USER TESTS
 # =============================================================================
@@ -463,6 +526,49 @@ class TestDeleteUser:
         )
 
         assert response.status_code == 404
+
+    def test_delete_user_with_auth_artifacts(self, users_test_client, sample_user):
+        """Should delete user even when invite/reset/session rows exist."""
+        token = users_test_client.test_data["token"]
+        session = users_test_client.test_data["session"]
+        org = users_test_client.test_data["org"]
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        session.add(
+            Invitation(
+                gid=str(uuid.uuid4()),
+                email=str(sample_user.email),
+                o_id=int(org.o_id),
+                user_id=int(sample_user.id),
+                token_hash=hashlib.sha256(b"invite-token").hexdigest(),
+                invited_by="admin@example.com",
+                created_at=now,
+                expires_at=now + timedelta(hours=24),
+            )
+        )
+        session.add(
+            PasswordResetToken(
+                user_id=int(sample_user.id),
+                token_hash=hashlib.sha256(b"reset-token").hexdigest(),
+                created_at=now,
+                expires_at=now + timedelta(hours=1),
+            )
+        )
+        session.add(
+            UserSession(
+                user_id=int(sample_user.id),
+                refresh_token="refresh-token-for-delete-test",
+                expires_at=now + timedelta(days=1),
+            )
+        )
+        session.commit()
+
+        response = users_test_client.delete(
+            f"/api/v2/users/{sample_user.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+        assert response.json()["success"] is True
 
 
 # =============================================================================

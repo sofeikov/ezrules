@@ -36,13 +36,21 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      mailpit:
+        image: axllent/mailpit:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
 
     env:
       EZRULES_DB_ENDPOINT: postgresql://postgres:root@localhost:5432/tests
-      EZRULES_TESTING: "true"
+      EZRULES_TESTING: "false"
       EZRULES_APP_SECRET: "test-secret"
       EZRULES_ORG_ID: "1"
       EZRULES_CELERY_BROKER_URL: redis://localhost:6379
+      EZRULES_SMTP_HOST: localhost
+      EZRULES_SMTP_PORT: "1025"
+      EZRULES_FROM_EMAIL: no-reply@ezrules.local
 
     steps:
     - uses: actions/checkout@v4
@@ -93,10 +101,21 @@ jobs:
         cat /tmp/ezrules-api.log || true
         exit 1
 
+    - name: Wait for Mailpit
+      run: |
+        for i in {1..30}; do
+          if curl -fsS http://localhost:8025/api/v1/messages > /dev/null; then
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "Mailpit did not become ready in time"
+        exit 1
+
     - name: Start frontend
       working-directory: ezrules/frontend
       run: |
-        nohup npm start -- --host 0.0.0.0 > /tmp/ezrules-frontend.log 2>&1 &
+        nohup npm start -- --configuration production --host 0.0.0.0 --port 4200 > /tmp/ezrules-frontend.log 2>&1 &
         echo $! > /tmp/ezrules-frontend.pid
 
     - name: Wait for frontend

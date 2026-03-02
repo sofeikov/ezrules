@@ -18,10 +18,14 @@ export class UserManagementComponent implements OnInit {
   newEmail: string = '';
   newPassword: string = '';
   selectedRoleId: number | null = null;
+  inviteEmail: string = '';
+  inviteRoleId: number | null = null;
 
   loading: boolean = true;
   error: string | null = null;
   createError: string | null = null;
+  inviteError: string | null = null;
+  inviteMessage: string | null = null;
   actionError: string | null = null;
 
   constructor(private userService: UserService) { }
@@ -62,6 +66,7 @@ export class UserManagementComponent implements OnInit {
     if (!this.newEmail.trim() || !this.newPassword.trim()) return;
 
     this.createError = null;
+    this.inviteMessage = null;
     const roleIds = this.selectedRoleId ? [this.selectedRoleId] : undefined;
 
     this.userService.createUser(this.newEmail.trim(), this.newPassword, roleIds).subscribe({
@@ -77,6 +82,30 @@ export class UserManagementComponent implements OnInit {
       },
       error: (err: HttpErrorResponse) => {
         this.createError = err.error?.error ?? 'Failed to create user. Please try again.';
+      }
+    });
+  }
+
+  inviteUser(): void {
+    if (!this.inviteEmail.trim()) return;
+
+    this.inviteError = null;
+    this.inviteMessage = null;
+    const roleIds = this.inviteRoleId ? [this.inviteRoleId] : undefined;
+
+    this.userService.inviteUser(this.inviteEmail.trim(), roleIds).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.inviteMessage = response.message;
+          this.inviteEmail = '';
+          this.inviteRoleId = null;
+          this.loadUsers();
+        } else {
+          this.inviteError = response.error ?? 'Failed to send invitation.';
+        }
+      },
+      error: (err: HttpErrorResponse) => {
+        this.inviteError = err.error?.detail ?? 'Failed to send invitation. Please try again.';
       }
     });
   }

@@ -28,14 +28,11 @@ e2e/
 
 ## What's Tested
 
-Currently tests only the **implemented features**:
-- Rule list page display (from `/api/rules` endpoint)
-- Loading states
-- Table rendering with rule data
-- "How to Run" section toggle
-- Responsive design
-
-Navigation and other pages are not yet implemented, so they're not tested.
+Current coverage includes:
+- Authentication and login
+- Rule management pages
+- Security pages (roles/users/API keys/audit trail)
+- Invite + password reset flows, including Mailpit email delivery assertions
 
 ## Prerequisites
 
@@ -54,7 +51,13 @@ Before running E2E tests, you need to have the following services running:
    npm start
    ```
 
-3. **Playwright Browsers**: Install Playwright browsers (first time only)
+3. **Mailpit**: Required for invite/reset email E2E tests
+   ```bash
+   # Terminal 3: start local infrastructure (includes mailpit on :8025)
+   docker compose up -d postgres redis mailpit
+   ```
+
+4. **Playwright Browsers**: Install Playwright browsers (first time only)
    ```bash
    cd ezrules/frontend
    npx playwright install chromium
@@ -96,6 +99,16 @@ npm run test:e2e -- --grep "should display"
 
 # Run a specific test by line number
 npm run test:e2e -- rule-list.spec.ts:42
+```
+
+### Endpoint Overrides
+
+If your API or Mailpit runs on non-default hosts/ports, set:
+
+```bash
+E2E_API_BASE_URL=http://localhost:8888 \
+E2E_MAILPIT_BASE_URL=http://localhost:8025 \
+npm run test:e2e -- auth-email-flows.spec.ts
 ```
 
 ## Test Organization

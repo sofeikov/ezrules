@@ -32,6 +32,22 @@ class UserCreate(BaseModel):
     }
 
 
+class UserInvite(BaseModel):
+    """Schema for inviting a new user."""
+
+    email: EmailStr = Field(..., description="User's email address")
+    role_ids: list[int] | None = Field(default=None, description="Optional list of role IDs to assign")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "email": "newuser@example.com",
+                "role_ids": [1, 2],
+            }
+        }
+    }
+
+
 class UserUpdate(BaseModel):
     """Schema for updating an existing user.
 
@@ -117,4 +133,12 @@ class RoleAssignmentResponse(BaseModel):
     success: bool
     message: str
     user: UserResponse | None = None
+    error: str | None = None
+
+
+class UserInviteResponse(BaseModel):
+    """Response for invite operations."""
+
+    success: bool
+    message: str
     error: str | None = None

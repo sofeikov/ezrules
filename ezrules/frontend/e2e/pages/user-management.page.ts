@@ -11,6 +11,11 @@ export class UserManagementPage {
   readonly passwordInput: Locator;
   readonly roleSelect: Locator;
   readonly createUserButton: Locator;
+  readonly inviteEmailInput: Locator;
+  readonly inviteRoleSelect: Locator;
+  readonly sendInviteButton: Locator;
+  readonly inviteSuccessMessage: Locator;
+  readonly inviteErrorMessage: Locator;
   readonly loadingSpinner: Locator;
   readonly errorMessage: Locator;
   readonly userCountText: Locator;
@@ -19,10 +24,15 @@ export class UserManagementPage {
   constructor(page: Page) {
     this.page = page;
     this.heading = page.locator('h1');
-    this.emailInput = page.locator('input[type="email"]');
+    this.emailInput = page.locator('input[placeholder="user@example.com"]');
     this.passwordInput = page.locator('input[type="password"]');
     this.roleSelect = page.locator('select').first();
     this.createUserButton = page.locator('button:has-text("Create User")');
+    this.inviteEmailInput = page.locator('input[placeholder="invitee@example.com"]');
+    this.inviteRoleSelect = page.locator('h2:has-text("Invite User")').locator('..').locator('select');
+    this.sendInviteButton = page.locator('button:has-text("Send Invite")');
+    this.inviteSuccessMessage = page.locator('text=/Invitation sent to/i');
+    this.inviteErrorMessage = page.locator('div.text-red-600').filter({ hasText: 'Failed to send invitation' });
     this.loadingSpinner = page.locator('.animate-spin');
     this.errorMessage = page.locator('.bg-red-50.border-red-200');
     this.userCountText = page.locator('text=/\\d+ users? total/');
@@ -51,6 +61,11 @@ export class UserManagementPage {
     await this.emailInput.fill(email);
     await this.passwordInput.fill(password);
     await this.createUserButton.click();
+  }
+
+  async inviteUser(email: string) {
+    await this.inviteEmailInput.fill(email);
+    await this.sendInviteButton.click();
   }
 
   async clickDeleteUser(email: string) {
