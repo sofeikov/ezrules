@@ -76,6 +76,7 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 10. If functionality affects user experience/actions, update README and `docs/whatsnew.md`.
 11. When tests are approved, run ALL tests, not selective subsets.
 12. After tests are done, kill API server (8888) and Angular dev server (4200) if you started them manually.
+13. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
 
 # Writing New Documentation
 1. Canonical documentation map: [DOCUMENTATION_MAP.md](DOCUMENTATION_MAP.md)
