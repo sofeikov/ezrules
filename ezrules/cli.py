@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 from random import choice, choices, randint, uniform
 from urllib.parse import urlparse
 
@@ -63,6 +64,24 @@ def _create_database(engine, db_name):
             logger.info(f"Database '{db_name}' created successfully")
         else:
             logger.info(f"Database '{db_name}' already exists")
+
+
+def _upgrade_database_schema(db_endpoint: str) -> None:
+    """Apply all pending database migrations for the configured database."""
+    logger.info("Applying database migrations with Alembic...")
+    env = os.environ.copy()
+    env["EZRULES_DB_ENDPOINT"] = db_endpoint
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=Path(__file__).resolve().parent.parent,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        error_text = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(f"Alembic migration failed: {error_text}")
 
 
 @click.group()
@@ -190,13 +209,13 @@ def init_db(auto_delete):
         logger.error(f"Failed to connect to database server: {e}")
         sys.exit(1)
 
-    # Now initialize the database schema and permissions
+    # Now apply migrations and seed default data
     try:
+        _upgrade_database_schema(db_endpoint)
+
         engine = create_engine(db_endpoint)
         db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
         Base.query = db_session.query_property()
-
-        Base.metadata.create_all(bind=engine)
 
         # Create default organisation
         logger.info("Creating default organisation...")

@@ -101,6 +101,9 @@ uv run ezrules init-db
 uv run ezrules add-user --user-email admin@example.com --password admin --admin
 ```
 
+`init-db` creates the target database (if missing), applies Alembic migrations, and seeds default data.
+After pulling future schema changes, run `uv run alembic upgrade head` on existing databases.
+
 ### 5) Start API and frontend
 
 Start backend:

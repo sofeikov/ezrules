@@ -119,8 +119,12 @@ EZRULES_ORG_ID=1
 EOF
 
 # Initialise DB and create an admin user
+# init-db creates the database if missing, applies Alembic migrations, and seeds defaults
 uv run ezrules init-db
 uv run ezrules add-user --user-email admin@example.com --password admin --admin
+
+# For existing databases, apply new migrations after pulling updates
+uv run alembic upgrade head
 
 # Start the API
 uv run ezrules api --port 8888

@@ -1,13 +1,33 @@
 import hashlib
+import os
 import secrets
+import subprocess
+import sys
 import uuid
+from pathlib import Path
 
 import pytest
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
 from ezrules.models.backend_core import ApiKey, Organisation, User
-from ezrules.models.database import Base, engine
+from ezrules.models.database import engine
+
+
+def _apply_migrations(database_url: str) -> None:
+    env = os.environ.copy()
+    env["EZRULES_DB_ENDPOINT"] = database_url
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=Path(__file__).resolve().parent,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        error_text = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(f"Failed to apply test database migrations: {error_text}")
 
 
 @pytest.fixture(scope="session")
@@ -16,7 +36,7 @@ def engine_fix():
         drop_database(engine.url)
     create_database(engine.url)
 
-    Base.metadata.create_all(engine)  # Assuming Base is the declarative base from your models
+    _apply_migrations(engine.url.render_as_string(hide_password=False))
 
     yield engine
 
