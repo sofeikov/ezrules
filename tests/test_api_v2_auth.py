@@ -8,6 +8,10 @@ These tests verify:
 - Token expiration handling
 """
 
+import hashlib
+import uuid
+from datetime import UTC, datetime, timedelta
+
 import bcrypt
 import pytest
 from fastapi.testclient import TestClient
@@ -19,7 +23,8 @@ from ezrules.backend.api_v2.auth.jwt import (
     decode_token,
 )
 from ezrules.backend.api_v2.main import app
-from ezrules.models.backend_core import Role, User, UserSession
+from ezrules.backend.api_v2.routes import auth as auth_routes
+from ezrules.models.backend_core import Invitation, Organisation, PasswordResetToken, Role, User, UserSession
 
 
 @pytest.fixture(scope="function")
@@ -309,6 +314,156 @@ class TestRefreshEndpoint:
 
         assert response.status_code == 401
         assert "Invalid token type" in response.json()["detail"]
+
+
+# =============================================================================
+# INVITE/PASSWORD RESET ENDPOINT TESTS
+# =============================================================================
+
+
+class TestInviteAndPasswordResetEndpoints:
+    """Tests for invitation acceptance and password reset flows."""
+
+    def test_accept_invite_sets_password_and_activates_user(self, api_client, session):
+        """Valid invitation should activate user and set provided password."""
+        now = datetime.now(UTC).replace(tzinfo=None)
+
+        invited_user = User(
+            email="invited_user@example.com",
+            password=bcrypt.hashpw("placeholder".encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
+            active=False,
+            fs_uniquifier="invited_user@example.com",
+        )
+        session.add(invited_user)
+        session.commit()
+
+        org = session.query(Organisation).first()
+        assert org is not None
+
+        raw_token = "invite_token_for_test_123456"
+        invitation = Invitation(
+            gid=str(uuid.uuid4()),
+            email="invited_user@example.com",
+            o_id=int(org.o_id),
+            user_id=int(invited_user.id),
+            token_hash=hashlib.sha256(raw_token.encode("utf-8")).hexdigest(),
+            invited_by="admin@example.com",
+            created_at=now,
+            expires_at=now + timedelta(hours=2),
+        )
+        session.add(invitation)
+        session.commit()
+
+        response = api_client.post(
+            "/api/v2/auth/accept-invite",
+            json={"token": raw_token, "password": "newpassword123"},
+        )
+        assert response.status_code == 200
+
+        session.refresh(invited_user)
+        session.refresh(invitation)
+        assert invited_user.active is True
+        assert bcrypt.checkpw("newpassword123".encode("utf-8"), invited_user.password.encode("utf-8"))
+        assert invitation.accepted_at is not None
+
+    def test_accept_invite_with_expired_token_returns_400(self, api_client, session):
+        """Expired invitation token should be rejected."""
+        now = datetime.now(UTC).replace(tzinfo=None)
+        invited_user = User(
+            email="expired_invite@example.com",
+            password=bcrypt.hashpw("placeholder".encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
+            active=False,
+            fs_uniquifier="expired_invite@example.com",
+        )
+        session.add(invited_user)
+        session.commit()
+
+        org = session.query(Organisation).first()
+        assert org is not None
+
+        raw_token = "expired_invite_token_123456"
+        session.add(
+            Invitation(
+                gid=str(uuid.uuid4()),
+                email="expired_invite@example.com",
+                o_id=int(org.o_id),
+                user_id=int(invited_user.id),
+                token_hash=hashlib.sha256(raw_token.encode("utf-8")).hexdigest(),
+                invited_by="admin@example.com",
+                created_at=now - timedelta(hours=3),
+                expires_at=now - timedelta(hours=1),
+            )
+        )
+        session.commit()
+
+        response = api_client.post(
+            "/api/v2/auth/accept-invite",
+            json={"token": raw_token, "password": "newpassword123"},
+        )
+        assert response.status_code == 400
+
+    def test_forgot_password_creates_reset_token(self, api_client, session, monkeypatch):
+        """Forgot password should create hashed token and trigger email send."""
+        sent_data: dict[str, str] = {}
+
+        def fake_send_reset(email: str, token: str) -> None:
+            sent_data["email"] = email
+            sent_data["token"] = token
+
+        monkeypatch.setattr(auth_routes, "send_password_reset_email", fake_send_reset)
+
+        response = api_client.post(
+            "/api/v2/auth/forgot-password",
+            json={"email": "testuser@example.com"},
+        )
+        assert response.status_code == 200
+        assert "password reset link has been sent" in response.json()["message"].lower()
+
+        user = session.query(User).filter(User.email == "testuser@example.com").first()
+        assert user is not None
+
+        token_row = session.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id).first()
+        assert token_row is not None
+        assert token_row.used_at is None
+        assert token_row.token_hash == hashlib.sha256(sent_data["token"].encode("utf-8")).hexdigest()
+        assert sent_data["email"] == "testuser@example.com"
+
+    def test_reset_password_marks_token_used_and_revokes_sessions(self, api_client, session):
+        """Reset password should use token once and remove active refresh sessions."""
+        user = session.query(User).filter(User.email == "testuser@example.com").first()
+        assert user is not None
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        raw_token = "reset_token_for_test_123456"
+        token_row = PasswordResetToken(
+            user_id=int(user.id),
+            token_hash=hashlib.sha256(raw_token.encode("utf-8")).hexdigest(),
+            created_at=now,
+            expires_at=now + timedelta(hours=1),
+        )
+        session.add(token_row)
+        session.add(
+            UserSession(
+                user_id=int(user.id),
+                refresh_token="test_refresh_token_to_revoke",
+                expires_at=now + timedelta(days=1),
+            )
+        )
+        session.commit()
+
+        response = api_client.post(
+            "/api/v2/auth/reset-password",
+            json={"token": raw_token, "password": "brandnewpassword123"},
+        )
+        assert response.status_code == 200
+
+        session.refresh(user)
+        session.refresh(token_row)
+        assert token_row.used_at is not None
+        assert bcrypt.checkpw("brandnewpassword123".encode("utf-8"), user.password.encode("utf-8"))
+
+        active_sessions = session.query(UserSession).filter(UserSession.user_id == user.id).all()
+        assert active_sessions == []
 
 
 # =============================================================================

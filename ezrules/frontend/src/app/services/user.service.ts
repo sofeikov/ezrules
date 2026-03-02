@@ -40,6 +40,12 @@ export interface RoleAssignmentResponse {
   error?: string;
 }
 
+export interface UserInviteResponse {
+  success: boolean;
+  message: string;
+  error?: string;
+}
+
 export interface RoleListItem {
   id: number;
   name: string;
@@ -76,6 +82,14 @@ export class UserService {
       body.role_ids = roleIds;
     }
     return this.http.post<UserMutationResponse>(this.usersUrl, body);
+  }
+
+  inviteUser(email: string, roleIds?: number[]): Observable<UserInviteResponse> {
+    const body: { email: string; role_ids?: number[] } = { email };
+    if (roleIds && roleIds.length > 0) {
+      body.role_ids = roleIds;
+    }
+    return this.http.post<UserInviteResponse>(`${this.usersUrl}/invite`, body);
   }
 
   updateUser(userId: number, data: { email?: string; password?: string; active?: boolean }): Observable<UserMutationResponse> {

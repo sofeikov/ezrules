@@ -1,5 +1,13 @@
 # What's New
 
+## v0.17
+
+* **Invitation onboarding flow**: Added `POST /api/v2/users/invite` for admin-triggered email invitations. Invited users can complete onboarding via `POST /api/v2/auth/accept-invite` and set their own password.
+* **Self-service password reset**: Added `POST /api/v2/auth/forgot-password` and `POST /api/v2/auth/reset-password` with one-time, expiring reset tokens. Admin intervention is no longer required for standard password resets.
+* **Email delivery settings**: Added SMTP configuration keys (`EZRULES_SMTP_HOST`, `EZRULES_SMTP_PORT`, `EZRULES_SMTP_USER`, `EZRULES_SMTP_PASSWORD`, `EZRULES_FROM_EMAIL`) and `EZRULES_APP_BASE_URL` for invite/reset link generation.
+* **Frontend auth pages**: Added dedicated pages/routes for invite acceptance, forgot password, and reset password. Login now includes a "Forgot password?" path.
+* **Security hardening**: Invitation and reset tokens are stored as SHA-256 hashes, checked for expiration, and enforced as single-use. Successful password reset revokes active refresh sessions.
+
 ## v0.16
 
 * **Full-stack Docker Compose**: Two new compose files replace the previous infrastructure-only setup.

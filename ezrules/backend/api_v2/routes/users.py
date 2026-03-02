@@ -5,12 +5,17 @@ These endpoints provide CRUD operations for users and role assignments.
 All endpoints require authentication and appropriate permissions.
 """
 
+import hashlib
+import logging
+import secrets
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from ezrules.backend.email_service import send_invitation_email
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
     get_db,
@@ -21,6 +26,8 @@ from ezrules.backend.api_v2.schemas.users import (
     RoleAssignmentResponse,
     RoleResponse,
     UserCreate,
+    UserInvite,
+    UserInviteResponse,
     UserListItem,
     UserMutationResponse,
     UserResponse,
@@ -29,9 +36,11 @@ from ezrules.backend.api_v2.schemas.users import (
 )
 from ezrules.core.audit_helpers import save_user_account_history
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Role, User
+from ezrules.models.backend_core import Invitation, Role, User
+from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/users", tags=["Users"])
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -86,6 +95,16 @@ def user_to_list_item(user: User) -> UserListItem:
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt."""
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def hash_token(token: str) -> str:
+    """Hash a one-time token for database storage."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def now_utc_naive() -> datetime:
+    """Get current UTC timestamp without tzinfo for DB compatibility."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 # =============================================================================
@@ -204,6 +223,108 @@ def create_user(
         success=True,
         message="User created successfully",
         user=user_to_response(new_user),
+    )
+
+
+# =============================================================================
+# INVITE USER
+# =============================================================================
+
+
+@router.post("/invite", response_model=UserInviteResponse)
+def invite_user(
+    invite_data: UserInvite,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.CREATE_USER)),
+    db: Any = Depends(get_db),
+) -> UserInviteResponse:
+    """
+    Invite a user by email.
+
+    Requires CREATE_USER permission.
+    Creates an inactive user when needed and sends a one-time invite email.
+    """
+    email = str(invite_data.email).strip().lower()
+    existing_user = db.query(User).filter(User.email == email).first()
+
+    if existing_user and existing_user.active:
+        return UserInviteResponse(
+            success=False,
+            message="Email already exists",
+            error=f"A user with email '{email}' already exists and is active",
+        )
+
+    target_user = existing_user
+    if target_user is None:
+        target_user = User(
+            email=email,
+            password=hash_password(secrets.token_urlsafe(32)),
+            active=False,
+            fs_uniquifier=str(uuid.uuid4()),
+        )
+        db.add(target_user)
+        db.flush()
+    else:
+        target_user.active = False
+
+    if invite_data.role_ids:
+        roles = db.query(Role).filter(Role.id.in_(invite_data.role_ids)).all()
+        if len(roles) != len(invite_data.role_ids):
+            found_ids = {int(r.id) for r in roles}
+            missing_ids = [rid for rid in invite_data.role_ids if rid not in found_ids]
+            return UserInviteResponse(
+                success=False,
+                message="Some roles not found",
+                error=f"Role IDs not found: {missing_ids}",
+            )
+        for role in roles:
+            if role not in target_user.roles:
+                target_user.roles.append(role)
+
+    now = now_utc_naive()
+    db.query(Invitation).filter(
+        Invitation.user_id == int(target_user.id),
+        Invitation.accepted_at.is_(None),
+    ).delete(synchronize_session=False)
+
+    invite_token = secrets.token_urlsafe(48)
+    invitation = Invitation(
+        gid=str(uuid.uuid4()),
+        email=email,
+        o_id=app_settings.ORG_ID,
+        user_id=int(target_user.id),
+        token_hash=hash_token(invite_token),
+        invited_by=str(user.email),
+        created_at=now,
+        expires_at=now + timedelta(hours=app_settings.INVITE_TOKEN_EXPIRY_HOURS),
+    )
+    db.add(invitation)
+
+    try:
+        db.flush()
+        send_invitation_email(email, invite_token)
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Failed to send invite email for %s", email)
+        return UserInviteResponse(
+            success=False,
+            message="Failed to send invitation",
+            error=str(exc),
+        )
+
+    save_user_account_history(
+        db,
+        user_id=int(target_user.id),
+        user_email=str(target_user.email),
+        action="invited",
+        changed_by=str(user.email),
+        details=f"invited_by={user.email}",
+    )
+    db.commit()
+
+    return UserInviteResponse(
+        success=True,
+        message=f"Invitation sent to {email}",
     )
 
 

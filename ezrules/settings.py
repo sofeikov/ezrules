@@ -11,6 +11,14 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379"
     TESTING: bool | None = False
     MAX_BODY_SIZE_KB: int = 1024
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    FROM_EMAIL: str | None = None
+    APP_BASE_URL: str = "http://localhost:4200"
+    INVITE_TOKEN_EXPIRY_HOURS: int = 72
+    PASSWORD_RESET_TOKEN_EXPIRY_HOURS: int = 1
 
 
 app_settings = Settings()  # type: ignore[missing-argument]

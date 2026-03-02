@@ -14,9 +14,10 @@ from fastapi.testclient import TestClient
 
 from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
+from ezrules.backend.api_v2.routes import users as users_routes
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Organisation, Role, User
+from ezrules.models.backend_core import Invitation, Organisation, Role, User
 
 
 @pytest.fixture(scope="function")
@@ -305,6 +306,65 @@ class TestCreateUser:
         data = response.json()
         assert data["success"] is False
         assert "not found" in data["error"]
+
+
+class TestInviteUser:
+    """Tests for POST /api/v2/users/invite."""
+
+    def test_invite_user_success(self, users_test_client, monkeypatch):
+        """Should create inactive user and invitation token."""
+        token = users_test_client.test_data["token"]
+        session = users_test_client.test_data["session"]
+        sent_email: dict[str, str] = {}
+
+        def fake_send_invitation_email(email: str, raw_token: str) -> None:
+            sent_email["email"] = email
+            sent_email["token"] = raw_token
+
+        monkeypatch.setattr(users_routes, "send_invitation_email", fake_send_invitation_email)
+
+        response = users_test_client.post(
+            "/api/v2/users/invite",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "email": "invited@example.com",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+
+        invited_user = session.query(User).filter(User.email == "invited@example.com").first()
+        assert invited_user is not None
+        assert invited_user.active is False
+
+        invitation = session.query(Invitation).filter(Invitation.user_id == invited_user.id).first()
+        assert invitation is not None
+        assert invitation.accepted_at is None
+        assert sent_email["email"] == "invited@example.com"
+        assert invitation.token_hash != sent_email["token"]
+        assert len(invitation.token_hash) == 64
+
+    def test_invite_active_user_returns_error(self, users_test_client, sample_user, monkeypatch):
+        """Should reject invitations for already active users."""
+        token = users_test_client.test_data["token"]
+
+        def fake_send_invitation_email(email: str, raw_token: str) -> None:
+            raise AssertionError("email send should not be called")
+
+        monkeypatch.setattr(users_routes, "send_invitation_email", fake_send_invitation_email)
+
+        response = users_test_client.post(
+            "/api/v2/users/invite",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"email": sample_user.email},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert "already exists" in data["message"].lower()
 
 
 # =============================================================================

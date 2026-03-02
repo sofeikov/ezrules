@@ -14,7 +14,7 @@ When you define a schema and use it in a route, FastAPI will:
 
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 # =============================================================================
 # REQUEST SCHEMAS (what the client sends to us)
@@ -53,6 +53,26 @@ class RefreshRequest(BaseModel):
     """
 
     refresh_token: str
+
+
+class AcceptInviteRequest(BaseModel):
+    """Accept-invite payload."""
+
+    token: str = Field(..., min_length=16)
+    password: str = Field(..., min_length=6)
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Forgot-password payload."""
+
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Reset-password payload."""
+
+    token: str = Field(..., min_length=16)
+    password: str = Field(..., min_length=6)
 
 
 # =============================================================================
@@ -147,3 +167,9 @@ class ErrorResponse(BaseModel):
     """
 
     detail: str
+
+
+class MessageResponse(BaseModel):
+    """Simple message response."""
+
+    message: str

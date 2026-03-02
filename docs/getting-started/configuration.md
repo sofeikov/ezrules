@@ -21,6 +21,12 @@ EZRULES_DB_ENDPOINT=postgresql://postgres:password@localhost:5432/ezrules
 EZRULES_APP_SECRET=dev-secret-key-change-me
 EZRULES_ORG_ID=1
 EZRULES_EVALUATOR_ENDPOINT=http://localhost:8888/api/v2
+EZRULES_APP_BASE_URL=http://localhost:4200
+EZRULES_SMTP_HOST=smtp.example.com
+EZRULES_SMTP_PORT=587
+EZRULES_SMTP_USER=mailer-user
+EZRULES_SMTP_PASSWORD=mailer-password
+EZRULES_FROM_EMAIL=no-reply@example.com
 ```
 
 Run the service:
@@ -39,6 +45,14 @@ Run the service:
 | `EZRULES_EVALUATOR_ENDPOINT` | No | `localhost:9999` | `http://localhost:8888/api/v2` | Base URL used by Rules page "Evaluate" shortcut |
 | `EZRULES_TESTING` | No | `false` | `true` in tests | Testing mode |
 | `EZRULES_CELERY_BROKER_URL` | No | `redis://localhost:6379` | `redis://host:6379/0` | Celery broker for backtesting |
+| `EZRULES_SMTP_HOST` | No | None | `smtp.example.com` | SMTP host for invitation/password reset emails |
+| `EZRULES_SMTP_PORT` | No | `587` | `587` | SMTP port |
+| `EZRULES_SMTP_USER` | No | None | `mailer-user` | SMTP username |
+| `EZRULES_SMTP_PASSWORD` | No | None | `mailer-password` | SMTP password |
+| `EZRULES_FROM_EMAIL` | No | None | `no-reply@example.com` | Sender address for auth emails |
+| `EZRULES_APP_BASE_URL` | No | `http://localhost:4200` | `https://app.company.com` | Base UI URL used to build invite/reset links |
+| `EZRULES_INVITE_TOKEN_EXPIRY_HOURS` | No | `72` | `24` | Invitation token lifetime in hours |
+| `EZRULES_PASSWORD_RESET_TOKEN_EXPIRY_HOURS` | No | `1` | `1` | Password reset token lifetime in hours |
 
 ---
 
@@ -55,6 +69,12 @@ export EZRULES_DB_ENDPOINT="postgresql://postgres:mypassword@localhost:5432/ezru
 export EZRULES_APP_SECRET="your-secret-key"
 export EZRULES_ORG_ID="1"
 export EZRULES_EVALUATOR_ENDPOINT="http://localhost:8888/api/v2"
+export EZRULES_APP_BASE_URL="http://localhost:4200"
+export EZRULES_SMTP_HOST="smtp.example.com"
+export EZRULES_SMTP_PORT="587"
+export EZRULES_SMTP_USER="mailer-user"
+export EZRULES_SMTP_PASSWORD="mailer-password"
+export EZRULES_FROM_EMAIL="no-reply@example.com"
 ```
 
 ---

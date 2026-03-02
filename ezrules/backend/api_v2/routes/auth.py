@@ -3,11 +3,17 @@ Authentication routes for the API v2.
 
 Endpoints:
 - POST /api/v2/auth/login   - Exchange email/password for tokens
+- POST /api/v2/auth/accept-invite - Accept invite and set account password
+- POST /api/v2/auth/forgot-password - Send password reset link
+- POST /api/v2/auth/reset-password - Reset password using one-time token
 - POST /api/v2/auth/refresh - Exchange refresh token for new access token (rotation)
 - POST /api/v2/auth/logout  - Revoke the current refresh token server-side
 - GET  /api/v2/auth/me      - Get current user info (test endpoint)
 """
 
+import hashlib
+import logging
+import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -24,16 +30,24 @@ from ezrules.backend.api_v2.auth.jwt import (
     decode_token,
 )
 from ezrules.backend.api_v2.auth.schemas import (
+    AcceptInviteRequest,
+    ForgotPasswordRequest,
+    MessageResponse,
     RefreshRequest,
+    ResetPasswordRequest,
     RoleResponse,
     TokenResponse,
     UserResponse,
 )
-from ezrules.models.backend_core import User, UserSession
+from ezrules.backend.email_service import send_password_reset_email
+from ezrules.core.audit_helpers import save_user_account_history
+from ezrules.models.backend_core import Invitation, PasswordResetToken, User, UserSession
+from ezrules.settings import app_settings
 
 # Create a router with a prefix and tag for organization
 # All routes here will be under /api/v2/auth/...
 router = APIRouter(prefix="/api/v2/auth", tags=["Authentication"])
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -61,6 +75,21 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 
+def hash_password(password: str) -> str:
+    """Hash a password using bcrypt."""
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def hash_token(token: str) -> str:
+    """Hash a one-time token for secure storage."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def now_utc_naive() -> datetime:
+    """Get current UTC timestamp without tzinfo for DB compatibility."""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 def authenticate_user(db: Any, email: str, password: str) -> User | None:
     """
     Find a user by email and verify their password.
@@ -83,7 +112,7 @@ def authenticate_user(db: Any, email: str, password: str) -> User | None:
 
 def _cleanup_expired_sessions(db: Any, user_id: int) -> None:
     """Delete expired session rows for the given user (lazy cleanup)."""
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = now_utc_naive()
     db.query(UserSession).filter(
         UserSession.user_id == user_id,
         UserSession.expires_at < now,
@@ -184,6 +213,143 @@ def login(
         token_type="bearer",
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert to seconds
     )
+
+
+# =============================================================================
+# INVITE / PASSWORD RESET ENDPOINTS
+# =============================================================================
+
+
+@router.post("/accept-invite", response_model=MessageResponse)
+def accept_invite(
+    request: AcceptInviteRequest,
+    db: Any = Depends(get_db),
+) -> MessageResponse:
+    """
+    Accept an invitation and set the account password.
+    """
+    token_hash = hash_token(request.token)
+    now = now_utc_naive()
+    invitation = db.query(Invitation).filter(Invitation.token_hash == token_hash).first()
+    if invitation is None or invitation.accepted_at is not None or invitation.expires_at <= now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired invitation token",
+        )
+
+    user = db.query(User).filter(User.id == invitation.user_id).first()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invitation user no longer exists",
+        )
+
+    user.password = hash_password(request.password)
+    user.active = True
+    user.confirmed_at = now
+    invitation.accepted_at = now
+    db.query(Invitation).filter(
+        Invitation.user_id == int(user.id),
+        Invitation.accepted_at.is_(None),
+        Invitation.gid != invitation.gid,
+    ).update({Invitation.accepted_at: now}, synchronize_session=False)
+
+    save_user_account_history(
+        db,
+        user_id=int(user.id),
+        user_email=str(user.email),
+        action="invitation_accepted",
+        changed_by=str(user.email),
+    )
+    db.commit()
+    return MessageResponse(message="Invitation accepted. You can now sign in.")
+
+
+_FORGOT_PASSWORD_MESSAGE = "If an account with that email exists, a password reset link has been sent."
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+def forgot_password(
+    request: ForgotPasswordRequest,
+    db: Any = Depends(get_db),
+) -> MessageResponse:
+    """
+    Trigger a password reset email for an active account.
+
+    This endpoint always returns a generic message to avoid account enumeration.
+    """
+    email = str(request.email).strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if user is None or not user.active:
+        return MessageResponse(message=_FORGOT_PASSWORD_MESSAGE)
+
+    now = now_utc_naive()
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == int(user.id),
+        PasswordResetToken.used_at.is_(None),
+    ).update({PasswordResetToken.used_at: now}, synchronize_session=False)
+
+    raw_token = secrets.token_urlsafe(48)
+    reset_token = PasswordResetToken(
+        token_hash=hash_token(raw_token),
+        user_id=int(user.id),
+        created_at=now,
+        expires_at=now + timedelta(hours=app_settings.PASSWORD_RESET_TOKEN_EXPIRY_HOURS),
+    )
+    db.add(reset_token)
+
+    try:
+        db.flush()
+        send_password_reset_email(email, raw_token)
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to send password reset email for %s", email)
+        return MessageResponse(message=_FORGOT_PASSWORD_MESSAGE)
+
+    db.commit()
+    return MessageResponse(message=_FORGOT_PASSWORD_MESSAGE)
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+def reset_password(
+    request: ResetPasswordRequest,
+    db: Any = Depends(get_db),
+) -> MessageResponse:
+    """
+    Reset password using a one-time reset token.
+    """
+    token_hash = hash_token(request.token)
+    now = now_utc_naive()
+    reset_token = db.query(PasswordResetToken).filter(PasswordResetToken.token_hash == token_hash).first()
+
+    if reset_token is None or reset_token.used_at is not None or reset_token.expires_at <= now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired password reset token",
+        )
+
+    user = db.query(User).filter(User.id == reset_token.user_id).first()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token user no longer exists",
+        )
+
+    user.password = hash_password(request.password)
+    reset_token.used_at = now
+
+    # Invalidate active sessions to force re-authentication after password change.
+    db.query(UserSession).filter(UserSession.user_id == int(user.id)).delete()
+
+    save_user_account_history(
+        db,
+        user_id=int(user.id),
+        user_email=str(user.email),
+        action="password_reset",
+        changed_by=str(user.email),
+    )
+    db.commit()
+    return MessageResponse(message="Password has been reset successfully.")
 
 
 # =============================================================================
