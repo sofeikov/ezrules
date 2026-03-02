@@ -36,7 +36,11 @@ def _send_email(recipient: str, subject: str, body: str) -> None:
             smtp.starttls()
             smtp.ehlo()
         else:
-            logger.warning("SMTP server %s:%s does not support STARTTLS; sending without TLS", app_settings.SMTP_HOST, app_settings.SMTP_PORT)
+            logger.warning(
+                "SMTP server %s:%s does not support STARTTLS; sending without TLS",
+                app_settings.SMTP_HOST,
+                app_settings.SMTP_PORT,
+            )
         if smtp_user and smtp_password:
             smtp.login(smtp_user, smtp_password)
         smtp.send_message(message)
