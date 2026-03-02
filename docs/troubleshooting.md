@@ -169,6 +169,34 @@ docker compose ps
    uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo
    ```
 
+## Backend tests fail during DB setup
+
+**Likely causes**
+
+- Another PostgreSQL container is already bound to `localhost:5432`
+- Credentials in `EZRULES_DB_ENDPOINT` do not match the running DB
+- Test DB name differs from expected (`tests`)
+
+**Diagnose**
+
+```bash
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+echo "$EZRULES_DB_ENDPOINT"
+```
+
+**Fix**
+
+1. Use project defaults from `docker-compose.yml` (`postgres:root@localhost:5432`) or update endpoint to match your container credentials
+2. Run tests with explicit env vars:
+
+   ```bash
+   EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/tests \
+   EZRULES_TESTING=true \
+   EZRULES_APP_SECRET=test-secret \
+   EZRULES_ORG_ID=1 \
+   uv run pytest --cov=ezrules.backend --cov=ezrules.core --cov-report=term-missing --cov-report=xml tests
+   ```
+
 ## Need deeper setup guidance?
 
 - [Installation](getting-started/installation.md)
