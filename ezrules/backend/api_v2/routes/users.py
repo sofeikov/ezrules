@@ -36,7 +36,7 @@ from ezrules.backend.api_v2.schemas.users import (
 from ezrules.backend.email_service import send_invitation_email
 from ezrules.core.audit_helpers import save_user_account_history
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Invitation, Role, User
+from ezrules.models.backend_core import Invitation, PasswordResetToken, Role, User, UserSession
 from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/users", tags=["Users"])
@@ -454,6 +454,11 @@ def delete_user(
         action="deleted",
         changed_by=str(user.email),
     )
+
+    # Clean up dependent rows explicitly to avoid FK violations.
+    db.query(Invitation).filter(Invitation.user_id == target_id).delete(synchronize_session=False)
+    db.query(PasswordResetToken).filter(PasswordResetToken.user_id == target_id).delete(synchronize_session=False)
+    db.query(UserSession).filter(UserSession.user_id == target_id).delete(synchronize_session=False)
 
     db.delete(target_user)
     db.commit()

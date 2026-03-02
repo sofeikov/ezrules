@@ -20,6 +20,7 @@ All services start automatically (PostgreSQL, Redis, Celery worker, API, fronten
 |---|---|
 | Web UI | http://localhost:4200 |
 | API | http://localhost:8888 |
+| Mailpit UI (captured emails) | http://localhost:8025 |
 
 Login: `admin@example.com` / `admin`
 
@@ -57,6 +58,7 @@ docker compose -f docker-compose.prod.yml up --build
 ```
 
 The database is initialised empty. Login with the credentials you set in `.env`.
+By default, SMTP is routed to local Mailpit (`http://localhost:8025`) unless SMTP env vars override it.
 
 Data persists in a Docker volume between restarts. To stop without losing data:
 
@@ -85,6 +87,7 @@ docker compose up -d
 ```
 
 This starts PostgreSQL, Redis, and the Celery worker. The API and frontend run as local processes.
+It also starts Mailpit for local email capture on `http://localhost:8025`.
 
 ### 3) Configure `settings.env`
 
@@ -92,6 +95,10 @@ This starts PostgreSQL, Redis, and the Celery worker. The API and frontend run a
 EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules
 EZRULES_APP_SECRET=dev_secret
 EZRULES_ORG_ID=1
+EZRULES_SMTP_HOST=localhost
+EZRULES_SMTP_PORT=1025
+EZRULES_FROM_EMAIL=no-reply@ezrules.local
+EZRULES_APP_BASE_URL=http://localhost:4200
 ```
 
 ### 4) Initialize database and create first user
@@ -123,6 +130,7 @@ npm start
 ```
 
 Open [http://localhost:4200](http://localhost:4200).
+For invitation/password-reset email testing, open [http://localhost:8025](http://localhost:8025).
 
 ---
 

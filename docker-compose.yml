@@ -5,7 +5,7 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: root
       POSTGRES_HOST_AUTH_METHOD: trust
       LC_CTYPE: en_US.UTF-8
     volumes:
@@ -26,6 +26,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ezrules-mailpit
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
 
   worker:
     build: .

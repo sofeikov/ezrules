@@ -11,13 +11,16 @@ These tests verify:
 import bcrypt
 import pytest
 from fastapi.testclient import TestClient
+from datetime import UTC, datetime, timedelta
+import hashlib
+import uuid
 
 from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
 from ezrules.backend.api_v2.routes import users as users_routes
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Invitation, Organisation, Role, User
+from ezrules.models.backend_core import Invitation, Organisation, PasswordResetToken, Role, User, UserSession
 
 
 @pytest.fixture(scope="function")
@@ -523,6 +526,49 @@ class TestDeleteUser:
         )
 
         assert response.status_code == 404
+
+    def test_delete_user_with_auth_artifacts(self, users_test_client, sample_user):
+        """Should delete user even when invite/reset/session rows exist."""
+        token = users_test_client.test_data["token"]
+        session = users_test_client.test_data["session"]
+        org = users_test_client.test_data["org"]
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        session.add(
+            Invitation(
+                gid=str(uuid.uuid4()),
+                email=str(sample_user.email),
+                o_id=int(org.o_id),
+                user_id=int(sample_user.id),
+                token_hash=hashlib.sha256(b"invite-token").hexdigest(),
+                invited_by="admin@example.com",
+                created_at=now,
+                expires_at=now + timedelta(hours=24),
+            )
+        )
+        session.add(
+            PasswordResetToken(
+                user_id=int(sample_user.id),
+                token_hash=hashlib.sha256(b"reset-token").hexdigest(),
+                created_at=now,
+                expires_at=now + timedelta(hours=1),
+            )
+        )
+        session.add(
+            UserSession(
+                user_id=int(sample_user.id),
+                refresh_token="refresh-token-for-delete-test",
+                expires_at=now + timedelta(days=1),
+            )
+        )
+        session.commit()
+
+        response = users_test_client.delete(
+            f"/api/v2/users/{sample_user.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+        assert response.json()["success"] is True
 
 
 # =============================================================================

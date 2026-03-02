@@ -60,6 +60,7 @@ Once all containers are healthy:
 |---|---|
 | Web UI | http://localhost:4200 |
 | API | http://localhost:8888 |
+| Mailpit UI (captured emails) | http://localhost:8025 |
 
 Login: `admin@example.com` / `admin`
 
@@ -86,6 +87,7 @@ docker compose -f docker-compose.prod.yml up --build
 |---|---|
 | Web UI | http://localhost:4200 |
 | API | http://localhost:8888 |
+| Mailpit UI (default local SMTP sink) | http://localhost:8025 |
 
 Login with the email/password you set in `.env`.
 
@@ -116,6 +118,10 @@ cat > settings.env <<EOF
 EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules
 EZRULES_APP_SECRET=dev_secret
 EZRULES_ORG_ID=1
+EZRULES_SMTP_HOST=localhost
+EZRULES_SMTP_PORT=1025
+EZRULES_FROM_EMAIL=no-reply@ezrules.local
+EZRULES_APP_BASE_URL=http://localhost:4200
 EOF
 
 # Initialise DB and create an admin user
@@ -134,6 +140,7 @@ cd ezrules/frontend && npm install && npm start
 ```
 
 Open http://localhost:4200.
+Open Mailpit at http://localhost:8025 to inspect invitation/password-reset emails in development.
 
 To generate sample data for development:
 

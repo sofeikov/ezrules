@@ -65,7 +65,7 @@ class AcceptInviteRequest(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     """Forgot-password payload."""
 
-    email: EmailStr
+    email: str = Field(..., min_length=3)
 
 
 class ResetPasswordRequest(BaseModel):

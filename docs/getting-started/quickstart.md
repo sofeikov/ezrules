@@ -27,6 +27,7 @@ By the end of this page, you should have:
 
     - `http://localhost:8888/ping` responds
     - `http://localhost:4200` loads login page
+    - `http://localhost:8025` opens Mailpit inbox (for invite/reset email validation)
 
 === "Development (local processes)"
 
@@ -52,6 +53,7 @@ By the end of this page, you should have:
 
     - `http://localhost:8888/ping` responds
     - `http://localhost:4200` loads login page
+    - `http://localhost:8025` opens Mailpit inbox
 
 ---
 

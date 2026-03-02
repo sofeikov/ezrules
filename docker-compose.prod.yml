@@ -8,6 +8,7 @@
 # Access:
 #   Frontend: http://localhost:4200
 #   API:      http://localhost:8888
+#   Mail UI:  http://localhost:8025 (default local Mailpit)
 
 services:
   postgres:
@@ -31,6 +32,12 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
 
   # Runs once on first boot to initialise the DB and create the admin user.
   # Safe to re-run: init-db skips existing DB, add-user skips duplicate user.
@@ -58,11 +65,19 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     environment:
       EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
       EZRULES_APP_SECRET: ${EZRULES_APP_SECRET}
       EZRULES_ORG_ID: 1
       EZRULES_CELERY_BROKER_URL: redis://redis:6379
+      EZRULES_SMTP_HOST: ${EZRULES_SMTP_HOST:-mailpit}
+      EZRULES_SMTP_PORT: ${EZRULES_SMTP_PORT:-1025}
+      EZRULES_SMTP_USER: ${EZRULES_SMTP_USER:-}
+      EZRULES_SMTP_PASSWORD: ${EZRULES_SMTP_PASSWORD:-}
+      EZRULES_FROM_EMAIL: ${EZRULES_FROM_EMAIL:-no-reply@ezrules.local}
+      EZRULES_APP_BASE_URL: ${EZRULES_APP_BASE_URL:-http://localhost:4200}
 
   worker:
     build: .

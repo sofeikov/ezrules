@@ -20,6 +20,7 @@ from typing import Any
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import func
 
 from ezrules.backend.api_v2.auth.dependencies import get_current_active_user_strict, get_db
 from ezrules.backend.api_v2.auth.jwt import (
@@ -279,34 +280,37 @@ def forgot_password(
     This endpoint always returns a generic message to avoid account enumeration.
     """
     email = str(request.email).strip().lower()
-    user = db.query(User).filter(User.email == email).first()
-    if user is None or not user.active:
+    if not email:
         return MessageResponse(message=_FORGOT_PASSWORD_MESSAGE)
 
-    now = now_utc_naive()
-    db.query(PasswordResetToken).filter(
-        PasswordResetToken.user_id == int(user.id),
-        PasswordResetToken.used_at.is_(None),
-    ).update({PasswordResetToken.used_at: now}, synchronize_session=False)
-
-    raw_token = secrets.token_urlsafe(48)
-    reset_token = PasswordResetToken(
-        token_hash=hash_token(raw_token),
-        user_id=int(user.id),
-        created_at=now,
-        expires_at=now + timedelta(hours=app_settings.PASSWORD_RESET_TOKEN_EXPIRY_HOURS),
-    )
-    db.add(reset_token)
-
     try:
+        user = db.query(User).filter(func.lower(User.email) == email).first()
+        if user is None or not user.active:
+            return MessageResponse(message=_FORGOT_PASSWORD_MESSAGE)
+
+        now = now_utc_naive()
+        db.query(PasswordResetToken).filter(
+            PasswordResetToken.user_id == int(user.id),
+            PasswordResetToken.used_at.is_(None),
+        ).update({PasswordResetToken.used_at: now}, synchronize_session=False)
+
+        raw_token = secrets.token_urlsafe(48)
+        reset_token = PasswordResetToken(
+            token_hash=hash_token(raw_token),
+            user_id=int(user.id),
+            created_at=now,
+            expires_at=now + timedelta(hours=app_settings.PASSWORD_RESET_TOKEN_EXPIRY_HOURS),
+        )
+        db.add(reset_token)
+
         db.flush()
         send_password_reset_email(email, raw_token)
+        db.commit()
     except Exception:
         db.rollback()
         logger.exception("Failed to send password reset email for %s", email)
         return MessageResponse(message=_FORGOT_PASSWORD_MESSAGE)
 
-    db.commit()
     return MessageResponse(message=_FORGOT_PASSWORD_MESSAGE)
 
 

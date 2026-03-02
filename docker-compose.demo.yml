@@ -7,6 +7,7 @@
 # Access:
 #   Frontend: http://localhost:4200
 #   API:      http://localhost:8888
+#   Mail UI:  http://localhost:8025
 #   Login:    admin@example.com / admin
 #
 # To reset and re-seed from scratch (wipes all data):
@@ -35,6 +36,12 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
 
   # Runs once on first boot to initialise the DB and seed demo data.
   # On subsequent `docker compose up` (volumes intact) the commands are
@@ -65,11 +72,17 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     environment:
       EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
       EZRULES_APP_SECRET: demo_secret_do_not_use_in_production
       EZRULES_ORG_ID: 1
       EZRULES_CELERY_BROKER_URL: redis://redis:6379
+      EZRULES_SMTP_HOST: mailpit
+      EZRULES_SMTP_PORT: 1025
+      EZRULES_FROM_EMAIL: no-reply@ezrules.local
+      EZRULES_APP_BASE_URL: http://localhost:4200
 
   worker:
     build: .
