@@ -15,7 +15,6 @@ from typing import Any
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from ezrules.backend.email_service import send_invitation_email
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
     get_db,
@@ -34,6 +33,7 @@ from ezrules.backend.api_v2.schemas.users import (
     UsersListResponse,
     UserUpdate,
 )
+from ezrules.backend.email_service import send_invitation_email
 from ezrules.core.audit_helpers import save_user_account_history
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Invitation, Role, User
