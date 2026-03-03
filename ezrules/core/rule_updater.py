@@ -1,6 +1,7 @@
 import datetime
 from abc import ABC, abstractmethod
 from collections import namedtuple
+from typing import cast
 
 from sqlalchemy.exc import NoResultFound
 
@@ -10,6 +11,7 @@ from ezrules.models.backend_core import (
     RuleEngineConfig,
     RuleEngineConfigHistory,
     RuleHistory,
+    RuleStatus,
     ShadowResultsLog,
 )
 from ezrules.models.backend_core import (
@@ -19,7 +21,16 @@ from ezrules.models.backend_core import (
 RuleRevision = namedtuple("RuleRevision", ["revision_number", "created"])
 
 
-def save_rule_history(db, rule: "RuleModel", changed_by: str | None = None) -> None:
+def save_rule_history(
+    db,
+    rule: "RuleModel",
+    changed_by: str | None = None,
+    action: str = "updated",
+    to_status: RuleStatus | None = None,
+    effective_from_override: datetime.datetime | None = None,
+    approved_by_override: int | None = None,
+    approved_at_override: datetime.datetime | None = None,
+) -> None:
     """Snapshot the current state of a rule into the history table before mutation."""
     history = RuleHistory(
         r_id=rule.r_id,
@@ -27,6 +38,12 @@ def save_rule_history(db, rule: "RuleModel", changed_by: str | None = None) -> N
         rid=rule.rid,
         logic=rule.logic,
         description=rule.description,
+        action=action,
+        status=rule.status,
+        to_status=to_status,
+        effective_from=effective_from_override if effective_from_override is not None else rule.effective_from,
+        approved_by=approved_by_override if approved_by_override is not None else rule.approved_by,
+        approved_at=approved_at_override if approved_at_override is not None else rule.approved_at,
         created_at=rule.created_at,
         o_id=rule.o_id,
         changed=datetime.datetime.now(datetime.UTC),
@@ -142,7 +159,8 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
         self.o_id = o_id
 
     def save_config(self, rule_manager: RuleManager, changed_by: str | None = None) -> None:
-        all_rules = rule_manager.load_all_rules()
+        stored_rules = cast(list[RuleModel], rule_manager.load_all_rules())
+        all_rules = [rule for rule in stored_rules if rule.status == RuleStatus.ACTIVE]
         all_rules = [RuleFactory.from_json(r.__dict__) for r in all_rules]
         rules_json = [RuleConverter.to_json(r) for r in all_rules]
         try:
@@ -230,7 +248,13 @@ def remove_rule_from_shadow(db, o_id: int, r_id: int, changed_by: str | None = N
     db.commit()
 
 
-def promote_shadow_rule_to_production(db, o_id: int, r_id: int, changed_by: str | None = None) -> None:
+def promote_shadow_rule_to_production(
+    db,
+    o_id: int,
+    r_id: int,
+    changed_by: str | None = None,
+    approved_by: int | None = None,
+) -> None:
     """Promote a rule from the shadow config into the production config.
 
     Raises ValueError if the rule is not currently in shadow.
@@ -254,9 +278,23 @@ def promote_shadow_rule_to_production(db, o_id: int, r_id: int, changed_by: str 
     # Update the rules table so the rule detail page reflects the promoted logic
     rule = db.get(RuleModel, r_id)
     if rule is not None:
-        save_rule_history(db, rule, changed_by=changed_by)
+        promoted_at = datetime.datetime.now(datetime.UTC)
+        save_rule_history(
+            db,
+            rule,
+            changed_by=changed_by,
+            action="promoted",
+            to_status=RuleStatus.ACTIVE,
+            effective_from_override=promoted_at,
+            approved_by_override=approved_by,
+            approved_at_override=promoted_at,
+        )
         rule.logic = shadow_entry["logic"]
         rule.description = shadow_entry["description"]
+        rule.status = RuleStatus.ACTIVE
+        rule.effective_from = promoted_at
+        rule.approved_by = approved_by
+        rule.approved_at = promoted_at
         rule.version += 1
 
     try:

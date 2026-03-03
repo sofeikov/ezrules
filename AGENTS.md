@@ -72,11 +72,12 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 6. **FOR ANGULAR FRONTEND CHANGES**: Any new pages/navigation must have Playwright e2e tests in `ezrules/frontend/e2e/tests/` plus corresponding page objects in `e2e/pages/*.page.ts`.
 7. If a new endpoint is implemented, restart the API server if needed.
 8. If one e2e test fails, stop and fix the root cause before waiting for all failures.
-9. Database-related functionality must be tested on the live test DB rather than mocked.
-10. If functionality affects user experience/actions, update README and `docs/whatsnew.md`.
-11. When tests are approved, run ALL tests, not selective subsets.
-12. After tests are done, kill API server (8888) and Angular dev server (4200) if you started them manually.
-13. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
+9. For Playwright runs that include invite/reset flows, start API with `EZRULES_TESTING=false` and SMTP configured (for local stack: `EZRULES_SMTP_HOST=localhost`, `EZRULES_SMTP_PORT=1025`, `EZRULES_FROM_EMAIL=...`). `EZRULES_TESTING=true` skips SMTP sends and will break email-flow e2e tests.
+10. Database-related functionality must be tested on the live test DB rather than mocked.
+11. If functionality affects user experience/actions, update README and `docs/whatsnew.md`.
+12. When tests are approved, run ALL tests, not selective subsets.
+13. After tests are done, kill API server (8888) and Angular dev server (4200) if you started them manually.
+14. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
 
 # Writing New Documentation
 1. Canonical documentation map: [DOCUMENTATION_MAP.md](DOCUMENTATION_MAP.md)

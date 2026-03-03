@@ -6,6 +6,10 @@ This directory contains end-to-end (E2E) tests for the ezrules Angular frontend 
 
 ```bash
 # 1. Make sure the API service is running
+EZRULES_TESTING=false \
+EZRULES_SMTP_HOST=localhost \
+EZRULES_SMTP_PORT=1025 \
+EZRULES_FROM_EMAIL=no-reply@ezrules.local \
 uv run ezrules api --port 8888
 
 # 2. Make sure Angular dev server is running
@@ -41,6 +45,11 @@ Before running E2E tests, you need to have the following services running:
 1. **API Service**: The unified API service (includes rule evaluation)
    ```bash
    # Terminal 1: Start API service
+   # Important: invite/reset tests require TESTING=false because TESTING=true skips SMTP sends.
+   EZRULES_TESTING=false \
+   EZRULES_SMTP_HOST=localhost \
+   EZRULES_SMTP_PORT=1025 \
+   EZRULES_FROM_EMAIL=no-reply@ezrules.local \
    uv run ezrules api --port 8888
    ```
 

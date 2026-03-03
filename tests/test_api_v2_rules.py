@@ -17,7 +17,7 @@ from ezrules.backend.api_v2.main import app
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule_updater import RDBRuleManager, save_rule_history
-from ezrules.models.backend_core import Organisation, Role, User
+from ezrules.models.backend_core import Organisation, Role, RuleHistory, RuleStatus, User
 from ezrules.models.backend_core import Rule as RuleModel
 
 
@@ -61,6 +61,7 @@ def rules_test_client(session):
     PermissionManager.grant_permission(rule_role.id, PermissionAction.VIEW_RULES)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.CREATE_RULE)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.MODIFY_RULE)
+    PermissionManager.grant_permission(rule_role.id, PermissionAction.DELETE_RULE)
 
     # Create a token for the user
     roles = [role.name for role in rule_user.roles]
@@ -327,6 +328,87 @@ class TestUpdateRule:
         data = response.json()
         assert data["success"] is False
         assert "error" in data
+
+
+# =============================================================================
+# RULE LIFECYCLE AUDIT TESTS
+# =============================================================================
+
+
+class TestRuleLifecycleAudit:
+    """Tests for lifecycle actions recorded in rule audit history."""
+
+    def test_promote_records_audit_transition_and_approver(self, rules_test_client):
+        token = rules_test_client.test_data["token"]
+        session = rules_test_client.test_data["session"]
+        user = rules_test_client.test_data["user"]
+
+        create_response = rules_test_client.post(
+            "/api/v2/rules",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "rid": "draft_to_promote",
+                "description": "Promotion audit test",
+                "logic": "event.amount > 10",
+            },
+        )
+        assert create_response.status_code == 201
+        r_id = create_response.json()["rule"]["r_id"]
+
+        promote_response = rules_test_client.post(
+            f"/api/v2/rules/{r_id}/promote",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert promote_response.status_code == 200
+
+        history = (
+            session.query(RuleHistory).filter(RuleHistory.r_id == r_id).order_by(RuleHistory.version.desc()).first()
+        )
+        assert history is not None
+        assert history.action == "promoted"
+        assert history.status == RuleStatus.DRAFT
+        assert history.to_status == RuleStatus.ACTIVE
+        assert history.approved_by == user.id
+        assert history.approved_at is not None
+
+    def test_archive_records_deactivation_action(self, rules_test_client, sample_rule):
+        token = rules_test_client.test_data["token"]
+        session = rules_test_client.test_data["session"]
+
+        response = rules_test_client.post(
+            f"/api/v2/rules/{sample_rule.r_id}/archive",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+
+        history = (
+            session.query(RuleHistory)
+            .filter(RuleHistory.r_id == sample_rule.r_id)
+            .order_by(RuleHistory.version.desc())
+            .first()
+        )
+        assert history is not None
+        assert history.action == "deactivated"
+        assert history.status == RuleStatus.ACTIVE
+        assert history.to_status == RuleStatus.ARCHIVED
+
+    def test_delete_preserves_history_with_deleted_action(self, rules_test_client, sample_rule):
+        token = rules_test_client.test_data["token"]
+        session = rules_test_client.test_data["session"]
+        rule_id = sample_rule.r_id
+
+        response = rules_test_client.delete(
+            f"/api/v2/rules/{rule_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 204
+
+        history = session.query(RuleHistory).filter(RuleHistory.r_id == rule_id).all()
+        assert len(history) == 1
+        assert history[0].action == "deleted"
+        assert history[0].to_status is None
+        session.expire_all()
+        assert session.query(RuleModel).filter(RuleModel.r_id == rule_id).one_or_none() is None
 
 
 # =============================================================================

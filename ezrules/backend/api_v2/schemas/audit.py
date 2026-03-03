@@ -11,6 +11,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ezrules.models.backend_core import RuleStatus
+
 # =============================================================================
 # ENUMS
 # =============================================================================
@@ -36,6 +38,12 @@ class RuleHistoryEntry(BaseModel):
     version: int = Field(..., description="Version number")
     logic: str = Field(..., description="Rule logic at this version")
     description: str = Field(..., description="Rule description at this version")
+    action: str = Field(..., description="Action type (updated, promoted, deactivated, deleted)")
+    status: RuleStatus = Field(..., description="Rule lifecycle status at this version")
+    to_status: RuleStatus | None = Field(default=None, description="Target status for lifecycle transitions")
+    effective_from: datetime | None = Field(default=None, description="Activation timestamp for this version")
+    approved_by: int | None = Field(default=None, description="User ID that approved this version")
+    approved_at: datetime | None = Field(default=None, description="Approval timestamp for this version")
     changed: datetime | None = Field(default=None, description="When this version was created")
     changed_by: str | None = Field(default=None, description="Who made this change")
 

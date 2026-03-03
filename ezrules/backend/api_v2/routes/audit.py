@@ -70,6 +70,12 @@ def rule_history_to_response(history: RuleHistory) -> RuleHistoryEntry:
         version=int(history.version),
         logic=str(history.logic),
         description=str(history.description),
+        action=str(history.action),
+        status=history.status,
+        to_status=history.to_status,
+        effective_from=history.effective_from if history.effective_from is not None else None,  # type: ignore[arg-type]
+        approved_by=int(history.approved_by) if history.approved_by is not None else None,
+        approved_at=history.approved_at if history.approved_at is not None else None,  # type: ignore[arg-type]
         changed=changed,  # type: ignore[arg-type]
         changed_by=str(history.changed_by) if history.changed_by else None,
     )
@@ -284,22 +290,22 @@ def get_rule_audit(
     Returns all versions of the rule from oldest to newest.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    # Get the current rule
     rule = db.query(Rule).filter(Rule.r_id == rule_id).first()
+    history = db.query(RuleHistory).filter(RuleHistory.r_id == rule_id).order_by(RuleHistory.version.asc()).all()
 
-    if not rule:
+    if not rule and not history:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Rule with id {rule_id} not found",
         )
 
-    # Get all history entries for this rule
-    history = db.query(RuleHistory).filter(RuleHistory.r_id == rule_id).order_by(RuleHistory.version.asc()).all()
+    current_version = int(rule.version) if rule is not None else int(history[-1].version)
+    rid = str(rule.rid) if rule is not None else str(history[-1].rid)
 
     return RuleAuditResponse(
-        r_id=int(rule.r_id),
-        rid=str(rule.rid),
-        current_version=int(rule.version),
+        r_id=rule_id,
+        rid=rid,
+        current_version=current_version,
         history=[rule_history_to_response(h) for h in history],
     )
 
