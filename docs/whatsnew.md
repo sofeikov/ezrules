@@ -1,5 +1,15 @@
 # What's New
 
+## v0.18
+
+* **Rule lifecycle states**: Rules now carry lifecycle metadata with `status` (`draft`, `active`, `archived`), `effective_from`, `approved_by`, and `approved_at`.
+* **Promotion workflow**: Added `POST /api/v2/rules/{id}/promote` to transition draft rules to active with approver audit attribution.
+* **Archive workflow**: Added `POST /api/v2/rules/{id}/archive` to archive rules and remove active rules from production evaluation.
+* **Delete endpoint documented and permissioned**: `DELETE /api/v2/rules/{id}` is explicitly documented and guarded by `DELETE_RULE`.
+* **UI lifecycle controls**: Rule list now shows lifecycle badges and includes promote/archive actions.
+* **Audit trail enrichment**: Rule history entries now persist lifecycle/approval metadata plus explicit rule actions (`promoted`, `deactivated`, `deleted`) with target status transitions; deleted rules retain audit history and remain queryable via `GET /api/v2/audit/rules/{rule_id}`.
+* **E2E setup guardrail**: Frontend e2e docs now explicitly require starting API with `EZRULES_TESTING=false` for invite/reset email flows; testing mode disables SMTP delivery and causes those tests to fail.
+
 ## v0.17
 
 * **Invitation onboarding flow**: Added `POST /api/v2/users/invite` for admin-triggered email invitations. Invited users can complete onboarding via `POST /api/v2/auth/accept-invite` and set their own password.

@@ -209,4 +209,18 @@ export class AuditTrailComponent implements OnInit {
   formatAction(action: string): string {
     return action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
+
+  formatStatus(status: string | null): string {
+    if (!status) {
+      return '—';
+    }
+    return status.replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  ruleActionClass(action: string): string {
+    if (action === 'promoted') return 'bg-green-100 text-green-800';
+    if (action === 'deactivated') return 'bg-amber-100 text-amber-800';
+    if (action === 'deleted') return 'bg-red-100 text-red-800';
+    return 'bg-blue-100 text-blue-800';
+  }
 }

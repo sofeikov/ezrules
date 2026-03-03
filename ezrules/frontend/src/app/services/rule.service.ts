@@ -3,11 +3,17 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
+export type RuleStatus = 'draft' | 'active' | 'archived';
+
 export interface Rule {
   r_id: number;
   rid: string;
   description: string;
   logic: string;
+  status: RuleStatus;
+  effective_from: string | null;
+  approved_by: number | null;
+  approved_at: string | null;
   created_at: string | null;
   in_shadow?: boolean;
 }
@@ -183,6 +189,18 @@ export class RuleService {
 
   promoteFromShadow(ruleId: number): Observable<ShadowDeployResponse> {
     return this.http.post<ShadowDeployResponse>(`${this.apiUrl}/${ruleId}/shadow/promote`, {});
+  }
+
+  promoteRule(ruleId: number): Observable<UpdateRuleResponse> {
+    return this.http.post<UpdateRuleResponse>(`${this.apiUrl}/${ruleId}/promote`, {});
+  }
+
+  archiveRule(ruleId: number): Observable<UpdateRuleResponse> {
+    return this.http.post<UpdateRuleResponse>(`${this.apiUrl}/${ruleId}/archive`, {});
+  }
+
+  deleteRule(ruleId: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${ruleId}`);
   }
 
   getShadowConfig(): Observable<ShadowConfigResponse> {

@@ -13,9 +13,10 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Analytics Dashboard**: Real-time transaction volume charts with configurable time ranges (1h, 6h, 12h, 24h, 30d)
 - **Scalable Architecture**: Unified API service with integrated rule evaluation
 - **Database Integration**: PostgreSQL backend with SQLAlchemy ORM and full audit history
-- **Audit Trail**: Change tracking for rules, user lists, outcomes, labels, and field type configurations, with per-change user attribution
+- **Audit Trail**: Change tracking for rules, user lists, outcomes, labels, and field type configurations, with per-change user attribution and explicit rule lifecycle actions (`promoted`, `deactivated`, `deleted`)
 - **Field Type Management**: Auto-discovers JSON field types from live traffic and test payloads; configurable type casting (integer, float, string, boolean, datetime) applied before rule evaluation so comparisons behave correctly regardless of how values arrive in JSON
 - **Shadow Deployment**: Deploy rules to a shadow environment that observes live traffic without affecting production outcomes; promote validated shadows to production in one step
+- **Rule Lifecycle Controls**: Rules now support `draft`, `active`, and `archived` states with explicit promotion and approver tracking (`effective_from`, `approved_by`, `approved_at`)
 - **Backtesting**: Test rule changes against historical data before deployment
 - **CLI Tools**: Command-line interface for database management and realistic test data generation
 
@@ -347,10 +348,23 @@ uv run ezrules delete-test-data
 The Angular frontend includes comprehensive end-to-end tests using Playwright.
 
 **Prerequisites:**
-- API service running on port 8888
+- API service running on port 8888 with email delivery enabled for invite/reset tests.
+  Start API for e2e with `EZRULES_TESTING=false` (if `EZRULES_TESTING=true`, SMTP sends are skipped and email-flow tests fail).
 - Angular dev server running (port 4200)
 - Playwright browsers installed (first time only): `npx playwright install chromium`
 ```bash
+# Terminal 1: API (mail flows require TESTING=false)
+EZRULES_TESTING=false \
+EZRULES_SMTP_HOST=localhost \
+EZRULES_SMTP_PORT=1025 \
+EZRULES_FROM_EMAIL=no-reply@ezrules.local \
+uv run ezrules api --port 8888
+
+# Terminal 2: Frontend
+cd ezrules/frontend
+npm start
+
+# Terminal 3: E2E
 cd ezrules/frontend
 npm run test:e2e
 ```

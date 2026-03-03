@@ -10,8 +10,6 @@ from ezrules.core.rule_helpers import (
 )
 from ezrules.models.backend_core import Rule as RuleModel
 
-dollar_converter = DollarNotationConverter()
-
 
 class Fields:
     LOGIC = "logic"
@@ -77,7 +75,9 @@ class Rule:
     @logic.setter
     def logic(self, logic):
         """Compile the code."""
-        post_proc_logic = dollar_converter.transform_rule(logic)
+        # Build a fresh converter per compilation to avoid shared parser state
+        # across concurrent API requests.
+        post_proc_logic = DollarNotationConverter().transform_rule(logic)
         # Get the list provider from application context
         list_provider = get_user_list_manager()
         at_converter = AtNotationConverter(list_values_provider=list_provider)

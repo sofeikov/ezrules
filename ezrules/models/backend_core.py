@@ -1,4 +1,5 @@
 import datetime
+from enum import Enum
 
 from sqlalchemy import (
     JSON,
@@ -10,6 +11,9 @@ from sqlalchemy import (
     String,
     UnicodeText,
     types,
+)
+from sqlalchemy import (
+    Enum as SQLEnum,
 )
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
@@ -160,6 +164,20 @@ class RuleEngineConfig(Base):
     org: Mapped["Organisation"] = relationship(back_populates="re_configs")
 
 
+class RuleStatus(str, Enum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+
+
+rule_status_enum_type = SQLEnum(
+    RuleStatus,
+    name="rule_status_enum",
+    values_callable=lambda enum_cls: [status.value for status in enum_cls],
+    validate_strings=True,
+)
+
+
 class Rule(Base):
     __tablename__ = "rules"
 
@@ -168,6 +186,10 @@ class Rule(Base):
     rid: Mapped[str] = mapped_column()
     logic: Mapped[str] = mapped_column()
     description: Mapped[str] = mapped_column()
+    status: Mapped[RuleStatus] = mapped_column(rule_status_enum_type, nullable=False, default=RuleStatus.ACTIVE)
+    effective_from: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
+    approved_by: Mapped[int | None] = mapped_column(ForeignKey("user.id"), nullable=True)
+    approved_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
     version = Column(Integer, default=1, nullable=False)
 
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
@@ -304,6 +326,12 @@ class RuleHistory(Base):
     rid = Column(String, nullable=False)
     logic = Column(String, nullable=False)
     description = Column(String, nullable=False)
+    action = Column(String, nullable=False, default="updated")
+    status: Mapped[RuleStatus] = mapped_column(rule_status_enum_type, nullable=False, default=RuleStatus.ACTIVE)
+    to_status: Mapped[RuleStatus | None] = mapped_column(rule_status_enum_type, nullable=True)
+    effective_from: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
+    approved_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    approved_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=True)
     o_id = Column(Integer, nullable=False)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))

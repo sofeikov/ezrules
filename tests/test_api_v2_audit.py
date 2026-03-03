@@ -21,6 +21,7 @@ from ezrules.models.backend_core import (
     Role,
     Rule,
     RuleHistory,
+    RuleStatus,
     User,
 )
 
@@ -214,6 +215,28 @@ class TestListRuleHistory:
         for item in data["items"]:
             assert item["r_id"] == sample_rule_with_history.r_id
 
+    def test_list_rule_history_includes_action_and_transition_fields(self, audit_test_client, sample_rule_with_history):
+        """Rule history payload should include lifecycle action metadata."""
+        token = audit_test_client.test_data["token"]
+        session = audit_test_client.test_data["session"]
+
+        sample = session.query(RuleHistory).filter(RuleHistory.r_id == sample_rule_with_history.r_id).first()
+        assert sample is not None
+        sample.action = "promoted"
+        sample.status = RuleStatus.DRAFT
+        sample.to_status = RuleStatus.ACTIVE
+        session.commit()
+
+        response = audit_test_client.get(
+            f"/api/v2/audit/rules?rule_id={sample_rule_with_history.r_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        item = response.json()["items"][0]
+        assert "action" in item
+        assert "to_status" in item
+
 
 # =============================================================================
 # RULE AUDIT DETAIL TESTS
@@ -253,6 +276,46 @@ class TestGetRuleAudit:
         )
 
         assert response.status_code == 404
+
+    def test_get_rule_audit_for_deleted_rule(self, audit_test_client, session):
+        """Deleted rules should still be available through audit history."""
+        token = audit_test_client.test_data["token"]
+
+        rule = Rule(
+            rid="deleted_rule",
+            logic="event.amount > 500",
+            description="To be deleted",
+            o_id=1,
+            version=1,
+        )
+        session.add(rule)
+        session.flush()
+
+        history = RuleHistory(
+            r_id=rule.r_id,
+            rid=rule.rid,
+            version=1,
+            logic=rule.logic,
+            description=rule.description,
+            action="deleted",
+            status=RuleStatus.ACTIVE,
+            to_status=None,
+            o_id=1,
+            changed_by="auditadmin@example.com",
+        )
+        session.add(history)
+        session.delete(rule)
+        session.commit()
+
+        response = audit_test_client.get(
+            f"/api/v2/audit/rules/{history.r_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["rid"] == "deleted_rule"
+        assert data["current_version"] == 1
+        assert data["history"][0]["action"] == "deleted"
 
 
 # =============================================================================

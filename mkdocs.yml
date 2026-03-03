@@ -50,6 +50,9 @@ nav:
   - Blog:
       - Overview: blog/index.md
       - From Zero to Live Rule Evaluation: blog/zero-to-live-rule-evaluation.md
+      - Rule Lifecycle Management: blog/rule-lifecycle-management.md
+      - Automatic Field Type Management: blog/field-type-management.md
+      - Shipping Rule Changes with Less Guesswork: blog/shadow-deployment.md
   - User Guide:
       - For Analysts: user-guide/analyst-guide.md
       - For Administrators: user-guide/admin-guide.md

@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { Rule, RuleService } from '../services/rule.service';
+import { Rule, RuleService, RuleStatus } from '../services/rule.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -16,6 +16,8 @@ export class RuleListComponent implements OnInit {
   loading: boolean = true;
   error: string | null = null;
   showHowToRun: boolean = false;
+  actionError: string | null = null;
+  actionLoading: Record<number, 'promote' | 'archive'> = {};
 
   constructor(private ruleService: RuleService) { }
 
@@ -26,6 +28,7 @@ export class RuleListComponent implements OnInit {
   loadRules(): void {
     this.loading = true;
     this.error = null;
+    this.actionError = null;
 
     this.ruleService.getRules().subscribe({
       next: (response) => {
@@ -39,6 +42,78 @@ export class RuleListComponent implements OnInit {
         console.error('Error loading rules:', error);
       }
     });
+  }
+
+  promoteRule(rule: Rule): void {
+    if (rule.status !== 'draft') {
+      return;
+    }
+    this.actionError = null;
+    this.actionLoading[rule.r_id] = 'promote';
+    this.ruleService.promoteRule(rule.r_id).subscribe({
+      next: (response) => {
+        delete this.actionLoading[rule.r_id];
+        if (response.success) {
+          this.loadRules();
+          return;
+        }
+        this.actionError = response.error || 'Failed to promote rule.';
+      },
+      error: (error) => {
+        delete this.actionLoading[rule.r_id];
+        this.actionError = error.error?.detail || error.error?.error || 'Failed to promote rule.';
+      }
+    });
+  }
+
+  archiveRule(rule: Rule): void {
+    if (rule.status === 'archived') {
+      return;
+    }
+    const confirmed = window.confirm(`Archive rule ${rule.rid}?`);
+    if (!confirmed) {
+      return;
+    }
+    this.actionError = null;
+    this.actionLoading[rule.r_id] = 'archive';
+    this.ruleService.archiveRule(rule.r_id).subscribe({
+      next: (response) => {
+        delete this.actionLoading[rule.r_id];
+        if (response.success) {
+          this.loadRules();
+          return;
+        }
+        this.actionError = response.error || 'Failed to archive rule.';
+      },
+      error: (error) => {
+        delete this.actionLoading[rule.r_id];
+        this.actionError = error.error?.detail || error.error?.error || 'Failed to archive rule.';
+      }
+    });
+  }
+
+  isActionLoading(ruleId: number, action: 'promote' | 'archive'): boolean {
+    return this.actionLoading[ruleId] === action;
+  }
+
+  canPromote(rule: Rule): boolean {
+    return rule.status === 'draft';
+  }
+
+  canArchive(rule: Rule): boolean {
+    return rule.status !== 'archived';
+  }
+
+  statusLabel(status: RuleStatus): string {
+    if (status === 'active') return 'ACTIVE';
+    if (status === 'archived') return 'ARCHIVED';
+    return 'DRAFT';
+  }
+
+  statusClass(status: RuleStatus): string {
+    if (status === 'active') return 'bg-green-100 text-green-800';
+    if (status === 'archived') return 'bg-gray-200 text-gray-700';
+    return 'bg-amber-100 text-amber-800';
   }
 
   toggleHowToRun(): void {

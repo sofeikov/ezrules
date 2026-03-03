@@ -70,12 +70,23 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 | `GET` | `/api/v2/rules/{rule_id}` | Bearer + permission | Rule details |
 | `GET` | `/api/v2/rules/{rule_id}/revisions/{revision_number}` | Bearer + permission | Specific historical revision |
 | `PUT` | `/api/v2/rules/{rule_id}` | Bearer + permission | Update rule |
+| `DELETE` | `/api/v2/rules/{rule_id}` | Bearer + `DELETE_RULE` | Delete rule |
+| `POST` | `/api/v2/rules/{rule_id}/promote` | Bearer + `MODIFY_RULE` | Promote draft rule to active |
+| `POST` | `/api/v2/rules/{rule_id}/archive` | Bearer + `MODIFY_RULE` | Archive rule |
 | `POST` | `/api/v2/rules/verify` | Bearer + permission | Verify rule source and extracted params |
 | `POST` | `/api/v2/rules/test` | Bearer + permission | Test rule payload |
 | `GET` | `/api/v2/rules/{rule_id}/history` | Bearer + permission | Revision list |
 | `POST` | `/api/v2/rules/{rule_id}/shadow` | Bearer + `MODIFY_RULE` | Deploy rule to shadow |
 | `DELETE` | `/api/v2/rules/{rule_id}/shadow` | Bearer + `MODIFY_RULE` | Remove rule from shadow |
 | `POST` | `/api/v2/rules/{rule_id}/shadow/promote` | Bearer + `MODIFY_RULE` | Promote shadow rule to production |
+
+Rule lifecycle fields on rule responses:
+- `status`: `draft`, `active`, or `archived`
+- `effective_from`: activation timestamp for active versions
+- `approved_by` / `approved_at`: approver audit metadata for promotions
+- `POST /api/v2/rules` creates draft rules; `PUT /api/v2/rules/{id}` saves edits as draft and requires promotion to reactivate.
+- Rule audit entries (`GET /api/v2/audit/rules*`) now include `action` (`updated`, `promoted`, `deactivated`, `deleted`) and `to_status` to show lifecycle transitions such as `draft -> active`.
+- Deleting a rule preserves its history so `GET /api/v2/audit/rules/{rule_id}` remains available after deletion.
 
 ### Shadow
 
