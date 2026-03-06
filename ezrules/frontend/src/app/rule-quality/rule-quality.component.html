@@ -1,0 +1,217 @@
+<div class="flex min-h-screen bg-gray-50">
+  <app-sidebar></app-sidebar>
+
+  <div class="ml-64 flex-1">
+    <div class="p-8">
+      <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">Rule Quality</h1>
+        <p class="text-gray-500 mt-1">Precision and recall by outcome-to-label pairs from labeled events</p>
+      </div>
+
+      <div *ngIf="error" class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6">
+        {{ error }}
+      </div>
+
+      <div class="bg-white rounded-lg shadow border border-gray-200 p-6 mb-6">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Filtering</h2>
+            <p class="text-sm text-gray-500">Hide low-support pairs where both predicted and actual counts are below threshold.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <label for="rule-quality-minSupport" class="text-sm text-gray-600">Min support</label>
+            <input
+              id="rule-quality-minSupport"
+              type="number"
+              min="1"
+              class="border border-gray-300 rounded-md px-3 py-1.5 text-sm w-24"
+              [value]="minSupport"
+              (change)="onMinSupportChange($event)"
+            />
+          </div>
+
+          <div class="flex items-center gap-2">
+            <label for="rule-quality-lookbackDays" class="text-sm text-gray-600">Lookback days</label>
+            <input
+              id="rule-quality-lookbackDays"
+              type="number"
+              min="1"
+              class="border border-gray-300 rounded-md px-3 py-1.5 text-sm w-28"
+              [value]="lookbackDays"
+              (change)="onLookbackDaysChange($event)"
+            />
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 mt-4">
+          <button
+            id="rule-quality-refreshReport"
+            type="button"
+            class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded-md hover:bg-blue-700"
+            (click)="refreshReport()"
+          >
+            Refresh Report
+          </button>
+
+          <span *ngIf="freezeAt" class="text-xs text-gray-500">
+            Snapshot as of {{ freezeAt | date: 'medium' }}
+          </span>
+        </div>
+      </div>
+
+      <div *ngIf="loading" class="flex justify-center py-16">
+        <div class="text-center">
+          <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
+          <p class="text-sm text-gray-500 mt-3">
+            {{ polling ? 'Generating snapshot report...' : 'Loading rule quality report...' }}
+          </p>
+        </div>
+      </div>
+
+      <div *ngIf="!loading">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div class="bg-white rounded-lg shadow border border-gray-200 p-5">
+            <p class="text-sm text-gray-500">Labeled Events</p>
+            <p class="text-3xl font-bold text-blue-600 mt-2">{{ totalLabeledEvents }}</p>
+          </div>
+          <div class="bg-white rounded-lg shadow border border-gray-200 p-5">
+            <p class="text-sm text-gray-500">Rules Analyzed</p>
+            <p class="text-3xl font-bold text-emerald-600 mt-2">{{ uniqueRulesCount() }}</p>
+          </div>
+          <div class="bg-white rounded-lg shadow border border-gray-200 p-5">
+            <p class="text-sm text-gray-500">Outcome/Label Pairs</p>
+            <p class="text-3xl font-bold text-indigo-600 mt-2">{{ pairMetrics.length }}</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+          <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+            <div class="p-4 border-b border-gray-200 bg-green-50">
+              <h2 class="text-lg font-semibold text-green-900">Best Rules</h2>
+              <p class="text-sm text-green-700">Highest average F1 score</p>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600 uppercase text-xs tracking-wide">
+                  <tr>
+                    <th class="px-4 py-3 text-left">Rule</th>
+                    <th class="px-4 py-3 text-left">Avg F1</th>
+                    <th class="px-4 py-3 text-left">Best Pair</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let rule of bestRules; trackBy: trackRule" class="border-t border-gray-100">
+                    <td class="px-4 py-3 font-medium">
+                      <a
+                        [routerLink]="['/rules', rule.rId]"
+                        data-testid="rule-quality-rule-link"
+                        class="text-blue-700 hover:text-blue-900 hover:underline"
+                      >
+                        {{ rule.rid }}
+                      </a>
+                    </td>
+                    <td class="px-4 py-3 text-gray-700">{{ formatPercent(rule.averageF1) }}</td>
+                    <td class="px-4 py-3 text-gray-600">{{ rule.bestPair || 'N/A' }}</td>
+                  </tr>
+                  <tr *ngIf="bestRules.length === 0">
+                    <td colspan="3" class="px-4 py-6 text-center text-gray-500">No ranked rules for this support threshold.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+            <div class="p-4 border-b border-gray-200 bg-amber-50">
+              <h2 class="text-lg font-semibold text-amber-900">Needs Attention</h2>
+              <p class="text-sm text-amber-700">Lowest average F1 score</p>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600 uppercase text-xs tracking-wide">
+                  <tr>
+                    <th class="px-4 py-3 text-left">Rule</th>
+                    <th class="px-4 py-3 text-left">Avg F1</th>
+                    <th class="px-4 py-3 text-left">Worst Pair</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let rule of worstRules; trackBy: trackRule" class="border-t border-gray-100">
+                    <td class="px-4 py-3 font-medium">
+                      <a
+                        [routerLink]="['/rules', rule.rId]"
+                        data-testid="rule-quality-rule-link"
+                        class="text-blue-700 hover:text-blue-900 hover:underline"
+                      >
+                        {{ rule.rid }}
+                      </a>
+                    </td>
+                    <td class="px-4 py-3 text-gray-700">{{ formatPercent(rule.averageF1) }}</td>
+                    <td class="px-4 py-3 text-gray-600">{{ rule.worstPair || 'N/A' }}</td>
+                  </tr>
+                  <tr *ngIf="worstRules.length === 0">
+                    <td colspan="3" class="px-4 py-6 text-center text-gray-500">No ranked rules for this support threshold.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+          <div class="p-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Pair Metrics</h2>
+            <p class="text-sm text-gray-500">Each row evaluates one mapping: outcome prediction vs ground-truth label.</p>
+          </div>
+
+          <div *ngIf="pairMetrics.length === 0" class="p-8 text-center text-gray-500">
+            No rule-quality pairs available. Configure curated outcome→label pairs in Settings, add labeled events, or lower the min support.
+          </div>
+
+          <div *ngIf="pairMetrics.length > 0" class="overflow-x-auto">
+            <table class="w-full min-w-[1000px] text-sm">
+              <thead class="bg-gray-50 text-gray-600 uppercase text-xs tracking-wide">
+                <tr>
+                  <th class="px-4 py-3 text-left">Rule</th>
+                  <th class="px-4 py-3 text-left">Outcome</th>
+                  <th class="px-4 py-3 text-left">Label</th>
+                  <th class="px-4 py-3 text-left">Precision</th>
+                  <th class="px-4 py-3 text-left">Recall</th>
+                  <th class="px-4 py-3 text-left">F1</th>
+                  <th class="px-4 py-3 text-left">TP</th>
+                  <th class="px-4 py-3 text-left">FP</th>
+                  <th class="px-4 py-3 text-left">FN</th>
+                  <th class="px-4 py-3 text-left">Predicted</th>
+                  <th class="px-4 py-3 text-left">Actual</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let metric of pairMetrics; trackBy: trackPair" class="border-t border-gray-100">
+                  <td class="px-4 py-3 font-medium">
+                    <a
+                      [routerLink]="['/rules', metric.rId]"
+                      data-testid="rule-quality-rule-link"
+                      class="text-blue-700 hover:text-blue-900 hover:underline"
+                    >
+                      {{ metric.rid }}
+                    </a>
+                  </td>
+                  <td class="px-4 py-3 text-gray-700">{{ metric.outcome }}</td>
+                  <td class="px-4 py-3 text-gray-700">{{ metric.label }}</td>
+                  <td class="px-4 py-3 text-gray-700">{{ formatPercent(metric.precision) }}</td>
+                  <td class="px-4 py-3 text-gray-700">{{ formatPercent(metric.recall) }}</td>
+                  <td class="px-4 py-3 text-gray-700">{{ formatPercent(metric.f1) }}</td>
+                  <td class="px-4 py-3 text-gray-700">{{ metric.truePositive }}</td>
+                  <td class="px-4 py-3 text-gray-700">{{ metric.falsePositive }}</td>
+                  <td class="px-4 py-3 text-gray-700">{{ metric.falseNegative }}</td>
+                  <td class="px-4 py-3 text-gray-700">{{ metric.predictedPositives }}</td>
+                  <td class="px-4 py-3 text-gray-700">{{ metric.actualPositives }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

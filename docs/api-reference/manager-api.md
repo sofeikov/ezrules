@@ -124,6 +124,27 @@ Rule lifecycle fields on rule responses:
 | `GET` | `/api/v2/analytics/labels-summary` | Bearer + permission | Total labeled summary |
 | `GET` | `/api/v2/analytics/labels-distribution` | Bearer + permission | Label trends |
 | `GET` | `/api/v2/analytics/labeled-transaction-volume` | Bearer + permission | Time-series labeled event volume |
+| `GET` | `/api/v2/analytics/rule-quality` | Bearer + `VIEW_RULES` + `VIEW_LABELS` | Synchronous snapshot precision/recall report for configured curated pairs (includes `freeze_at`) |
+| `POST` | `/api/v2/analytics/rule-quality/reports` | Bearer + `VIEW_RULES` + `VIEW_LABELS` | Request or reuse cached async report (`force_refresh` optional) |
+| `GET` | `/api/v2/analytics/rule-quality/reports/{report_id}` | Bearer + `VIEW_RULES` + `VIEW_LABELS` | Poll async report status/result |
+
+Rule quality query params:
+- `min_support` (default `1`)
+- `lookback_days` (optional; defaults to runtime setting)
+- `freeze_at` is returned in responses to indicate snapshot timestamp
+- Reports include only active curated pairs configured under Settings.
+
+### Settings
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/settings/runtime` | Bearer + `VIEW_ROLES` | Read runtime settings |
+| `PUT` | `/api/v2/settings/runtime` | Bearer + `MANAGE_PERMISSIONS` | Update runtime settings (e.g., rule quality lookback days) |
+| `GET` | `/api/v2/settings/rule-quality-pairs` | Bearer + `VIEW_ROLES` | List configured curated outcome→label pairs |
+| `GET` | `/api/v2/settings/rule-quality-pairs/options` | Bearer + `VIEW_ROLES` | List available outcomes and labels for pair creation |
+| `POST` | `/api/v2/settings/rule-quality-pairs` | Bearer + `MANAGE_PERMISSIONS` | Create curated pair |
+| `PUT` | `/api/v2/settings/rule-quality-pairs/{pair_id}` | Bearer + `MANAGE_PERMISSIONS` | Toggle pair active/inactive |
+| `DELETE` | `/api/v2/settings/rule-quality-pairs/{pair_id}` | Bearer + `MANAGE_PERMISSIONS` | Delete curated pair |
 
 ### Users and Roles
 

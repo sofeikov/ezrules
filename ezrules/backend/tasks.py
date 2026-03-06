@@ -3,11 +3,16 @@ from datetime import UTC, datetime, timedelta
 
 from celery import Celery
 
+from ezrules.backend.rule_quality import (
+    compute_rule_quality_metrics,
+    get_active_rule_quality_pairs,
+    normalize_rule_quality_pairs,
+)
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
 from ezrules.core.rule import Rule, RuleFactory
 from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import TestingRecordLog
+from ezrules.models.backend_core import RuleQualityReport, TestingRecordLog
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
@@ -85,3 +90,54 @@ def backtest_rule_change(r_id: int, new_rule_logic: str):
         "proposed_result_rate": proposed_result_rate,
         "total_records": total_records,
     }
+
+
+@app.task
+def generate_rule_quality_report(report_id: int) -> dict[str, str]:
+    report = db_session.get(RuleQualityReport, report_id)
+    if report is None:
+        return {"error": f"Rule quality report {report_id} not found"}
+
+    try:
+        report.status = "RUNNING"
+        report.started_at = datetime.utcnow()
+        report.error = None
+        db_session.commit()
+
+        snapshot_pairs = []
+        if report.pair_set:
+            snapshot_pairs = [
+                (str(item.get("outcome", "")), str(item.get("label", "")))
+                for item in report.pair_set
+                if isinstance(item, dict)
+            ]
+        curated_pairs = normalize_rule_quality_pairs(snapshot_pairs)
+        if not curated_pairs:
+            curated_pairs = get_active_rule_quality_pairs(db_session, o_id=report.o_id)
+
+        payload = compute_rule_quality_metrics(
+            db_session,
+            min_support=report.min_support,
+            lookback_days=report.lookback_days,
+            freeze_at=report.freeze_at,
+            max_tl_id=report.max_tl_id,
+            o_id=report.o_id,
+            curated_pairs=curated_pairs,
+        )
+        payload["freeze_at"] = payload["freeze_at"].isoformat()
+
+        report.result = payload
+        report.status = "SUCCESS"
+        report.completed_at = datetime.utcnow()
+        report.error = None
+        db_session.commit()
+        return {"status": "SUCCESS"}
+    except Exception as e:
+        db_session.rollback()
+        report = db_session.get(RuleQualityReport, report_id)
+        if report is not None:
+            report.status = "FAILURE"
+            report.error = str(e)
+            report.completed_at = datetime.utcnow()
+            db_session.commit()
+        return {"error": f"Rule quality report {report_id} failed: {e!s}"}

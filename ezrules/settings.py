@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     APP_BASE_URL: str = "http://localhost:4200"
     INVITE_TOKEN_EXPIRY_HOURS: int = 72
     PASSWORD_RESET_TOKEN_EXPIRY_HOURS: int = 1
+    RULE_QUALITY_LOOKBACK_DAYS: int = 30
+    RULE_QUALITY_REPORT_CACHE_MINUTES: int = 15
+    RULE_QUALITY_REPORT_SYNC_FALLBACK: bool = True
 
 
 app_settings = Settings()  # type: ignore[missing-argument]
