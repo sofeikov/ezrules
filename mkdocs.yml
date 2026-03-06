@@ -53,6 +53,7 @@ nav:
       - Rule Lifecycle Management: blog/rule-lifecycle-management.md
       - Automatic Field Type Management: blog/field-type-management.md
       - Shipping Rule Changes with Less Guesswork: blog/shadow-deployment.md
+      - Rule Quality Precision & Recall: blog/rule-quality-precision-recall.md
   - User Guide:
       - For Analysts: user-guide/analyst-guide.md
       - For Administrators: user-guide/admin-guide.md

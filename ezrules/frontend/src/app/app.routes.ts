@@ -6,6 +6,7 @@ import { RuleCreateComponent } from './rule-create/rule-create.component';
 import { LabelsComponent } from './labels/labels.component';
 import { OutcomesComponent } from './outcomes/outcomes.component';
 import { LabelAnalyticsComponent } from './label-analytics/label-analytics.component';
+import { RuleQualityComponent } from './rule-quality/rule-quality.component';
 import { UserListsComponent } from './user-lists/user-lists.component';
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { UserManagementComponent } from './user-management/user-management.component';
@@ -20,6 +21,7 @@ import { authGuard } from './auth/auth.guard';
 import { ForgotPasswordComponent } from './forgot-password/forgot-password.component';
 import { ResetPasswordComponent } from './reset-password/reset-password.component';
 import { AcceptInviteComponent } from './accept-invite/accept-invite.component';
+import { SettingsComponent } from './settings/settings.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -37,6 +39,8 @@ export const routes: Routes = [
   { path: 'outcomes', component: OutcomesComponent, canActivate: [authGuard] },
   { path: 'user-lists', component: UserListsComponent, canActivate: [authGuard] },
   { path: 'label_analytics', component: LabelAnalyticsComponent, canActivate: [authGuard] },
+  { path: 'rule-quality', component: RuleQualityComponent, canActivate: [authGuard] },
+  { path: 'settings', component: SettingsComponent, canActivate: [authGuard] },
   { path: 'management/users', component: UserManagementComponent, canActivate: [authGuard] },
   { path: 'role_management', component: RoleManagementComponent, canActivate: [authGuard] },
   { path: 'role_management/:id/permissions', component: RolePermissionsComponent, canActivate: [authGuard] },

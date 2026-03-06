@@ -6,6 +6,7 @@ These tests verify:
 - Outcomes distribution endpoint
 - Labels distribution endpoint
 - Labels summary endpoint
+- Rule quality endpoint
 - Aggregation parameter validation
 - Permission checks
 """
@@ -16,19 +17,24 @@ import bcrypt
 import pytest
 from fastapi.testclient import TestClient
 
+from ezrules.backend.api_v2.routes import analytics as analytics_routes
 from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
+from ezrules.backend.tasks import generate_rule_quality_report
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
     Label,
     Organisation,
+    RuleQualityPair,
+    RuleQualityReport,
     Role,
     TestingRecordLog,
     TestingResultsLog,
     User,
 )
 from ezrules.models.backend_core import Rule as RuleModel
+from ezrules.settings import app_settings
 
 
 @pytest.fixture(scope="function")
@@ -150,6 +156,105 @@ def sample_analytics_data(session):
         "rule": rule,
         "label": label,
         "events": events,
+    }
+
+
+@pytest.fixture(scope="function")
+def sample_rule_quality_data(session):
+    """Create deterministic labeled data for rule-quality metric tests."""
+    org = session.query(Organisation).filter(Organisation.o_id == 1).first()
+    if not org:
+        org = Organisation(o_id=1, name="Test Org")
+        session.add(org)
+        session.commit()
+
+    rule_a = RuleModel(
+        rid="quality_rule_a",
+        logic="return 'HOLD'",
+        description="Rule A",
+        o_id=org.o_id,
+    )
+    rule_b = RuleModel(
+        rid="quality_rule_b",
+        logic="return 'HOLD'",
+        description="Rule B",
+        o_id=org.o_id,
+    )
+    session.add_all([rule_a, rule_b])
+    session.commit()
+
+    fraud_label = Label(label="QUALITY_FRAUD")
+    normal_label = Label(label="QUALITY_NORMAL")
+    session.add_all([fraud_label, normal_label])
+    session.commit()
+
+    curated_pairs = [
+        RuleQualityPair(
+            outcome="HOLD",
+            label=fraud_label.label,
+            active=True,
+            created_by="tests",
+            o_id=org.o_id,
+        ),
+        RuleQualityPair(
+            outcome="RELEASE",
+            label=normal_label.label,
+            active=True,
+            created_by="tests",
+            o_id=org.o_id,
+        ),
+    ]
+    session.add_all(curated_pairs)
+    session.commit()
+
+    # Six labeled events. rule_b is perfect for HOLD->QUALITY_FRAUD and
+    # RELEASE->QUALITY_NORMAL. rule_a is intentionally mixed.
+    labels = [
+        fraud_label.el_id,
+        fraud_label.el_id,
+        normal_label.el_id,
+        normal_label.el_id,
+        fraud_label.el_id,
+        normal_label.el_id,
+    ]
+    rule_a_outcomes = ["HOLD", "RELEASE", "HOLD", "RELEASE", "HOLD", "RELEASE"]
+    rule_b_outcomes = ["HOLD", "HOLD", "RELEASE", "RELEASE", "HOLD", "RELEASE"]
+
+    now = datetime.datetime.now()
+    for idx, label_id in enumerate(labels):
+        event = TestingRecordLog(
+            event_id=f"quality_event_{idx}",
+            event={"idx": idx},
+            event_timestamp=int((now - datetime.timedelta(minutes=idx)).timestamp()),
+            o_id=org.o_id,
+            el_id=label_id,
+            created_at=now - datetime.timedelta(minutes=idx),
+        )
+        session.add(event)
+        session.commit()
+
+        session.add(
+            TestingResultsLog(
+                tl_id=event.tl_id,
+                r_id=rule_a.r_id,
+                rule_result=rule_a_outcomes[idx],
+            )
+        )
+        session.add(
+            TestingResultsLog(
+                tl_id=event.tl_id,
+                r_id=rule_b.r_id,
+                rule_result=rule_b_outcomes[idx],
+            )
+        )
+
+    session.commit()
+    return {
+        "rule_a": rule_a,
+        "rule_b": rule_b,
+        "fraud_label": fraud_label,
+        "normal_label": normal_label,
+        "curated_pairs": curated_pairs,
     }
 
 
@@ -422,6 +527,391 @@ class TestLabelsSummary:
 
 
 # =============================================================================
+# RULE QUALITY TESTS
+# =============================================================================
+
+
+class TestRuleQuality:
+    """Tests for GET /api/v2/analytics/rule-quality."""
+
+    def test_rule_quality_with_data(self, analytics_test_client, sample_rule_quality_data):
+        """Should return pair metrics and ranked best/worst rules."""
+        token = analytics_test_client.test_data["token"]
+        rule_a = sample_rule_quality_data["rule_a"]
+        rule_b = sample_rule_quality_data["rule_b"]
+        fraud_label = sample_rule_quality_data["fraud_label"]
+
+        response = analytics_test_client.get(
+            "/api/v2/analytics/rule-quality",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["total_labeled_events"] == 6
+        assert data["min_support"] == 1
+        assert data["lookback_days"] >= 1
+        assert data["freeze_at"]
+        assert len(data["pair_metrics"]) == 4
+        assert len(data["best_rules"]) >= 1
+        assert len(data["worst_rules"]) >= 1
+
+        pair = next(
+            metric
+            for metric in data["pair_metrics"]
+            if metric["r_id"] == rule_a.r_id and metric["outcome"] == "HOLD" and metric["label"] == fraud_label.label
+        )
+        assert pair["true_positive"] == 2
+        assert pair["false_positive"] == 1
+        assert pair["false_negative"] == 1
+        assert pair["precision"] == pytest.approx(0.6667, rel=0, abs=1e-4)
+        assert pair["recall"] == pytest.approx(0.6667, rel=0, abs=1e-4)
+        assert pair["f1"] == pytest.approx(0.6667, rel=0, abs=1e-4)
+        assert not any(
+            metric["outcome"] == "HOLD" and metric["label"] == "QUALITY_NORMAL" for metric in data["pair_metrics"]
+        )
+
+        assert data["best_rules"][0]["r_id"] == rule_b.r_id
+        assert data["worst_rules"][0]["r_id"] == rule_a.r_id
+
+    def test_rule_quality_empty_when_no_active_curated_pairs(self, analytics_test_client, sample_rule_quality_data):
+        token = analytics_test_client.test_data["token"]
+        session = analytics_test_client.test_data["session"]
+
+        for pair in sample_rule_quality_data["curated_pairs"]:
+            pair.active = False
+        session.commit()
+
+        response = analytics_test_client.get(
+            "/api/v2/analytics/rule-quality",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total_labeled_events"] == 6
+        assert payload["pair_metrics"] == []
+        assert payload["best_rules"] == []
+        assert payload["worst_rules"] == []
+
+    def test_rule_quality_min_support_filter(self, analytics_test_client, sample_rule_quality_data):
+        """Should filter out all pairs when support threshold is above data volume."""
+        token = analytics_test_client.test_data["token"]
+
+        response = analytics_test_client.get(
+            "/api/v2/analytics/rule-quality?min_support=4",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["min_support"] == 4
+        assert data["lookback_days"] >= 1
+        assert data["freeze_at"]
+        assert data["pair_metrics"] == []
+        assert data["best_rules"] == []
+        assert data["worst_rules"] == []
+
+    def test_rule_quality_lookback_days_filter(self, analytics_test_client, sample_rule_quality_data):
+        """Should exclude old labeled events outside the lookback window."""
+        token = analytics_test_client.test_data["token"]
+        session = analytics_test_client.test_data["session"]
+
+        rule_a = sample_rule_quality_data["rule_a"]
+        fraud_label = sample_rule_quality_data["fraud_label"]
+
+        old_created_at = datetime.datetime.now() - datetime.timedelta(days=40)
+        old_event = TestingRecordLog(
+            event_id="quality_old_event",
+            event={"idx": 999},
+            event_timestamp=int(old_created_at.timestamp()),
+            o_id=1,
+            el_id=fraud_label.el_id,
+            created_at=old_created_at,
+        )
+        session.add(old_event)
+        session.commit()
+
+        session.add(
+            TestingResultsLog(
+                tl_id=old_event.tl_id,
+                r_id=rule_a.r_id,
+                rule_result="HOLD",
+            )
+        )
+        session.commit()
+
+        recent_response = analytics_test_client.get(
+            "/api/v2/analytics/rule-quality?lookback_days=1",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        all_response = analytics_test_client.get(
+            "/api/v2/analytics/rule-quality?lookback_days=90",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert recent_response.status_code == 200
+        assert all_response.status_code == 200
+
+        recent = recent_response.json()
+        historical = all_response.json()
+        assert recent["lookback_days"] == 1
+        assert historical["lookback_days"] == 90
+        assert recent["total_labeled_events"] == 6
+        assert historical["total_labeled_events"] == 7
+
+    def test_rule_quality_unauthorized(self, analytics_test_client):
+        """Should return 401 without token."""
+        response = analytics_test_client.get("/api/v2/analytics/rule-quality")
+        assert response.status_code == 401
+
+
+class TestRuleQualityReports:
+    """Tests for async report lifecycle endpoints."""
+
+    def test_rule_quality_report_request_and_get(self, analytics_test_client, sample_rule_quality_data, monkeypatch):
+        """Should generate a report and return it via request/get endpoints."""
+        token = analytics_test_client.test_data["token"]
+
+        def fake_delay(report_id: int):
+            generate_rule_quality_report(report_id)
+
+            class FakeResult:
+                id = "rule-quality-task-1"
+
+            return FakeResult()
+
+        monkeypatch.setattr(analytics_routes.generate_rule_quality_report, "delay", fake_delay)
+
+        create_response = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30},
+        )
+        assert create_response.status_code == 200
+        created = create_response.json()
+        assert created["status"] == "SUCCESS"
+        assert created["cached"] is False
+        assert created["result"] is not None
+        assert created["result"]["freeze_at"]
+
+        report_id = created["report_id"]
+        get_response = analytics_test_client.get(
+            f"/api/v2/analytics/rule-quality/reports/{report_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert get_response.status_code == 200
+        fetched = get_response.json()
+        assert fetched["report_id"] == report_id
+        assert fetched["status"] == "SUCCESS"
+        assert fetched["result"] is not None
+        assert fetched["result"]["total_labeled_events"] == 6
+
+    def test_rule_quality_report_reuses_cached_success(
+        self,
+        analytics_test_client,
+        sample_rule_quality_data,
+        monkeypatch,
+    ):
+        """Second identical request should reuse recent success report."""
+        token = analytics_test_client.test_data["token"]
+        session = analytics_test_client.test_data["session"]
+        delay_calls = {"count": 0}
+
+        def fake_delay(report_id: int):
+            delay_calls["count"] += 1
+            generate_rule_quality_report(report_id)
+
+            class FakeResult:
+                id = f"rule-quality-task-{delay_calls['count']}"
+
+            return FakeResult()
+
+        monkeypatch.setattr(analytics_routes.generate_rule_quality_report, "delay", fake_delay)
+
+        first = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30},
+        )
+        second = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30},
+        )
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        first_data = first.json()
+        second_data = second.json()
+        assert first_data["report_id"] == second_data["report_id"]
+        assert second_data["cached"] is True
+        assert delay_calls["count"] == 1
+        assert session.query(RuleQualityReport).count() == 1
+
+    def test_rule_quality_report_force_refresh(
+        self,
+        analytics_test_client,
+        sample_rule_quality_data,
+        monkeypatch,
+    ):
+        """Force refresh should create a new report even with same params."""
+        token = analytics_test_client.test_data["token"]
+        delay_calls = {"count": 0}
+
+        def fake_delay(report_id: int):
+            delay_calls["count"] += 1
+            generate_rule_quality_report(report_id)
+
+            class FakeResult:
+                id = f"rule-quality-task-refresh-{delay_calls['count']}"
+
+            return FakeResult()
+
+        monkeypatch.setattr(analytics_routes.generate_rule_quality_report, "delay", fake_delay)
+
+        first = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30},
+        )
+        refreshed = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30, "force_refresh": True},
+        )
+
+        assert first.status_code == 200
+        assert refreshed.status_code == 200
+        assert first.json()["report_id"] != refreshed.json()["report_id"]
+        assert refreshed.json()["cached"] is False
+        assert delay_calls["count"] == 2
+
+    def test_rule_quality_report_cache_invalidation_on_pair_change(
+        self,
+        analytics_test_client,
+        sample_rule_quality_data,
+        monkeypatch,
+    ):
+        token = analytics_test_client.test_data["token"]
+        session = analytics_test_client.test_data["session"]
+        delay_calls = {"count": 0}
+
+        def fake_delay(report_id: int):
+            delay_calls["count"] += 1
+            generate_rule_quality_report(report_id)
+
+            class FakeResult:
+                id = f"rule-quality-task-pairs-{delay_calls['count']}"
+
+            return FakeResult()
+
+        monkeypatch.setattr(analytics_routes.generate_rule_quality_report, "delay", fake_delay)
+
+        first = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30},
+        )
+        assert first.status_code == 200
+
+        extra_pair = RuleQualityPair(
+            outcome="HOLD",
+            label=sample_rule_quality_data["normal_label"].label,
+            active=True,
+            created_by="tests",
+            o_id=app_settings.ORG_ID,
+        )
+        session.add(extra_pair)
+        session.commit()
+
+        second = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30},
+        )
+        assert second.status_code == 200
+        assert first.json()["report_id"] != second.json()["report_id"]
+        assert second.json()["cached"] is False
+        assert delay_calls["count"] == 2
+
+    def test_rule_quality_report_pending(self, analytics_test_client, sample_rule_quality_data, monkeypatch):
+        """If task is not executed yet, status should remain pending."""
+        token = analytics_test_client.test_data["token"]
+        monkeypatch.setattr(app_settings, "RULE_QUALITY_REPORT_SYNC_FALLBACK", False)
+
+        def fake_delay(_report_id: int):
+            class FakeResult:
+                id = "rule-quality-task-pending"
+
+            return FakeResult()
+
+        monkeypatch.setattr(analytics_routes.generate_rule_quality_report, "delay", fake_delay)
+
+        create_response = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30},
+        )
+        assert create_response.status_code == 200
+        created = create_response.json()
+        assert created["status"] == "PENDING"
+        assert created["result"] is None
+
+        report_id = created["report_id"]
+        get_response = analytics_test_client.get(
+            f"/api/v2/analytics/rule-quality/reports/{report_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert get_response.status_code == 200
+        fetched = get_response.json()
+        assert fetched["status"] == "PENDING"
+        assert fetched["result"] is None
+
+    def test_rule_quality_report_sync_fallback(self, analytics_test_client, sample_rule_quality_data, monkeypatch):
+        """GET status should compute report inline when fallback is enabled and task is still pending."""
+        token = analytics_test_client.test_data["token"]
+        monkeypatch.setattr(app_settings, "RULE_QUALITY_REPORT_SYNC_FALLBACK", True)
+
+        def fake_delay(_report_id: int):
+            class FakeResult:
+                id = "rule-quality-task-pending-fallback"
+
+            return FakeResult()
+
+        monkeypatch.setattr(analytics_routes.generate_rule_quality_report, "delay", fake_delay)
+
+        create_response = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30},
+        )
+        assert create_response.status_code == 200
+        created = create_response.json()
+        assert created["status"] == "PENDING"
+
+        report_id = created["report_id"]
+        get_response = analytics_test_client.get(
+            f"/api/v2/analytics/rule-quality/reports/{report_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert get_response.status_code == 200
+        fetched = get_response.json()
+        assert fetched["status"] == "SUCCESS"
+        assert fetched["result"] is not None
+
+    def test_rule_quality_report_not_found(self, analytics_test_client):
+        """Unknown report ID should return 404."""
+        token = analytics_test_client.test_data["token"]
+
+        response = analytics_test_client.get(
+            "/api/v2/analytics/rule-quality/reports/999999",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 404
+
+
+# =============================================================================
 # PERMISSION TESTS
 # =============================================================================
 
@@ -495,6 +985,42 @@ class TestAnalyticsPermissions:
         with TestClient(app) as client:
             response = client.get(
                 "/api/v2/analytics/labels-summary",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+            assert response.status_code == 403
+
+    def test_rule_quality_without_label_permission(self, session):
+        """User missing VIEW_LABELS should get 403 for rule-quality endpoint."""
+        hashed_password = bcrypt.hashpw("norulequalitylabels".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+        rules_only_role = Role(name="rules_only_rule_quality", description="Can only view rules")
+        session.add(rules_only_role)
+        session.commit()
+
+        rules_only_user = User(
+            email="rulesonly_rule_quality@example.com",
+            password=hashed_password,
+            active=True,
+            fs_uniquifier="rulesonly_rule_quality@example.com",
+        )
+        rules_only_user.roles.append(rules_only_role)
+        session.add(rules_only_user)
+        session.commit()
+
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+        PermissionManager.grant_permission(rules_only_role.id, PermissionAction.VIEW_RULES)
+
+        token = create_access_token(
+            user_id=int(rules_only_user.id),
+            email=str(rules_only_user.email),
+            roles=[rules_only_role.name],
+        )
+
+        with TestClient(app) as client:
+            response = client.get(
+                "/api/v2/analytics/rule-quality",
                 headers={"Authorization": f"Bearer {token}"},
             )
 

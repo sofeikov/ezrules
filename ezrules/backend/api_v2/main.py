@@ -22,6 +22,7 @@ from ezrules.backend.api_v2.routes import (
     outcomes,
     roles,
     rules,
+    settings,
     shadow,
     user_lists,
     users,
@@ -135,3 +136,6 @@ app.include_router(shadow.router)
 
 # API Key routes: /api/v2/api-keys/*
 app.include_router(api_keys.router)
+
+# Runtime settings routes: /api/v2/settings/*
+app.include_router(settings.router)

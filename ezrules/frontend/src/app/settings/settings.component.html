@@ -1,0 +1,151 @@
+<div class="flex min-h-screen bg-gray-50">
+  <app-sidebar></app-sidebar>
+
+  <div class="ml-64 flex-1">
+    <div class="p-8 max-w-4xl">
+      <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">Settings</h1>
+        <p class="text-gray-500 mt-1">System-level runtime defaults for analytics and platform behavior</p>
+      </div>
+
+      <div *ngIf="error" class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6">
+        {{ error }}
+      </div>
+
+      <div *ngIf="success" class="bg-green-50 border border-green-200 text-green-700 rounded-lg p-4 mb-6">
+        {{ success }}
+      </div>
+
+      <div *ngIf="loading" class="flex justify-center py-12">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+      </div>
+
+      <div *ngIf="!loading" class="space-y-6">
+        <div class="bg-white rounded-lg shadow border border-gray-200">
+          <div class="p-6 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Rule Quality Analytics</h2>
+            <p class="text-sm text-gray-500 mt-1">Default lookback window used by Rule Quality when no explicit lookback is selected.</p>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <div>
+              <label for="settings-ruleQualityLookbackDays" class="block text-sm font-medium text-gray-700 mb-2">
+                Lookback Days
+              </label>
+              <input
+                id="settings-ruleQualityLookbackDays"
+                type="number"
+                min="1"
+                class="border border-gray-300 rounded-md px-3 py-2 text-sm w-48"
+                [(ngModel)]="ruleQualityLookbackDays"
+              />
+            </div>
+
+            <p class="text-xs text-gray-500">
+              Environment fallback: {{ defaultRuleQualityLookbackDays }} days (`EZRULES_RULE_QUALITY_LOOKBACK_DAYS`).
+            </p>
+
+            <div class="pt-2">
+              <button
+                id="settings-saveRuntimeSettings"
+                type="button"
+                class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                [disabled]="saving"
+                (click)="save()"
+              >
+                {{ saving ? 'Saving...' : 'Save Settings' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow border border-gray-200">
+          <div class="p-6 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Curated Rule Quality Pairs</h2>
+            <p class="text-sm text-gray-500 mt-1">Only configured active outcome→label pairs are used by Rule Quality reports.</p>
+          </div>
+
+          <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end mb-5">
+              <div>
+                <label for="settings-pairOutcome" class="block text-sm font-medium text-gray-700 mb-2">Outcome</label>
+                <select
+                  id="settings-pairOutcome"
+                  class="border border-gray-300 rounded-md px-3 py-2 text-sm w-full"
+                  [(ngModel)]="newPairOutcome"
+                >
+                  <option *ngFor="let outcome of availableOutcomes" [value]="outcome">{{ outcome }}</option>
+                </select>
+              </div>
+              <div>
+                <label for="settings-pairLabel" class="block text-sm font-medium text-gray-700 mb-2">Label</label>
+                <select
+                  id="settings-pairLabel"
+                  class="border border-gray-300 rounded-md px-3 py-2 text-sm w-full"
+                  [(ngModel)]="newPairLabel"
+                >
+                  <option *ngFor="let label of availableLabels" [value]="label">{{ label }}</option>
+                </select>
+              </div>
+              <div>
+                <button
+                  id="settings-addPair"
+                  type="button"
+                  class="bg-emerald-600 text-white px-4 py-2 rounded-md hover:bg-emerald-700 disabled:opacity-50 w-full"
+                  [disabled]="pairSaving || !newPairOutcome || !newPairLabel"
+                  (click)="addPair()"
+                >
+                  {{ pairSaving ? 'Adding...' : 'Add Pair' }}
+                </button>
+              </div>
+            </div>
+
+            <div class="border border-gray-200 rounded-lg overflow-hidden">
+              <table id="settings-pairsTable" class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600 uppercase text-xs tracking-wide">
+                  <tr>
+                    <th class="px-4 py-3 text-left">Outcome</th>
+                    <th class="px-4 py-3 text-left">Label</th>
+                    <th class="px-4 py-3 text-left">Active</th>
+                    <th class="px-4 py-3 text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let pair of pairs" class="border-t border-gray-100">
+                    <td class="px-4 py-3 font-medium text-gray-900">{{ pair.outcome }}</td>
+                    <td class="px-4 py-3 text-gray-700">{{ pair.label }}</td>
+                    <td class="px-4 py-3">
+                      <input
+                        [id]="'settings-pair-active-' + pair.rqpId"
+                        type="checkbox"
+                        [checked]="pair.active"
+                        [disabled]="isPairBusy(pair.rqpId)"
+                        (change)="onPairActiveChange(pair, $event)"
+                      />
+                    </td>
+                    <td class="px-4 py-3">
+                      <button
+                        [id]="'settings-pair-delete-' + pair.rqpId"
+                        type="button"
+                        class="text-red-600 hover:text-red-700 disabled:opacity-50"
+                        [disabled]="isPairBusy(pair.rqpId)"
+                        (click)="deletePair(pair)"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                  <tr *ngIf="pairs.length === 0">
+                    <td colspan="4" class="px-4 py-6 text-center text-gray-500">
+                      No curated pairs configured yet. Add at least one pair to enable Rule Quality reporting.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

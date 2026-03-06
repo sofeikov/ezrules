@@ -61,7 +61,7 @@ By the end of this page, you should have:
 
 1. Open [http://localhost:4200](http://localhost:4200)
 2. Sign in with your created user
-3. Confirm sidebar shows: **Dashboard**, **Rules**, **Labels**, **Outcomes**, **Analytics**
+3. Confirm sidebar shows: **Dashboard**, **Rules**, **Labels**, **Outcomes**, **Analytics**, **Rule Quality**
 
 ---
 
@@ -123,6 +123,8 @@ Checkpoint:
 2. Confirm `FRAUD`, `NORMAL`, `CHARGEBACK` labels exist
 3. Open **Analytics**
 4. Check total labeled count and trend charts
+5. Open **Settings → General**, add curated outcome→label pairs to track
+6. Open **Rule Quality** and confirm pair metrics load for curated pairs
 
 If your deployment supports CSV upload in the Labels UI, upload a small label file and recheck charts.
 

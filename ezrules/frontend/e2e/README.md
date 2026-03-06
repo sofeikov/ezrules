@@ -35,6 +35,7 @@ e2e/
 Current coverage includes:
 - Authentication and login
 - Rule management pages
+- Rule quality analytics page
 - Security pages (roles/users/API keys/audit trail)
 - Invite + password reset flows, including Mailpit email delivery assertions
 
