@@ -59,4 +59,21 @@ test.describe('Settings Page', () => {
     await targetRow.locator('button:has-text("Delete")').click();
     await expect(page.locator('text=Pair deleted successfully.')).toBeVisible();
   });
+
+  test('should allow reordering the outcome hierarchy', async ({ page }) => {
+    await settingsPage.goto();
+    await settingsPage.waitForPageToLoad();
+
+    const initialHierarchy = await settingsPage.getOutcomeHierarchy();
+    expect(initialHierarchy.length).toBeGreaterThan(1);
+
+    const targetOutcome = initialHierarchy[0].trim();
+    await settingsPage.moveOutcomeDownByName(targetOutcome);
+    await settingsPage.saveOutcomeHierarchy();
+
+    await expect(page.locator('text=Outcome hierarchy saved successfully.')).toBeVisible();
+
+    const updatedHierarchy = (await settingsPage.getOutcomeHierarchy()).map(item => item.trim());
+    expect(updatedHierarchy[1]).toBe(targetOutcome);
+  });
 });

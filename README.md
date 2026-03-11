@@ -15,6 +15,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Database Integration**: PostgreSQL backend with SQLAlchemy ORM and full audit history
 - **Audit Trail**: Change tracking for rules, user lists, outcomes, labels, and field type configurations, with per-change user attribution and explicit rule lifecycle actions (`promoted`, `deactivated`, `deleted`)
 - **Field Type Management**: Auto-discovers JSON field types from live traffic and test payloads; configurable type casting (integer, float, string, boolean, datetime) applied before rule evaluation so comparisons behave correctly regardless of how values arrive in JSON
+- **Outcome Resolution Hierarchy**: Configure outcome severity order in Settings so conflicting rule hits resolve to one persisted winning outcome
 - **Shadow Deployment**: Deploy rules to a shadow environment that observes live traffic without affecting production outcomes; promote validated shadows to production in one step
 - **Rule Lifecycle Controls**: Rules now support `draft`, `active`, and `archived` states with explicit promotion and approver tracking (`effective_from`, `approved_by`, `approved_at`)
 - **Backtesting**: Test rule changes against historical data before deployment
@@ -33,7 +34,7 @@ ezrules consists of several core components:
 
 1. Events are submitted to the API service at `/api/v2/evaluate`
 2. Rules are executed against event data
-3. Outcomes are aggregated and stored
+3. Outcomes are aggregated, resolved through the configured severity hierarchy, and stored
 4. Results are available via API and web interface
 
 ## 🚀 Quick Start

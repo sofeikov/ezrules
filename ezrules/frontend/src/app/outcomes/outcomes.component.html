@@ -45,6 +45,10 @@
             </button>
           </div>
           <div *ngIf="createError" class="mt-3 text-sm text-red-600">{{ createError }}</div>
+          <p class="mt-4 text-xs text-gray-500">
+            New outcomes are appended to the bottom of the conflict-resolution hierarchy.
+            Reorder severity under <a href="/settings" class="text-blue-600 hover:text-blue-700">Settings</a>.
+          </p>
         </div>
 
         <!-- Delete Error -->
@@ -68,9 +72,19 @@
           <!-- Outcome Items -->
           <ul *ngIf="outcomes.length > 0" class="divide-y divide-gray-200">
             <li *ngFor="let outcome of outcomes" class="flex items-center justify-between px-6 py-4">
-              <span class="text-sm font-medium text-gray-900">{{ outcome }}</span>
+              <div>
+                <div class="flex items-center gap-3">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                    {{ formatRank(outcome.severity_rank) }}
+                  </span>
+                  <span class="text-sm font-medium text-gray-900">{{ outcome.outcome_name }}</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">
+                  {{ outcome.severity_rank === 1 ? 'Highest severity' : 'Lower severity than outcomes above it' }}
+                </p>
+              </div>
               <button
-                (click)="deleteOutcome(outcome)"
+                (click)="deleteOutcome(outcome.outcome_name)"
                 class="px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
               >
                 Delete

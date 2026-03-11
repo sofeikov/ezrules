@@ -8,7 +8,16 @@ from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import AllowedOutcome, Label, Organisation, Role, RuleQualityPair, RuntimeSetting, User
+from ezrules.models.backend_core import (
+    AllowedOutcome,
+    Label,
+    Organisation,
+    OutcomeHistory,
+    Role,
+    RuleQualityPair,
+    RuntimeSetting,
+    User,
+)
 from ezrules.settings import app_settings
 
 
@@ -142,6 +151,96 @@ class TestRuntimeSettings:
             assert response.status_code == 403
 
 
+class TestOutcomeHierarchySettings:
+    def test_list_outcome_hierarchy(self, settings_test_client):
+        token = settings_test_client.test_data["token"]
+        session = settings_test_client.test_data["session"]
+
+        _ensure_org(session)
+        session.add_all(
+            [
+                AllowedOutcome(outcome_name="CANCEL", severity_rank=1, o_id=app_settings.ORG_ID),
+                AllowedOutcome(outcome_name="HOLD", severity_rank=2, o_id=app_settings.ORG_ID),
+                AllowedOutcome(outcome_name="RELEASE", severity_rank=3, o_id=app_settings.ORG_ID),
+            ]
+        )
+        session.commit()
+
+        response = settings_test_client.get(
+            "/api/v2/settings/outcome-hierarchy",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert [item["outcome_name"] for item in payload["outcomes"]] == ["CANCEL", "HOLD", "RELEASE"]
+        assert [item["severity_rank"] for item in payload["outcomes"]] == [1, 2, 3]
+
+    def test_update_outcome_hierarchy_reorders_outcomes(self, settings_test_client):
+        token = settings_test_client.test_data["token"]
+        session = settings_test_client.test_data["session"]
+        user = settings_test_client.test_data["user"]
+
+        _ensure_org(session)
+        outcomes = [
+            AllowedOutcome(outcome_name="CANCEL", severity_rank=1, o_id=app_settings.ORG_ID),
+            AllowedOutcome(outcome_name="HOLD", severity_rank=2, o_id=app_settings.ORG_ID),
+            AllowedOutcome(outcome_name="RELEASE", severity_rank=3, o_id=app_settings.ORG_ID),
+        ]
+        session.add_all(outcomes)
+        session.commit()
+
+        response = settings_test_client.put(
+            "/api/v2/settings/outcome-hierarchy",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"ordered_ao_ids": [outcomes[2].ao_id, outcomes[1].ao_id, outcomes[0].ao_id]},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert [item["outcome_name"] for item in payload["outcomes"]] == ["RELEASE", "HOLD", "CANCEL"]
+
+        session.expire_all()
+        stored = (
+            session.query(AllowedOutcome)
+            .filter(AllowedOutcome.o_id == app_settings.ORG_ID)
+            .order_by(AllowedOutcome.severity_rank.asc())
+            .all()
+        )
+        assert [item.outcome_name for item in stored] == ["RELEASE", "HOLD", "CANCEL"]
+        assert [item.severity_rank for item in stored] == [1, 2, 3]
+
+        history = (
+            session.query(OutcomeHistory)
+            .filter(OutcomeHistory.action == "reordered")
+            .order_by(OutcomeHistory.id.asc())
+            .all()
+        )
+        assert len(history) == 2
+        assert {item.outcome_name for item in history} == {"RELEASE", "CANCEL"}
+        assert {item.changed_by for item in history} == {str(user.email)}
+
+    def test_update_outcome_hierarchy_requires_full_set(self, settings_test_client):
+        token = settings_test_client.test_data["token"]
+        session = settings_test_client.test_data["session"]
+
+        _ensure_org(session)
+        outcomes = [
+            AllowedOutcome(outcome_name="CANCEL", severity_rank=1, o_id=app_settings.ORG_ID),
+            AllowedOutcome(outcome_name="HOLD", severity_rank=2, o_id=app_settings.ORG_ID),
+        ]
+        session.add_all(outcomes)
+        session.commit()
+
+        response = settings_test_client.put(
+            "/api/v2/settings/outcome-hierarchy",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"ordered_ao_ids": [outcomes[0].ao_id]},
+        )
+
+        assert response.status_code == 400
+
+
 class TestRuleQualityPairsSettings:
     def test_list_rule_quality_pairs_empty(self, settings_test_client):
         token = settings_test_client.test_data["token"]
@@ -160,6 +259,7 @@ class TestRuleQualityPairsSettings:
 
         outcome = AllowedOutcome(
             outcome_name="SETTINGS_OUTCOME",
+            severity_rank=10,
             o_id=app_settings.ORG_ID,
         )
         label = Label(label="SETTINGS_LABEL")
@@ -208,6 +308,7 @@ class TestRuleQualityPairsSettings:
         _ensure_org(session)
         outcome = AllowedOutcome(
             outcome_name="SETTINGS_OUTCOME_OPTIONS",
+            severity_rank=11,
             o_id=app_settings.ORG_ID,
         )
         label = Label(label="SETTINGS_LABEL_OPTIONS")
@@ -230,6 +331,7 @@ class TestRuleQualityPairsSettings:
         _ensure_org(session)
         outcome = AllowedOutcome(
             outcome_name="SETTINGS_OUTCOME_DUP",
+            severity_rank=12,
             o_id=app_settings.ORG_ID,
         )
         label = Label(label="SETTINGS_LABEL_DUP")
@@ -305,6 +407,7 @@ class TestRuleQualityPairsSettings:
         _ensure_org(session)
         outcome = AllowedOutcome(
             outcome_name="SETTINGS_OUTCOME_PERM",
+            severity_rank=13,
             o_id=app_settings.ORG_ID,
         )
         label = Label(label="SETTINGS_LABEL_PERM")

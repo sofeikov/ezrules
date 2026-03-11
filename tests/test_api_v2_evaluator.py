@@ -18,7 +18,7 @@ from ezrules.backend.api_v2.main import app
 from ezrules.backend.api_v2.routes import evaluator as evaluator_router
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
-from ezrules.models.backend_core import ApiKey, Organisation, Rule
+from ezrules.models.backend_core import ApiKey, Organisation, Rule, TestingRecordLog
 
 
 @pytest.fixture(scope="function")
@@ -76,7 +76,57 @@ class TestEvaluate:
         data = response.json()
         assert data["outcome_counters"] == {"HOLD": 1}
         assert data["outcome_set"] == ["HOLD"]
+        assert data["resolved_outcome"] == "HOLD"
         assert data["rule_results"]["9001"] == "HOLD"
+
+    def test_evaluate_event_resolves_highest_severity_outcome(self, session, eval_api_key):
+        """Should resolve a single winning outcome using the configured hierarchy."""
+        org = session.query(Organisation).one()
+
+        session.add_all(
+            [
+                Rule(logic="return 'HOLD'", description="Always hold", rid="EVAL_V2:002", o_id=org.o_id, r_id=9002),
+                Rule(
+                    logic="return 'RELEASE'",
+                    description="Always release",
+                    rid="EVAL_V2:003",
+                    o_id=org.o_id,
+                    r_id=9003,
+                ),
+            ]
+        )
+        session.commit()
+
+        rm = RDBRuleManager(db=session, o_id=org.o_id)
+        config_producer = RDBRuleEngineConfigProducer(db=session, o_id=org.o_id)
+        config_producer.save_config(rm)
+
+        evaluator_router._lre = LocalRuleExecutorSQL(db=session, o_id=org.o_id)
+
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v2/evaluate",
+                json={
+                    "event_id": "eval_v2_test_conflict",
+                    "event_timestamp": 1234567891,
+                    "event_data": {"amount": 500},
+                },
+                headers={"X-API-Key": eval_api_key},
+            )
+
+        evaluator_router._lre = None
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["outcome_counters"] == {"HOLD": 1, "RELEASE": 1}
+        assert data["outcome_set"] == ["HOLD", "RELEASE"]
+        assert data["resolved_outcome"] == "HOLD"
+
+        stored_event = (
+            session.query(TestingRecordLog).filter(TestingRecordLog.event_id == "eval_v2_test_conflict").one()
+        )
+        assert stored_event.resolved_outcome == "HOLD"
+        assert stored_event.outcome_counters == {"HOLD": 1, "RELEASE": 1}
 
     def test_evaluate_invalid_event(self, session, eval_api_key):
         """Should return 422 for invalid event data."""

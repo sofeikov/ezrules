@@ -2,6 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, field_validator
 
+from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.models.backend_core import TestingRecordLog, TestingResultsLog
 
 
@@ -27,6 +28,7 @@ class Event(BaseModel):
 
 def eval_and_store(lre, event: Event):
     db_session = lre.db
+    outcome_manager = DatabaseOutcome(db_session=db_session, o_id=lre.o_id)
     # Convert Unix timestamp to datetime for created_at
     created_at_datetime = datetime.fromtimestamp(event.event_timestamp)
     tl = TestingRecordLog(
@@ -39,8 +41,12 @@ def eval_and_store(lre, event: Event):
     db_session.add(tl)
     db_session.commit()
     response = lre.evaluate_rules(event.event_data)
+    resolved_outcome = outcome_manager.resolve_outcome(response["outcome_counters"])
+    tl.outcome_counters = response["outcome_counters"]
+    tl.resolved_outcome = resolved_outcome
     for r_id, result in response["rule_results"].items():
         trl = TestingResultsLog(tl_id=tl.tl_id, r_id=r_id, rule_result=result)
         db_session.add(trl)
     db_session.commit()
+    response["resolved_outcome"] = resolved_outcome
     return response, tl.tl_id

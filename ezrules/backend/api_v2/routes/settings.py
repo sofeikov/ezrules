@@ -7,6 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from ezrules.backend.api_v2.auth.dependencies import get_current_active_user, get_db, require_permission
 from ezrules.backend.api_v2.schemas.settings import (
+    OutcomeHierarchyItem,
+    OutcomeHierarchyResponse,
+    OutcomeHierarchyUpdateRequest,
     RuleQualityPairCreateRequest,
     RuleQualityPairOptionsResponse,
     RuleQualityPairResponse,
@@ -19,6 +22,7 @@ from ezrules.backend.runtime_settings import (
     get_rule_quality_lookback_days,
     set_rule_quality_lookback_days,
 )
+from ezrules.core.audit_helpers import save_outcome_history
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import AllowedOutcome, Label, RuleQualityPair, User
 from ezrules.settings import app_settings
@@ -35,6 +39,23 @@ def _serialize_rule_quality_pair(pair: RuleQualityPair) -> RuleQualityPairRespon
         created_at=cast(datetime, pair.created_at),
         updated_at=cast(datetime, pair.updated_at),
         created_by=cast(str | None, pair.created_by),
+    )
+
+
+def _list_outcomes_in_severity_order(db: Any) -> list[AllowedOutcome]:
+    return (
+        db.query(AllowedOutcome)
+        .filter(AllowedOutcome.o_id == app_settings.ORG_ID)
+        .order_by(AllowedOutcome.severity_rank.asc(), AllowedOutcome.outcome_name.asc())
+        .all()
+    )
+
+
+def _serialize_outcome(outcome: AllowedOutcome) -> OutcomeHierarchyItem:
+    return OutcomeHierarchyItem(
+        ao_id=int(outcome.ao_id),
+        outcome_name=str(outcome.outcome_name),
+        severity_rank=int(outcome.severity_rank),
     )
 
 
@@ -68,6 +89,73 @@ def update_runtime_settings(
     )
 
 
+@router.get("/outcome-hierarchy", response_model=OutcomeHierarchyResponse)
+def get_outcome_hierarchy(
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    db: Any = Depends(get_db),
+) -> OutcomeHierarchyResponse:
+    """Return the configured outcome severity ordering used for conflict resolution."""
+    return OutcomeHierarchyResponse(
+        outcomes=[_serialize_outcome(outcome) for outcome in _list_outcomes_in_severity_order(db)],
+    )
+
+
+@router.put("/outcome-hierarchy", response_model=OutcomeHierarchyResponse)
+def update_outcome_hierarchy(
+    request_data: OutcomeHierarchyUpdateRequest,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_PERMISSIONS)),
+    db: Any = Depends(get_db),
+) -> OutcomeHierarchyResponse:
+    """Replace the full ordered outcome hierarchy for the current organization."""
+    outcomes = _list_outcomes_in_severity_order(db)
+    current_ids = [int(outcome.ao_id) for outcome in outcomes]
+    requested_ids = [int(ao_id) for ao_id in request_data.ordered_ao_ids]
+
+    if len(requested_ids) != len(set(requested_ids)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Outcome hierarchy contains duplicate IDs")
+
+    if requested_ids != current_ids and sorted(requested_ids) != sorted(current_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Outcome hierarchy update must include every existing outcome exactly once",
+        )
+
+    by_id = {int(outcome.ao_id): outcome for outcome in outcomes}
+    original_ranks = {int(outcome.ao_id): int(outcome.severity_rank) for outcome in outcomes}
+    temporary_rank_base = len(requested_ids) + 100
+
+    for temporary_offset, ao_id in enumerate(requested_ids, start=1):
+        by_id[ao_id].severity_rank = temporary_rank_base + temporary_offset
+
+    db.flush()
+
+    for severity_rank, ao_id in enumerate(requested_ids, start=1):
+        by_id[ao_id].severity_rank = severity_rank
+
+    changed_outcomes = [
+        by_id[ao_id]
+        for severity_rank, ao_id in enumerate(requested_ids, start=1)
+        if original_ranks[ao_id] != severity_rank
+    ]
+
+    for outcome in changed_outcomes:
+        save_outcome_history(
+            db,
+            ao_id=int(outcome.ao_id),
+            outcome_name=str(outcome.outcome_name),
+            action="reordered",
+            o_id=app_settings.ORG_ID,
+            changed_by=str(user.email) if user.email else None,
+        )
+
+    db.commit()
+    return OutcomeHierarchyResponse(
+        outcomes=[_serialize_outcome(outcome) for outcome in _list_outcomes_in_severity_order(db)],
+    )
+
+
 @router.get("/rule-quality-pairs", response_model=RuleQualityPairsListResponse)
 def list_rule_quality_pairs(
     user: User = Depends(get_current_active_user),
@@ -95,7 +183,7 @@ def get_rule_quality_pair_options(
         str(item.outcome_name)
         for item in db.query(AllowedOutcome)
         .filter(AllowedOutcome.o_id == app_settings.ORG_ID)
-        .order_by(AllowedOutcome.outcome_name.asc())
+        .order_by(AllowedOutcome.severity_rank.asc(), AllowedOutcome.outcome_name.asc())
         .all()
     ]
     labels = [str(item.label) for item in db.query(Label).order_by(Label.label.asc()).all()]

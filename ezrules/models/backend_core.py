@@ -238,6 +238,8 @@ class TestingRecordLog(Base):
     event = Column(JSON, nullable=False)
     event_timestamp = Column(Integer, nullable=False)
     event_id = Column(String, nullable=False)
+    outcome_counters = Column(JSON, nullable=True)
+    resolved_outcome = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
@@ -274,9 +276,11 @@ class ShadowResultsLog(Base):
 
 class AllowedOutcome(Base):
     __tablename__ = "allowed_outcomes"
+    __table_args__ = (UniqueConstraint("o_id", "severity_rank", name="uq_allowed_outcomes_org_severity_rank"),)
 
     ao_id = Column(Integer, unique=True, primary_key=True)
     outcome_name = Column(String, nullable=False)
+    severity_rank = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))

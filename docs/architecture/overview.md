@@ -53,6 +53,7 @@ High-level storage domains:
 
 - Rules/config history: `rules`, `rules_history`, `rule_engine_config`, `rule_engine_config_history`
 - Event evaluation: `testing_record_log`, `testing_results_log`
+- Event evaluation rows persist both per-rule outcomes and the resolved winning outcome for each event
 - Shadow evaluation: `shadow_results_log` (parallel results, never returned to callers)
 - Decision controls: `allowed_outcomes`, `event_labels`, user list tables
 - Access control: `user`, `role`, `roles_users`, `actions`, `role_actions`
@@ -68,8 +69,9 @@ High-level storage domains:
 2. API validates payload
 3. Active rule configuration is loaded/executed
 4. Outcomes are aggregated (`rule_results`, `outcome_counters`, `outcome_set`)
-5. Evaluation data is stored in DB
-6. Response returned to caller
+5. A single `resolved_outcome` is selected from the configured outcome hierarchy
+6. Evaluation data is stored in DB
+7. Response returned to caller
 
 ### 2) Shadow Evaluation Flow
 

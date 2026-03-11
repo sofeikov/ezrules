@@ -42,6 +42,7 @@ class OutcomeResponse(BaseModel):
 
     ao_id: int = Field(..., description="Database primary key")
     outcome_name: str = Field(..., description="Outcome name (uppercase)")
+    severity_rank: int = Field(..., ge=1, description="Configured severity rank; 1 is the highest severity")
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
@@ -52,6 +53,7 @@ class OutcomeListItem(BaseModel):
 
     ao_id: int
     outcome_name: str
+    severity_rank: int
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}

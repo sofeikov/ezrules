@@ -75,6 +75,9 @@ Common outcomes include:
 1. Open **Outcomes**.
 2. Add outcome names you want rules to return.
 3. Remove unused outcomes to keep the set clear.
+4. Open **Settings** and order outcomes under **Outcome Resolution** so conflicts resolve predictably.
+
+When multiple rules return different outcomes for the same event, ezrules applies the **Outcome Resolution** hierarchy and stores the highest-severity `resolved_outcome`.
 
 Example rule snippet:
 
@@ -97,6 +100,7 @@ Supported `aggregation` values: `1h`, `6h`, `12h`, `24h`, `30d`.
 
 - Keep outcome names short and stable.
 - Reuse existing outcomes where possible.
+- Review the outcome hierarchy whenever you add a new operational decision.
 - Remove unused outcomes during periodic cleanup.
 - Validate your outcome set before major rule rollouts.
 

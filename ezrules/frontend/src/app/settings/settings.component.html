@@ -23,6 +23,75 @@
       <div *ngIf="!loading" class="space-y-6">
         <div class="bg-white rounded-lg shadow border border-gray-200">
           <div class="p-6 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Outcome Resolution</h2>
+            <p class="text-sm text-gray-500 mt-1">When multiple rules return different outcomes for the same event, the highest-severity outcome wins.</p>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <div *ngIf="hierarchyOutcomes.length === 0" class="text-sm text-gray-500">
+              No outcomes exist yet. Add outcomes on the Outcomes page first.
+            </div>
+
+            <div *ngIf="hierarchyOutcomes.length > 0" class="border border-gray-200 rounded-lg overflow-hidden">
+              <div
+                *ngFor="let outcome of hierarchyOutcomes; let idx = index"
+                [id]="'settings-outcome-row-' + outcome.aoId"
+                class="flex items-center justify-between px-4 py-3 border-t border-gray-100 first:border-t-0"
+              >
+                <div class="flex items-center gap-3">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 min-w-12 justify-center">
+                    #{{ outcome.severityRank }}
+                  </span>
+                  <div>
+                    <p [id]="'settings-outcome-name-' + outcome.aoId" class="text-sm font-medium text-gray-900">{{ outcome.outcomeName }}</p>
+                    <p class="text-xs text-gray-500">
+                      {{ idx === 0 ? 'Highest severity; resolves conflicts first.' : idx === hierarchyOutcomes.length - 1 ? 'Lowest severity fallback.' : 'Lower than outcomes above it.' }}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    class="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    [disabled]="idx === 0 || hierarchySaving"
+                    [id]="'settings-outcome-up-' + outcome.aoId"
+                    (click)="moveOutcome(idx, -1)"
+                  >
+                    Up
+                  </button>
+                  <button
+                    type="button"
+                    class="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    [disabled]="idx === hierarchyOutcomes.length - 1 || hierarchySaving"
+                    [id]="'settings-outcome-down-' + outcome.aoId"
+                    (click)="moveOutcome(idx, 1)"
+                  >
+                    Down
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div *ngIf="hierarchyOutcomes.length > 0" class="flex items-center justify-between pt-2">
+              <p class="text-xs text-gray-500">
+                Top of the list is the most severe outcome. New outcomes are appended to the bottom by default.
+              </p>
+              <button
+                id="settings-saveOutcomeHierarchy"
+                type="button"
+                class="bg-amber-600 text-white px-4 py-2 rounded-md hover:bg-amber-700 disabled:opacity-50"
+                [disabled]="hierarchySaving || !hierarchyDirty"
+                (click)="saveOutcomeHierarchy()"
+              >
+                {{ hierarchySaving ? 'Saving...' : 'Save Hierarchy' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow border border-gray-200">
+          <div class="p-6 border-b border-gray-200">
             <h2 class="text-lg font-semibold text-gray-900">Rule Quality Analytics</h2>
             <p class="text-sm text-gray-500 mt-1">Default lookback window used by Rule Quality when no explicit lookback is selected.</p>
           </div>

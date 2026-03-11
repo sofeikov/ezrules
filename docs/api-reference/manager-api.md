@@ -100,7 +100,7 @@ Rule lifecycle fields on rule responses:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/outcomes` | Bearer + permission | List allowed outcomes |
+| `GET` | `/api/v2/outcomes` | Bearer + permission | List allowed outcomes in severity order |
 | `POST` | `/api/v2/outcomes` | Bearer + permission | Create allowed outcome |
 | `DELETE` | `/api/v2/outcomes/{outcome_name}` | Bearer + permission | Delete outcome |
 
@@ -141,11 +141,17 @@ Rule quality query params:
 |---|---|---|---|
 | `GET` | `/api/v2/settings/runtime` | Bearer + `VIEW_ROLES` | Read runtime settings |
 | `PUT` | `/api/v2/settings/runtime` | Bearer + `MANAGE_PERMISSIONS` | Update runtime settings (e.g., rule quality lookback days) |
+| `GET` | `/api/v2/settings/outcome-hierarchy` | Bearer + `VIEW_ROLES` | Read ordered outcome severity hierarchy |
+| `PUT` | `/api/v2/settings/outcome-hierarchy` | Bearer + `MANAGE_PERMISSIONS` | Replace ordered outcome severity hierarchy |
 | `GET` | `/api/v2/settings/rule-quality-pairs` | Bearer + `VIEW_ROLES` | List configured curated outcome→label pairs |
 | `GET` | `/api/v2/settings/rule-quality-pairs/options` | Bearer + `VIEW_ROLES` | List available outcomes and labels for pair creation |
 | `POST` | `/api/v2/settings/rule-quality-pairs` | Bearer + `MANAGE_PERMISSIONS` | Create curated pair |
 | `PUT` | `/api/v2/settings/rule-quality-pairs/{pair_id}` | Bearer + `MANAGE_PERMISSIONS` | Toggle pair active/inactive |
 | `DELETE` | `/api/v2/settings/rule-quality-pairs/{pair_id}` | Bearer + `MANAGE_PERMISSIONS` | Delete curated pair |
+
+Outcome hierarchy notes:
+- Outcome hierarchy is ordered from highest severity to lowest severity.
+- `POST /api/v2/evaluate` uses this hierarchy to compute the single `resolved_outcome` stored for each event.
 
 ### Users and Roles
 

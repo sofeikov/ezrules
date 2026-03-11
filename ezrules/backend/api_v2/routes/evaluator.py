@@ -96,5 +96,6 @@ def evaluate(
     return EvaluateResponse(
         outcome_counters=result["outcome_counters"],
         outcome_set=result["outcome_set"],
+        resolved_outcome=result.get("resolved_outcome"),
         rule_results={str(k): str(v) for k, v in result["rule_results"].items()},
     )
