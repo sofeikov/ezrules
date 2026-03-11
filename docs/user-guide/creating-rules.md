@@ -167,7 +167,7 @@ If a rule is not behaving as expected:
    - `outcome_counters`
    - `outcome_set`
 
-You can also generate sample data:
+You can also generate fraud-oriented demo data with familiar transaction fields:
 
 ```bash
 uv run ezrules generate-random-data --n-events 100
