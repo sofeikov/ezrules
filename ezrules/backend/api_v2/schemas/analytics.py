@@ -128,7 +128,7 @@ class RuleQualityReportRequest(BaseModel):
     )
     force_refresh: bool = Field(
         default=False,
-        description="When true, always enqueue a fresh report instead of reusing cache",
+        description="When true, enqueue a fresh report; when false, return only an existing snapshot",
     )
 
 

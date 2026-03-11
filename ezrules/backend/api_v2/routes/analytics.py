@@ -437,7 +437,6 @@ def request_rule_quality_report(
     active_pairs = get_active_rule_quality_pairs(db, o_id=app_settings.ORG_ID)
     pair_set_hash = compute_rule_quality_pairs_hash(active_pairs)
     now = datetime.datetime.utcnow()
-    cache_cutoff = now - datetime.timedelta(minutes=app_settings.RULE_QUALITY_REPORT_CACHE_MINUTES)
 
     if not request_data.force_refresh:
         cached_report = (
@@ -446,13 +445,16 @@ def request_rule_quality_report(
             .filter(RuleQualityReport.min_support == request_data.min_support)
             .filter(RuleQualityReport.lookback_days == applied_lookback_days)
             .filter(RuleQualityReport.pair_set_hash == pair_set_hash)
-            .filter(RuleQualityReport.created_at >= cache_cutoff)
             .filter(RuleQualityReport.status.in_(["PENDING", "RUNNING", "SUCCESS"]))
             .order_by(RuleQualityReport.created_at.desc())
             .first()
         )
         if cached_report is not None:
             return _serialize_rule_quality_report(cached_report, cached=True)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No existing rule quality snapshot for the requested filters. Use force_refresh=true to generate one.",
+        )
 
     freeze_at = now
     max_tl_id = get_rule_quality_snapshot_max_tl_id(

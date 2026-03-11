@@ -12,6 +12,10 @@
         {{ error }}
       </div>
 
+      <div *ngIf="noSnapshotAvailable" class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-6">
+        No snapshot exists for the selected filters. Click <strong>Refresh Report</strong> to generate one.
+      </div>
+
       <div class="bg-white rounded-lg shadow border border-gray-200 p-6 mb-6">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>

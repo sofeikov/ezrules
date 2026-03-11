@@ -686,7 +686,7 @@ class TestRuleQualityReports:
         create_response = analytics_test_client.post(
             "/api/v2/analytics/rule-quality/reports",
             headers={"Authorization": f"Bearer {token}"},
-            json={"min_support": 1, "lookback_days": 30},
+            json={"min_support": 1, "lookback_days": 30, "force_refresh": True},
         )
         assert create_response.status_code == 200
         created = create_response.json()
@@ -732,7 +732,7 @@ class TestRuleQualityReports:
         first = analytics_test_client.post(
             "/api/v2/analytics/rule-quality/reports",
             headers={"Authorization": f"Bearer {token}"},
-            json={"min_support": 1, "lookback_days": 30},
+            json={"min_support": 1, "lookback_days": 30, "force_refresh": True},
         )
         second = analytics_test_client.post(
             "/api/v2/analytics/rule-quality/reports",
@@ -748,6 +748,50 @@ class TestRuleQualityReports:
         assert second_data["cached"] is True
         assert delay_calls["count"] == 1
         assert session.query(RuleQualityReport).count() == 1
+
+    def test_rule_quality_report_reuses_cached_snapshot_regardless_of_age(
+        self,
+        analytics_test_client,
+        sample_rule_quality_data,
+        monkeypatch,
+    ):
+        token = analytics_test_client.test_data["token"]
+        session = analytics_test_client.test_data["session"]
+        delay_calls = {"count": 0}
+
+        def fake_delay(report_id: int):
+            delay_calls["count"] += 1
+            generate_rule_quality_report(report_id)
+
+            class FakeResult:
+                id = f"rule-quality-task-aged-{delay_calls['count']}"
+
+            return FakeResult()
+
+        monkeypatch.setattr(analytics_routes.generate_rule_quality_report, "delay", fake_delay)
+
+        first = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30, "force_refresh": True},
+        )
+        assert first.status_code == 200
+        report_id = first.json()["report_id"]
+
+        report = session.query(RuleQualityReport).filter(RuleQualityReport.rqr_id == report_id).first()
+        assert report is not None
+        report.created_at = datetime.datetime.utcnow() - datetime.timedelta(days=365)
+        session.commit()
+
+        second = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30},
+        )
+        assert second.status_code == 200
+        assert second.json()["report_id"] == report_id
+        assert second.json()["cached"] is True
+        assert delay_calls["count"] == 1
 
     def test_rule_quality_report_force_refresh(
         self,
@@ -773,7 +817,7 @@ class TestRuleQualityReports:
         first = analytics_test_client.post(
             "/api/v2/analytics/rule-quality/reports",
             headers={"Authorization": f"Bearer {token}"},
-            json={"min_support": 1, "lookback_days": 30},
+            json={"min_support": 1, "lookback_days": 30, "force_refresh": True},
         )
         refreshed = analytics_test_client.post(
             "/api/v2/analytics/rule-quality/reports",
@@ -786,6 +830,34 @@ class TestRuleQualityReports:
         assert first.json()["report_id"] != refreshed.json()["report_id"]
         assert refreshed.json()["cached"] is False
         assert delay_calls["count"] == 2
+
+    def test_rule_quality_report_without_refresh_requires_existing_snapshot(
+        self,
+        analytics_test_client,
+        sample_rule_quality_data,
+        monkeypatch,
+    ):
+        token = analytics_test_client.test_data["token"]
+        delay_calls = {"count": 0}
+
+        def fake_delay(_report_id: int):
+            delay_calls["count"] += 1
+
+            class FakeResult:
+                id = f"rule-quality-task-no-refresh-{delay_calls['count']}"
+
+            return FakeResult()
+
+        monkeypatch.setattr(analytics_routes.generate_rule_quality_report, "delay", fake_delay)
+
+        response = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30},
+        )
+        assert response.status_code == 404
+        assert "No existing rule quality snapshot" in response.json()["detail"]
+        assert delay_calls["count"] == 0
 
     def test_rule_quality_report_cache_invalidation_on_pair_change(
         self,
@@ -811,7 +883,7 @@ class TestRuleQualityReports:
         first = analytics_test_client.post(
             "/api/v2/analytics/rule-quality/reports",
             headers={"Authorization": f"Bearer {token}"},
-            json={"min_support": 1, "lookback_days": 30},
+            json={"min_support": 1, "lookback_days": 30, "force_refresh": True},
         )
         assert first.status_code == 200
 
@@ -830,9 +902,16 @@ class TestRuleQualityReports:
             headers={"Authorization": f"Bearer {token}"},
             json={"min_support": 1, "lookback_days": 30},
         )
-        assert second.status_code == 200
-        assert first.json()["report_id"] != second.json()["report_id"]
-        assert second.json()["cached"] is False
+        assert second.status_code == 404
+        assert "No existing rule quality snapshot" in second.json()["detail"]
+        third = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30, "force_refresh": True},
+        )
+        assert third.status_code == 200
+        assert first.json()["report_id"] != third.json()["report_id"]
+        assert third.json()["cached"] is False
         assert delay_calls["count"] == 2
 
     def test_rule_quality_report_pending(self, analytics_test_client, sample_rule_quality_data, monkeypatch):
@@ -851,7 +930,7 @@ class TestRuleQualityReports:
         create_response = analytics_test_client.post(
             "/api/v2/analytics/rule-quality/reports",
             headers={"Authorization": f"Bearer {token}"},
-            json={"min_support": 1, "lookback_days": 30},
+            json={"min_support": 1, "lookback_days": 30, "force_refresh": True},
         )
         assert create_response.status_code == 200
         created = create_response.json()
@@ -884,7 +963,7 @@ class TestRuleQualityReports:
         create_response = analytics_test_client.post(
             "/api/v2/analytics/rule-quality/reports",
             headers={"Authorization": f"Bearer {token}"},
-            json={"min_support": 1, "lookback_days": 30},
+            json={"min_support": 1, "lookback_days": 30, "force_refresh": True},
         )
         assert create_response.status_code == 200
         created = create_response.json()

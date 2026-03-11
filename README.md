@@ -262,7 +262,7 @@ Use the **Rule Quality** page to evaluate underperforming rules from labeled eve
 **API Endpoint:**
 - `/api/v2/analytics/rule-quality?min_support=5&lookback_days=30` - Rule-level ranking plus pair-level metrics over a bounded window
 - Async report flow:
-  - `POST /api/v2/analytics/rule-quality/reports` (request/reuse)
+  - `POST /api/v2/analytics/rule-quality/reports` (`force_refresh=false` returns existing snapshot only; `force_refresh=true` generates new)
   - `GET /api/v2/analytics/rule-quality/reports/{report_id}` (poll status/result)
 
 Default lookback for Rule Quality can be configured in **Settings → General** and is stored as a runtime setting.

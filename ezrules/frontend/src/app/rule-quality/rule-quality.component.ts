@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { SidebarComponent } from '../components/sidebar.component';
 import {
@@ -20,6 +21,7 @@ export class RuleQualityComponent implements OnInit, OnDestroy {
   loading: boolean = true;
   polling: boolean = false;
   error: string | null = null;
+  noSnapshotAvailable: boolean = false;
 
   minSupport: number = 1;
   lookbackDays: number = 30;
@@ -49,6 +51,7 @@ export class RuleQualityComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.polling = false;
     this.error = null;
+    this.noSnapshotAvailable = false;
     this.clearPollTimeout();
 
     const lookbackDays = useConfiguredDefault ? null : this.lookbackDays;
@@ -56,7 +59,18 @@ export class RuleQualityComponent implements OnInit, OnDestroy {
       next: (report) => {
         this.handleReportResponse(report);
       },
-      error: () => {
+      error: (err: HttpErrorResponse) => {
+        if (err.status === 404) {
+          this.noSnapshotAvailable = true;
+          this.totalLabeledEvents = 0;
+          this.freezeAt = null;
+          this.pairMetrics = [];
+          this.bestRules = [];
+          this.worstRules = [];
+          this.loading = false;
+          this.polling = false;
+          return;
+        }
         this.error = 'Failed to request rule quality report. Please try again.';
         this.loading = false;
         this.polling = false;
@@ -148,6 +162,7 @@ export class RuleQualityComponent implements OnInit, OnDestroy {
   }
 
   private applyResult(response: RuleQualityResponse): void {
+    this.noSnapshotAvailable = false;
     this.totalLabeledEvents = response.totalLabeledEvents;
     this.lookbackDays = response.lookbackDays;
     this.freezeAt = response.freezeAt;
