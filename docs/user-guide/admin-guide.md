@@ -126,7 +126,20 @@ Use audit endpoints during incident review or compliance checks:
 Operational tips:
 
 - Capture `changed_by` values and timestamps when preparing incident timelines
+- Watch for `rolled_back` rule actions when reconstructing emergency change timelines
 - Field type changes affect rule evaluation behavior; review `GET /api/v2/audit/field-types` when investigating unexpected rule outcomes
+
+### Rule rollback in incident response
+
+If a recently edited rule needs to be restored quickly:
+
+1. Open the rule's **History** timeline in the UI.
+2. Select the last known-good revision.
+3. Trigger **Roll back to revision ...** to create a new draft version from that historical logic.
+4. Re-test or shadow validate if time allows.
+5. Promote the rollback draft if the rule needs to be active again in production.
+
+Rollback preserves every prior revision. It is preferable to manual copy/paste because it records the recovery action explicitly in audit history.
 
 ---
 

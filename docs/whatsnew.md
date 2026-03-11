@@ -1,5 +1,10 @@
 # What's New
 
+## v0.20.0
+
+* **Rule rollback workflow**: Rule history now supports rolling back to a selected historical revision without deleting any prior versions. Rollback copies the chosen revision's logic and description into a new draft version, so the previous live version remains in the audit trail.
+* **Rollback API and UI**: Added `POST /api/v2/rules/{id}/rollback` plus rollback actions in the Rule History timeline with a confirmation dialog that previews the current-to-target diff before creating the new draft version.
+
 ## v0.20
 
 * **Rule Quality curated pairs**: Rule Quality reports now compute only analyst-configured curated outcome→label pairs (instead of all observed pairs), while preserving existing precision/recall/F1 and best/worst rule summaries.

@@ -35,6 +35,8 @@ uv run pytest --cov=ezrules.backend --cov=ezrules.core --cov-report=term-missing
 - **Generate test data**: `uv run ezrules generate-random-data --n-rules 10 --n-events 100`
 
 # VS Code Launch Configs (.vscode/launch.json)
+When creating a new git worktree for this repository, copy the root `.vscode/` folder into the new worktree before starting work so all launch/run configurations remain available there.
+
 All common operations are available as VS Code launch configs; use these instead of manual commands where possible:
 - **Reset Dev Environment**: recreates dev DB (`ezrules`), adds admin user, generates fake data.
   Equivalent CLI: `EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules EZRULES_TESTING=true uv run ezrules reset-dev`
