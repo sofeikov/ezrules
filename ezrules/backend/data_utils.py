@@ -26,7 +26,7 @@ class Event(BaseModel):
         return value
 
 
-def eval_and_store(lre, event: Event):
+def eval_and_store(lre, event: Event, commit: bool = True):
     db_session = lre.db
     outcome_manager = DatabaseOutcome(db_session=db_session, o_id=lre.o_id)
     # Convert Unix timestamp to datetime for created_at
@@ -39,7 +39,10 @@ def eval_and_store(lre, event: Event):
         created_at=created_at_datetime,
     )
     db_session.add(tl)
-    db_session.commit()
+    if commit:
+        db_session.commit()
+    else:
+        db_session.flush()
     response = lre.evaluate_rules(event.event_data)
     resolved_outcome = outcome_manager.resolve_outcome(response["outcome_counters"])
     tl.outcome_counters = response["outcome_counters"]
@@ -47,6 +50,7 @@ def eval_and_store(lre, event: Event):
     for r_id, result in response["rule_results"].items():
         trl = TestingResultsLog(tl_id=tl.tl_id, r_id=r_id, rule_result=result)
         db_session.add(trl)
-    db_session.commit()
     response["resolved_outcome"] = resolved_outcome
+    if commit:
+        db_session.commit()
     return response, tl.tl_id

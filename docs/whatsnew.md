@@ -9,6 +9,9 @@
 * **Pair-set-aware report cache**: Rule quality report reuse now includes a pair-set hash, so changing curated pairs invalidates stale cached reports automatically.
 * **Runtime lookback controls**: `GET /api/v2/analytics/rule-quality` now supports `lookback_days`. A new **Settings → General** page persists the default lookback via `GET/PUT /api/v2/settings/runtime` so teams can bound query windows without redeploying.
 * **Bombardment fraud labeling**: Enhanced `scripts/bombard_evaluator.py` to optionally mark a small random portion of successful evaluations as fraud labels (default 1%) using `--fraud-rate` and labels API calls.
+* **Fraud-shaped demo data generation**: `uv run ezrules generate-random-data` now seeds correlated payment events and list-backed rules that look more like analyst-facing fraud operations, including CNP geo mismatch, card-testing bursts, account-takeover reset patterns, and payout cash-out scenarios.
+* **Showcase rule patterns in demo seed**: The generated sample rule set now also includes a few intentionally illustrative rules that demonstrate nested branching, loop-based signal counting, and customer-baseline computations.
+* **Observation write-path optimization**: Field observations are now upserted in one query per event instead of one lookup per field, which matters much more now that demo events carry richer payloads.
 
 ## v0.18
 

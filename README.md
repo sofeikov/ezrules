@@ -144,7 +144,7 @@ cd ezrules/frontend && npm install && npm start
 Open http://localhost:4200.
 Open Mailpit at http://localhost:8025 to inspect invitation/password-reset emails in development.
 
-To generate sample data for development:
+To generate fraud-oriented demo data for development:
 
 ```bash
 uv run ezrules generate-random-data --n-rules 10 --n-events 100
@@ -285,7 +285,8 @@ This mirrors CSV-style labeling but works inline while generating evaluator traf
 
 ### Test Data Generation
 
-Generate realistic test data with fraud patterns:
+Generate fraud-oriented demo data with correlated fields such as device age, 3DS, velocity, geography mismatch,
+beneficiary age, prior chargeback history, plus a few showcase rules using branching, loops, and baseline calculations:
 
 ```bash
 # Generate 200 events, label 40% with realistic patterns, export to CSV

@@ -76,9 +76,10 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 10. Database-related functionality must be tested on the live test DB rather than mocked.
 11. If functionality affects user experience/actions, update README and `docs/whatsnew.md`.
 12. When tests are approved, run ALL tests, not selective subsets.
-13. After tests are done, kill API server (8888) and Angular dev server (4200) if you started them manually.
-14. After all tests pass, reset the dev environment (prefer VS Code launch config **Reset Dev Environment**, or run `EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules EZRULES_TESTING=true uv run ezrules reset-dev`).
-15. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
+13. When tests require starting local services manually, run the API/backend and Angular frontend on random available high ports instead of standard ports like `8888` and `4200` to reduce the chance of blocking commonly used defaults.
+14. After tests are done, kill any API/backend and Angular dev servers you started manually, regardless of which ports were used.
+15. After all tests pass, reset the dev environment (prefer VS Code launch config **Reset Dev Environment**, or run `EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules EZRULES_TESTING=true uv run ezrules reset-dev`).
+16. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
 
 # Writing New Documentation
 1. Canonical documentation map: [DOCUMENTATION_MAP.md](DOCUMENTATION_MAP.md)

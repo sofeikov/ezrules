@@ -1,10 +1,10 @@
+import csv
 import logging
 import os
 import subprocess
 import sys
-from datetime import datetime, timedelta
 from pathlib import Path
-from random import choice, choices, randint, uniform
+from random import Random
 from urllib.parse import urlparse
 
 import bcrypt
@@ -16,6 +16,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from ezrules.backend.data_utils import Event, eval_and_store
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.utils import record_observations
+from ezrules.core.application_context import set_organization_id, set_user_list_manager
 from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import RoleType
@@ -25,6 +26,7 @@ from ezrules.core.rule_updater import (
     RuleManagerFactory,
 )
 from ezrules.core.user_lists import PersistentUserListManager
+from ezrules.demo_data import build_demo_events, build_demo_rules, determine_demo_label, seed_demo_user_lists
 from ezrules.models.backend_core import Label, Organisation, Role, TestingRecordLog, User
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import Base, db_session
@@ -32,6 +34,8 @@ from ezrules.settings import app_settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+DEMO_DATA_COMMIT_BATCH_SIZE = 50
 
 
 def _drop_database(engine, db_name):
@@ -334,81 +338,58 @@ def api(port, reload):
 @click.option("--label-ratio", default=0.3, help="Ratio of events to label (0.0-1.0)")
 @click.option("--export-csv", help="Export labeled events to CSV file for testing uploads")
 def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export_csv: str):
-    test_attributes = {
-        "amount": float,
-        "send_country": str,
-        "receive_country": str,
-        "score": float,
-        "is_verified": int,
-    }
+    if n_rules < 0 or n_events < 0:
+        raise click.BadParameter("n-rules and n-events must be zero or greater")
+    if not 0 <= label_ratio <= 1:
+        raise click.BadParameter("label-ratio must be between 0.0 and 1.0")
+
+    rng = Random()
+    user_list_manager = PersistentUserListManager(db_session=db_session, o_id=1)
+    set_user_list_manager(user_list_manager)
+    set_organization_id(1)
+    seed_demo_user_lists(user_list_manager)
+
     fsrm: RuleManager = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db": db_session, "o_id": 1})
     rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=1)
-    all_attrs = list(test_attributes)
-    for r_ind in range(n_rules):
-        n_attrs_by_rule = randint(1, len(all_attrs))
-        selected_attrs = set(choices(all_attrs, k=n_attrs_by_rule))
-
-        # Logic is a simple "if" statement randomly combining the attributes above with some thresholds
-        conditions = []
-        for attr in selected_attrs:
-            if test_attributes[attr] is float:
-                threshold = round(uniform(0, 1000), 2)
-                conditions.append(f"${attr} > {threshold}")
-            elif test_attributes[attr] is str:
-                value = f"'{attr}_value_{randint(1, 10)}'"
-                conditions.append(f"${attr} == {value}")
-            elif test_attributes[attr] is int:
-                threshold = randint(0, 1)
-                conditions.append(f"${attr} == {threshold}")
-
-        logic = " and ".join(conditions)
-        outcome = choice(["HOLD", "CANCEL", "RELEASE"])
-        logic = f"if {logic}:\n    return '{outcome}'"
-
-        # Create a description for the rule
-        description = f"This rule applies when: {', '.join(conditions)}."
-
-        # Create the RuleModel instance
-        r = RuleModel(rid=f"TestRule_Rule_{r_ind}", logic=logic, description=description, o_id=1)
-
-        # Add the rule to the database session and commit it
-        db_session.add(r)
+    existing_rule_count = db_session.query(RuleModel).filter(RuleModel.rid.like("TestRule_%")).count()
+    generated_rules = build_demo_rules(n_rules=n_rules, start_index=existing_rule_count)
+    for rule in generated_rules:
+        db_session.add(RuleModel(rid=rule.rid, logic=rule.logic, description=rule.description, o_id=1))
+    if generated_rules:
         db_session.commit()
-
-        print(f"Generated Rule {r_ind}: {logic}")
-
-        lre = LocalRuleExecutorSQL(db=db_session, o_id=1)
+        logger.info(
+            "Generated %s fraud-demo rules with list-backed conditions and correlated thresholds.", len(generated_rules)
+        )
 
     rule_engine_config_producer.save_config(fsrm, changed_by="cli")
+    lre = LocalRuleExecutorSQL(db=db_session, o_id=1)
+
     # Generate and evaluate events
-    for e_ind in range(n_events):
-        event_data = {}
-        for attr, attr_type in test_attributes.items():
-            if attr_type is float:
-                event_data[attr] = round(uniform(0, 1000), 2)
-            elif attr_type is str:
-                event_data[attr] = f"{attr}_value_{randint(1, 10)}"
-            elif attr_type is int:
-                event_data[attr] = randint(0, 1)
-
-        # Calculate a timestamp within the last month
-        current_time = datetime.now()
-        start_time = current_time - timedelta(days=30)
-        event_timestamp = randint(int(start_time.timestamp()), int(current_time.timestamp()))
-
+    existing_event_count = (
+        db_session.query(TestingRecordLog).filter(TestingRecordLog.event_id.like("TestEvent_%")).count()
+    )
+    generated_events = build_demo_events(n_events=n_events, start_index=existing_event_count)
+    for index, generated_event in enumerate(generated_events, start=1):
         event = Event(
-            event_id=f"TestEvent_Event_{e_ind}",
-            event_timestamp=event_timestamp,
-            event_data=event_data,
+            event_id=generated_event.event_id,
+            event_timestamp=generated_event.event_timestamp,
+            event_data=generated_event.event_data,
         )
 
         # Evaluate the event against the rules and store the results
-        response = eval_and_store(lre, event)
-        record_observations(db_session, event_data, 1)
-        print(f"Evaluated Event {e_ind}: {response}")
+        response = eval_and_store(lre, event, commit=False)
+        record_observations(db_session, generated_event.event_data, 1, commit=False)
+        if index % DEMO_DATA_COMMIT_BATCH_SIZE == 0:
+            db_session.commit()
+        if index == n_events or index % 25 == 0:
+            logger.info(
+                "Evaluated %s/%s demo events. Last outcome set: %s", index, n_events, response[0]["outcome_set"]
+            )
+    if generated_events:
+        db_session.commit()
 
     # Enhanced labeling logic
-    if label_ratio > 0:
+    if label_ratio > 0 and generated_events:
         logger.info(f"Labeling {label_ratio * 100:.1f}% of events with realistic patterns...")
 
         # Get all available labels, create defaults if none exist
@@ -421,12 +402,19 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
         if available_labels:
             logger.info(f"Available labels: {list(available_labels.keys())}")
 
-            # Get all generated events
-            all_events = db_session.query(TestingRecordLog).filter(TestingRecordLog.event_id.like("TestEvent_%")).all()
+            generated_event_ids = [generated_event.event_id for generated_event in generated_events]
+            all_events = (
+                db_session.query(TestingRecordLog).filter(TestingRecordLog.event_id.in_(generated_event_ids)).all()
+            )
 
             # Determine how many events to label
             n_to_label = int(len(all_events) * label_ratio)
-            events_to_label = choices(all_events, k=n_to_label)
+            if n_to_label <= 0:
+                events_to_label = []
+            elif n_to_label >= len(all_events):
+                events_to_label = all_events
+            else:
+                events_to_label = rng.sample(all_events, k=n_to_label)
 
             labeled_events = []
 
@@ -464,53 +452,11 @@ def _create_default_labels(session):
 
 def _determine_realistic_label(event_data: dict, available_labels) -> str | None:
     """Determine a realistic label based on event characteristics"""
-    amount = event_data.get("amount", 0)
-    score = event_data.get("score", 0)
-    is_verified = event_data.get("is_verified", 1)
-
-    # Define realistic labeling patterns
-    fraud_probability = 0
-    chargeback_probability = 0
-
-    # High amounts are more likely to be scrutinized
-    if amount > 800:
-        fraud_probability += 0.15
-        chargeback_probability += 0.10
-    elif amount > 500:
-        fraud_probability += 0.08
-        chargeback_probability += 0.05
-
-    # High scores indicate suspicion
-    if score > 800:
-        fraud_probability += 0.25
-        chargeback_probability += 0.15
-    elif score > 600:
-        fraud_probability += 0.12
-        chargeback_probability += 0.08
-
-    # Unverified users are riskier
-    if is_verified == 0:
-        fraud_probability += 0.20
-        chargeback_probability += 0.10
-
-    # Determine label based on probabilities
-    random_val = uniform(0, 1)
-
-    if "FRAUD" in available_labels and random_val < fraud_probability:
-        return "FRAUD"
-    elif "CHARGEBACK" in available_labels and random_val < fraud_probability + chargeback_probability:
-        return "CHARGEBACK"
-    elif "NORMAL" in available_labels and uniform(0, 1) < 0.7:  # 70% of remaining labeled as normal
-        return "NORMAL"
-
-    # Default fallback
-    return choice(list(available_labels)) if available_labels else None
+    return determine_demo_label(event_data, list(available_labels))
 
 
 def _export_labels_to_csv(labeled_events: list, filename: str):
     """Export labeled events to CSV for testing uploads"""
-    import csv
-
     try:
         with open(filename, "w", newline="") as csvfile:
             writer = csv.writer(csvfile)
