@@ -24,6 +24,12 @@ export interface RuleQualityPairOptions {
   labels: string[];
 }
 
+export interface OutcomeHierarchyItem {
+  aoId: number;
+  outcomeName: string;
+  severityRank: number;
+}
+
 interface RuntimeSettingsV2 {
   rule_quality_lookback_days: number;
   default_rule_quality_lookback_days: number;
@@ -48,12 +54,23 @@ interface RuleQualityPairOptionsResponseV2 {
   labels: string[];
 }
 
+interface OutcomeHierarchyItemV2 {
+  ao_id: number;
+  outcome_name: string;
+  severity_rank: number;
+}
+
+interface OutcomeHierarchyResponseV2 {
+  outcomes: OutcomeHierarchyItemV2[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class RuntimeSettingsService {
   private settingsUrl = `${environment.apiUrl}/api/v2/settings/runtime`;
   private ruleQualityPairsUrl = `${environment.apiUrl}/api/v2/settings/rule-quality-pairs`;
+  private outcomeHierarchyUrl = `${environment.apiUrl}/api/v2/settings/outcome-hierarchy`;
 
   constructor(private http: HttpClient) {}
 
@@ -113,6 +130,20 @@ export class RuntimeSettingsService {
     return this.http.delete<void>(`${this.ruleQualityPairsUrl}/${pairId}`);
   }
 
+  getOutcomeHierarchy(): Observable<OutcomeHierarchyItem[]> {
+    return this.http.get<OutcomeHierarchyResponseV2>(this.outcomeHierarchyUrl).pipe(
+      map(response => response.outcomes.map(item => this.mapOutcomeHierarchyItem(item)))
+    );
+  }
+
+  updateOutcomeHierarchy(orderedAoIds: number[]): Observable<OutcomeHierarchyItem[]> {
+    return this.http.put<OutcomeHierarchyResponseV2>(this.outcomeHierarchyUrl, {
+      ordered_ao_ids: orderedAoIds
+    }).pipe(
+      map(response => response.outcomes.map(item => this.mapOutcomeHierarchyItem(item)))
+    );
+  }
+
   private mapRuleQualityPair(pair: RuleQualityPairV2): RuleQualityPair {
     return {
       rqpId: pair.rqp_id,
@@ -122,6 +153,14 @@ export class RuntimeSettingsService {
       createdAt: pair.created_at,
       updatedAt: pair.updated_at,
       createdBy: pair.created_by
+    };
+  }
+
+  private mapOutcomeHierarchyItem(item: OutcomeHierarchyItemV2): OutcomeHierarchyItem {
+    return {
+      aoId: item.ao_id,
+      outcomeName: item.outcome_name,
+      severityRank: item.severity_rank
     };
   }
 }

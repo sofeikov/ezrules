@@ -5,12 +5,12 @@ import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 export interface OutcomesResponse {
-  outcomes: string[];
+  outcomes: OutcomeItem[];
 }
 
 export interface CreateOutcomeResponse {
   success: boolean;
-  outcome?: string;
+  outcome?: OutcomeItem;
   error?: string;
 }
 
@@ -18,21 +18,22 @@ export interface DeleteOutcomeResponse {
   message: string;
 }
 
-interface OutcomeListItem {
+export interface OutcomeItem {
   ao_id: number;
   outcome_name: string;
+  severity_rank: number;
   created_at: string | null;
 }
 
 interface OutcomesListResponseV2 {
-  outcomes: OutcomeListItem[];
+  outcomes: OutcomeItem[];
 }
 
 interface OutcomeMutationResponseV2 {
   success: boolean;
   message: string;
   error?: string;
-  outcome?: OutcomeListItem;
+  outcome?: OutcomeItem;
 }
 
 @Injectable({
@@ -46,7 +47,7 @@ export class OutcomeService {
   getOutcomes(): Observable<OutcomesResponse> {
     return this.http.get<OutcomesListResponseV2>(this.apiUrl).pipe(
       map(response => ({
-        outcomes: response.outcomes.map(o => o.outcome_name)
+        outcomes: response.outcomes.map(o => this.mapOutcome(o))
       }))
     );
   }
@@ -55,7 +56,7 @@ export class OutcomeService {
     return this.http.post<OutcomeMutationResponseV2>(this.apiUrl, { outcome_name: outcome }).pipe(
       map(response => ({
         success: response.success,
-        outcome: response.outcome?.outcome_name,
+        outcome: response.outcome ? this.mapOutcome(response.outcome) : undefined,
         error: response.error
       }))
     );
@@ -65,5 +66,14 @@ export class OutcomeService {
     return this.http.delete<OutcomeMutationResponseV2>(`${this.apiUrl}/${outcome}`).pipe(
       map(response => ({ message: response.message }))
     );
+  }
+
+  private mapOutcome(outcome: OutcomeItem): OutcomeItem {
+    return {
+      ao_id: outcome.ao_id,
+      outcome_name: outcome.outcome_name,
+      severity_rank: outcome.severity_rank,
+      created_at: outcome.created_at
+    };
   }
 }

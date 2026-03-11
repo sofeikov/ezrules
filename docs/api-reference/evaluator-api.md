@@ -47,7 +47,7 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
 
 `POST /api/v2/evaluate`
 
-Evaluates an event against the current rule configuration and stores evaluation results in the database.
+Evaluates an event against the current rule configuration, resolves any conflicting outcomes using the configured outcome hierarchy, and stores evaluation results in the database.
 
 #### Request Fields
 
@@ -84,11 +84,14 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
   "outcome_set": [
     "HOLD"
   ],
+  "resolved_outcome": "HOLD",
   "rule_results": {
     "7": "HOLD"
   }
 }
 ```
+
+`resolved_outcome` is the highest-severity outcome after applying the ordering configured under **Settings → Outcome Resolution**.
 
 #### Field Type Casting
 

@@ -5,6 +5,7 @@ export class SettingsPage {
   readonly heading: Locator;
   readonly lookbackDaysInput: Locator;
   readonly saveButton: Locator;
+  readonly outcomeHierarchySaveButton: Locator;
   readonly successMessage: Locator;
   readonly pairOutcomeSelect: Locator;
   readonly pairLabelSelect: Locator;
@@ -16,6 +17,7 @@ export class SettingsPage {
     this.heading = page.locator('h1');
     this.lookbackDaysInput = page.locator('#settings-ruleQualityLookbackDays');
     this.saveButton = page.locator('#settings-saveRuntimeSettings');
+    this.outcomeHierarchySaveButton = page.locator('#settings-saveOutcomeHierarchy');
     this.successMessage = page.locator('text=Settings saved successfully.');
     this.pairOutcomeSelect = page.locator('#settings-pairOutcome');
     this.pairLabelSelect = page.locator('#settings-pairLabel');
@@ -30,6 +32,7 @@ export class SettingsPage {
   async waitForPageToLoad() {
     await this.heading.waitFor({ state: 'visible' });
     await this.lookbackDaysInput.waitFor({ state: 'visible' });
+    await this.outcomeHierarchySaveButton.waitFor({ state: 'visible' });
     await this.pairsTable.waitFor({ state: 'visible' });
   }
 
@@ -54,5 +57,20 @@ export class SettingsPage {
 
   async getPairRowCount(): Promise<number> {
     return this.page.locator('#settings-pairsTable tbody tr').count();
+  }
+
+  async getOutcomeHierarchy(): Promise<string[]> {
+    return this.page.locator('[id^="settings-outcome-name-"]').allTextContents();
+  }
+
+  async moveOutcomeDownByName(outcomeName: string) {
+    const row = this.page.locator('[id^="settings-outcome-row-"]').filter({
+      has: this.page.locator('.text-sm.font-medium.text-gray-900', { hasText: outcomeName }),
+    }).first();
+    await row.locator('button:has-text("Down")').click();
+  }
+
+  async saveOutcomeHierarchy() {
+    await this.outcomeHierarchySaveButton.click();
   }
 }

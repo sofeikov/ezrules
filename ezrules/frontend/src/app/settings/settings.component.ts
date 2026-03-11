@@ -3,7 +3,11 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { SidebarComponent } from '../components/sidebar.component';
-import { RuleQualityPair, RuntimeSettingsService } from '../services/runtime-settings.service';
+import {
+  OutcomeHierarchyItem,
+  RuleQualityPair,
+  RuntimeSettingsService,
+} from '../services/runtime-settings.service';
 
 @Component({
   selector: 'app-settings',
@@ -14,6 +18,7 @@ import { RuleQualityPair, RuntimeSettingsService } from '../services/runtime-set
 export class SettingsComponent implements OnInit {
   loading: boolean = true;
   saving: boolean = false;
+  hierarchySaving: boolean = false;
   pairSaving: boolean = false;
   pairBusyIds: Set<number> = new Set<number>();
   error: string | null = null;
@@ -23,9 +28,11 @@ export class SettingsComponent implements OnInit {
   defaultRuleQualityLookbackDays: number = 30;
   availableOutcomes: string[] = [];
   availableLabels: string[] = [];
+  hierarchyOutcomes: OutcomeHierarchyItem[] = [];
   pairs: RuleQualityPair[] = [];
   newPairOutcome: string = '';
   newPairLabel: string = '';
+  hierarchyDirty: boolean = false;
 
   constructor(
     private runtimeSettingsService: RuntimeSettingsService,
@@ -42,17 +49,20 @@ export class SettingsComponent implements OnInit {
 
     forkJoin({
       settings: this.runtimeSettingsService.getRuntimeSettings(),
+      hierarchy: this.runtimeSettingsService.getOutcomeHierarchy(),
       options: this.runtimeSettingsService.getRuleQualityPairOptions(),
       pairs: this.runtimeSettingsService.getRuleQualityPairs(),
     }).subscribe({
-      next: ({ settings, options, pairs }) => {
+      next: ({ settings, hierarchy, options, pairs }) => {
         this.ruleQualityLookbackDays = settings.ruleQualityLookbackDays;
         this.defaultRuleQualityLookbackDays = settings.defaultRuleQualityLookbackDays;
+        this.hierarchyOutcomes = hierarchy;
         this.availableOutcomes = options.outcomes;
         this.availableLabels = options.labels;
         this.pairs = pairs;
         this.newPairOutcome = this.availableOutcomes[0] || '';
         this.newPairLabel = this.availableLabels[0] || '';
+        this.hierarchyDirty = false;
         this.loading = false;
       },
       error: (err) => {
@@ -151,5 +161,46 @@ export class SettingsComponent implements OnInit {
 
   isPairBusy(pairId: number): boolean {
     return this.pairBusyIds.has(pairId);
+  }
+
+  moveOutcome(index: number, direction: -1 | 1): void {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= this.hierarchyOutcomes.length) {
+      return;
+    }
+
+    const reordered = [...this.hierarchyOutcomes];
+    const [item] = reordered.splice(index, 1);
+    reordered.splice(nextIndex, 0, item);
+    this.hierarchyOutcomes = reordered.map((outcome, position) => ({
+      ...outcome,
+      severityRank: position + 1,
+    }));
+    this.hierarchyDirty = true;
+  }
+
+  saveOutcomeHierarchy(): void {
+    this.error = null;
+    this.success = null;
+
+    if (this.hierarchyOutcomes.length === 0) {
+      this.success = 'No outcomes available to reorder.';
+      return;
+    }
+
+    this.hierarchySaving = true;
+    this.runtimeSettingsService.updateOutcomeHierarchy(this.hierarchyOutcomes.map(outcome => outcome.aoId)).subscribe({
+      next: (outcomes) => {
+        this.hierarchyOutcomes = outcomes;
+        this.availableOutcomes = outcomes.map(outcome => outcome.outcomeName);
+        this.hierarchyDirty = false;
+        this.success = 'Outcome hierarchy saved successfully.';
+        this.hierarchySaving = false;
+      },
+      error: (err) => {
+        this.error = err?.error?.detail || 'Failed to save outcome hierarchy.';
+        this.hierarchySaving = false;
+      }
+    });
   }
 }

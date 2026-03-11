@@ -91,6 +91,7 @@ def sample_outcome(session):
 
     outcome = AllowedOutcome(
         outcome_name="TEST_OUTCOME",
+        severity_rank=10,
         o_id=org.o_id,
     )
     session.add(outcome)

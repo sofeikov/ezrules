@@ -66,7 +66,7 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 4. Results available via API and web interface
 
 # Writing New Code
-1. Never modify test files unless explicitly allowed.
+1. You may add new test files without asking. Do not modify existing test files unless explicitly allowed.
 2. **BEFORE RUNNING ANY TESTS**: Ask the user if they want tests to be run. Tests can take significant time. If you do run the tests, make sure you run production grade serving on the backend, otherwise playwright tests will overwhel mthe dev server
 3. Before reporting task completion, ensure `uv run poe check` completes successfully.
 4. Any new imports must go to the top of the file (no inline imports in functions).

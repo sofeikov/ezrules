@@ -41,4 +41,7 @@ class EvaluateResponse(BaseModel):
 
     outcome_counters: dict[str, int] = Field(..., description="Count of each outcome type across all rules")
     outcome_set: list[str] = Field(..., description="Unique set of outcomes produced")
+    resolved_outcome: str | None = Field(
+        None, description="Highest-severity outcome after applying the configured hierarchy"
+    )
     rule_results: dict[str, str] = Field(..., description="Mapping of rule_id to its outcome")

@@ -25,6 +25,7 @@ from ezrules.core.audit_helpers import save_outcome_history
 from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import AllowedOutcome, User
+from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/outcomes", tags=["Outcomes"])
 
@@ -36,9 +37,7 @@ router = APIRouter(prefix="/api/v2/outcomes", tags=["Outcomes"])
 
 def get_outcome_manager(db: Any) -> DatabaseOutcome:
     """Get an outcome manager instance for the current organization."""
-    # For now, use o_id=1 as default. In multi-tenant setup, this would come from user context.
-    o_id = 1
-    return DatabaseOutcome(db_session=db, o_id=o_id)
+    return DatabaseOutcome(db_session=db, o_id=app_settings.ORG_ID)
 
 
 def outcome_to_response(outcome: AllowedOutcome) -> OutcomeResponse:
@@ -46,6 +45,7 @@ def outcome_to_response(outcome: AllowedOutcome) -> OutcomeResponse:
     return OutcomeResponse(
         ao_id=int(outcome.ao_id),
         outcome_name=str(outcome.outcome_name),
+        severity_rank=int(outcome.severity_rank),
         created_at=outcome.created_at,  # type: ignore[arg-type]
     )
 
@@ -66,13 +66,18 @@ def list_outcomes(
 
     Returns a list of all outcomes that rules can return.
     """
-    o_id = 1  # Default org ID
-    outcomes = db.query(AllowedOutcome).filter(AllowedOutcome.o_id == o_id).all()
+    outcomes = (
+        db.query(AllowedOutcome)
+        .filter(AllowedOutcome.o_id == app_settings.ORG_ID)
+        .order_by(AllowedOutcome.severity_rank.asc(), AllowedOutcome.outcome_name.asc())
+        .all()
+    )
 
     outcomes_data = [
         OutcomeListItem(
             ao_id=int(outcome.ao_id),
             outcome_name=str(outcome.outcome_name),
+            severity_rank=int(outcome.severity_rank),
             created_at=outcome.created_at,  # type: ignore[arg-type]
         )
         for outcome in outcomes
@@ -114,10 +119,9 @@ def create_outcome(
     outcome_manager.add_outcome(outcome_name)
 
     # Fetch the newly created outcome for the response
-    o_id = 1
     new_outcome = (
         db.query(AllowedOutcome)
-        .filter(AllowedOutcome.outcome_name == outcome_name, AllowedOutcome.o_id == o_id)
+        .filter(AllowedOutcome.outcome_name == outcome_name, AllowedOutcome.o_id == app_settings.ORG_ID)
         .first()
     )
 
@@ -127,7 +131,7 @@ def create_outcome(
             ao_id=new_outcome.ao_id,
             outcome_name=outcome_name,
             action="created",
-            o_id=o_id,
+            o_id=app_settings.ORG_ID,
             changed_by=str(user.email) if user.email else None,
         )
         db.commit()
@@ -167,10 +171,9 @@ def delete_outcome(
         )
 
     # Get outcome ID before deletion
-    o_id = 1
     outcome_obj = (
         db.query(AllowedOutcome)
-        .filter(AllowedOutcome.outcome_name == outcome_name, AllowedOutcome.o_id == o_id)
+        .filter(AllowedOutcome.outcome_name == outcome_name, AllowedOutcome.o_id == app_settings.ORG_ID)
         .first()
     )
     ao_id = outcome_obj.ao_id if outcome_obj else 0
@@ -180,7 +183,7 @@ def delete_outcome(
         ao_id=ao_id,
         outcome_name=outcome_name,
         action="deleted",
-        o_id=o_id,
+        o_id=app_settings.ORG_ID,
         changed_by=str(user.email) if user.email else None,
     )
 

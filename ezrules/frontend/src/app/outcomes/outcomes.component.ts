@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { OutcomeService } from '../services/outcome.service';
+import { OutcomeItem, OutcomeService } from '../services/outcome.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -12,7 +12,7 @@ import { SidebarComponent } from '../components/sidebar.component';
   templateUrl: './outcomes.component.html'
 })
 export class OutcomesComponent implements OnInit {
-  outcomes: string[] = [];
+  outcomes: OutcomeItem[] = [];
   newOutcome: string = '';
   loading: boolean = true;
   error: string | null = null;
@@ -72,5 +72,9 @@ export class OutcomesComponent implements OnInit {
         this.deleteError = `Failed to delete outcome "${outcome}". Please try again.`;
       }
     });
+  }
+
+  formatRank(rank: number): string {
+    return `#${rank}`;
   }
 }

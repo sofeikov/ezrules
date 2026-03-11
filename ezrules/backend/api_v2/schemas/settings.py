@@ -20,6 +20,28 @@ class RuntimeSettingsUpdateRequest(BaseModel):
     rule_quality_lookback_days: int = Field(..., ge=1, le=3650)
 
 
+class OutcomeHierarchyItem(BaseModel):
+    """Allowed outcome with its configured severity order."""
+
+    ao_id: int = Field(..., description="Outcome ID")
+    outcome_name: str = Field(..., description="Outcome name")
+    severity_rank: int = Field(..., ge=1, description="1-based severity rank; lower values are more severe")
+
+
+class OutcomeHierarchyResponse(BaseModel):
+    """Ordered list of outcomes used to resolve conflicting rule hits."""
+
+    outcomes: list[OutcomeHierarchyItem] = Field(default_factory=list)
+
+
+class OutcomeHierarchyUpdateRequest(BaseModel):
+    """Replace the full outcome hierarchy ordering."""
+
+    ordered_ao_ids: list[int] = Field(
+        default_factory=list, description="Outcome IDs ordered from highest to lowest severity"
+    )
+
+
 class RuleQualityPairResponse(BaseModel):
     """Configured curated pair used by rule-quality analytics."""
 
