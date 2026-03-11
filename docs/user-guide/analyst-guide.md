@@ -23,6 +23,7 @@ Most analyst work in ezrules follows this loop:
 5. Check analytics for false positives and missed fraud.
 6. Backtest before promoting major rule changes.
 7. For higher-stakes changes, shadow deploy to validate on live traffic before promoting.
+8. If a new revision performs worse than expected, use **Rule History** to roll back to a known-good revision and create a replacement draft.
 
 This process is simple, but doing it consistently is what improves model quality over time.
 
@@ -127,7 +128,22 @@ Relevant endpoints:
 - Start conservative, then tighten thresholds with data.
 - Label quickly and consistently with team-agreed definitions.
 - Backtest for initial calibration on historical data; shadow deploy to validate on current traffic before promoting.
+- If a change degrades outcomes, roll back from the rule history timeline instead of manually retyping old logic.
 - Review trends on a fixed cadence (daily/weekly).
+
+---
+
+## Recover From a Bad Revision
+
+When a recent edit increases false positives or misses confirmed fraud:
+
+1. Open the affected rule.
+2. Click **Visualize history**.
+3. Find the last revision that behaved correctly.
+4. Use **Roll back to revision ...** to create a new draft from that historical version.
+5. Re-test, optionally shadow deploy, then promote when satisfied.
+
+This keeps the audit trail intact. The problematic revision remains visible in history, and the rollback itself is recorded as a new change.
 
 ---
 

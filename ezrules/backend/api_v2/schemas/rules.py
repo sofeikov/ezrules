@@ -57,6 +57,12 @@ class RuleTestRequest(BaseModel):
     test_json: str = Field(..., description="JSON string of test event data")
 
 
+class RuleRollbackRequest(BaseModel):
+    """Schema for rolling a rule back to a historical revision."""
+
+    revision_number: int = Field(..., ge=1, description="Historical revision number to restore")
+
+
 # =============================================================================
 # RESPONSE SCHEMAS
 # =============================================================================

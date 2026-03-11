@@ -1,11 +1,11 @@
-# Rule Lifecycle Management in ezrules: Draft, Promote, Archive with Audit Trail
+# Rule Lifecycle Management in ezrules: Draft, Promote, Roll Back, Archive with Audit Trail
 
 Rule engines usually fail at one of two extremes:
 
 - Every edit is live immediately, which is fast but risky.
 - Every edit requires an external process, which is safe but slow.
 
-ezrules now supports an explicit lifecycle so teams can move fast without losing control: `draft` -> `active` -> `archived`, with promotion approvals captured in the audit trail.
+ezrules now supports an explicit lifecycle so teams can move fast without losing control: `draft` -> `active` -> `archived`, with promotion approvals captured in the audit trail and rollback available when a historical revision needs to be restored as a new draft.
 
 ## Why lifecycle controls matter
 
@@ -36,6 +36,7 @@ The lifecycle is enforced by API behavior:
 
 - `POST /api/v2/rules` creates a `draft` rule
 - `PUT /api/v2/rules/{id}` saves edits as `draft` and clears previous approval metadata
+- `POST /api/v2/rules/{id}/rollback` restores a historical revision's logic and description into a brand new `draft`
 - `POST /api/v2/rules/{id}/promote` moves `draft` to `active` and records approver + approval timestamp
 - `POST /api/v2/rules/{id}/archive` moves a rule to `archived`
 - `DELETE /api/v2/rules/{id}` deletes the rule (requires `DELETE_RULE`)
@@ -49,8 +50,11 @@ flowchart LR
     C --> B
     B --> D[Promote]
     D --> E[active]
-    E --> F[Archive]
-    F --> G[archived]
+    E --> F[Edit or detect issue]
+    F --> G[Rollback to prior revision]
+    G --> B
+    E --> H[Archive]
+    H --> I[archived]
 ```
 
 ## Promotion is a first-class approval step
@@ -73,9 +77,26 @@ Archiving is useful when you need to retire a rule but keep full context.
 
 Use delete when you intentionally want permanent removal. Use archive when you want operational retirement with history intact.
 
+## Rollback is not history deletion
+
+Rollback does not rewind the database in place and it does not remove newer revisions.
+
+- the selected historical revision remains in history
+- the current revision remains in history
+- rollback creates a new `draft` version using the older logic and description
+- the rollback action itself is recorded in audit history
+
+This is the safer operational model: you recover known-good logic quickly without destroying evidence of what changed.
+
 ## Example: promote and archive
 
 ```bash
+# Roll back rule 42 to revision 3 (creates a new draft)
+curl -X POST http://localhost:8888/api/v2/rules/42/rollback \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"revision_number": 3}'
+
 # Promote draft rule 42
 curl -X POST http://localhost:8888/api/v2/rules/42/promote \
   -H "Authorization: Bearer <access_token>"
@@ -96,14 +117,16 @@ A practical sequence is:
 
 1. Edit rule in draft
 2. (Optional) deploy to shadow for live validation
-3. Promote when approved
-4. Archive when rule is retired
+3. Roll back to a known-good revision if a newer draft or active version proves wrong
+4. Promote when approved
+5. Archive when rule is retired
 
 ## Net effect
 
 You get a cleaner rule lifecycle without adding operational friction:
 
 - safer releases through explicit promotion
+- faster recovery through auditable rollback
 - auditable approval chain
 - clear operational state in UI and API
 - predictable retirement path through archive

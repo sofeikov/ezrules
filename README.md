@@ -13,10 +13,11 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Analytics Dashboard**: Real-time transaction volume charts with configurable time ranges (1h, 6h, 12h, 24h, 30d)
 - **Scalable Architecture**: Unified API service with integrated rule evaluation
 - **Database Integration**: PostgreSQL backend with SQLAlchemy ORM and full audit history
-- **Audit Trail**: Change tracking for rules, user lists, outcomes, labels, and field type configurations, with per-change user attribution and explicit rule lifecycle actions (`promoted`, `deactivated`, `deleted`)
+- **Audit Trail**: Change tracking for rules, user lists, outcomes, labels, and field type configurations, with per-change user attribution and explicit rule lifecycle actions (`promoted`, `deactivated`, `rolled_back`, `deleted`)
 - **Field Type Management**: Auto-discovers JSON field types from live traffic and test payloads; configurable type casting (integer, float, string, boolean, datetime) applied before rule evaluation so comparisons behave correctly regardless of how values arrive in JSON
 - **Shadow Deployment**: Deploy rules to a shadow environment that observes live traffic without affecting production outcomes; promote validated shadows to production in one step
 - **Rule Lifecycle Controls**: Rules now support `draft`, `active`, and `archived` states with explicit promotion and approver tracking (`effective_from`, `approved_by`, `approved_at`)
+- **Revision Rollback**: Restore logic and description from a historical rule revision into a new draft version directly from the history timeline, without deleting any audit history
 - **Backtesting**: Test rule changes against historical data before deployment
 - **CLI Tools**: Command-line interface for database management and realistic test data generation
 

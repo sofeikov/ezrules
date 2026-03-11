@@ -50,6 +50,10 @@ export interface RuleHistoryEntry {
   revision_number: number;
   logic: string;
   description: string;
+  status: RuleStatus;
+  effective_from: string | null;
+  approved_by: number | null;
+  approved_at: string | null;
   created_at: string | null;
   is_current?: boolean;
 }
@@ -169,6 +173,12 @@ export class RuleService {
 
   getRuleHistory(ruleId: number, limit: number = 10): Observable<RuleHistoryResponse> {
     return this.http.get<RuleHistoryResponse>(`${this.apiUrl}/${ruleId}/history`, { params: { limit: limit.toString() } });
+  }
+
+  rollbackRule(ruleId: number, revisionNumber: number): Observable<UpdateRuleResponse> {
+    return this.http.post<UpdateRuleResponse>(`${this.apiUrl}/${ruleId}/rollback`, {
+      revision_number: revisionNumber
+    });
   }
 
   updateRule(ruleId: number, data: UpdateRuleRequest): Observable<UpdateRuleResponse> {

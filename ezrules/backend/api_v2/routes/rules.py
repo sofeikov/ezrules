@@ -26,6 +26,7 @@ from ezrules.backend.api_v2.schemas.rules import (
     RuleMutationResponse,
     RuleResponse,
     RuleRevisionSummary,
+    RuleRollbackRequest,
     RulesListResponse,
     RuleTestRequest,
     RuleTestResponse,
@@ -47,7 +48,7 @@ from ezrules.core.rule_updater import (
 )
 from ezrules.core.type_casting import CastError, cast_event
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import RuleEngineConfig, RuleStatus, User
+from ezrules.models.backend_core import RuleEngineConfig, RuleHistory, RuleStatus, User
 from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/rules", tags=["Rules"])
@@ -267,6 +268,10 @@ def get_rule_history(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Rule not found",
         )
+    latest_history_entry = (
+        db.query(RuleHistory).filter(RuleHistory.r_id == rule_id).order_by(RuleHistory.version.desc()).first()
+    )
+    current_created_at = latest_history_entry.changed if latest_history_entry is not None else latest_version.created_at
 
     revision_list = rule_manager.get_rule_revision_list(latest_version)
 
@@ -302,7 +307,7 @@ def get_rule_history(
             effective_from=latest_version.effective_from if latest_version.effective_from is not None else None,  # type: ignore[arg-type]
             approved_by=int(latest_version.approved_by) if latest_version.approved_by is not None else None,
             approved_at=latest_version.approved_at if latest_version.approved_at is not None else None,  # type: ignore[arg-type]
-            created_at=latest_version.created_at,  # type: ignore[arg-type]
+            created_at=current_created_at,  # type: ignore[arg-type]
             is_current=True,
         )
     )
@@ -592,6 +597,89 @@ def archive_rule(
         success=True,
         message="Rule archived",
         rule=rule_to_response(rule),
+    )
+
+
+@router.post("/{rule_id}/rollback", response_model=RuleMutationResponse)
+def rollback_rule(
+    rule_id: int,
+    rollback_data: RuleRollbackRequest,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    db: Any = Depends(get_db),
+) -> RuleMutationResponse:
+    """Create a new draft version from a historical revision."""
+    rule_manager = get_rule_manager(db)
+    config_producer = get_config_producer(db)
+    rule = rule_manager.load_rule(rule_id)  # type: ignore[arg-type]
+
+    if rule is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Rule not found",
+        )
+
+    if rollback_data.revision_number == int(rule.version):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot roll back to the current revision",
+        )
+
+    try:
+        target_revision = rule_manager.load_rule(rule_id, revision_number=rollback_data.revision_number)  # type: ignore[arg-type]
+    except NoResultFound as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Historical revision not found",
+        ) from e
+
+    try:
+        RuleFactory.from_json(
+            {
+                "rid": rule.rid,
+                "logic": target_revision.logic,
+                "description": target_revision.description,
+            }
+        )
+    except Exception as e:
+        return RuleMutationResponse(
+            success=False,
+            message="Rule validation failed",
+            error=f"Invalid historical rule logic: {e!s}",
+        )
+
+    was_active = is_active(rule)
+    save_rule_history(
+        db,
+        rule,
+        changed_by=str(user.email),
+        action="rolled_back",
+        to_status=RuleStatus.DRAFT,
+    )
+    rule.logic = str(target_revision.logic)
+    rule.description = str(target_revision.description)
+    rule.status = RuleStatus.DRAFT
+    rule.effective_from = None
+    rule.approved_by = None
+    rule.approved_at = None
+    rule_manager.save_rule(rule)
+
+    if was_active:
+        config_producer.save_config(rule_manager, changed_by=str(user.email))
+
+    revision_list = rule_manager.get_rule_revision_list(rule)
+    revisions = [
+        RuleRevisionSummary(
+            revision_number=rev.revision_number,
+            created_at=rev.created,
+        )
+        for rev in revision_list
+    ]
+
+    return RuleMutationResponse(
+        success=True,
+        message=f"Rule rolled back to revision {rollback_data.revision_number} in draft status. Promote to activate.",
+        rule=rule_to_response(rule, revisions),
     )
 
 

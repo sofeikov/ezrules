@@ -155,6 +155,25 @@ Shadow deployment gives you live-traffic validation without any production impac
 
 ---
 
+## Review History and Roll Back Safely
+
+If a new rule version performs worse than expected, you do not need to rewrite the old logic by hand.
+
+1. Open the rule and click **Visualize history**.
+2. Review the diff timeline to find the last known good revision.
+3. Click **Roll back to revision ...** on that historical version.
+4. Confirm the dialog after checking the current-to-target diff.
+
+Rollback does **not** delete anything. It creates a brand new `draft` version using the selected historical revision's logic and description, while preserving the full audit trail. If the rule was previously active, promote the new draft after verification to put it back into production.
+
+Use rollback when:
+
+- a recent edit introduced false positives or missed detections
+- you need to restore known-good logic quickly during incident response
+- you want to recover an older description/logic pair without losing later audit entries
+
+---
+
 ## Debugging
 
 If a rule is not behaving as expected:
