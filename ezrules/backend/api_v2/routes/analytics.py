@@ -6,7 +6,7 @@ All endpoints require authentication and appropriate permissions.
 """
 
 import datetime
-from typing import Any
+from typing import Any, cast
 
 import sqlalchemy
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -24,10 +24,22 @@ from ezrules.backend.api_v2.schemas.analytics import (
     LabelsSummaryResponse,
     MultiSeriesResponse,
     PieChartData,
+    RuleQualityReportRequest,
+    RuleQualityReportTaskResponse,
+    RuleQualityResponse,
     TimeSeriesResponse,
 )
+from ezrules.backend.rule_quality import (
+    compute_rule_quality_metrics,
+    compute_rule_quality_pairs_hash,
+    get_active_rule_quality_pairs,
+    get_rule_quality_snapshot_max_tl_id,
+)
+from ezrules.backend.runtime_settings import get_rule_quality_lookback_days
+from ezrules.backend.tasks import generate_rule_quality_report
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Label, TestingRecordLog, TestingResultsLog, User
+from ezrules.models.backend_core import Label, RuleQualityReport, TestingRecordLog, TestingResultsLog, User
+from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/analytics", tags=["Analytics"])
 
@@ -332,3 +344,184 @@ def get_labels_summary(
             backgroundColor=PIE_COLORS[: len(pie_labels)],
         ),
     )
+
+
+# =============================================================================
+# RULE QUALITY
+# =============================================================================
+
+
+def _serialize_rule_quality_report(
+    report: RuleQualityReport,
+    *,
+    cached: bool,
+) -> RuleQualityReportTaskResponse:
+    result_payload = RuleQualityResponse(**report.result) if report.result is not None else None
+    report_id = cast(int, report.rqr_id)
+    task_id = cast(str | None, report.task_id)
+    status_value = cast(str, report.status)
+    min_support = cast(int, report.min_support)
+    lookback_days = cast(int, report.lookback_days)
+    freeze_at = cast(datetime.datetime, report.freeze_at)
+    created_at = cast(datetime.datetime, report.created_at)
+    started_at = cast(datetime.datetime | None, report.started_at)
+    completed_at = cast(datetime.datetime | None, report.completed_at)
+    error = cast(str | None, report.error)
+    return RuleQualityReportTaskResponse(
+        report_id=report_id,
+        task_id=task_id,
+        status=status_value,
+        min_support=min_support,
+        lookback_days=lookback_days,
+        freeze_at=freeze_at,
+        created_at=created_at,
+        started_at=started_at,
+        completed_at=completed_at,
+        cached=cached,
+        error=error,
+        result=result_payload,
+    )
+
+
+@router.get("/rule-quality", response_model=RuleQualityResponse)
+def get_rule_quality(
+    min_support: int = Query(default=1, ge=1, description="Minimum support for either predicted or actual positives"),
+    lookback_days: int | None = Query(
+        default=None,
+        ge=1,
+        description="Only include labeled events created in the last N days (defaults to runtime setting)",
+    ),
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    __: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    db: Any = Depends(get_db),
+) -> RuleQualityResponse:
+    """
+    Get precision/recall metrics for rule outcome to label pairs.
+
+    The endpoint only uses labeled events. It builds a confusion matrix per rule
+    where each pair treats one rule outcome as a "predicted positive" signal and
+    one ground-truth label as the "actual positive" class.
+    """
+    applied_lookback_days = lookback_days if lookback_days is not None else get_rule_quality_lookback_days(db)
+    freeze_at = datetime.datetime.utcnow()
+    max_tl_id = get_rule_quality_snapshot_max_tl_id(
+        db,
+        freeze_at=freeze_at,
+        o_id=app_settings.ORG_ID,
+    )
+    payload = compute_rule_quality_metrics(
+        db,
+        min_support=min_support,
+        lookback_days=applied_lookback_days,
+        freeze_at=freeze_at,
+        max_tl_id=max_tl_id,
+        o_id=app_settings.ORG_ID,
+        curated_pairs=get_active_rule_quality_pairs(db, o_id=app_settings.ORG_ID),
+    )
+    return RuleQualityResponse(**payload)
+
+
+@router.post("/rule-quality/reports", response_model=RuleQualityReportTaskResponse)
+def request_rule_quality_report(
+    request_data: RuleQualityReportRequest,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    __: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    db: Any = Depends(get_db),
+) -> RuleQualityReportTaskResponse:
+    """Create or reuse a rule-quality report request."""
+    applied_lookback_days = (
+        request_data.lookback_days if request_data.lookback_days is not None else get_rule_quality_lookback_days(db)
+    )
+    active_pairs = get_active_rule_quality_pairs(db, o_id=app_settings.ORG_ID)
+    pair_set_hash = compute_rule_quality_pairs_hash(active_pairs)
+    now = datetime.datetime.utcnow()
+
+    if not request_data.force_refresh:
+        cached_report = (
+            db.query(RuleQualityReport)
+            .filter(RuleQualityReport.o_id == app_settings.ORG_ID)
+            .filter(RuleQualityReport.min_support == request_data.min_support)
+            .filter(RuleQualityReport.lookback_days == applied_lookback_days)
+            .filter(RuleQualityReport.pair_set_hash == pair_set_hash)
+            .filter(RuleQualityReport.status.in_(["PENDING", "RUNNING", "SUCCESS"]))
+            .order_by(RuleQualityReport.created_at.desc())
+            .first()
+        )
+        if cached_report is not None:
+            return _serialize_rule_quality_report(cached_report, cached=True)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No existing rule quality snapshot for the requested filters. Use force_refresh=true to generate one.",
+        )
+
+    freeze_at = now
+    max_tl_id = get_rule_quality_snapshot_max_tl_id(
+        db,
+        freeze_at=freeze_at,
+        o_id=app_settings.ORG_ID,
+    )
+
+    report = RuleQualityReport(
+        status="PENDING",
+        min_support=request_data.min_support,
+        lookback_days=applied_lookback_days,
+        freeze_at=freeze_at,
+        max_tl_id=max_tl_id,
+        pair_set_hash=pair_set_hash,
+        pair_set=[{"outcome": outcome, "label": label} for outcome, label in active_pairs],
+        requested_by=str(user.email),
+        o_id=app_settings.ORG_ID,
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+
+    task = generate_rule_quality_report.delay(report.rqr_id)
+    report.task_id = task.id
+    db.commit()
+    db.refresh(report)
+
+    return _serialize_rule_quality_report(report, cached=False)
+
+
+@router.get("/rule-quality/reports/{report_id}", response_model=RuleQualityReportTaskResponse)
+def get_rule_quality_report(
+    report_id: int,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    __: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    db: Any = Depends(get_db),
+) -> RuleQualityReportTaskResponse:
+    """Return current status (and result when available) for a rule-quality report."""
+    report = (
+        db.query(RuleQualityReport)
+        .filter(RuleQualityReport.rqr_id == report_id)
+        .filter(RuleQualityReport.o_id == app_settings.ORG_ID)
+        .first()
+    )
+    if report is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Rule quality report not found",
+        )
+
+    if (
+        app_settings.RULE_QUALITY_REPORT_SYNC_FALLBACK
+        and report.status == "PENDING"
+        and report.started_at is None
+        and report.result is None
+    ):
+        generate_rule_quality_report(report.rqr_id)
+        db.expire_all()
+        refreshed = (
+            db.query(RuleQualityReport)
+            .filter(RuleQualityReport.rqr_id == report_id)
+            .filter(RuleQualityReport.o_id == app_settings.ORG_ID)
+            .first()
+        )
+        if refreshed is not None:
+            report = refreshed
+
+    return _serialize_rule_quality_report(report, cached=False)

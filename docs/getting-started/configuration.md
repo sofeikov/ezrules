@@ -27,6 +27,7 @@ EZRULES_SMTP_PORT=587
 EZRULES_SMTP_USER=mailer-user
 EZRULES_SMTP_PASSWORD=mailer-password
 EZRULES_FROM_EMAIL=no-reply@example.com
+EZRULES_RULE_QUALITY_LOOKBACK_DAYS=30
 ```
 
 Run the service:
@@ -50,6 +51,8 @@ Run the service:
 | `EZRULES_SMTP_USER` | No | None | `mailer-user` | SMTP username |
 | `EZRULES_SMTP_PASSWORD` | No | None | `mailer-password` | SMTP password |
 | `EZRULES_FROM_EMAIL` | No | None | `no-reply@example.com` | Sender address for auth emails |
+| `EZRULES_RULE_QUALITY_LOOKBACK_DAYS` | No | `30` | `30` | Fallback default lookback window (days) for rule-quality analytics |
+| `EZRULES_RULE_QUALITY_REPORT_SYNC_FALLBACK` | No | `true` | `true` | If worker is unavailable, compute pending reports inline on status polling |
 | `EZRULES_APP_BASE_URL` | No | `http://localhost:4200` | `https://app.company.com` | Base UI URL used to build invite/reset links |
 | `EZRULES_INVITE_TOKEN_EXPIRY_HOURS` | No | `72` | `24` | Invitation token lifetime in hours |
 | `EZRULES_PASSWORD_RESET_TOKEN_EXPIRY_HOURS` | No | `1` | `1` | Password reset token lifetime in hours |
@@ -75,6 +78,8 @@ export EZRULES_SMTP_PORT="587"
 export EZRULES_SMTP_USER="mailer-user"
 export EZRULES_SMTP_PASSWORD="mailer-password"
 export EZRULES_FROM_EMAIL="no-reply@example.com"
+export EZRULES_RULE_QUALITY_LOOKBACK_DAYS="30"
+export EZRULES_RULE_QUALITY_REPORT_SYNC_FALLBACK="true"
 ```
 
 ---

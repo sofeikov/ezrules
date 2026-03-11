@@ -9,7 +9,9 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     UnicodeText,
+    UniqueConstraint,
     types,
 )
 from sqlalchemy import (
@@ -150,6 +152,19 @@ class Organisation(Base):
 
     def __repr__(self):
         return f"ID:{self.o_id}, {self.name=}, {len(self.rules)=}"
+
+
+class RuntimeSetting(Base):
+    __tablename__ = "runtime_settings"
+
+    key = Column(String(100), primary_key=True)
+    value_type = Column(String(20), nullable=False)
+    value = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<RuntimeSetting key={self.key} value_type={self.value_type} value={self.value}>"
 
 
 class RuleEngineConfig(Base):
@@ -316,6 +331,45 @@ class RuleBackTestingResult(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     rule: Mapped["Rule"] = relationship(back_populates="backtesting_results")
+
+
+class RuleQualityPair(Base):
+    __tablename__ = "rule_quality_pairs"
+    __table_args__ = (UniqueConstraint("o_id", "outcome", "label", name="uq_rule_quality_pairs_org_outcome_label"),)
+
+    rqp_id = Column(Integer, unique=True, primary_key=True)
+    outcome = Column(String(255), nullable=False)
+    label = Column(String(255), nullable=False)
+    active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+    created_by = Column(String(255), nullable=True)
+
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    org: Mapped["Organisation"] = relationship()
+
+
+class RuleQualityReport(Base):
+    __tablename__ = "rule_quality_reports"
+
+    rqr_id = Column(Integer, unique=True, primary_key=True)
+    task_id = Column(String(50), nullable=True, index=True)
+    status = Column(String(20), nullable=False, default="PENDING", index=True)
+    min_support = Column(Integer, nullable=False)
+    lookback_days = Column(Integer, nullable=False)
+    freeze_at = Column(DateTime, nullable=False)
+    max_tl_id = Column(Integer, nullable=False, default=0)
+    pair_set_hash = Column(String(64), nullable=False, index=True, default="")
+    pair_set = Column(JSON, nullable=False, default=list)
+    requested_by = Column(String(255), nullable=True)
+    error = Column(String, nullable=True)
+    result = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    org: Mapped["Organisation"] = relationship()
 
 
 class RuleHistory(Base):

@@ -248,6 +248,40 @@ Access comprehensive analytics for labeled transactions via the web interface:
 - `/api/v2/analytics/labels-summary` - Summary statistics (total labeled events count)
 - `/api/v2/analytics/labels-distribution` - Distribution of individual labels by time period
 
+### Rule Quality View
+
+Use the **Rule Quality** page to evaluate underperforming rules from labeled events.
+
+**What it shows:**
+- **Best Rules**: Highest average F1 score
+- **Needs Attention**: Lowest average F1 score
+- **Pair Metrics Table**: Precision/recall/F1 for configured curated `outcome -> label` pairs with TP/FP/FN counts
+- **Lookback control**: Query only recent labeled events to keep analytics responsive at scale
+- **Snapshot timestamp**: Report is frozen "as of" a specific datetime for auditability
+
+**API Endpoint:**
+- `/api/v2/analytics/rule-quality?min_support=5&lookback_days=30` - Rule-level ranking plus pair-level metrics over a bounded window
+- Async report flow:
+  - `POST /api/v2/analytics/rule-quality/reports` (`force_refresh=false` returns existing snapshot only; `force_refresh=true` generates new)
+  - `GET /api/v2/analytics/rule-quality/reports/{report_id}` (poll status/result)
+
+Default lookback for Rule Quality can be configured in **Settings → General** and is stored as a runtime setting.
+Curated rule-quality pairs are also managed in **Settings → General** and drive which pairs appear in reports.
+
+### Bombardment with Fraud Labels
+
+The bombardment script now supports low-rate fraud labeling directly after evaluation:
+
+```bash
+# Evaluate events with API key and label ~1% as FRAUD using bearer token
+uv run python scripts/bombard_evaluator.py \
+  --api-key <api_key> \
+  --token <access_token> \
+  --fraud-rate 0.01
+```
+
+This mirrors CSV-style labeling but works inline while generating evaluator traffic.
+
 ### Test Data Generation
 
 Generate realistic test data with fraud patterns:

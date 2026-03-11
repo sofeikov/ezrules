@@ -65,6 +65,15 @@ import { AuthService } from '../services/auth.service';
           <span>Analytics</span>
         </a>
 
+        <a href="/rule-quality" [ngClass]="linkClasses('/rule-quality')">
+          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a4 4 0 014-4h8" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 13l4-4 3 3 5-5" />
+          </svg>
+          <span>Rule Quality</span>
+        </a>
+
         <a href="/audit" [ngClass]="linkClasses('/audit')">
           <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -82,6 +91,13 @@ import { AuthService } from '../services/auth.service';
         <!-- Settings section -->
         <div class="mt-2">
           <p class="px-6 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Settings</p>
+
+          <a href="/settings" [ngClass]="subLinkClasses('/settings')">
+            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 16v-2m8-6h-2M6 12H4m12.364 5.364l-1.414-1.414M9.05 9.05 7.636 7.636m8.728 0L14.95 9.05m-5.9 5.9-1.414 1.414" />
+            </svg>
+            <span>General</span>
+          </a>
 
           <a href="/role_management" [ngClass]="subLinkClasses('/role_management')">
             <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -1,5 +1,15 @@
 # What's New
 
+## v0.20
+
+* **Rule Quality curated pairs**: Rule Quality reports now compute only analyst-configured curated outcome→label pairs (instead of all observed pairs), while preserving existing precision/recall/F1 and best/worst rule summaries.
+* **Curated pair catalog in Settings**: Added centralized pair management under **Settings → General** with create/toggle/delete controls and outcome/label dropdowns.
+* **New settings APIs for curated pairs**: Added CRUD endpoints under `/api/v2/settings/rule-quality-pairs` plus `/options` for dropdown catalogs.
+* **Async report snapshots**: Added `POST/GET /api/v2/analytics/rule-quality/reports` to request and poll persisted snapshots. Reports are frozen at a specific `freeze_at` timestamp and are reused until an explicit refresh request (`force_refresh=true`) is made.
+* **Pair-set-aware report cache**: Rule quality report reuse now includes a pair-set hash, so changing curated pairs invalidates stale cached reports automatically.
+* **Runtime lookback controls**: `GET /api/v2/analytics/rule-quality` now supports `lookback_days`. A new **Settings → General** page persists the default lookback via `GET/PUT /api/v2/settings/runtime` so teams can bound query windows without redeploying.
+* **Bombardment fraud labeling**: Enhanced `scripts/bombard_evaluator.py` to optionally mark a small random portion of successful evaluations as fraud labels (default 1%) using `--fraud-rate` and labels API calls.
+
 ## v0.18
 
 * **Rule lifecycle states**: Rules now carry lifecycle metadata with `status` (`draft`, `active`, `archived`), `effective_from`, `approved_by`, and `approved_at`.
