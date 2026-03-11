@@ -28,7 +28,7 @@ DEFAULT_MAX_DELAY = 5.0
 DEFAULT_FRAUD_RATE = 0.01
 DEFAULT_FRAUD_LABEL = "FRAUD"
 
-# Matches the test_attributes used by `uv run ezrules generate-random-data`
+# Lightweight evaluator payload for load testing. This is intentionally simpler than the CLI demo-data schema.
 _ATTRS: dict = {
     "amount": float,
     "send_country": str,
