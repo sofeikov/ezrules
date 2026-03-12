@@ -5,19 +5,27 @@ This directory contains end-to-end (E2E) tests for the ezrules Angular frontend 
 ## Quick Start
 
 ```bash
+# Example random high ports
+API_PORT=38888
+FRONTEND_PORT=44200
+
 # 1. Make sure the API service is running
 EZRULES_TESTING=false \
 EZRULES_SMTP_HOST=localhost \
 EZRULES_SMTP_PORT=1025 \
 EZRULES_FROM_EMAIL=no-reply@ezrules.local \
-uv run ezrules api --port 8888
+EZRULES_APP_BASE_URL=http://localhost:$FRONTEND_PORT \
+uv run ezrules api --port $API_PORT
 
 # 2. Make sure Angular dev server is running
 cd ezrules/frontend
-npm start
+EZRULES_FRONTEND_API_URL=http://localhost:$API_PORT \
+npm start -- --port $FRONTEND_PORT
 
 # 3. Run E2E tests
 cd ezrules/frontend
+E2E_BASE_URL=http://localhost:$FRONTEND_PORT \
+E2E_API_BASE_URL=http://localhost:$API_PORT \
 npm run test:e2e
 ```
 
@@ -47,18 +55,22 @@ Before running E2E tests, you need to have the following services running:
    ```bash
    # Terminal 1: Start API service
    # Important: invite/reset tests require TESTING=false because TESTING=true skips SMTP sends.
+   API_PORT=38888
+   FRONTEND_PORT=44200
    EZRULES_TESTING=false \
    EZRULES_SMTP_HOST=localhost \
    EZRULES_SMTP_PORT=1025 \
    EZRULES_FROM_EMAIL=no-reply@ezrules.local \
-   uv run ezrules api --port 8888
+   EZRULES_APP_BASE_URL=http://localhost:$FRONTEND_PORT \
+   uv run ezrules api --port $API_PORT
    ```
 
 2. **Angular Dev Server**: Frontend application
    ```bash
    # Terminal 2: Start Angular dev server
    cd ezrules/frontend
-   npm start
+   EZRULES_FRONTEND_API_URL=http://localhost:$API_PORT \
+   npm start -- --port $FRONTEND_PORT
    ```
 
 3. **Mailpit**: Required for invite/reset email E2E tests
@@ -113,9 +125,10 @@ npm run test:e2e -- rule-list.spec.ts:42
 
 ### Endpoint Overrides
 
-If your API or Mailpit runs on non-default hosts/ports, set:
+If your frontend, API, or Mailpit runs on non-default hosts/ports, set:
 
 ```bash
+E2E_BASE_URL=http://localhost:4200 \
 E2E_API_BASE_URL=http://localhost:8888 \
 E2E_MAILPIT_BASE_URL=http://localhost:8025 \
 npm run test:e2e -- auth-email-flows.spec.ts
@@ -219,7 +232,7 @@ Install the [Playwright VSCode extension](https://marketplace.visualstudio.com/i
 
 Main configuration is in `playwright.config.ts`:
 
-- **Base URL**: `http://localhost:4200`
+- **Base URL**: `E2E_BASE_URL` (defaults to `http://localhost:4200`)
 - **Timeout**: 30s per test
 - **Retries**: 2 on CI, 0 locally
 - **Workers**: 4 parallel (1 on CI)

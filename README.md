@@ -385,24 +385,32 @@ uv run ezrules delete-test-data
 The Angular frontend includes comprehensive end-to-end tests using Playwright.
 
 **Prerequisites:**
-- API service running on port 8888 with email delivery enabled for invite/reset tests.
+- API service running with email delivery enabled for invite/reset tests.
   Start API for e2e with `EZRULES_TESTING=false` (if `EZRULES_TESTING=true`, SMTP sends are skipped and email-flow tests fail).
-- Angular dev server running (port 4200)
+- Angular dev server running
 - Playwright browsers installed (first time only): `npx playwright install chromium`
 ```bash
+# Example random high ports
+API_PORT=38888
+FRONTEND_PORT=44200
+
 # Terminal 1: API (mail flows require TESTING=false)
 EZRULES_TESTING=false \
 EZRULES_SMTP_HOST=localhost \
 EZRULES_SMTP_PORT=1025 \
 EZRULES_FROM_EMAIL=no-reply@ezrules.local \
-uv run ezrules api --port 8888
+EZRULES_APP_BASE_URL=http://localhost:$FRONTEND_PORT \
+uv run ezrules api --port $API_PORT
 
 # Terminal 2: Frontend
 cd ezrules/frontend
-npm start
+EZRULES_FRONTEND_API_URL=http://localhost:$API_PORT \
+npm start -- --port $FRONTEND_PORT
 
 # Terminal 3: E2E
 cd ezrules/frontend
+E2E_BASE_URL=http://localhost:$FRONTEND_PORT \
+E2E_API_BASE_URL=http://localhost:$API_PORT \
 npm run test:e2e
 ```
 
