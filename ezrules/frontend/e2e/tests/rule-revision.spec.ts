@@ -1,16 +1,8 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { test, expect } from '@playwright/test';
 import { RuleDetailPage } from '../pages/rule-detail.page';
+import { getApiBaseUrl, getAuthToken } from '../support/config';
 
-const API_BASE = 'http://localhost:8888';
-
-/** Read the JWT access token from the saved auth state file. */
-function getAuthToken(): string {
-  const state = JSON.parse(readFileSync(join(__dirname, '../.auth/user.json'), 'utf-8'));
-  const origin = state.origins?.find((o: any) => o.origin === 'http://localhost:4200');
-  return origin?.localStorage?.find((e: any) => e.name === 'ezrules_access_token')?.value ?? '';
-}
+const API_BASE = getApiBaseUrl();
 
 /**
  * E2E tests for the Rule Revision navigation functionality.

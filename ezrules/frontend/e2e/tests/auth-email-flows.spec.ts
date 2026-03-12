@@ -1,27 +1,19 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { APIRequestContext, expect, test } from '@playwright/test';
 import { AcceptInvitePage } from '../pages/accept-invite.page';
 import { ForgotPasswordPage } from '../pages/forgot-password.page';
 import { LoginPage } from '../pages/login.page';
 import { ResetPasswordPage } from '../pages/reset-password.page';
 import { UserManagementPage } from '../pages/user-management.page';
+import { getApiBaseUrl, getAuthToken, getMailpitBaseUrl } from '../support/config';
 
-const API_BASE = process.env.E2E_API_BASE_URL ?? 'http://localhost:8888';
-const MAILPIT_BASE = process.env.E2E_MAILPIT_BASE_URL ?? 'http://localhost:8025';
+const API_BASE = getApiBaseUrl();
+const MAILPIT_BASE = getMailpitBaseUrl();
 
 type MailpitMessage = {
   id: string;
   subject: string;
   to: string;
 };
-
-/** Read the JWT access token from the saved auth state file. */
-function getAuthToken(): string {
-  const state = JSON.parse(readFileSync(join(__dirname, '../.auth/user.json'), 'utf-8'));
-  const origin = state.origins?.find((o: any) => o.origin === 'http://localhost:4200');
-  return origin?.localStorage?.find((e: any) => e.name === 'ezrules_access_token')?.value ?? '';
-}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
