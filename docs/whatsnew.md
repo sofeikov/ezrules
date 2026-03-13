@@ -2,6 +2,10 @@
 
 ## v0.20.0
 
+* **Settings-aware rule test JSON**: The rule create/detail test panels now prefill sample JSON with demo-friendly values that respect stored field-type metadata and observed types, so live demos no longer start from empty strings.
+* **Demo-ready rule-quality defaults**: `uv run ezrules reset-dev` now activates a curated demo pair set (`RELEASE -> CHARGEBACK`, `HOLD -> CHARGEBACK`, `CANCEL -> FRAUD`) so Rule Quality reports have meaningful scored pairs immediately after a reset.
+* **Rule-quality ranking cleanup**: Best/Worst rule summaries now exclude unscored rules whose curated pairs never fired, avoiding misleading `N/A` rankings in generated reports.
+* **Bombardment/demo schema alignment**: `scripts/bombard_evaluator.py` now emits the richer demo-event payloads used by the seeded rule pack, so bombardment traffic produces real rule outcomes instead of mostly no-op evaluations.
 * **Rule rollback workflow**: Rule history now supports rolling back to a selected historical revision without deleting any prior versions. Rollback copies the chosen revision's logic and description into a new draft version, so the previous live version remains in the audit trail.
 * **Rollback API and UI**: Added `POST /api/v2/rules/{id}/rollback` plus rollback actions in the Rule History timeline with a confirmation dialog that previews the current-to-target diff before creating the new draft version.
 

@@ -22,26 +22,22 @@ from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2", tags=["Evaluator"])
 
-# Lazily-initialised rule executor — created on first request so that
-# module import doesn't hit the database during test collection.
 _lre: LocalRuleExecutorSQL | None = None
 _shadow_lre: LocalRuleExecutorSQL | None = None
 
 
 def _get_rule_executor(db=Depends(get_db)) -> LocalRuleExecutorSQL:  # noqa: B008
-    """Return the shared LocalRuleExecutorSQL instance, creating it on first call."""
-    global _lre  # noqa: PLW0603
-    if _lre is None:
-        _lre = LocalRuleExecutorSQL(db=db, o_id=app_settings.ORG_ID)
-    return _lre
+    """Return the test-injected executor or a request-scoped production executor."""
+    if app_settings.TESTING and _lre is not None:
+        return _lre
+    return LocalRuleExecutorSQL(db=db, o_id=app_settings.ORG_ID)
 
 
 def _get_shadow_executor(db=Depends(get_db)) -> LocalRuleExecutorSQL:  # noqa: B008
-    """Return the shared shadow LocalRuleExecutorSQL instance, creating it on first call."""
-    global _shadow_lre  # noqa: PLW0603
-    if _shadow_lre is None:
-        _shadow_lre = LocalRuleExecutorSQL(db=db, o_id=app_settings.ORG_ID, label="shadow")
-    return _shadow_lre
+    """Return the test-injected shadow executor or a request-scoped production executor."""
+    if app_settings.TESTING and _shadow_lre is not None:
+        return _shadow_lre
+    return LocalRuleExecutorSQL(db=db, o_id=app_settings.ORG_ID, label="shadow")
 
 
 @router.post("/evaluate", response_model=EvaluateResponse)

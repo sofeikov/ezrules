@@ -2,7 +2,10 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { of } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 import { CreateRuleRequest, RuleService } from '../services/rule.service';
+import { RuleTestDataService } from '../services/rule-test-data.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -24,7 +27,8 @@ export class RuleCreateComponent {
 
   constructor(
     private router: Router,
-    private ruleService: RuleService
+    private ruleService: RuleService,
+    private ruleTestDataService: RuleTestDataService
   ) { }
 
   handleTextareaTab(event: KeyboardEvent): void {
@@ -41,16 +45,23 @@ export class RuleCreateComponent {
   }
 
   fillInExampleParams(): void {
-    if (!this.logic) return;
+    if (!this.logic.trim()) {
+      this.testJson = '';
+      return;
+    }
 
-    this.ruleService.verifyRule(this.logic).subscribe({
+    this.ruleService.verifyRule(this.logic).pipe(
+      switchMap((response) => {
+        if (!response.params.length && /\$[A-Za-z_]/.test(this.logic)) {
+          return of<string | null>(null);
+        }
+
+        return this.ruleTestDataService.buildExampleJson(response.params ?? []);
+      })
+    ).subscribe({
       next: (response) => {
-        if (response.params && response.params.length > 0) {
-          const exampleJson: any = {};
-          response.params.forEach((param: string) => {
-            exampleJson[param] = '';
-          });
-          this.testJson = JSON.stringify(exampleJson, null, 2);
+        if (response !== null) {
+          this.testJson = response;
         }
       },
       error: (error) => {

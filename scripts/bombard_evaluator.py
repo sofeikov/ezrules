@@ -19,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from random import randint, uniform
 
 import httpx
+from ezrules.demo_data import build_demo_events
 
 DEFAULT_URL = "http://localhost:8888"
 DEFAULT_N = 100
@@ -26,33 +27,34 @@ DEFAULT_CONCURRENCY = 1
 DEFAULT_BATCH_SIZE = 10
 DEFAULT_MAX_DELAY = 5.0
 DEFAULT_FRAUD_RATE = 0.01
-DEFAULT_FRAUD_LABEL = "FRAUD"
-
-# Lightweight evaluator payload for load testing. This is intentionally simpler than the CLI demo-data schema.
-_ATTRS: dict = {
-    "amount": float,
-    "send_country": str,
-    "receive_country": str,
-    "score": float,
-    "is_verified": int,
-}
+DEFAULT_FRAUD_LABEL = "CHARGEBACK"
+_event_cursor = 0
 
 
 def random_event() -> dict:
-    event_data = {}
-    for attr, attr_type in _ATTRS.items():
-        if attr_type is float:
-            event_data[attr] = round(uniform(0, 1000), 2)
-        elif attr_type is str:
-            event_data[attr] = f"{attr}_value_{randint(1, 10)}"
-        elif attr_type is int:
-            event_data[attr] = randint(0, 1)
+    return build_bombard_events(1)[0]
 
-    return {
-        "event_id": f"bombard_{uuid.uuid4().hex[:12]}",
-        "event_timestamp": int(time.time()),
-        "event_data": event_data,
-    }
+
+def build_bombard_events(n: int, start_index: int | None = None) -> list[dict]:
+    """Build evaluator payloads that match the reset-dev demo rule schema."""
+    global _event_cursor
+
+    if start_index is None:
+        start_index = _event_cursor
+        _event_cursor += n
+
+    demo_events = build_demo_events(n, start_index=start_index)
+    payloads: list[dict] = []
+    for offset, demo_event in enumerate(demo_events, start=1):
+        sequence = start_index + offset
+        payloads.append(
+            {
+                "event_id": f"bombard_{sequence:08d}_{uuid.uuid4().hex[:6]}",
+                "event_timestamp": demo_event.event_timestamp,
+                "event_data": demo_event.event_data,
+            }
+        )
+    return payloads
 
 
 def build_evaluate_headers(token: str | None, api_key: str | None) -> dict[str, str]:
@@ -218,7 +220,7 @@ def print_summary(
 
 def run_finite(args: argparse.Namespace, evaluate_headers: dict[str, str], label_enabled: bool) -> None:
     n = randint(1, args.n)
-    events = [random_event() for _ in range(n)]
+    events = build_bombard_events(n)
     print(f"Sending {n} events (random up to {args.n}) to {args.url} …\n")
 
     results = []
@@ -271,7 +273,7 @@ def run_continuous(args: argparse.Namespace, evaluate_headers: dict[str, str], l
 
     while True:
         batch_num += 1
-        batch = [random_event() for _ in range(randint(1, args.batch_size))]
+        batch = build_bombard_events(randint(1, args.batch_size))
         results = send_batch(args.url, batch, args.concurrency, evaluate_headers)
         all_results.extend(results)
 

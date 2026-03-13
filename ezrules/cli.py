@@ -27,7 +27,15 @@ from ezrules.core.rule_updater import (
 )
 from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.demo_data import build_demo_events, build_demo_rules, determine_demo_label, seed_demo_user_lists
-from ezrules.models.backend_core import Label, Organisation, Role, TestingRecordLog, User
+from ezrules.models.backend_core import (
+    AllowedOutcome,
+    Label,
+    Organisation,
+    Role,
+    RuleQualityPair,
+    TestingRecordLog,
+    User,
+)
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import Base, db_session
 from ezrules.settings import app_settings
@@ -455,6 +463,90 @@ def _determine_realistic_label(event_data: dict, available_labels) -> str | None
     return determine_demo_label(event_data, list(available_labels))
 
 
+def _ensure_rule_quality_pair(
+    session,
+    *,
+    o_id: int,
+    outcome: str,
+    label: str,
+    created_by: str,
+) -> bool:
+    normalized_outcome = outcome.strip()
+    normalized_label = label.strip()
+
+    outcome_exists = (
+        session.query(AllowedOutcome)
+        .filter(AllowedOutcome.o_id == o_id, AllowedOutcome.outcome_name == normalized_outcome)
+        .first()
+        is not None
+    )
+    label_exists = session.query(Label).filter(Label.label == normalized_label).first() is not None
+    if not outcome_exists or not label_exists:
+        logger.warning(
+            "Skipping default rule-quality pair %s -> %s because the outcome or label is missing.",
+            normalized_outcome,
+            normalized_label,
+        )
+        return False
+
+    pair = (
+        session.query(RuleQualityPair)
+        .filter(
+            RuleQualityPair.o_id == o_id,
+            RuleQualityPair.outcome == normalized_outcome,
+            RuleQualityPair.label == normalized_label,
+        )
+        .first()
+    )
+    if pair is not None:
+        if not pair.active:
+            pair.active = True
+            session.commit()
+            logger.info("Reactivated default rule-quality pair %s -> %s", normalized_outcome, normalized_label)
+        else:
+            logger.info("Default rule-quality pair %s -> %s already present", normalized_outcome, normalized_label)
+        return True
+
+    session.add(
+        RuleQualityPair(
+            outcome=normalized_outcome,
+            label=normalized_label,
+            active=True,
+            created_by=created_by,
+            o_id=o_id,
+        )
+    )
+    session.commit()
+    logger.info("Seeded default rule-quality pair %s -> %s", normalized_outcome, normalized_label)
+    return True
+
+
+DEFAULT_DEMO_RULE_QUALITY_PAIRS = (
+    ("RELEASE", "CHARGEBACK"),
+    ("HOLD", "CHARGEBACK"),
+    ("CANCEL", "FRAUD"),
+)
+
+
+def _ensure_default_rule_quality_pairs(
+    session,
+    *,
+    o_id: int,
+    created_by: str,
+) -> list[tuple[str, str]]:
+    seeded_pairs: list[tuple[str, str]] = []
+    for outcome, label in DEFAULT_DEMO_RULE_QUALITY_PAIRS:
+        if _ensure_rule_quality_pair(
+            session,
+            o_id=o_id,
+            outcome=outcome,
+            label=label,
+            created_by=created_by,
+        ):
+            seeded_pairs.append((outcome, label))
+    return seeded_pairs
+
+
 def _export_labels_to_csv(labeled_events: list, filename: str):
     """Export labeled events to CSV for testing uploads"""
     try:
@@ -540,6 +632,11 @@ def reset_dev(ctx, user_email, password, n_rules, n_events):
     # Step 3: generate fake data
     logger.info(f"Step 3/3: Generating fake data ({n_rules} rules, {n_events} events)...")
     ctx.invoke(generate_random_data, n_rules=n_rules, n_events=n_events, label_ratio=0.3, export_csv=None)
+    _ensure_default_rule_quality_pairs(
+        db_session,
+        o_id=app_settings.ORG_ID,
+        created_by="cli.reset_dev",
+    )
 
     logger.info("=== Development environment ready ===")
     logger.info(f"Login with: {user_email} / {password}")
