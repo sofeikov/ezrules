@@ -17,6 +17,7 @@ import { LoginComponent } from './login/login.component';
 import { FieldTypesComponent } from './field-types/field-types.component';
 import { ShadowRulesComponent } from './shadow-rules/shadow-rules.component';
 import { ApiKeysComponent } from './api-keys/api-keys.component';
+import { TestedEventsComponent } from './tested-events/tested-events.component';
 import { authGuard } from './auth/auth.guard';
 import { ForgotPasswordComponent } from './forgot-password/forgot-password.component';
 import { ResetPasswordComponent } from './reset-password/reset-password.component';
@@ -37,6 +38,7 @@ export const routes: Routes = [
   { path: 'rules/:id', component: RuleDetailComponent, canActivate: [authGuard] },
   { path: 'labels', component: LabelsComponent, canActivate: [authGuard] },
   { path: 'outcomes', component: OutcomesComponent, canActivate: [authGuard] },
+  { path: 'tested-events', component: TestedEventsComponent, canActivate: [authGuard] },
   { path: 'user-lists', component: UserListsComponent, canActivate: [authGuard] },
   { path: 'label_analytics', component: LabelAnalyticsComponent, canActivate: [authGuard] },
   { path: 'rule-quality', component: RuleQualityComponent, canActivate: [authGuard] },
