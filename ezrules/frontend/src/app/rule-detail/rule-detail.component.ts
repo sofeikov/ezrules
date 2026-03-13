@@ -3,8 +3,11 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { diffLines, Change } from 'diff';
+import { of } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 import { RuleDetail, RuleRevisionDetail, RuleService, ShadowDeployResponse, ShadowRuleItem, UpdateRuleRequest } from '../services/rule.service';
 import { BacktestingService, BacktestResultItem, BacktestTaskResult } from '../services/backtesting.service';
+import { RuleTestDataService } from '../services/rule-test-data.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -54,7 +57,8 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private ruleService: RuleService,
-    private backtestingService: BacktestingService
+    private backtestingService: BacktestingService,
+    private ruleTestDataService: RuleTestDataService
   ) { }
 
   ngOnInit(): void {
@@ -123,14 +127,18 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   fillInExampleParams(): void {
     if (!this.rule) return;
 
-    this.ruleService.verifyRule(this.rule.logic).subscribe({
+    this.ruleService.verifyRule(this.rule.logic).pipe(
+      switchMap((response) => {
+        if (!response.params.length && /\$[A-Za-z_]/.test(this.rule?.logic ?? '')) {
+          return of<string | null>(null);
+        }
+
+        return this.ruleTestDataService.buildExampleJson(response.params ?? []);
+      })
+    ).subscribe({
       next: (response) => {
-        if (response.params && response.params.length > 0) {
-          const exampleJson: any = {};
-          response.params.forEach((param: string) => {
-            exampleJson[param] = '';
-          });
-          this.testJson = JSON.stringify(exampleJson, null, 2);
+        if (response !== null) {
+          this.testJson = response;
         }
       },
       error: (error) => {

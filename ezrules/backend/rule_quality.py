@@ -219,7 +219,9 @@ def compute_rule_quality_metrics(
 
     pair_metrics.sort(key=lambda metric: (metric["rid"], metric["outcome"], metric["label"]))
 
-    ranked_summaries = [summary for summary in summaries if summary["pair_count"] > 0]
+    # Only rank rules that produced at least one scored pair. Otherwise the
+    # summary tables fill with N/A rows when a curated pair never fires.
+    ranked_summaries = [summary for summary in summaries if summary["average_f1"] is not None]
     best_rules = sorted(
         ranked_summaries,
         key=lambda summary: summary["average_f1"] if summary["average_f1"] is not None else -1.0,

@@ -269,10 +269,11 @@ Use the **Rule Quality** page to evaluate underperforming rules from labeled eve
 
 Default lookback for Rule Quality can be configured in **Settings → General** and is stored as a runtime setting.
 Curated rule-quality pairs are also managed in **Settings → General** and drive which pairs appear in reports.
+`uv run ezrules reset-dev` now seeds a demo-ready curated pair set: `RELEASE -> CHARGEBACK`, `HOLD -> CHARGEBACK`, and `CANCEL -> FRAUD`.
 
 ### Bombardment with Fraud Labels
 
-The bombardment script now supports low-rate fraud labeling directly after evaluation:
+The bombardment script now sends the same demo-shaped event payloads used by `reset-dev`, so live traffic will hit the seeded showcase rules instead of bypassing them. It also supports low-rate fraud labeling directly after evaluation:
 
 ```bash
 # Evaluate events with API key and label ~1% as FRAUD using bearer token

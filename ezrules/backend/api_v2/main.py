@@ -64,6 +64,16 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
 app.add_middleware(BodySizeLimitMiddleware)
 
 
+@app.middleware("http")
+async def cleanup_scoped_db_session(request: StarletteRequest, call_next):
+    """Release any connection checked out via the global scoped session."""
+    try:
+        return await call_next(request)
+    finally:
+        if not app_settings.TESTING:
+            db_session.remove()
+
+
 # =============================================================================
 # INITIALIZE APPLICATION CONTEXT
 # =============================================================================
