@@ -98,6 +98,12 @@ Rule lifecycle fields on rule responses:
 | `GET` | `/api/v2/shadow/results` | Bearer + `VIEW_RULES` | Recent shadow evaluation results (`?limit=50`) |
 | `GET` | `/api/v2/shadow/stats` | Bearer + `VIEW_RULES` | Per-rule shadow vs production outcome comparison |
 
+### Tested Events
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/tested-events` | Bearer + `VIEW_RULES` | Recent stored event evaluations with raw payload, resolved outcome, and triggered rules (`?limit=50`) |
+
 ### Outcomes
 
 | Method | Path | Auth | Notes |
@@ -236,6 +242,9 @@ Outcome hierarchy notes:
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | `POST` | `/api/v2/evaluate` | API key or Bearer | Evaluate one event against active rules |
+
+Evaluator storage note:
+- `POST /api/v2/evaluate` persists events and per-rule results, which can then be reviewed via `GET /api/v2/tested-events`.
 
 ## API Conventions
 

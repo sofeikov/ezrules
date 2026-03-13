@@ -24,6 +24,7 @@ from ezrules.backend.api_v2.routes import (
     rules,
     settings,
     shadow,
+    tested_events,
     user_lists,
     users,
 )
@@ -134,6 +135,9 @@ app.include_router(audit.router)
 
 # Evaluator routes: /api/v2/evaluate, /api/v2/ping (merged from evaluator service)
 app.include_router(evaluator.router)
+
+# Tested event routes: /api/v2/tested-events/*
+app.include_router(tested_events.router)
 
 # Backtesting routes: /api/v2/backtesting/*
 app.include_router(backtesting.router)

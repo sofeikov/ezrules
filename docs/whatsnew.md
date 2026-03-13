@@ -1,5 +1,11 @@
 # What's New
 
+
+## v0.23.0
+
+* **Tested Events view**: Added a dedicated **Tested Events** page in the Angular UI so analysts can inspect the latest stored transactions, see the resolved outcome, expand the raw event payload, review every triggered rule per event, jump directly from triggered rules to the matching rule detail page, and refresh the list without reloading the browser.
+* **Tested Events API**: Added `GET /api/v2/tested-events` for retrieving recent stored evaluations with event payloads, outcome counters, and triggered rule metadata.
+
 ## v0.20.0
 
 * **Settings-aware rule test JSON**: The rule create/detail test panels now prefill sample JSON with demo-friendly values that respect stored field-type metadata and observed types, so live demos no longer start from empty strings.

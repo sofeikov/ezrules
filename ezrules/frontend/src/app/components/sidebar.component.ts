@@ -51,6 +51,13 @@ import { AuthService } from '../services/auth.service';
           <span>Outcomes</span>
         </a>
 
+        <a href="/tested-events" [ngClass]="linkClasses('/tested-events')">
+          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10m-11 9h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11a2 2 0 002 2z" />
+          </svg>
+          <span>Tested Events</span>
+        </a>
+
         <a href="/user-lists" [ngClass]="linkClasses('/user-lists')">
           <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />

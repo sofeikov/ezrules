@@ -2,9 +2,10 @@
 
 Monitoring is where rule quality becomes visible. Use this page for a fast operational check.
 
-You should be able to answer three questions quickly:
+You should be able to answer four questions quickly:
 
 - Are events flowing as expected?
+- Which concrete transactions were just processed, and which rules fired for each one?
 - Which outcomes are firing most often?
 - Do labels confirm or contradict current rule behavior?
 
@@ -27,7 +28,31 @@ Healthy signal:
 
 ---
 
-## 2) Check Label Feedback (Analytics)
+## 2) Inspect Recent Tested Events
+
+Open **Tested Events** in the sidebar and review the latest stored evaluations.
+
+Use it to answer:
+
+- Which event IDs were most recently stored
+- What the raw event payload looked like
+- Which rules actually fired for a given transaction
+- What resolved outcome was persisted after severity resolution
+
+Tips:
+
+- Increase or decrease the **Show latest** selector to inspect a wider or narrower slice.
+- Expand a row to see the full JSON payload, every triggered rule, and the per-outcome counts for that event.
+- Events with **NO OUTCOME** passed through evaluation without any rule returning an allowed outcome.
+
+Healthy signal:
+
+- recent traffic appears quickly after calls to `POST /api/v2/evaluate`
+- triggered rules match the rule logic you expect from the payload
+
+---
+
+## 3) Check Label Feedback (Analytics)
 
 Open **Analytics** in the sidebar and verify:
 
@@ -46,7 +71,7 @@ Healthy signal:
 
 ---
 
-## 3) Rank Rule Quality (Rule Quality Page)
+## 4) Rank Rule Quality (Rule Quality Page)
 
 Open **Rule Quality** in the sidebar and review:
 
@@ -71,8 +96,9 @@ Healthy signal:
 
 ---
 
-## 4) Drill Down via API
+## 5) Drill Down via API
 
+- `GET /api/v2/tested-events?limit=50`
 - `GET /api/v2/analytics/transaction-volume?aggregation=6h`
 - `GET /api/v2/analytics/outcomes-distribution?aggregation=24h`
 - `GET /api/v2/analytics/labels-summary`
@@ -106,10 +132,11 @@ GROUP BY el.label;
 
 ---
 
-## 5) Common Symptoms
+## 6) Common Symptoms
 
 | Symptom | Likely Cause | Fix |
 |---|---|---|
+| Tested Events page is empty | No events have been persisted yet | Send traffic to `POST /api/v2/evaluate` or seed demo/test data |
 | Dashboard charts are empty | No recent events in selected window | Submit new events and switch aggregation to `24h` |
 | Outcome charts empty but volume exists | Rules return no allowed outcomes | Verify rule returns valid outcomes and outcome exists in **Outcomes** |
 | Label charts empty | No labels marked/uploaded | Add labels via UI workflow or `POST /api/v2/labels/mark-event` |
