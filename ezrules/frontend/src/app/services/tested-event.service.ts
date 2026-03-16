@@ -8,6 +8,7 @@ export interface TriggeredRule {
   rid: string;
   description: string;
   outcome: string;
+  referenced_fields: string[];
 }
 
 export interface TestedEvent {
@@ -35,7 +36,9 @@ export class TestedEventService {
   constructor(private http: HttpClient) {}
 
   getTestedEvents(limit: number = 50): Observable<TestedEventsResponse> {
-    const params = new HttpParams().set('limit', limit.toString());
+    const params = new HttpParams()
+      .set('limit', limit.toString())
+      .set('include_referenced_fields', 'true');
     return this.http.get<TestedEventsResponse>(this.apiUrl, { params });
   }
 }

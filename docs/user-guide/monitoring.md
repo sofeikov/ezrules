@@ -42,7 +42,9 @@ Use it to answer:
 Tips:
 
 - Increase or decrease the **Show latest** selector to inspect a wider or narrower slice.
-- Expand a row to see the full JSON payload, every triggered rule, and the per-outcome counts for that event.
+- Expand a row to see the payload fields, every triggered rule, and the per-outcome counts for that event.
+- When no rule is hovered, fields referenced by any triggered rule stay highlighted.
+- Hover a specific triggered rule to narrow the payload highlight to just the fields that rule references.
 - Events with **NO OUTCOME** passed through evaluation without any rule returning an allowed outcome.
 
 Healthy signal:

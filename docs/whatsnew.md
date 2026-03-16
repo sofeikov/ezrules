@@ -5,6 +5,7 @@
 
 * **Tested Events view**: Added a dedicated **Tested Events** page in the Angular UI so analysts can inspect the latest stored transactions, see the resolved outcome, expand the raw event payload, review every triggered rule per event, jump directly from triggered rules to the matching rule detail page, and refresh the list without reloading the browser.
 * **Tested Events API**: Added `GET /api/v2/tested-events` for retrieving recent stored evaluations with event payloads, outcome counters, and triggered rule metadata.
+* **Rule field highlighting in Tested Events**: Triggered rules now expose the top-level event fields they reference. The Tested Events detail panel highlights the union of referenced fields by default and narrows the highlight to a single rule while you hover that rule.
 
 ## v0.20.0
 
