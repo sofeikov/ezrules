@@ -36,6 +36,7 @@ uv run pytest --cov=ezrules.backend --cov=ezrules.core --cov-report=term-missing
 
 # VS Code Launch Configs (.vscode/launch.json)
 When creating a new git worktree for this repository, copy the root `.vscode/` folder into the new worktree before starting work so all launch/run configurations remain available there.
+When working in a new git worktree, proactively ensure dependencies are installed in that worktree before starting: run `uv sync` for Python deps and make sure frontend deps are present in `ezrules/frontend/` (run `npm install` there if `node_modules` is missing) so the user does not have to do manual dependency setup.
 
 All common operations are available as VS Code launch configs; use these instead of manual commands where possible:
 - **Reset Dev Environment**: recreates dev DB (`ezrules`), adds admin user, generates fake data.
@@ -77,11 +78,12 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 9. For Playwright runs that include invite/reset flows, start API with `EZRULES_TESTING=false` and SMTP configured (for local stack: `EZRULES_SMTP_HOST=localhost`, `EZRULES_SMTP_PORT=1025`, `EZRULES_FROM_EMAIL=...`). `EZRULES_TESTING=true` skips SMTP sends and will break email-flow e2e tests.
 10. Database-related functionality must be tested on the live test DB rather than mocked.
 11. If functionality affects user experience/actions, update README and `docs/whatsnew.md`.
-12. When tests are approved, run ALL tests, not selective subsets.
-13. When tests require starting local services manually, run the API/backend and Angular frontend on random available high ports instead of standard ports like `8888` and `4200` to reduce the chance of blocking commonly used defaults.
-14. After tests are done, kill any API/backend and Angular dev servers you started manually, regardless of which ports were used.
-15. After all tests pass, reset the dev environment (prefer VS Code launch config **Reset Dev Environment**, or run `EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules EZRULES_TESTING=true uv run ezrules reset-dev`).
-16. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
+12. If you are asked to bump the version, bump the version first, then create or update the matching topmost version section in `docs/whatsnew.md` and place the current change notes under that new version heading. Do not add new changes under an older version section.
+13. When tests are approved, run ALL tests, not selective subsets.
+14. When tests require starting local services manually, run the API/backend and Angular frontend on random available high ports instead of standard ports like `8888` and `4200` to reduce the chance of blocking commonly used defaults.
+15. After tests are done, kill any API/backend and Angular dev servers you started manually, regardless of which ports were used.
+16. After all tests pass, reset the dev environment (prefer VS Code launch config **Reset Dev Environment**, or run `EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules EZRULES_TESTING=true uv run ezrules reset-dev`).
+17. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
 
 # Writing New Documentation
 1. Canonical documentation map: [DOCUMENTATION_MAP.md](DOCUMENTATION_MAP.md)

@@ -61,6 +61,7 @@ def rules_test_client(session):
     PermissionManager.grant_permission(rule_role.id, PermissionAction.VIEW_RULES)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.CREATE_RULE)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.MODIFY_RULE)
+    PermissionManager.grant_permission(rule_role.id, PermissionAction.PROMOTE_RULES)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.DELETE_RULE)
 
     # Create a token for the user
@@ -697,3 +698,63 @@ class TestRulePermissions:
             )
 
             assert response.status_code == 403
+
+    def test_promote_rule_without_promote_permission(self, session):
+        """User with MODIFY_RULE but without PROMOTE_RULES should get 403."""
+        hashed_password = bcrypt.hashpw("nopromotepass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+        org = session.query(Organisation).filter(Organisation.o_id == 1).first()
+        if not org:
+            org = Organisation(o_id=1, name="Test Org")
+            session.add(org)
+            session.commit()
+
+        role = session.query(Role).filter(Role.name == "rule_modify_only").first()
+        if not role:
+            role = Role(name="rule_modify_only", description="Can modify rules but not promote them")
+            session.add(role)
+            session.commit()
+
+        user = session.query(User).filter(User.email == "nopromote@example.com").first()
+        if not user:
+            user = User(
+                email="nopromote@example.com",
+                password=hashed_password,
+                active=True,
+                fs_uniquifier="nopromote@example.com",
+            )
+            user.roles.append(role)
+            session.add(user)
+            session.commit()
+
+        draft_rule = RuleModel(
+            rid="draft_without_promote_permission",
+            logic="event.amount > 42",
+            description="Draft rule that should not be promotable",
+            o_id=org.o_id,
+            status=RuleStatus.DRAFT,
+        )
+        session.add(draft_rule)
+        session.commit()
+
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+        PermissionManager.grant_permission(role.id, PermissionAction.MODIFY_RULE)
+
+        token = create_access_token(
+            user_id=int(user.id),
+            email=str(user.email),
+            roles=[role.name for role in user.roles],
+        )
+
+        with TestClient(app) as client:
+            response = client.post(
+                f"/api/v2/rules/{draft_rule.r_id}/promote",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+            assert response.status_code == 403
+            assert response.json()["detail"] == "Permission denied"
+
+        session.refresh(draft_rule)
+        assert draft_rule.status == RuleStatus.DRAFT

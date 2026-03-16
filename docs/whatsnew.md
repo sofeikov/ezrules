@@ -1,6 +1,12 @@
 # What's New
 
 
+## v0.24.0
+
+* **Dedicated rule-promotion permission**: Added `PROMOTE_RULES` so draft promotion and shadow-to-production promotion are separated from general rule editing. `MODIFY_RULE` still covers editing and shadow deploy/remove, while `PROMOTE_RULES` is now required for both promotion paths.
+* **Permission-aware promotion controls**: The Angular UI now hides draft and shadow promotion buttons for users whose effective permissions do not include `PROMOTE_RULES`.
+* **Current-user permissions in API**: `GET /api/v2/auth/me` now includes the authenticated user's effective permission names so the frontend can hide or show role-gated actions without reimplementing permission resolution client-side.
+
 ## v0.23.0
 
 * **Tested Events view**: Added a dedicated **Tested Events** page in the Angular UI so analysts can inspect the latest stored transactions, see the resolved outcome, expand the raw event payload, review every triggered rule per event, jump directly from triggered rules to the matching rule detail page, and refresh the list without reloading the browser.

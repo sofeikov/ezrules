@@ -7,6 +7,7 @@ class PermissionAction(Enum):
     # Rule Management
     CREATE_RULE = "create_rule"
     MODIFY_RULE = "modify_rule"
+    PROMOTE_RULES = "promote_rules"
     DELETE_RULE = "delete_rule"
     VIEW_RULES = "view_rules"
 
@@ -59,6 +60,7 @@ class PermissionAction(Enum):
         return [
             (cls.CREATE_RULE.value, "Create new rules", "rule"),
             (cls.MODIFY_RULE.value, "Modify existing rules", "rule"),
+            (cls.PROMOTE_RULES.value, "Promote draft or shadow rules to production", "rule"),
             (cls.DELETE_RULE.value, "Delete rules", "rule"),
             (cls.VIEW_RULES.value, "View rules", "rule"),
             (cls.CREATE_OUTCOME.value, "Create new outcomes", "outcome"),

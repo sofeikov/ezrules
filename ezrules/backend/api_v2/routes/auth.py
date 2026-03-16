@@ -42,7 +42,7 @@ from ezrules.backend.api_v2.auth.schemas import (
 )
 from ezrules.backend.email_service import send_password_reset_email
 from ezrules.core.audit_helpers import save_user_account_history
-from ezrules.models.backend_core import Invitation, PasswordResetToken, User, UserSession
+from ezrules.models.backend_core import Action, Invitation, PasswordResetToken, RoleActions, User, UserSession
 from ezrules.settings import app_settings
 
 # Create a router with a prefix and tag for organization
@@ -525,6 +525,7 @@ def logout(
 )
 def get_current_user_info(
     user: User = Depends(get_current_active_user_strict),
+    db: Any = Depends(get_db),
 ):
     """
     Get information about the currently authenticated user.
@@ -544,14 +545,30 @@ def get_current_user_info(
     - email: User's email
     - active: Whether the account is enabled
     - roles: List of roles with names and descriptions
+    - permissions: Effective permission names granted through the user's roles
     - last_login_at: When the user last logged in
     """
     # Cast last_login_at - it's either a datetime or None
     last_login = user.last_login_at if user.last_login_at is not None else None
+    role_ids = [int(role.id) for role in user.roles]
+    permissions: list[str] = []
+
+    if role_ids:
+        permission_rows = (
+            db.query(Action.name)
+            .join(RoleActions, RoleActions.action_id == Action.id)
+            .filter(RoleActions.role_id.in_(role_ids))
+            .distinct()
+            .order_by(Action.name)
+            .all()
+        )
+        permissions = [str(name) for (name,) in permission_rows]
+
     return UserResponse(
         id=int(user.id),
         email=str(user.email),
         active=bool(user.active),
         roles=[RoleResponse(id=int(role.id), name=str(role.name), description=role.description) for role in user.roles],
+        permissions=permissions,
         last_login_at=last_login,  # type: ignore[arg-type]
     )

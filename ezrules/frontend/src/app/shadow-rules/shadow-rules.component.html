@@ -84,6 +84,7 @@
                     Edit
                   </button>
                   <button
+                    *ngIf="canPromoteRules"
                     (click)="openPromoteDialog(item.rule)"
                     class="px-3 py-1.5 text-sm text-green-600 border border-green-200 rounded-lg hover:bg-green-50 transition-colors"
                     data-testid="promote-button"
