@@ -43,7 +43,7 @@ Everything runs inside Docker. No local Python or Node required.
 docker compose -f docker-compose.demo.yml up --build
 ```
 
-Re-running that command with the existing demo volume intact keeps the data and applies pending migrations before seeding more sample records.
+Re-running that command recreates the demo database from scratch so older persisted schemas do not break the stack.
 
 **Production** (empty database, credentials from `.env`):
 

@@ -15,7 +15,7 @@ docker compose -f docker-compose.demo.yml up --build
 ```
 
 All services start automatically (PostgreSQL, Redis, Celery worker, API, frontend). The database is seeded with 10 sample rules and 100 events.
-If you re-run the same command later with the existing Docker volume intact, the stack keeps the data and applies pending migrations before adding more demo seed data.
+If you re-run the same command later, the demo database is recreated from scratch so older persisted schemas do not break the stack.
 
 | Service | URL |
 |---|---|

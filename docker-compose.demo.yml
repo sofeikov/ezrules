@@ -43,17 +43,13 @@ services:
       - "1025:1025" # SMTP
       - "8025:8025" # Web UI
 
-  # Runs once on first boot to initialise the DB and seed demo data.
-  # On subsequent `docker compose up` (volumes intact), init-db keeps the
-  # existing database, Alembic applies pending migrations, add-user skips
-  # duplicates, and generate-random-data adds more sample records.
+  # Runs once on boot to recreate the demo database from scratch and seed it.
+  # This is intentionally destructive so rerunning the demo stack never gets
+  # stuck on stale persisted schemas from older versions.
   init:
     build: .
     command: >
-      sh -c "echo N | uv run ezrules init-db &&
-             uv run alembic upgrade head &&
-             uv run ezrules add-user --user-email admin@example.com --password admin --admin &&
-             uv run ezrules generate-random-data --n-rules 10 --n-events 100"
+      uv run ezrules reset-dev --user-email admin@example.com --password admin --n-rules 10 --n-events 100
     depends_on:
       postgres:
         condition: service_healthy

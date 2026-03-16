@@ -69,7 +69,7 @@ Once all containers are healthy:
 
 Login: `admin@example.com` / `admin`
 
-Re-running `docker compose -f docker-compose.demo.yml up --build` with an existing Docker volume keeps the demo data and applies pending database migrations before seeding more sample records.
+Re-running `docker compose -f docker-compose.demo.yml up --build` intentionally recreates the demo database from scratch so stale persisted schemas do not break the demo stack.
 
 To stop and wipe all data:
 
