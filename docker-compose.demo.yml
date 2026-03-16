@@ -44,13 +44,14 @@ services:
       - "8025:8025" # Web UI
 
   # Runs once on first boot to initialise the DB and seed demo data.
-  # On subsequent `docker compose up` (volumes intact) the commands are
-  # idempotent: init-db skips re-creation, add-user skips duplicate user,
-  # and generate-random-data adds more sample records.
+  # On subsequent `docker compose up` (volumes intact), init-db keeps the
+  # existing database, Alembic applies pending migrations, add-user skips
+  # duplicates, and generate-random-data adds more sample records.
   init:
     build: .
     command: >
       sh -c "echo N | uv run ezrules init-db &&
+             uv run alembic upgrade head &&
              uv run ezrules add-user --user-email admin@example.com --password admin --admin &&
              uv run ezrules generate-random-data --n-rules 10 --n-events 100"
     depends_on:

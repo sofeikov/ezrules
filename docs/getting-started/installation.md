@@ -15,6 +15,7 @@ docker compose -f docker-compose.demo.yml up --build
 ```
 
 All services start automatically (PostgreSQL, Redis, Celery worker, API, frontend). The database is seeded with 10 sample rules and 100 events.
+If you re-run the same command later with the existing Docker volume intact, the stack keeps the data and applies pending migrations before adding more demo seed data.
 
 | Service | URL |
 |---|---|
@@ -59,6 +60,7 @@ docker compose -f docker-compose.prod.yml up --build
 
 The database is initialised empty. Login with the credentials you set in `.env`.
 By default, SMTP is routed to local Mailpit (`http://localhost:8025`) unless SMTP env vars override it.
+Re-running the same command later keeps the existing Docker volume and applies pending migrations before the stack starts.
 
 Data persists in a Docker volume between restarts. To stop without losing data:
 

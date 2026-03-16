@@ -80,10 +80,11 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 11. If functionality affects user experience/actions, update README and `docs/whatsnew.md`.
 12. If you are asked to bump the version, bump the version first, then create or update the matching topmost version section in `docs/whatsnew.md` and place the current change notes under that new version heading. Do not add new changes under an older version section.
 13. When tests are approved, run ALL tests, not selective subsets.
-14. When tests require starting local services manually, run the API/backend and Angular frontend on random available high ports instead of standard ports like `8888` and `4200` to reduce the chance of blocking commonly used defaults.
-15. After tests are done, kill any API/backend and Angular dev servers you started manually, regardless of which ports were used.
-16. After all tests pass, reset the dev environment (prefer VS Code launch config **Reset Dev Environment**, or run `EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules EZRULES_TESTING=true uv run ezrules reset-dev`).
-17. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
+14. When the user requests the full test suite, also validate the demo Docker path by testing `docker compose -f docker-compose.demo.yml up --build` and confirming the demo stack starts successfully; tear it down afterward.
+15. When tests require starting local services manually, run the API/backend and Angular frontend on random available high ports instead of standard ports like `8888` and `4200` to reduce the chance of blocking commonly used defaults.
+16. After tests are done, kill any API/backend and Angular dev servers you started manually, regardless of which ports were used.
+17. After all tests pass, reset the dev environment (prefer VS Code launch config **Reset Dev Environment**, or run `EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules EZRULES_TESTING=true uv run ezrules reset-dev`).
+18. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
 
 # Writing New Documentation
 1. Canonical documentation map: [DOCUMENTATION_MAP.md](DOCUMENTATION_MAP.md)

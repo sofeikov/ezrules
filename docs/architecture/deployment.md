@@ -43,12 +43,16 @@ Everything runs inside Docker. No local Python or Node required.
 docker compose -f docker-compose.demo.yml up --build
 ```
 
+Re-running that command with the existing demo volume intact keeps the data and applies pending migrations before seeding more sample records.
+
 **Production** (empty database, credentials from `.env`):
 
 ```bash
 cp .env.example .env   # fill in APP_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
 docker compose -f docker-compose.prod.yml up --build
 ```
+
+Re-running that command with the existing production volume intact keeps the data and applies pending migrations before services start.
 
 Verify:
 
