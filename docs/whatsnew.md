@@ -1,6 +1,11 @@
 # What's New
 
 
+## v0.24.2
+
+* **Label-aware backtesting**: Backtest task results on the Rule Detail page now include historical label counts plus stored/proposed precision, recall, and F1 by outcome→label pair when labeled events exist in the backtest window.
+
+
 ## v0.24.1
 
 * **Inline Tested Events payload highlighting**: The Tested Events detail view now keeps the payload in a single JSON block and highlights referenced top-level fields inline, instead of expanding the payload into a long field-by-field list.

@@ -1,8 +1,8 @@
-from collections import Counter
 from datetime import UTC, datetime, timedelta
 
 from celery import Celery
 
+from ezrules.backend.backtesting import compute_backtest_metrics
 from ezrules.backend.rule_quality import (
     compute_rule_quality_metrics,
     get_active_rule_quality_pairs,
@@ -11,22 +11,12 @@ from ezrules.backend.rule_quality import (
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
 from ezrules.core.rule import Rule, RuleFactory
 from ezrules.core.user_lists import PersistentUserListManager
+from ezrules.models.backend_core import Label, RuleQualityReport, TestingRecordLog
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import RuleQualityReport, TestingRecordLog
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
 app = Celery("tasks", backend=f"db+{app_settings.DB_ENDPOINT}", broker=app_settings.CELERY_BROKER_URL)
-
-
-def count_rule_outcomes(rule: Rule, test_records: list[TestingRecordLog]) -> dict[str, int]:
-    """Count non-None outcomes produced by rule across a list of test records."""
-    result: Counter[str] = Counter()
-    for record in test_records:
-        outcome = rule(record.event)
-        if outcome is not None:
-            result[str(outcome)] += 1
-    return dict(result)
 
 
 @app.task
@@ -60,36 +50,16 @@ def backtest_rule_change(r_id: int, new_rule_logic: str):
     except Exception as e:
         return {"error": f"Failed to query test records: {e!s}"}
 
-    stored_counter: Counter[str] = Counter()
-    proposed_counter: Counter[str] = Counter()
-    total_records = 0
-
-    for record in query.yield_per(5000):
-        total_records += 1
-        stored_outcome = stored_rule(record.event)
-        proposed_outcome = proposed_rule(record.event)
-        if stored_outcome is not None:
-            stored_counter[str(stored_outcome)] += 1
-        if proposed_outcome is not None:
-            proposed_counter[str(proposed_outcome)] += 1
-
-    stored_result = dict(stored_counter)
-    proposed_result = dict(proposed_counter)
-
-    if total_records > 0:
-        stored_result_rate = {outcome: 100 * ct / total_records for outcome, ct in stored_result.items()}
-        proposed_result_rate = {outcome: 100 * ct / total_records for outcome, ct in proposed_result.items()}
-    else:
-        stored_result_rate = {}
-        proposed_result_rate = {}
-
-    return {
-        "stored_result": stored_result,
-        "proposed_result": proposed_result,
-        "stored_result_rate": stored_result_rate,
-        "proposed_result_rate": proposed_result_rate,
-        "total_records": total_records,
+    label_lookup = {
+        int(label_id): str(label_name) for label_id, label_name in db_session.query(Label.el_id, Label.label)
     }
+
+    return compute_backtest_metrics(
+        stored_rule=stored_rule,
+        proposed_rule=proposed_rule,
+        test_records=query.yield_per(5000),
+        label_lookup=label_lookup,
+    )
 
 
 @app.task

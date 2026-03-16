@@ -21,6 +21,28 @@ export interface BacktestResultsResponse {
   results: BacktestResultItem[];
 }
 
+export interface BacktestQualityMetric {
+  outcome: string;
+  label: string;
+  true_positive: number;
+  false_positive: number;
+  false_negative: number;
+  predicted_positives: number;
+  actual_positives: number;
+  precision: number | null;
+  recall: number | null;
+  f1: number | null;
+}
+
+export interface BacktestQualitySummary {
+  pair_count: number;
+  average_precision: number | null;
+  average_recall: number | null;
+  average_f1: number | null;
+  best_pair: string | null;
+  worst_pair: string | null;
+}
+
 export interface BacktestTaskResult {
   status: string;
   stored_result?: Record<string, number>;
@@ -28,6 +50,12 @@ export interface BacktestTaskResult {
   stored_result_rate?: Record<string, number>;
   proposed_result_rate?: Record<string, number>;
   total_records?: number;
+  labeled_records?: number;
+  label_counts?: Record<string, number>;
+  stored_quality_summary?: BacktestQualitySummary | null;
+  proposed_quality_summary?: BacktestQualitySummary | null;
+  stored_quality_metrics?: BacktestQualityMetric[];
+  proposed_quality_metrics?: BacktestQualityMetric[];
   error?: string;
 }
 
