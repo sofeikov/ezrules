@@ -1,6 +1,11 @@
 # What's New
 
 
+## v0.24.1
+
+* **Inline Tested Events payload highlighting**: The Tested Events detail view now keeps the payload in a single JSON block and highlights referenced top-level fields inline, instead of expanding the payload into a long field-by-field list.
+* **Rule-focused hover behavior**: When no rule is hovered, the payload shows the union of fields referenced by all triggered rules. Hovering a specific triggered rule narrows the highlight to just the fields used by that rule.
+
 ## v0.24.0
 
 * **Dedicated rule-promotion permission**: Added `PROMOTE_RULES` so draft promotion and shadow-to-production promotion are separated from general rule editing. `MODIFY_RULE` still covers editing and shadow deploy/remove, while `PROMOTE_RULES` is now required for both promotion paths.
