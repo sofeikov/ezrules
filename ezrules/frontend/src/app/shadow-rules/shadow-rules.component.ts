@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { diffLines, Change } from 'diff';
 import { SidebarComponent } from '../components/sidebar.component';
+import { AuthService } from '../services/auth.service';
 import {
   RuleDetail,
   RuleService,
@@ -35,11 +36,28 @@ export class ShadowRulesComponent implements OnInit {
   // Action feedback
   actionSuccess: string | null = null;
   actionError: string | null = null;
+  canPromoteRules: boolean = false;
 
-  constructor(private ruleService: RuleService, private router: Router) {}
+  constructor(
+    private ruleService: RuleService,
+    private router: Router,
+    private authService: AuthService
+  ) {}
 
   ngOnInit(): void {
+    this.loadPermissions();
     this.loadData();
+  }
+
+  loadPermissions(): void {
+    this.authService.hasPermission('promote_rules').subscribe({
+      next: (hasPermission) => {
+        this.canPromoteRules = hasPermission;
+      },
+      error: () => {
+        this.canPromoteRules = false;
+      }
+    });
   }
 
   loadData(): void {
@@ -68,6 +86,9 @@ export class ShadowRulesComponent implements OnInit {
   }
 
   openPromoteDialog(rule: ShadowRuleItem): void {
+    if (!this.canPromoteRules) {
+      return;
+    }
     this.promoteTarget = rule;
     this.showPromoteDialog = true;
     this.promoteError = null;

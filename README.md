@@ -8,7 +8,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 
 - **Rule Engine**: Flexible Python-based rule execution with custom logic support
 - **Management Interface**: Modern web UI for creating and managing rules
-- **Enterprise Security**: Granular role-based access control with 28 permission types; API key authentication for service-to-service integration
+- **Enterprise Security**: Granular role-based access control with 32 permission types; API key authentication for service-to-service integration
 - **Transaction Labeling**: Comprehensive fraud analytics with API and bulk CSV upload capabilities
 - **Analytics Dashboard**: Real-time transaction volume charts with configurable time ranges (1h, 6h, 12h, 24h, 30d)
 - **Scalable Architecture**: Unified API service with integrated rule evaluation
@@ -19,6 +19,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Tested Events View**: Inspect the latest stored transactions, their final resolved outcomes, the raw event payload, every rule that fired for each event, jump straight from a trigger to the rule detail page, and refresh the list without reloading the whole app
 - **Shadow Deployment**: Deploy rules to a shadow environment that observes live traffic without affecting production outcomes; promote validated shadows to production in one step
 - **Rule Lifecycle Controls**: Rules now support `draft`, `active`, and `archived` states with explicit promotion and approver tracking (`effective_from`, `approved_by`, `approved_at`)
+- **Permission-Aware Promotion UI**: Draft and shadow promotion controls are only shown to users who hold the `promote_rules` permission
 - **Revision Rollback**: Restore logic and description from a historical rule revision into a new draft version directly from the history timeline, without deleting any audit history
 - **Backtesting**: Test rule changes against historical data before deployment
 - **CLI Tools**: Command-line interface for database management and realistic test data generation
@@ -158,11 +159,12 @@ ezrules includes a comprehensive role-based access control system designed for e
 
 ### Permission Types
 
-The system supports 27 granular permission types:
+The system supports 32 granular permission types:
 
 **Rule Management:**
 - `create_rule` - Create new business rules
 - `modify_rule` - Edit existing rules
+- `promote_rules` - Promote draft or shadow rules to production
 - `delete_rule` - Delete rules
 - `view_rules` - View rules and rule history
 
@@ -206,7 +208,7 @@ The system supports 27 granular permission types:
 Three pre-configured roles are available:
 
 - **Admin**: Full system access with all permissions
-- **Rule Editor**: Can create and modify rules, view outcomes and lists
+- **Rule Editor**: Can create and modify rules, deploy drafts to shadow, and view outcomes and lists; promotion remains a separate permission
 - **Read-only**: View-only access to rules, outcomes, and lists
 
 ### Role Assignment
