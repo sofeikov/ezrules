@@ -69,6 +69,8 @@ Once all containers are healthy:
 
 Login: `admin@example.com` / `admin`
 
+Re-running `docker compose -f docker-compose.demo.yml up --build` intentionally recreates the demo database from scratch so stale persisted schemas do not break the demo stack.
+
 To stop and wipe all data:
 
 ```bash
@@ -95,6 +97,8 @@ docker compose -f docker-compose.prod.yml up --build
 | Mailpit UI (default local SMTP sink) | http://localhost:8025 |
 
 Login with the email/password you set in `.env`.
+
+Re-running `docker compose -f docker-compose.prod.yml up --build` with an existing Docker volume keeps the data and applies pending database migrations before starting the services.
 
 To stop (data is preserved in a Docker volume):
 
