@@ -199,7 +199,9 @@ Removing clears the shadow config entry and its result history. The rules table 
 
 ## Permissions
 
-Shadow deploy, remove, and promote actions require the `MODIFY_RULE` permission.
+Shadow deploy and remove actions require the `MODIFY_RULE` permission.
+
+Promoting from shadow to production requires the `PROMOTE_RULES` permission.
 
 Viewing the shadow config and results requires the `VIEW_RULES` permission.
 

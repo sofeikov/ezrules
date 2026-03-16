@@ -31,7 +31,7 @@ from ezrules.models.backend_core import RuleEngineConfig, ShadowResultsLog, User
 
 @pytest.fixture(scope="function")
 def shadow_test_client(session):
-    """Create a FastAPI test client with MODIFY_RULE + VIEW_RULES permissions."""
+    """Create a FastAPI test client with shadow-management and promotion permissions."""
     hashed_password = bcrypt.hashpw("shadowpass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
     org = session.query(Organisation).filter(Organisation.o_id == 1).first()
@@ -62,6 +62,7 @@ def shadow_test_client(session):
     PermissionManager.init_default_actions()
     PermissionManager.grant_permission(shadow_role.id, PermissionAction.VIEW_RULES)
     PermissionManager.grant_permission(shadow_role.id, PermissionAction.MODIFY_RULE)
+    PermissionManager.grant_permission(shadow_role.id, PermissionAction.PROMOTE_RULES)
 
     roles = [role.name for role in shadow_user.roles]
     token = create_access_token(
@@ -373,6 +374,54 @@ class TestPromoteFromShadow:
         )
 
         assert response.status_code == 400
+
+    def test_promote_rule_without_promote_permission_returns_403(self, session, shadow_rule):
+        """MODIFY_RULE alone should not allow promoting a shadow rule."""
+        hashed_password = bcrypt.hashpw("shadownopromote".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+        role = session.query(Role).filter(Role.name == "shadow_modify_only").first()
+        if not role:
+            role = Role(name="shadow_modify_only", description="Can manage shadow entries but not promote them")
+            session.add(role)
+            session.commit()
+
+        user = session.query(User).filter(User.email == "shadow-nopromote@example.com").first()
+        if not user:
+            user = User(
+                email="shadow-nopromote@example.com",
+                password=hashed_password,
+                active=True,
+                fs_uniquifier="shadow-nopromote@example.com",
+            )
+            user.roles.append(role)
+            session.add(user)
+            session.commit()
+
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+        PermissionManager.grant_permission(role.id, PermissionAction.VIEW_RULES)
+        PermissionManager.grant_permission(role.id, PermissionAction.MODIFY_RULE)
+
+        token = create_access_token(
+            user_id=int(user.id),
+            email=str(user.email),
+            roles=[role.name for role in user.roles],
+        )
+
+        with TestClient(app) as client:
+            deploy_response = client.post(
+                f"/api/v2/rules/{shadow_rule.r_id}/shadow",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert deploy_response.status_code == 200
+
+            response = client.post(
+                f"/api/v2/rules/{shadow_rule.r_id}/shadow/promote",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+            assert response.status_code == 403
+            assert response.json()["detail"] == "Permission denied"
 
 
 # =============================================================================

@@ -12,6 +12,10 @@ class TriggeredRuleItem(BaseModel):
     rid: str = Field(..., description="Stable rule identifier")
     description: str = Field(..., description="Rule description")
     outcome: str = Field(..., description="Outcome returned by the rule")
+    referenced_fields: list[str] | None = Field(
+        default=None,
+        description="Top-level event fields referenced by the rule logic",
+    )
 
 
 class TestedEventItem(BaseModel):
