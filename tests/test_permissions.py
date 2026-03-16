@@ -10,6 +10,7 @@ from ezrules.models.backend_core import Action, Role, RoleActions, User
 class TestPermissionAction:
     def test_enum_values(self):
         assert PermissionAction.CREATE_RULE.value == "create_rule"
+        assert PermissionAction.PROMOTE_RULES.value == "promote_rules"
         assert PermissionAction.VIEW_RULES.value == "view_rules"
         assert PermissionAction.ACCESS_AUDIT_TRAIL.value == "access_audit_trail"
 
@@ -28,6 +29,7 @@ class TestPermissionAction:
         # Check specific actions exist
         action_names = [action[0] for action in default_actions]
         assert "create_rule" in action_names
+        assert "promote_rules" in action_names
         assert "view_rules" in action_names
         assert "access_audit_trail" in action_names
 
@@ -67,6 +69,7 @@ class TestRoleType:
             PermissionAction.VIEW_FIELD_TYPES,
         ]
         assert permissions == expected
+        assert PermissionAction.PROMOTE_RULES not in permissions
 
     def test_get_role_permissions_unknown(self):
         permissions = RoleType.get_role_permissions("unknown_role")

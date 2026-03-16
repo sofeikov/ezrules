@@ -145,6 +145,7 @@ class UserResponse(BaseModel):
     email: str
     active: bool
     roles: list[RoleResponse]
+    permissions: list[str] = []
     last_login_at: datetime | None = None
 
     class Config:

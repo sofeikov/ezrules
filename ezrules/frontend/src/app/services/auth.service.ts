@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject, tap, catchError, throwError } from 'rxjs';
+import { Observable, BehaviorSubject, tap, catchError, throwError, of } from 'rxjs';
+import { finalize, map, shareReplay } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { environment } from '../../environments/environment';
 
@@ -16,6 +17,7 @@ export interface AuthUser {
   email: string;
   active: boolean;
   roles: { id: number; name: string; description: string | null }[];
+  permissions: string[];
   last_login_at: string | null;
 }
 
@@ -32,6 +34,8 @@ export class AuthService {
   private readonly REFRESH_TOKEN_KEY = 'ezrules_refresh_token';
 
   private loggedIn = new BehaviorSubject<boolean>(this.hasToken());
+  private currentUser = new BehaviorSubject<AuthUser | null>(null);
+  private currentUserRequest$: Observable<AuthUser> | null = null;
   isLoggedIn$ = this.loggedIn.asObservable();
 
   constructor(private http: HttpClient, private router: Router) {}
@@ -60,6 +64,8 @@ export class AuthService {
       tap(response => {
         localStorage.setItem(this.ACCESS_TOKEN_KEY, response.access_token);
         localStorage.setItem(this.REFRESH_TOKEN_KEY, response.refresh_token);
+        this.currentUser.next(null);
+        this.currentUserRequest$ = null;
         this.loggedIn.next(true);
       })
     );
@@ -77,6 +83,7 @@ export class AuthService {
       tap(response => {
         localStorage.setItem(this.ACCESS_TOKEN_KEY, response.access_token);
         localStorage.setItem(this.REFRESH_TOKEN_KEY, response.refresh_token);
+        this.currentUserRequest$ = null;
         this.loggedIn.next(true);
       }),
       catchError(err => {
@@ -96,12 +103,38 @@ export class AuthService {
     }
     localStorage.removeItem(this.ACCESS_TOKEN_KEY);
     localStorage.removeItem(this.REFRESH_TOKEN_KEY);
+    this.currentUser.next(null);
+    this.currentUserRequest$ = null;
     this.loggedIn.next(false);
     this.router.navigate(['/login']);
   }
 
-  getCurrentUser(): Observable<AuthUser> {
-    return this.http.get<AuthUser>(`${this.AUTH_URL}/me`);
+  getCurrentUser(forceRefresh: boolean = false): Observable<AuthUser> {
+    if (!forceRefresh) {
+      const cachedUser = this.currentUser.value;
+      if (cachedUser) {
+        return of(cachedUser);
+      }
+      if (this.currentUserRequest$) {
+        return this.currentUserRequest$;
+      }
+    }
+
+    this.currentUserRequest$ = this.http.get<AuthUser>(`${this.AUTH_URL}/me`).pipe(
+      tap(user => this.currentUser.next(user)),
+      finalize(() => {
+        this.currentUserRequest$ = null;
+      }),
+      shareReplay(1)
+    );
+
+    return this.currentUserRequest$;
+  }
+
+  hasPermission(permission: string): Observable<boolean> {
+    return this.getCurrentUser().pipe(
+      map(user => user.permissions.includes(permission))
+    );
   }
 
   acceptInvite(token: string, password: string): Observable<MessageResponse> {

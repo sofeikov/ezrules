@@ -521,7 +521,7 @@ def delete_rule(
 def promote_rule(
     rule_id: int,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    _: None = Depends(require_permission(PermissionAction.PROMOTE_RULES)),
     db: Any = Depends(get_db),
 ) -> RuleMutationResponse:
     """Promote a draft rule to active and record approver metadata."""
@@ -849,7 +849,7 @@ def remove_from_shadow(
 def promote_to_production(
     rule_id: int,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    _: None = Depends(require_permission(PermissionAction.PROMOTE_RULES)),
     db: Any = Depends(get_db),
 ) -> ShadowDeployResponse:
     """Promote a rule from shadow config into the production config."""
