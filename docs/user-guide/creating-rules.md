@@ -138,7 +138,7 @@ Before enabling major rule changes:
 
 1. Run UI tests with realistic payloads
 2. Compare triggered vs non-triggered examples
-3. Backtest against historical traffic if available
+3. Backtest against historical traffic if available, and review label-aware precision/recall if your historical events have been labeled
 4. Review potential false-positive impact with analysts
 5. Confirm observability:
    - outcome trends visible in **Dashboard**

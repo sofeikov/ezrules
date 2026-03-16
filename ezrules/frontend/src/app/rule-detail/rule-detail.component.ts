@@ -6,7 +6,13 @@ import { diffLines, Change } from 'diff';
 import { of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { RuleDetail, RuleRevisionDetail, RuleService, ShadowDeployResponse, ShadowRuleItem, UpdateRuleRequest } from '../services/rule.service';
-import { BacktestingService, BacktestResultItem, BacktestTaskResult } from '../services/backtesting.service';
+import {
+  BacktestingService,
+  BacktestQualityMetric,
+  BacktestQualitySummary,
+  BacktestResultItem,
+  BacktestTaskResult
+} from '../services/backtesting.service';
 import { RuleTestDataService } from '../services/rule-test-data.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
@@ -394,6 +400,60 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       Object.keys(taskResult.proposed_result).forEach(k => keys.add(k));
     }
     return Array.from(keys).sort();
+  }
+
+  getLabelKeys(taskResult: BacktestTaskResult): string[] {
+    return Object.keys(taskResult.label_counts || {}).sort();
+  }
+
+  getLabeledShare(taskResult: BacktestTaskResult): number {
+    const totalRecords = taskResult.total_records || 0;
+    const labeledRecords = taskResult.labeled_records || 0;
+    if (totalRecords === 0) {
+      return 0;
+    }
+    return 100 * labeledRecords / totalRecords;
+  }
+
+  formatQualityMetric(value: number | null | undefined): string {
+    if (value === null || value === undefined) {
+      return '—';
+    }
+    return `${new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value * 100)}%`;
+  }
+
+  getQualitySummary(taskResult: BacktestTaskResult, variant: 'stored' | 'proposed'): BacktestQualitySummary | null {
+    return variant === 'stored'
+      ? taskResult.stored_quality_summary || null
+      : taskResult.proposed_quality_summary || null;
+  }
+
+  getQualityMetricPairs(taskResult: BacktestTaskResult): Array<{ outcome: string; label: string }> {
+    const pairs = new Map<string, { outcome: string; label: string }>();
+
+    for (const metric of taskResult.stored_quality_metrics || []) {
+      pairs.set(`${metric.outcome}|||${metric.label}`, { outcome: metric.outcome, label: metric.label });
+    }
+    for (const metric of taskResult.proposed_quality_metrics || []) {
+      pairs.set(`${metric.outcome}|||${metric.label}`, { outcome: metric.outcome, label: metric.label });
+    }
+
+    return Array.from(pairs.values()).sort(
+      (left, right) => left.outcome.localeCompare(right.outcome) || left.label.localeCompare(right.label)
+    );
+  }
+
+  getQualityMetric(
+    taskResult: BacktestTaskResult,
+    variant: 'stored' | 'proposed',
+    outcome: string,
+    label: string
+  ): BacktestQualityMetric | undefined {
+    const metrics = variant === 'stored'
+      ? taskResult.stored_quality_metrics || []
+      : taskResult.proposed_quality_metrics || [];
+
+    return metrics.find(metric => metric.outcome === outcome && metric.label === label);
   }
 
   private startPolling(taskId: string): void {
