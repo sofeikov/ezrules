@@ -226,8 +226,12 @@ Outcome hierarchy notes:
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | `POST` | `/api/v2/backtesting` | Bearer + permission | Trigger async backtest |
-| `GET` | `/api/v2/backtesting/task/{task_id}` | Bearer + permission | Task status/result |
+| `GET` | `/api/v2/backtesting/task/{task_id}` | Bearer + permission | Task status/result, including outcome counts/rates plus label counts and quality metrics for labeled history |
 | `GET` | `/api/v2/backtesting/{rule_id}` | Bearer + permission | Backtest history for rule |
+
+Backtest task result note:
+- `GET /api/v2/backtesting/task/{task_id}` returns raw outcome counts/rates over the full backtest window.
+- When labeled historical events exist, it also returns `labeled_records`, `label_counts`, and stored/proposed outcome→label quality summaries and pair metrics (`precision`, `recall`, `f1`, `true_positive`, `false_positive`, `false_negative`).
 
 ### API Keys
 

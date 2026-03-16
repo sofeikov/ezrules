@@ -90,6 +90,12 @@ def get_task_result(
             stored_result_rate=data.get("stored_result_rate"),
             proposed_result_rate=data.get("proposed_result_rate"),
             total_records=data.get("total_records"),
+            labeled_records=data.get("labeled_records"),
+            label_counts=data.get("label_counts"),
+            stored_quality_summary=data.get("stored_quality_summary"),
+            proposed_quality_summary=data.get("proposed_quality_summary"),
+            stored_quality_metrics=data.get("stored_quality_metrics"),
+            proposed_quality_metrics=data.get("proposed_quality_metrics"),
         )
 
     return BacktestTaskResult(status=result.state)
