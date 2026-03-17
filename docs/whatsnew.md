@@ -13,6 +13,7 @@
 
 * **Inline Tested Events payload highlighting**: The Tested Events detail view now keeps the payload in a single JSON block and highlights referenced top-level fields inline, instead of expanding the payload into a long field-by-field list.
 * **Rule-focused hover behavior**: When no rule is hovered, the payload shows the union of fields referenced by all triggered rules. Hovering a specific triggered rule narrows the highlight to just the fields used by that rule.
+* **Compose bootstrap fixes**: The backend Docker image now includes Alembic config and migration files, `docker-compose.demo.yml` now recreates the demo database on each run to avoid stale-volume failures, and `docker-compose.prod.yml` upgrades persisted databases before startup.
 
 ## v0.24.0
 
