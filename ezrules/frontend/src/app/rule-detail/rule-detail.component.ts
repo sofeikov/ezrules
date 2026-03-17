@@ -27,6 +27,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   loading: boolean = true;
   error: string | null = null;
   testJson: string = '';
+  private autoFilledTestJson: string = '';
   testResult: any = null;
   testError: string | null = null;
   testing: boolean = false;
@@ -143,8 +144,10 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       })
     ).subscribe({
       next: (response) => {
-        if (response !== null) {
+        const canApplyAutoFill = this.testJson === '' || this.testJson === this.autoFilledTestJson;
+        if (response !== null && canApplyAutoFill) {
           this.testJson = response;
+          this.autoFilledTestJson = response;
         }
       },
       error: (error) => {

@@ -3,7 +3,7 @@ from ezrules.models.backend_core import Label, Organisation, TestingRecordLog
 
 
 def test_upload_labels_from_csv_is_scoped_to_the_configured_org(session):
-    current_org = session.query(Organisation).filter(Organisation.o_id == 1).first()
+    current_org = session.query(Organisation).first()
     assert current_org is not None
 
     other_org = Organisation(name="other_org")
@@ -33,7 +33,7 @@ def test_upload_labels_from_csv_is_scoped_to_the_configured_org(session):
 
 
 def test_upload_labels_from_csv_rejects_duplicate_event_ids_in_org(session):
-    current_org = session.query(Organisation).filter(Organisation.o_id == 1).first()
+    current_org = session.query(Organisation).first()
     assert current_org is not None
 
     label = Label(label="NORMAL")
@@ -68,7 +68,7 @@ def test_upload_labels_from_csv_rejects_duplicate_event_ids_in_org(session):
 
 
 def test_upload_labels_from_csv_returns_assignment_metadata_for_audit(session):
-    current_org = session.query(Organisation).filter(Organisation.o_id == 1).first()
+    current_org = session.query(Organisation).first()
     assert current_org is not None
 
     label = Label(label="CHARGEBACK")

@@ -2,6 +2,7 @@ import csv
 import io
 from dataclasses import dataclass, field
 
+from ezrules.core.application_context import get_organization_id
 from ezrules.models.backend_core import Label, TestingRecordLog
 
 
@@ -39,9 +40,9 @@ class ParsedRow:
 class LabelUploadService:
     """Service for handling CSV label upload operations"""
 
-    def __init__(self, db_session, org_id: int = 1):
+    def __init__(self, db_session, org_id: int | None = None):
         self.db_session = db_session
-        self.org_id = org_id
+        self.org_id = org_id if org_id is not None else (get_organization_id() or 1)
 
     def parse_csv_content(self, csv_content: str) -> tuple[list[ParsedRow], list[str]]:
         """Parse CSV content and validate format"""
