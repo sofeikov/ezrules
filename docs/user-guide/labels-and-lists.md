@@ -26,7 +26,7 @@ Labels tell you what actually happened after investigation. They are essential f
 
 1. Open **Labels**.
 2. Ensure the label names you use operationally exist (`FRAUD`, `NORMAL`, `CHARGEBACK`, etc.).
-3. If your deployment includes CSV upload in the Labels UI, upload `event_id,label_name` rows.
+3. Upload `event_id,label_name` rows from the CSV section on the page.
 4. Confirm changes in **Analytics**.
 
 API alternatives are listed in **Automation Appendix** below.

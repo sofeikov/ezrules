@@ -119,8 +119,8 @@ Rule lifecycle fields on rule responses:
 | `GET` | `/api/v2/labels` | Bearer + permission | List labels |
 | `POST` | `/api/v2/labels` | Bearer + permission | Create label |
 | `POST` | `/api/v2/labels/bulk` | Bearer + permission | Create labels in bulk |
-| `POST` | `/api/v2/labels/mark-event` | Bearer + permission | Mark single event |
-| `POST` | `/api/v2/labels/upload` | Bearer + permission | CSV upload (`multipart/form-data`) |
+| `POST` | `/api/v2/labels/mark-event` | Bearer + permission | Mark single event; returns `409` if the current org has duplicate `event_id`s |
+| `POST` | `/api/v2/labels/upload` | Bearer + permission | CSV upload (`multipart/form-data`) with row-level success/error reporting |
 | `DELETE` | `/api/v2/labels/{label_name}` | Bearer + permission | Delete label |
 
 ### Analytics
@@ -216,7 +216,7 @@ Outcome hierarchy notes:
 | `GET` | `/api/v2/audit/config` | Bearer + permission | Config history (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/user-lists` | Bearer + permission | User-list history |
 | `GET` | `/api/v2/audit/outcomes` | Bearer + permission | Outcome history |
-| `GET` | `/api/v2/audit/labels` | Bearer + permission | Label history |
+| `GET` | `/api/v2/audit/labels` | Bearer + permission | Label history, including manual/CSV assignment details |
 | `GET` | `/api/v2/audit/users` | Bearer + permission | User-account history (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/roles` | Bearer + permission | Role/permission history (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/field-types` | Bearer + permission | Field type config history (`limit`, `offset`, `field_name` filter) |

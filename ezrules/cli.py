@@ -44,6 +44,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 DEMO_DATA_COMMIT_BATCH_SIZE = 50
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_RESET_DEV_LABELS_CSV_PATH = PROJECT_ROOT / "test_labels.csv"
 
 
 def _drop_database(engine, db_name):
@@ -85,7 +87,7 @@ def _upgrade_database_schema(db_endpoint: str) -> None:
     env["EZRULES_DB_ENDPOINT"] = db_endpoint
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
-        cwd=Path(__file__).resolve().parent.parent,
+        cwd=PROJECT_ROOT,
         env=env,
         capture_output=True,
         text=True,
@@ -562,6 +564,16 @@ def _export_labels_to_csv(labeled_events: list, filename: str):
         logger.error(f"Failed to export CSV: {e}")
 
 
+def _invoke_reset_dev_generation(ctx, *, n_rules: int, n_events: int) -> None:
+    ctx.invoke(
+        generate_random_data,
+        n_rules=n_rules,
+        n_events=n_events,
+        label_ratio=0.3,
+        export_csv=str(DEFAULT_RESET_DEV_LABELS_CSV_PATH),
+    )
+
+
 @cli.command()
 @click.option("--output-file", default="test_labels.csv", help="Output CSV filename")
 @click.option("--n-events", default=50, help="Number of events to include in CSV")
@@ -631,7 +643,7 @@ def reset_dev(ctx, user_email, password, n_rules, n_events):
 
     # Step 3: generate fake data
     logger.info(f"Step 3/3: Generating fake data ({n_rules} rules, {n_events} events)...")
-    ctx.invoke(generate_random_data, n_rules=n_rules, n_events=n_events, label_ratio=0.3, export_csv=None)
+    _invoke_reset_dev_generation(ctx, n_rules=n_rules, n_events=n_events)
     _ensure_default_rule_quality_pairs(
         db_session,
         o_id=app_settings.ORG_ID,
@@ -639,6 +651,7 @@ def reset_dev(ctx, user_email, password, n_rules, n_events):
     )
 
     logger.info("=== Development environment ready ===")
+    logger.info("Generated label-upload CSV at: %s", DEFAULT_RESET_DEV_LABELS_CSV_PATH)
     logger.info(f"Login with: {user_email} / {password}")
 
 

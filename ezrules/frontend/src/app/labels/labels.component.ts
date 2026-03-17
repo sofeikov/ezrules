@@ -1,7 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LabelService } from '../services/label.service';
+import { LabelService, LabelUploadResult } from '../services/label.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -11,12 +11,18 @@ import { SidebarComponent } from '../components/sidebar.component';
   templateUrl: './labels.component.html'
 })
 export class LabelsComponent implements OnInit {
+  @ViewChild('csvFileInput') csvFileInput?: ElementRef<HTMLInputElement>;
+
   labels: string[] = [];
   newLabel: string = '';
   loading: boolean = true;
   error: string | null = null;
   deleteError: string | null = null;
   createError: string | null = null;
+  uploadError: string | null = null;
+  uploadResult: LabelUploadResult | null = null;
+  selectedCsvFile: File | null = null;
+  uploading: boolean = false;
 
   constructor(private labelService: LabelService) { }
 
@@ -71,5 +77,43 @@ export class LabelsComponent implements OnInit {
         this.deleteError = `Failed to delete label "${labelName}". Please try again.`;
       }
     });
+  }
+
+  onCsvFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.selectedCsvFile = input.files?.item(0) ?? null;
+    this.uploadError = null;
+    this.uploadResult = null;
+  }
+
+  uploadLabelsCsv(): void {
+    if (!this.selectedCsvFile || this.uploading) return;
+
+    this.uploading = true;
+    this.uploadError = null;
+    this.uploadResult = null;
+
+    this.labelService.uploadLabelsCsv(this.selectedCsvFile).subscribe({
+      next: (result) => {
+        this.uploadResult = result;
+        this.uploading = false;
+        this.clearSelectedCsvFile();
+
+        if (result.successful > 0) {
+          this.loadLabels();
+        }
+      },
+      error: (error) => {
+        this.uploading = false;
+        this.uploadError = error.error?.detail ?? 'Failed to upload labels CSV. Please try again.';
+      }
+    });
+  }
+
+  private clearSelectedCsvFile(): void {
+    this.selectedCsvFile = null;
+    if (this.csvFileInput?.nativeElement) {
+      this.csvFileInput.nativeElement.value = '';
+    }
   }
 }

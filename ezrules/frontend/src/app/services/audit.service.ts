@@ -51,6 +51,7 @@ export interface LabelHistoryEntry {
   el_id: number;
   label: string;
   action: string;
+  details: string | null;
   changed: string | null;
   changed_by: string | null;
 }

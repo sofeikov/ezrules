@@ -182,6 +182,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 package-lock.json
+/test_labels.csv
 
 # Playwright
 ezrules/frontend/playwright-report/

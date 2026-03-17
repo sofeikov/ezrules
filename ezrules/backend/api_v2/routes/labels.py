@@ -33,6 +33,7 @@ from ezrules.core.audit_helpers import save_label_history
 from ezrules.core.labels import DatabaseLabelManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Label, TestingRecordLog, User
+from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/labels", tags=["Labels"])
 
@@ -44,9 +45,33 @@ router = APIRouter(prefix="/api/v2/labels", tags=["Labels"])
 
 def get_label_manager(db: Any) -> DatabaseLabelManager:
     """Get a label manager instance for the current organization."""
-    # For now, use o_id=1 as default. In multi-tenant setup, this would come from user context.
-    o_id = 1
-    return DatabaseLabelManager(db_session=db, o_id=o_id)
+    return DatabaseLabelManager(db_session=db, o_id=app_settings.ORG_ID)
+
+
+def get_unique_event_for_labeling(db: Any, event_id: str) -> TestingRecordLog:
+    """Load a single event in the active organization or raise a precise error."""
+    matches = (
+        db.query(TestingRecordLog)
+        .filter(
+            TestingRecordLog.event_id == event_id,
+            TestingRecordLog.o_id == app_settings.ORG_ID,
+        )
+        .limit(2)
+        .all()
+    )
+
+    if not matches:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Event with id '{event_id}' not found",
+        )
+    if len(matches) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Multiple events with id '{event_id}' found for the current organization",
+        )
+
+    return matches[0]
 
 
 def label_to_response(label: Label) -> LabelResponse:
@@ -258,13 +283,7 @@ def mark_event(
     event_id = request_data.event_id
     label_name = request_data.label_name.strip().upper()
 
-    # Find the event by event_id
-    event_record = db.query(TestingRecordLog).filter_by(event_id=event_id).first()
-    if not event_record:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Event with id '{event_id}' not found",
-        )
+    event_record = get_unique_event_for_labeling(db, event_id)
 
     # Find the label by name
     label = db.query(Label).filter_by(label=label_name).first()
@@ -276,6 +295,14 @@ def mark_event(
 
     # Update the event record with the label
     event_record.el_id = label.el_id
+    save_label_history(
+        db,
+        el_id=int(label.el_id),
+        label=label_name,
+        action="assigned",
+        changed_by=str(user.email) if user.email else None,
+        details=f"Event ID: {event_id}",
+    )
     db.commit()
 
     return MarkEventResponse(
@@ -328,8 +355,18 @@ async def upload_labels(
             detail="File is not valid UTF-8 encoded text.",
         ) from err
 
-    service = LabelUploadService(db)
+    service = LabelUploadService(db, org_id=app_settings.ORG_ID)
     result = service.upload_labels_from_csv(csv_content)
+
+    for assignment in result.applied_assignments:
+        save_label_history(
+            db,
+            el_id=assignment.label_id,
+            label=assignment.label_name,
+            action="assigned_via_csv",
+            changed_by=str(user.email) if user.email else None,
+            details=f"Event ID: {assignment.event_id}",
+        )
 
     db.commit()
 

@@ -77,7 +77,7 @@ Use API labeling only for integrations or batch automation.
 
 1. Open **Labels**.
 2. Confirm label names exist (for example `FRAUD`, `NORMAL`, `CHARGEBACK`).
-3. If your deployment exposes CSV upload in the UI, upload rows like:
+3. Upload rows like:
 
 ```csv
 txn_001,FRAUD

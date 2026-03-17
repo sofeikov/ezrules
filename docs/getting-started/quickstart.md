@@ -126,7 +126,7 @@ Checkpoint:
 5. Open **Settings → General**, add curated outcome→label pairs to track
 6. Open **Rule Quality** and confirm pair metrics load for curated pairs
 
-If your deployment supports CSV upload in the Labels UI, upload a small label file and recheck charts.
+You can also upload a small `event_id,label_name` CSV in **Labels** and recheck the charts.
 
 ---
 

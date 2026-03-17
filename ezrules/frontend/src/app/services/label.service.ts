@@ -20,6 +20,18 @@ interface LabelMutationResponse {
   label?: LabelListItem;
 }
 
+export interface LabelUploadError {
+  row: number;
+  error: string;
+}
+
+export interface LabelUploadResult {
+  total_rows: number;
+  successful: number;
+  failed: number;
+  errors: LabelUploadError[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -50,5 +62,11 @@ export class LabelService {
     return this.http.delete<LabelMutationResponse>(`${this.apiUrl}/${labelName}`).pipe(
       map(response => ({ message: response.message }))
     );
+  }
+
+  uploadLabelsCsv(file: File): Observable<LabelUploadResult> {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    return this.http.post<LabelUploadResult>(`${this.apiUrl}/upload`, formData);
   }
 }

@@ -113,6 +113,7 @@ def label_history_to_response(history: LabelHistory) -> LabelHistoryEntry:
         el_id=int(history.el_id),
         label=str(history.label),
         action=str(history.action),
+        details=str(history.details) if history.details else None,
         changed=history.changed if history.changed is not None else None,  # type: ignore[arg-type]
         changed_by=str(history.changed_by) if history.changed_by else None,
     )

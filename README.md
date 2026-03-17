@@ -233,7 +233,7 @@ curl -X POST http://localhost:8888/api/v2/labels/mark-event \
   -d '{"event_id": "txn_123", "label_name": "FRAUD"}'
 ```
 
-**Bulk CSV Upload**: Upload CSV files through the web interface for batch labeling (no header row)
+**Bulk CSV Upload**: Upload CSV files from the **Labels** page for batch labeling with per-row success/error reporting (no header row)
 ```csv
 txn_456,NORMAL
 txn_789,CHARGEBACK
@@ -273,6 +273,7 @@ Use the **Rule Quality** page to evaluate underperforming rules from labeled eve
 Default lookback for Rule Quality can be configured in **Settings → General** and is stored as a runtime setting.
 Curated rule-quality pairs are also managed in **Settings → General** and drive which pairs appear in reports.
 `uv run ezrules reset-dev` now seeds a demo-ready curated pair set: `RELEASE -> CHARGEBACK`, `HOLD -> CHARGEBACK`, and `CANCEL -> FRAUD`.
+It also writes a root-level `test_labels.csv` from the seeded labeled events so the Labels upload flow has a ready-made file after each reset.
 
 ### Bombardment with Fraud Labels
 
