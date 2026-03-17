@@ -1,8 +1,19 @@
 import csv
 import io
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from ezrules.core.application_context import get_organization_id
 from ezrules.models.backend_core import Label, TestingRecordLog
+
+
+@dataclass
+class AppliedLabelAssignment:
+    """A successful label assignment applied from an upload row."""
+
+    row_number: int
+    event_id: str
+    label_name: str
+    label_id: int
 
 
 @dataclass
@@ -12,6 +23,7 @@ class LabelUploadResult:
     success_count: int
     error_count: int
     errors: list[str]
+    applied_assignments: list[AppliedLabelAssignment] = field(default_factory=list)
 
 
 @dataclass
@@ -28,8 +40,9 @@ class ParsedRow:
 class LabelUploadService:
     """Service for handling CSV label upload operations"""
 
-    def __init__(self, db_session):
+    def __init__(self, db_session, org_id: int | None = None):
         self.db_session = db_session
+        self.org_id = org_id if org_id is not None else (get_organization_id() or 1)
 
     def parse_csv_content(self, csv_content: str) -> tuple[list[ParsedRow], list[str]]:
         """Parse CSV content and validate format"""
@@ -67,16 +80,32 @@ class LabelUploadService:
         """Process the actual label assignments to events"""
         success_count = 0
         error_count = 0
-        errors = []
+        errors: list[str] = []
+        applied_assignments: list[AppliedLabelAssignment] = []
 
         for row in parsed_rows:
             try:
-                # Find the event by event_id
-                event_record = self.db_session.query(TestingRecordLog).filter_by(event_id=row.event_id).first()
-                if not event_record:
+                # Find the event by event_id within the current organization.
+                event_records = (
+                    self.db_session.query(TestingRecordLog)
+                    .filter(
+                        TestingRecordLog.event_id == row.event_id,
+                        TestingRecordLog.o_id == self.org_id,
+                    )
+                    .limit(2)
+                    .all()
+                )
+                if not event_records:
                     error_count += 1
                     errors.append(f"Row {row.row_number}: Event with id '{row.event_id}' not found")
                     continue
+                if len(event_records) > 1:
+                    error_count += 1
+                    errors.append(
+                        f"Row {row.row_number}: Multiple events with id '{row.event_id}' found for the current organization"
+                    )
+                    continue
+                event_record = event_records[0]
 
                 # Find the label from cache
                 label = label_cache.get(row.label_name)
@@ -88,12 +117,25 @@ class LabelUploadService:
                 # Update the event record with the label
                 event_record.el_id = label.el_id
                 success_count += 1
+                applied_assignments.append(
+                    AppliedLabelAssignment(
+                        row_number=row.row_number,
+                        event_id=row.event_id,
+                        label_name=row.label_name,
+                        label_id=int(label.el_id),
+                    )
+                )
 
             except Exception as e:
                 error_count += 1
                 errors.append(f"Row {row.row_number}: Database error - {str(e)}")
 
-        return LabelUploadResult(success_count=success_count, error_count=error_count, errors=errors)
+        return LabelUploadResult(
+            success_count=success_count,
+            error_count=error_count,
+            errors=errors,
+            applied_assignments=applied_assignments,
+        )
 
     def upload_labels_from_csv(self, csv_content: str) -> LabelUploadResult:
         """Complete workflow for uploading labels from CSV content"""
@@ -113,5 +155,8 @@ class LabelUploadService:
         all_errors = format_errors + result.errors
 
         return LabelUploadResult(
-            success_count=result.success_count, error_count=result.error_count + len(format_errors), errors=all_errors
+            success_count=result.success_count,
+            error_count=result.error_count + len(format_errors),
+            errors=all_errors,
+            applied_assignments=result.applied_assignments,
         )

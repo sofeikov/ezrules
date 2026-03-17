@@ -143,7 +143,8 @@ class LabelHistoryEntry(BaseModel):
     id: int = Field(..., description="History entry ID")
     el_id: int = Field(..., description="Label ID")
     label: str = Field(..., description="Label name")
-    action: str = Field(..., description="Action type (created, deleted)")
+    action: str = Field(..., description="Action type (created, deleted, assigned, assigned_via_csv)")
+    details: str | None = Field(default=None, description="Additional details about the action")
     changed: datetime | None = Field(default=None, description="When this action occurred")
     changed_by: str | None = Field(default=None, description="Who performed this action")
 

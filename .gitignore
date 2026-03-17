@@ -182,6 +182,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 package-lock.json
+/test_labels.csv
 !ezrules/frontend/package-lock.json
 
 # Playwright

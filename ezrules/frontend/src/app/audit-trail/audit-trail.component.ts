@@ -224,4 +224,11 @@ export class AuditTrailComponent implements OnInit {
     if (action === 'deleted') return 'bg-red-100 text-red-800';
     return 'bg-blue-100 text-blue-800';
   }
+
+  labelActionClass(action: string): string {
+    if (action === 'created') return 'bg-green-100 text-green-800';
+    if (action === 'deleted') return 'bg-red-100 text-red-800';
+    if (action === 'assigned' || action === 'assigned_via_csv') return 'bg-blue-100 text-blue-800';
+    return 'bg-gray-100 text-gray-800';
+  }
 }

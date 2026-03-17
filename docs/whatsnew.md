@@ -1,9 +1,12 @@
 # What's New
 
 
-## v0.24.2
+## v0.24.3
 
 * **Label-aware backtesting**: Backtest task results on the Rule Detail page now include historical label counts plus stored/proposed precision, recall, and F1 by outcome→label pair when labeled events exist in the backtest window.
+* **Labels CSV upload in Angular UI**: The Labels page now includes a dedicated CSV upload panel with row-level success/error feedback, so batch labeling no longer depends on the retired Flask templates.
+* **Assignment audit trail for labels**: Manual labeling and CSV uploads now record label-history entries with event details, and label assignment lookups are scoped to the active organization instead of the first matching `event_id`.
+* **Reset-dev CSV seed file**: `uv run ezrules reset-dev` now writes a root-level `test_labels.csv` from the generated labeled events, so every fresh dev reset leaves behind a ready-to-upload Labels CSV.
 
 
 ## v0.24.1

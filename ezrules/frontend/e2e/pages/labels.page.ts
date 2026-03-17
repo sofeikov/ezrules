@@ -1,4 +1,5 @@
 import { Page, Locator } from '@playwright/test';
+import { Buffer } from 'node:buffer';
 
 /**
  * Page Object Model for the Labels management page.
@@ -9,6 +10,11 @@ export class LabelsPage {
   readonly heading: Locator;
   readonly labelInput: Locator;
   readonly addLabelButton: Locator;
+  readonly csvInput: Locator;
+  readonly uploadCsvButton: Locator;
+  readonly uploadResult: Locator;
+  readonly uploadSummary: Locator;
+  readonly uploadErrors: Locator;
   readonly loadingSpinner: Locator;
   readonly errorMessage: Locator;
   readonly labelCountText: Locator;
@@ -18,6 +24,11 @@ export class LabelsPage {
     this.heading = page.locator('h1');
     this.labelInput = page.locator('input[placeholder="Enter label name"]');
     this.addLabelButton = page.locator('button:has-text("Add Label")');
+    this.csvInput = page.locator('[data-testid="labels-csv-input"]');
+    this.uploadCsvButton = page.locator('[data-testid="labels-csv-upload-button"]');
+    this.uploadResult = page.locator('[data-testid="labels-csv-upload-result"]');
+    this.uploadSummary = page.locator('[data-testid="labels-csv-upload-summary"]');
+    this.uploadErrors = page.locator('[data-testid="labels-csv-upload-errors"]');
     this.loadingSpinner = page.locator('.animate-spin');
     this.errorMessage = page.locator('.bg-red-50.border-red-200');
     this.labelCountText = page.locator('text=/\\d+ labels? total/');
@@ -59,6 +70,18 @@ export class LabelsPage {
   async addLabel(name: string) {
     await this.labelInput.fill(name);
     await this.addLabelButton.click();
+  }
+
+  /**
+   * Select a CSV payload and submit it through the upload form.
+   */
+  async uploadCsvContent(content: string, fileName: string = 'labels.csv') {
+    await this.csvInput.setInputFiles({
+      name: fileName,
+      mimeType: 'text/csv',
+      buffer: Buffer.from(content, 'utf-8'),
+    });
+    await this.uploadCsvButton.click();
   }
 
   /**

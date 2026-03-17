@@ -67,12 +67,14 @@ def save_label_history(
     label: str,
     action: str,
     changed_by: str | None = None,
+    details: str | None = None,
 ) -> None:
     """Record an audit entry for a label action."""
     history = LabelHistory(
         el_id=el_id,
         label=label,
         action=action,
+        details=details,
         changed=datetime.datetime.now(datetime.UTC),
         changed_by=changed_by,
     )

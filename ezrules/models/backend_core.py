@@ -440,6 +440,7 @@ class LabelHistory(Base):
     el_id = Column(Integer, nullable=False)
     label = Column(String, nullable=False)
     action = Column(String, nullable=False)  # created, deleted
+    details = Column(String, nullable=True)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
 
