@@ -42,7 +42,13 @@ class LabelUploadService:
 
     def __init__(self, db_session, org_id: int | None = None):
         self.db_session = db_session
-        self.org_id = org_id if org_id is not None else get_organization_id()
+        self.org_id = org_id
+
+    def _resolved_org_id(self) -> int:
+        org_id = self.org_id if self.org_id is not None else get_organization_id()
+        if org_id is None:
+            raise RuntimeError("An organization context is required for label upload operations.")
+        return org_id
 
     def parse_csv_content(self, csv_content: str) -> tuple[list[ParsedRow], list[str]]:
         """Parse CSV content and validate format"""
@@ -71,7 +77,7 @@ class LabelUploadService:
 
     def get_label_cache(self) -> dict[str, Label]:
         """Get a dictionary mapping label names to Label objects"""
-        all_labels = self.db_session.query(Label).all()
+        all_labels = self.db_session.query(Label).filter(Label.o_id == self._resolved_org_id()).all()
         return {str(label.label).upper(): label for label in all_labels}
 
     def process_label_assignments(
@@ -85,12 +91,13 @@ class LabelUploadService:
 
         for row in parsed_rows:
             try:
+                org_id = self._resolved_org_id()
                 # Find the event by event_id within the current organization.
                 event_records = (
                     self.db_session.query(TestingRecordLog)
                     .filter(
                         TestingRecordLog.event_id == row.event_id,
-                        TestingRecordLog.o_id == self.org_id,
+                        TestingRecordLog.o_id == org_id,
                     )
                     .limit(2)
                     .all()

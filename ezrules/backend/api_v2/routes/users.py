@@ -200,7 +200,7 @@ def create_user(
 
     # Assign roles if provided
     if user_data.role_ids:
-        roles = db.query(Role).filter(Role.id.in_(user_data.role_ids)).all()
+        roles = db.query(Role).filter(Role.o_id == current_org_id, Role.id.in_(user_data.role_ids)).all()
         if len(roles) != len(user_data.role_ids):
             found_ids = {r.id for r in roles}
             missing_ids = [rid for rid in user_data.role_ids if rid not in found_ids]
@@ -220,6 +220,7 @@ def create_user(
         user_id=int(new_user.id),
         user_email=str(new_user.email),
         action="created",
+        o_id=current_org_id,
         changed_by=str(user.email),
     )
     db.commit()
@@ -282,7 +283,7 @@ def invite_user(
         target_user.active = False
 
     if invite_data.role_ids:
-        roles = db.query(Role).filter(Role.id.in_(invite_data.role_ids)).all()
+        roles = db.query(Role).filter(Role.o_id == current_org_id, Role.id.in_(invite_data.role_ids)).all()
         if len(roles) != len(invite_data.role_ids):
             found_ids = {int(r.id) for r in roles}
             missing_ids = [rid for rid in invite_data.role_ids if rid not in found_ids]
@@ -331,6 +332,7 @@ def invite_user(
         user_id=int(target_user.id),
         user_email=str(target_user.email),
         action="invited",
+        o_id=current_org_id,
         changed_by=str(user.email),
         details=f"invited_by={user.email}",
     )
@@ -413,6 +415,7 @@ def update_user(
             user_id=int(target_user.id),
             user_email=str(target_user.email),
             action="updated",
+            o_id=int(target_user.o_id),
             changed_by=str(user.email),
             details="; ".join(changes),
         )
@@ -468,6 +471,7 @@ def delete_user(
         user_id=target_id,
         user_email=target_email,
         action="deleted",
+        o_id=int(target_user.o_id),
         changed_by=str(user.email),
     )
 
@@ -512,7 +516,7 @@ def assign_role(
             detail=f"User with id {user_id} not found",
         )
 
-    role = db.query(Role).filter(Role.id == role_data.role_id).first()
+    role = db.query(Role).filter(Role.id == role_data.role_id, Role.o_id == current_org_id).first()
 
     if not role:
         raise HTTPException(
@@ -538,6 +542,7 @@ def assign_role(
         user_id=int(target_user.id),
         user_email=str(target_user.email),
         action="role_assigned",
+        o_id=int(target_user.o_id),
         changed_by=str(user.email),
         details=f"role: {role.name}",
     )
@@ -577,7 +582,7 @@ def remove_role(
             detail=f"User with id {user_id} not found",
         )
 
-    role = db.query(Role).filter(Role.id == role_id).first()
+    role = db.query(Role).filter(Role.id == role_id, Role.o_id == current_org_id).first()
 
     if not role:
         raise HTTPException(
@@ -603,6 +608,7 @@ def remove_role(
         user_id=int(target_user.id),
         user_email=str(target_user.email),
         action="role_removed",
+        o_id=int(target_user.o_id),
         changed_by=str(user.email),
         details=f"role: {role.name}",
     )

@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
@@ -132,6 +133,7 @@ def list_permissions(
 def list_roles(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RolesListResponse:
     """
@@ -140,7 +142,7 @@ def list_roles(
     Returns a list of all roles with user counts.
     Requires VIEW_ROLES permission.
     """
-    roles = db.query(Role).all()
+    roles = db.query(Role).filter(Role.o_id == current_org_id).all()
     roles_data = [role_to_list_item(r) for r in roles]
     return RolesListResponse(roles=roles_data)
 
@@ -155,6 +157,7 @@ def get_role(
     role_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RoleResponse:
     """
@@ -163,7 +166,7 @@ def get_role(
     Returns full role details including permissions.
     Requires VIEW_ROLES permission.
     """
-    role = db.query(Role).filter(Role.id == role_id).first()
+    role = db.query(Role).filter(Role.id == role_id, Role.o_id == current_org_id).first()
 
     if not role:
         raise HTTPException(
@@ -184,6 +187,7 @@ def create_role(
     role_data: RoleCreate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.CREATE_ROLE)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RoleMutationResponse:
     """
@@ -193,7 +197,7 @@ def create_role(
     Role name must be unique.
     """
     # Check if role name already exists
-    existing_role = db.query(Role).filter(Role.name == role_data.name).first()
+    existing_role = db.query(Role).filter(Role.o_id == current_org_id, Role.name == role_data.name).first()
     if existing_role:
         return RoleMutationResponse(
             success=False,
@@ -205,6 +209,7 @@ def create_role(
     new_role = Role(
         name=role_data.name,
         description=role_data.description,
+        o_id=current_org_id,
     )
 
     db.add(new_role)
@@ -212,7 +217,12 @@ def create_role(
     db.refresh(new_role)
 
     save_role_history(
-        db, role_id=int(new_role.id), role_name=str(new_role.name), action="created", changed_by=str(user.email)
+        db,
+        role_id=int(new_role.id),
+        role_name=str(new_role.name),
+        action="created",
+        o_id=current_org_id,
+        changed_by=str(user.email),
     )
     db.commit()
 
@@ -234,6 +244,7 @@ def update_role(
     role_data: RoleUpdate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_ROLE)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RoleMutationResponse:
     """
@@ -242,7 +253,7 @@ def update_role(
     Requires MODIFY_ROLE permission.
     Protected roles (admin, readonly, rule_editor) cannot be renamed.
     """
-    role = db.query(Role).filter(Role.id == role_id).first()
+    role = db.query(Role).filter(Role.id == role_id, Role.o_id == current_org_id).first()
 
     if not role:
         raise HTTPException(
@@ -261,7 +272,9 @@ def update_role(
     # Check if new name already exists
     changes: list[str] = []
     if role_data.name is not None:
-        existing = db.query(Role).filter(Role.name == role_data.name, Role.id != role_id).first()
+        existing = (
+            db.query(Role).filter(Role.o_id == current_org_id, Role.name == role_data.name, Role.id != role_id).first()
+        )
         if existing:
             return RoleMutationResponse(
                 success=False,
@@ -287,6 +300,7 @@ def update_role(
             role_id=int(role.id),
             role_name=str(role.name),
             action="updated",
+            o_id=current_org_id,
             changed_by=str(user.email),
             details="; ".join(changes),
         )
@@ -309,6 +323,7 @@ def delete_role(
     role_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.DELETE_ROLE)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RoleMutationResponse:
     """
@@ -318,7 +333,7 @@ def delete_role(
     Protected roles (admin, readonly, rule_editor) cannot be deleted.
     Roles with assigned users cannot be deleted.
     """
-    role = db.query(Role).filter(Role.id == role_id).first()
+    role = db.query(Role).filter(Role.id == role_id, Role.o_id == current_org_id).first()
 
     if not role:
         raise HTTPException(
@@ -344,7 +359,14 @@ def delete_role(
         )
 
     # Record audit before deletion
-    save_role_history(db, role_id=int(role.id), role_name=str(role.name), action="deleted", changed_by=str(user.email))
+    save_role_history(
+        db,
+        role_id=int(role.id),
+        role_name=str(role.name),
+        action="deleted",
+        o_id=current_org_id,
+        changed_by=str(user.email),
+    )
 
     # Delete role actions first
     db.query(RoleActions).filter(RoleActions.role_id == role_id).delete()
@@ -369,6 +391,7 @@ def get_role_permissions_endpoint(
     role_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RolePermissionsResponse:
     """
@@ -376,7 +399,7 @@ def get_role_permissions_endpoint(
 
     Requires VIEW_ROLES permission.
     """
-    role = db.query(Role).filter(Role.id == role_id).first()
+    role = db.query(Role).filter(Role.id == role_id, Role.o_id == current_org_id).first()
 
     if not role:
         raise HTTPException(
@@ -402,6 +425,7 @@ def update_role_permissions(
     permissions_data: RolePermissionsUpdate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MANAGE_PERMISSIONS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RolePermissionsResponse:
     """
@@ -410,7 +434,7 @@ def update_role_permissions(
     Replaces all existing permissions with the provided list.
     Requires MANAGE_PERMISSIONS permission.
     """
-    role = db.query(Role).filter(Role.id == role_id).first()
+    role = db.query(Role).filter(Role.id == role_id, Role.o_id == current_org_id).first()
 
     if not role:
         raise HTTPException(
@@ -471,6 +495,7 @@ def update_role_permissions(
         role_id=int(role.id),
         role_name=str(role.name),
         action="permissions_updated",
+        o_id=current_org_id,
         changed_by=str(user.email),
         details=details,
     )

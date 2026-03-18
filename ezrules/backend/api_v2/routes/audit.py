@@ -220,9 +220,11 @@ def get_audit_summary(
 
     total_user_list_actions = db.query(UserListHistory).filter(UserListHistory.o_id == current_org_id).count()
     total_outcome_actions = db.query(OutcomeHistory).filter(OutcomeHistory.o_id == current_org_id).count()
-    total_label_actions = db.query(LabelHistory).count()
-    total_user_account_actions = db.query(UserAccountHistory).count()
-    total_role_permission_actions = db.query(RolePermissionHistory).count()
+    total_label_actions = db.query(LabelHistory).filter(LabelHistory.o_id == current_org_id).count()
+    total_user_account_actions = db.query(UserAccountHistory).filter(UserAccountHistory.o_id == current_org_id).count()
+    total_role_permission_actions = (
+        db.query(RolePermissionHistory).filter(RolePermissionHistory.o_id == current_org_id).count()
+    )
     total_field_type_actions = db.query(FieldTypeHistory).filter(FieldTypeHistory.o_id == current_org_id).count()
     total_api_key_actions = db.query(ApiKeyHistory).filter(ApiKeyHistory.o_id == current_org_id).count()
 
@@ -466,6 +468,7 @@ def list_outcome_history(
 def list_label_history(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
     start_date: datetime | None = Query(default=None, description="Filter by start date"),
     end_date: datetime | None = Query(default=None, description="Filter by end date"),
@@ -478,7 +481,7 @@ def list_label_history(
     Returns all label changes with optional filtering.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    query = db.query(LabelHistory)
+    query = db.query(LabelHistory).filter(LabelHistory.o_id == current_org_id)
 
     if start_date:
         query = query.filter(LabelHistory.changed >= start_date)
@@ -505,6 +508,7 @@ def list_label_history(
 def list_user_account_history(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
     start_date: datetime | None = Query(default=None, description="Filter by start date"),
     end_date: datetime | None = Query(default=None, description="Filter by end date"),
@@ -518,7 +522,7 @@ def list_user_account_history(
     Returns all user account changes with optional filtering.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    query = db.query(UserAccountHistory)
+    query = db.query(UserAccountHistory).filter(UserAccountHistory.o_id == current_org_id)
 
     if start_date:
         query = query.filter(UserAccountHistory.changed >= start_date)
@@ -547,6 +551,7 @@ def list_user_account_history(
 def list_role_permission_history(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
     start_date: datetime | None = Query(default=None, description="Filter by start date"),
     end_date: datetime | None = Query(default=None, description="Filter by end date"),
@@ -560,7 +565,7 @@ def list_role_permission_history(
     Returns all role and permission changes with optional filtering.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    query = db.query(RolePermissionHistory)
+    query = db.query(RolePermissionHistory).filter(RolePermissionHistory.o_id == current_org_id)
 
     if start_date:
         query = query.filter(RolePermissionHistory.changed >= start_date)

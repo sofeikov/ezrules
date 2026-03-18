@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
+from ezrules.core.application_context import get_organization_id
 from ezrules.models.database import Base
 
 
@@ -50,13 +51,28 @@ class RoleMixin:
     """
 
     def __eq__(self, other):
-        return self.name == other or self.name == getattr(other, "name", None)
+        if isinstance(other, str):
+            return self.name == other
+
+        other_name = getattr(other, "name", None)
+        if other_name is None:
+            return False
+
+        self_id = getattr(self, "id", None)
+        other_id = getattr(other, "id", None)
+        if self_id is not None and other_id is not None:
+            return self_id == other_id
+
+        return self.name == other_name and getattr(self, "o_id", None) == getattr(other, "o_id", None)
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash(self.name)
+        role_id = getattr(self, "id", None)
+        if role_id is not None:
+            return hash(role_id)
+        return hash((self.name, getattr(self, "o_id", None)))
 
 
 class UserMixin:
@@ -86,12 +102,30 @@ class RolesUsers(Base):
     role_id = Column("role_id", Integer(), ForeignKey("role.id"))
 
 
+def _require_current_organization_id() -> int:
+    """Resolve org ownership from explicit context when a caller omits o_id."""
+    org_id = get_organization_id()
+    if org_id is None:
+        raise RuntimeError("An organization context is required when o_id is not provided explicitly.")
+    return org_id
+
+
 class Role(Base, RoleMixin):
     __tablename__ = "role"
+    __table_args__ = (UniqueConstraint("o_id", "name", name="uq_role_org_name"),)
+
     id = Column(Integer(), primary_key=True)
-    name = Column(String(80), unique=True)
+    name = Column(String(80), nullable=False)
     description = Column(String(255))
     permissions = Column(MutableList.as_mutable(AsaList()), nullable=True)
+    o_id = Column(
+        Integer(),
+        ForeignKey("organisation.o_id"),
+        nullable=False,
+        index=True,
+        default=_require_current_organization_id,
+    )
+    org: Mapped["Organisation"] = relationship(back_populates="roles")
 
 
 class User(Base, UserMixin):
@@ -150,6 +184,8 @@ class Organisation(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     users: Mapped[list["User"]] = relationship(back_populates="org")
+    roles: Mapped[list["Role"]] = relationship(back_populates="org")
+    labels: Mapped[list["Label"]] = relationship(back_populates="org")
     rules: Mapped[list["Rule"]] = relationship()
     re_configs: Mapped[list["RuleEngineConfig"]] = relationship()
 
@@ -226,9 +262,18 @@ class Rule(Base):
 
 class Label(Base):
     __tablename__ = "event_labels"
+    __table_args__ = (UniqueConstraint("o_id", "label", name="uq_event_labels_org_label"),)
 
     el_id = Column(Integer, unique=True, primary_key=True)
-    label = Column(String, unique=True, nullable=False)
+    label = Column(String, nullable=False)
+    o_id = Column(
+        Integer(),
+        ForeignKey("organisation.o_id"),
+        nullable=False,
+        index=True,
+        default=_require_current_organization_id,
+    )
+    org: Mapped["Organisation"] = relationship(back_populates="labels")
 
 
 class TestingRecordLog(Base):
@@ -445,6 +490,7 @@ class LabelHistory(Base):
     label = Column(String, nullable=False)
     action = Column(String, nullable=False)  # created, deleted
     details = Column(String, nullable=True)
+    o_id = Column(Integer, nullable=False)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
 
@@ -459,6 +505,7 @@ class UserAccountHistory(Base):
         String, nullable=False
     )  # created, updated, deleted, activated, deactivated, role_assigned, role_removed
     details = Column(String, nullable=True)
+    o_id = Column(Integer, nullable=False)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
 
@@ -471,6 +518,7 @@ class RolePermissionHistory(Base):
     role_name = Column(String, nullable=False)
     action = Column(String, nullable=False)  # created, updated, deleted, permissions_updated
     details = Column(String, nullable=True)
+    o_id = Column(Integer, nullable=False)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
 

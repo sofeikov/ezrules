@@ -5,7 +5,10 @@
 
 * **Org-aware manager JWTs**: Access tokens now include the authenticated user's organisation, and the API rejects access tokens whose org claim no longer matches the stored user membership.
 * **Core admin CRUD is org-scoped**: Users, outcomes, user lists, and field type configs/observations now resolve organisation context from auth instead of fixed org constants.
-* **Label usage is org-scoped**: Label assignment, CSV uploads, and label analytics now operate only on events in the caller's organisation, while the label catalog remains shared in this phase.
+* **Roles and labels are org-owned**: `Role` and `Label` now belong to an organisation, the same role/label name can exist in different orgs, and user-role assignment rejects cross-org roles.
+* **Label usage is org-scoped**: Label CRUD, assignment, CSV uploads, rule-quality label options, and label analytics now operate only on the caller's organisation.
+* **Audit trail org completion**: Label, user-account, and role-permission history now carry `o_id`, and the related audit summary/count endpoints only return the caller's organisation.
+* **Backtesting/bootstrap stop assuming org 1**: Backtest workers derive org context from the selected rule/request, and `init-db`, `init-permissions`, `add-user`, `generate-random-data`, and `reset-dev` now seed roles, labels, and rule-quality defaults in the provisioned organisation instead of a fixed global org.
 * **Fresh-init user ownership**: `User.o_id` is now mandatory, and fresh database/bootstrap flows create an organisation before creating users so clean rebuilds work with org-aware auth.
 
 ## v0.24.3

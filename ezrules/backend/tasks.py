@@ -20,14 +20,16 @@ app = Celery("tasks", backend=f"db+{app_settings.DB_ENDPOINT}", broker=app_setti
 
 
 @app.task
-def backtest_rule_change(r_id: int, new_rule_logic: str):
+def backtest_rule_change(r_id: int, new_rule_logic: str, org_id: int | None = None):
     rule_obj = db_session.get(RuleModel, r_id)
     if rule_obj is None:
         return {"error": f"Rule with id {r_id} not found"}
 
+    resolved_org_id = int(org_id) if org_id is not None else int(rule_obj.o_id)
+
     # Set up application context for background task
-    list_provider = PersistentUserListManager(db_session=db_session, o_id=app_settings.ORG_ID)
-    set_organization_id(app_settings.ORG_ID)
+    list_provider = PersistentUserListManager(db_session=db_session, o_id=resolved_org_id)
+    set_organization_id(resolved_org_id)
     set_user_list_manager(list_provider)
 
     try:
@@ -45,13 +47,14 @@ def backtest_rule_change(r_id: int, new_rule_logic: str):
     try:
         query = db_session.query(TestingRecordLog).filter(
             TestingRecordLog.created_at >= one_month_ago,
-            TestingRecordLog.o_id == app_settings.ORG_ID,
+            TestingRecordLog.o_id == resolved_org_id,
         )
     except Exception as e:
         return {"error": f"Failed to query test records: {e!s}"}
 
     label_lookup = {
-        int(label_id): str(label_name) for label_id, label_name in db_session.query(Label.el_id, Label.label)
+        int(label_id): str(label_name)
+        for label_id, label_name in db_session.query(Label.el_id, Label.label).filter(Label.o_id == resolved_org_id)
     }
 
     return compute_backtest_metrics(

@@ -198,7 +198,10 @@ def get_rule_quality_pair_options(
         .order_by(AllowedOutcome.severity_rank.asc(), AllowedOutcome.outcome_name.asc())
         .all()
     ]
-    labels = [str(item.label) for item in db.query(Label).order_by(Label.label.asc()).all()]
+    labels = [
+        str(item.label)
+        for item in db.query(Label).filter(Label.o_id == current_org_id).order_by(Label.label.asc()).all()
+    ]
     return RuleQualityPairOptionsResponse(
         outcomes=outcomes,
         labels=labels,
@@ -229,7 +232,15 @@ def create_rule_quality_pair(
             detail=f"Unknown outcome '{outcome}'",
         )
 
-    label_exists = db.query(Label).filter(func.upper(Label.label) == label.upper()).first() is not None
+    label_exists = (
+        db.query(Label)
+        .filter(
+            Label.o_id == current_org_id,
+            func.upper(Label.label) == label.upper(),
+        )
+        .first()
+        is not None
+    )
     if not label_exists:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

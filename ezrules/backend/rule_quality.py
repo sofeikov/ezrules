@@ -116,6 +116,7 @@ def compute_rule_quality_metrics(
         .join(Label, Label.el_id == TestingRecordLog.el_id)
         .join(RuleModel, RuleModel.r_id == TestingResultsLog.r_id)
         .filter(*base_filters)
+        .filter(Label.o_id == o_id if o_id is not None else sqlalchemy.true())
         .group_by(
             TestingResultsLog.r_id,
             RuleModel.rid,

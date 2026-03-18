@@ -35,7 +35,7 @@ def trigger_backtest(
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> BacktestTriggerResponse:
-    rule = db.get(RuleModel, request.r_id)
+    rule = db.query(RuleModel).filter(RuleModel.r_id == request.r_id, RuleModel.o_id == current_org_id).first()
     if rule is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -54,7 +54,7 @@ def trigger_backtest(
             detail=f"Invalid proposed rule logic: {e!s}",
         ) from e
 
-    task = backtest_rule_change.delay(request.r_id, request.new_rule_logic)
+    task = backtest_rule_change.delay(request.r_id, request.new_rule_logic, current_org_id)
 
     bt_result = RuleBackTestingResult(
         r_id=request.r_id,
@@ -77,7 +77,23 @@ def get_task_result(
     task_id: str,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
 ) -> BacktestTaskResult:
+    task_record = (
+        db.query(RuleBackTestingResult)
+        .join(RuleModel, RuleModel.r_id == RuleBackTestingResult.r_id)
+        .filter(
+            RuleBackTestingResult.task_id == task_id,
+        )
+        .first()
+    )
+    if task_record is not None and int(task_record.rule.o_id) != current_org_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Backtest task not found",
+        )
+
     result = AsyncResult(task_id, app=celery_app)
 
     if result.state == "PENDING":
@@ -113,8 +129,16 @@ def get_backtest_results(
     rule_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> BacktestResultsResponse:
+    rule = db.query(RuleModel).filter(RuleModel.r_id == rule_id).first()
+    if rule is not None and int(rule.o_id) != current_org_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Rule not found",
+        )
+
     results = (
         db.query(RuleBackTestingResult)
         .filter(RuleBackTestingResult.r_id == rule_id)

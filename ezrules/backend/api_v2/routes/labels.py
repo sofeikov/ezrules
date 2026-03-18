@@ -83,9 +83,16 @@ def label_to_response(label: Label) -> LabelResponse:
     )
 
 
-def get_label_by_name(db: Any, label_name: str) -> Label | None:
-    """Load a label by name using case-insensitive matching."""
-    return db.query(Label).filter(func.upper(Label.label) == label_name.strip().upper()).first()
+def get_label_by_name(db: Any, label_name: str, org_id: int) -> Label | None:
+    """Load a label by name within the active organization using case-insensitive matching."""
+    return (
+        db.query(Label)
+        .filter(
+            Label.o_id == org_id,
+            func.upper(Label.label) == label_name.strip().upper(),
+        )
+        .first()
+    )
 
 
 # =============================================================================
@@ -97,6 +104,7 @@ def get_label_by_name(db: Any, label_name: str) -> Label | None:
 def list_labels(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> LabelsListResponse:
     """
@@ -104,7 +112,7 @@ def list_labels(
 
     Returns a list of all labels that can be applied to events.
     """
-    labels = db.query(Label).all()
+    labels = db.query(Label).filter(Label.o_id == current_org_id).all()
 
     labels_data = [
         LabelListItem(
@@ -151,7 +159,7 @@ def create_label(
     label_manager.add_label(label_name)
 
     # Fetch the newly created label for the response
-    new_label = get_label_by_name(db, label_name)
+    new_label = get_label_by_name(db, label_name, current_org_id)
 
     if new_label:
         save_label_history(
@@ -159,6 +167,7 @@ def create_label(
             el_id=int(new_label.el_id),
             label=label_name,
             action="created",
+            o_id=current_org_id,
             changed_by=str(user.email) if user.email else None,
         )
         db.commit()
@@ -203,13 +212,14 @@ def create_labels_bulk(
 
     # Record audit entries for each created label
     for label_name in created:
-        label_obj = get_label_by_name(db, label_name)
+        label_obj = get_label_by_name(db, label_name, current_org_id)
         if label_obj:
             save_label_history(
                 db,
                 el_id=int(label_obj.el_id),
                 label=label_name,
                 action="created",
+                o_id=current_org_id,
                 changed_by=str(user.email) if user.email else None,
             )
     if created:
@@ -252,7 +262,7 @@ def delete_label(
         )
 
     # Get label ID before deletion
-    label_obj = get_label_by_name(db, label_name)
+    label_obj = get_label_by_name(db, label_name, current_org_id)
     el_id = int(label_obj.el_id) if label_obj else 0
 
     save_label_history(
@@ -260,6 +270,7 @@ def delete_label(
         el_id=el_id,
         label=label_name,
         action="deleted",
+        o_id=current_org_id,
         changed_by=str(user.email) if user.email else None,
     )
 
@@ -296,7 +307,7 @@ def mark_event(
     event_record = get_unique_event_for_labeling(db, event_id, current_org_id)
 
     # Find the label by name
-    label = get_label_by_name(db, label_name)
+    label = get_label_by_name(db, label_name, current_org_id)
     if not label:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -310,6 +321,7 @@ def mark_event(
         el_id=int(label.el_id),
         label=label_name,
         action="assigned",
+        o_id=current_org_id,
         changed_by=str(user.email) if user.email else None,
         details=f"Event ID: {event_id}",
     )
@@ -375,6 +387,7 @@ async def upload_labels(
             el_id=assignment.label_id,
             label=assignment.label_name,
             action="assigned_via_csv",
+            o_id=current_org_id,
             changed_by=str(user.email) if user.email else None,
             details=f"Event ID: {assignment.event_id}",
         )

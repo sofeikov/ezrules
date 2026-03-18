@@ -261,6 +261,7 @@ def accept_invite(
         user_id=int(user.id),
         user_email=str(user.email),
         action="invitation_accepted",
+        o_id=int(user.o_id),
         changed_by=str(user.email),
     )
     db.commit()
@@ -351,6 +352,7 @@ def reset_password(
         user_id=int(user.id),
         user_email=str(user.email),
         action="password_reset",
+        o_id=int(user.o_id),
         changed_by=str(user.email),
     )
     db.commit()
