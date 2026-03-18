@@ -8,6 +8,7 @@ from ezrules.core.rule_helpers import (
     DollarNotationConverter,
     RuleParamExtractor,
 )
+from ezrules.core.user_lists import AbstractUserListManager
 from ezrules.models.backend_core import Rule as RuleModel
 
 
@@ -29,6 +30,7 @@ class Rule:
         description: str | None = None,
         params: list[str] | None = None,
         r_id: int | None = None,
+        list_values_provider: AbstractUserListManager | None = None,
     ) -> None:
         """
         Creates a rule object.
@@ -43,6 +45,7 @@ class Rule:
         self.rid = rid
         self.description = description
         self.params = params
+        self._list_values_provider = list_values_provider
         # Compiled rule function
         self._compiled_rule = None
         # AST representation of the compiled function
@@ -79,7 +82,7 @@ class Rule:
         # across concurrent API requests.
         post_proc_logic = DollarNotationConverter().transform_rule(logic)
         # Get the list provider from application context
-        list_provider = get_user_list_manager()
+        list_provider = self._list_values_provider or get_user_list_manager()
         at_converter = AtNotationConverter(list_values_provider=list_provider)
         post_proc_logic = at_converter.transform_rule(post_proc_logic)
         code = self._wrap_with_function_header(post_proc_logic)
@@ -113,13 +116,14 @@ class Rule:
 
 class RuleFactory:
     @staticmethod
-    def from_json(rule_config) -> Rule:
+    def from_json(rule_config, list_values_provider: AbstractUserListManager | None = None) -> Rule:
         rule = Rule(
             logic=rule_config[Fields.LOGIC],
             description=rule_config.get(Fields.DESCRIPTION),
             rid=rule_config.get(Fields.RID),
             params=rule_config.get(Fields.PARAMS, ()),
             r_id=rule_config.get(Fields.R_ID),
+            list_values_provider=list_values_provider,
         )
         return rule
 

@@ -161,13 +161,14 @@ class RuntimeSetting(Base):
     __tablename__ = "runtime_settings"
 
     key = Column(String(100), primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), primary_key=True)
     value_type = Column(String(20), nullable=False)
     value = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
 
     def __repr__(self):
-        return f"<RuntimeSetting key={self.key} value_type={self.value_type} value={self.value}>"
+        return f"<RuntimeSetting key={self.key} o_id={self.o_id} value_type={self.value_type} value={self.value}>"
 
 
 class RuleEngineConfig(Base):

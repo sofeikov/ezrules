@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
@@ -19,6 +20,7 @@ from ezrules.backend.tasks import app as celery_app
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import Rule
+from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.backend_core import RuleBackTestingResult, User
 
@@ -30,6 +32,7 @@ def trigger_backtest(
     request: BacktestRequest,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> BacktestTriggerResponse:
     rule = db.get(RuleModel, request.r_id)
@@ -40,7 +43,11 @@ def trigger_backtest(
         )
 
     try:
-        Rule(rid="", logic=request.new_rule_logic)
+        Rule(
+            rid="",
+            logic=request.new_rule_logic,
+            list_values_provider=PersistentUserListManager(db, current_org_id),
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

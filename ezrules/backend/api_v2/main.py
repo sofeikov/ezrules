@@ -4,12 +4,16 @@ FastAPI application for ezrules API v2.
 This is the main entry point for the new FastAPI-based API.
 """
 
+import hashlib
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import JSONResponse
 
+from ezrules.backend.api_v2.auth.dependencies import SessionLocal, _bind_request_org_context
+from ezrules.backend.api_v2.auth.jwt import decode_token
 from ezrules.backend.api_v2.routes import (
     analytics,
     api_keys,
@@ -28,8 +32,8 @@ from ezrules.backend.api_v2.routes import (
     user_lists,
     users,
 )
-from ezrules.core.application_context import set_organization_id, set_user_list_manager
-from ezrules.core.user_lists import PersistentUserListManager
+from ezrules.core.application_context import reset_context
+from ezrules.models.backend_core import ApiKey, User
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
@@ -65,25 +69,37 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
 app.add_middleware(BodySizeLimitMiddleware)
 
 
+def _prime_request_context_from_headers(request: StarletteRequest, db) -> None:
+    """Best-effort context binding before sync dependency/route execution starts."""
+    api_key = request.headers.get("X-API-Key")
+    if api_key:
+        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        db_key = db.query(ApiKey).filter(ApiKey.key_hash == key_hash, ApiKey.revoked_at.is_(None)).first()
+        if db_key is not None:
+            _bind_request_org_context(db, int(db_key.o_id))
+            return
+
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        payload = decode_token(auth_header.removeprefix("Bearer ").strip())
+        if payload is not None and payload.token_type == "access" and payload.org_id is not None:
+            user = db.query(User).filter(User.id == payload.user_id).first()
+            if user is not None and user.active and int(user.o_id) == payload.org_id:
+                _bind_request_org_context(db, int(user.o_id))
+
+
 @app.middleware("http")
 async def cleanup_scoped_db_session(request: StarletteRequest, call_next):
-    """Release any connection checked out via the global scoped session."""
+    """Release request-local context and any checked-out scoped DB session."""
+    context_db = db_session if app_settings.TESTING else SessionLocal()
     try:
+        _prime_request_context_from_headers(request, context_db)
         return await call_next(request)
     finally:
+        reset_context()
         if not app_settings.TESTING:
+            context_db.close()
             db_session.remove()
-
-
-# =============================================================================
-# INITIALIZE APPLICATION CONTEXT
-# =============================================================================
-# Set up the user list manager so rule parsing can resolve @ListName references.
-# Without this, the AtNotationConverter falls back to the StaticUserListManager
-# which only knows about a few hardcoded lists.
-_user_list_manager = PersistentUserListManager(db_session=db_session, o_id=app_settings.ORG_ID)
-set_organization_id(app_settings.ORG_ID)
-set_user_list_manager(_user_list_manager)
 
 
 @app.get("/ping")

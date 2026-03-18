@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Query
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
@@ -16,7 +17,6 @@ from ezrules.backend.api_v2.schemas.tested_events import TestedEventItem, Tested
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import Rule as ParsedRule
 from ezrules.models.backend_core import Rule, TestingRecordLog, TestingResultsLog, User
-from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/tested-events", tags=["Tested Events"])
 
@@ -39,17 +39,18 @@ def list_tested_events(
     ),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> TestedEventsResponse:
     """Return the most recently stored event evaluations with triggered rules."""
     records = (
         db.query(TestingRecordLog)
-        .filter(TestingRecordLog.o_id == app_settings.ORG_ID)
+        .filter(TestingRecordLog.o_id == current_org_id)
         .order_by(TestingRecordLog.tl_id.desc())
         .limit(limit)
         .all()
     )
-    total = db.query(TestingRecordLog).filter(TestingRecordLog.o_id == app_settings.ORG_ID).count()
+    total = db.query(TestingRecordLog).filter(TestingRecordLog.o_id == current_org_id).count()
 
     triggered_rules_by_tl: dict[int, list[TriggeredRuleItem]] = defaultdict(list)
     referenced_fields_by_rule_id: dict[int, list[str]] = {}

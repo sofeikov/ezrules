@@ -16,14 +16,13 @@ from pydantic import BaseModel
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
-from ezrules.core.application_context import get_organization_id
 from ezrules.core.audit_helpers import save_api_key_history
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import ApiKey, User
-from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/api-keys", tags=["API Keys"])
 
@@ -61,13 +60,13 @@ def create_api_key(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MANAGE_API_KEYS)),
+    current_org_id: int = Depends(get_current_org_id),
 ) -> CreateApiKeyResponse:
     """
     Create a new API key.
 
     The raw key is returned exactly once. Store it securely — it cannot be retrieved again.
     """
-    o_id = get_organization_id() or app_settings.ORG_ID
     raw_key = "ezrk_" + secrets.token_hex(32)
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
     gid = str(uuid.uuid4())
@@ -76,7 +75,7 @@ def create_api_key(
         gid=gid,
         key_hash=key_hash,
         label=request_data.label,
-        o_id=o_id,
+        o_id=current_org_id,
     )
     db.add(api_key)
     db.flush()
@@ -86,7 +85,7 @@ def create_api_key(
         api_key_gid=gid,
         label=request_data.label,
         action="created",
-        o_id=o_id,
+        o_id=current_org_id,
         changed_by=str(current_user.email),
     )
 
@@ -106,14 +105,14 @@ def create_api_key(
 def list_api_keys(
     db: Any = Depends(get_db),
     _: None = Depends(require_permission(PermissionAction.MANAGE_API_KEYS)),
+    current_org_id: int = Depends(get_current_org_id),
 ) -> list[ApiKeyResponse]:
     """
     List all active (non-revoked) API keys for the organisation.
 
     Raw key values are never returned.
     """
-    o_id = get_organization_id() or app_settings.ORG_ID
-    keys = db.query(ApiKey).filter(ApiKey.o_id == o_id, ApiKey.revoked_at.is_(None)).all()
+    keys = db.query(ApiKey).filter(ApiKey.o_id == current_org_id, ApiKey.revoked_at.is_(None)).all()
     return [
         ApiKeyResponse(
             gid=str(k.gid),
@@ -131,6 +130,7 @@ def revoke_api_key(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MANAGE_API_KEYS)),
+    current_org_id: int = Depends(get_current_org_id),
 ) -> None:
     """
     Revoke an API key by its GID.
@@ -138,8 +138,7 @@ def revoke_api_key(
     Sets revoked_at to the current timestamp. The row is retained for audit purposes.
     Subsequent authenticate attempts with this key will return 401.
     """
-    o_id = get_organization_id() or app_settings.ORG_ID
-    api_key = db.query(ApiKey).filter(ApiKey.gid == gid, ApiKey.o_id == o_id).first()
+    api_key = db.query(ApiKey).filter(ApiKey.gid == gid, ApiKey.o_id == current_org_id).first()
     if api_key is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -157,7 +156,7 @@ def revoke_api_key(
         api_key_gid=gid,
         label=str(api_key.label),
         action="revoked",
-        o_id=o_id,
+        o_id=current_org_id,
         changed_by=str(current_user.email),
     )
 

@@ -37,7 +37,9 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import joinedload, sessionmaker
 
 from ezrules.backend.api_v2.auth.jwt import decode_token
+from ezrules.core.application_context import set_organization_id, set_user_list_manager
 from ezrules.core.permissions_constants import PermissionAction
+from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import Action, ApiKey, RoleActions, User
 from ezrules.models.database import db_session, engine
 from ezrules.settings import app_settings
@@ -87,6 +89,13 @@ def get_db() -> Any:
 # =============================================================================
 # USER AUTHENTICATION DEPENDENCIES
 # =============================================================================
+
+
+def _bind_request_org_context(db: Any, org_id: int) -> int:
+    """Bind org-scoped helpers into request-local context."""
+    set_organization_id(org_id)
+    set_user_list_manager(PersistentUserListManager(db_session=db, o_id=org_id))
+    return org_id
 
 
 def get_current_user(
@@ -158,8 +167,9 @@ def get_current_user(
     return user
 
 
-def get_current_active_user(
+async def get_current_active_user(
     user: User = Depends(get_current_user),
+    db: Any = Depends(get_db),
 ) -> User:
     """
     Get the current user and verify they're active.
@@ -186,6 +196,7 @@ def get_current_active_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is disabled",
         )
+    _bind_request_org_context(db, int(user.o_id))
     return user
 
 
@@ -239,8 +250,9 @@ def get_current_user_strict(
     return user
 
 
-def get_current_active_user_strict(
+async def get_current_active_user_strict(
     user: User = Depends(get_current_user_strict),
+    db: Any = Depends(get_db),
 ) -> User:
     """
     Get the current user and verify they're active (strict mode).
@@ -262,6 +274,7 @@ def get_current_active_user_strict(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is disabled",
         )
+    _bind_request_org_context(db, int(user.o_id))
     return user
 
 
@@ -367,7 +380,7 @@ def get_evaluator_auth(
     api_key: str | None = Header(default=None, alias="X-API-Key"),
     token: str | None = Depends(oauth2_scheme),
     db: Any = Depends(get_db),
-) -> None:
+) -> int:
     """
     Authentication dependency for the evaluate endpoint.
 
@@ -378,7 +391,7 @@ def get_evaluator_auth(
         key_hash = hashlib.sha256(api_key.encode()).hexdigest()
         db_key = db.query(ApiKey).filter(ApiKey.key_hash == key_hash, ApiKey.revoked_at.is_(None)).first()
         if db_key:
-            return None
+            return int(db_key.o_id)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or revoked API key",
@@ -386,10 +399,10 @@ def get_evaluator_auth(
 
     if token is not None:
         payload = decode_token(token)
-        if payload is not None and payload.token_type == "access":
+        if payload is not None and payload.token_type == "access" and payload.org_id is not None:
             user = db.query(User).filter(User.id == payload.user_id).first()
-            if user is not None and user.active:
-                return None
+            if user is not None and user.active and int(user.o_id) == payload.org_id:
+                return int(user.o_id)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -400,6 +413,14 @@ def get_evaluator_auth(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Authentication required",
     )
+
+
+async def get_current_evaluator_org_id(
+    org_id: int = Depends(get_evaluator_auth),
+    db: Any = Depends(get_db),
+) -> int:
+    """Bind evaluator org context in the async request task before sync execution hops."""
+    return _bind_request_org_context(db, org_id)
 
 
 def require_any_permission(*actions: PermissionAction) -> Callable[..., None]:

@@ -6,16 +6,16 @@ from typing import cast
 from sqlalchemy.exc import NoResultFound
 
 from ezrules.core.rule import Rule, RuleConverter, RuleFactory
+from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import (
-    Organisation,
+    Rule as RuleModel,
+)
+from ezrules.models.backend_core import (
     RuleEngineConfig,
     RuleEngineConfigHistory,
     RuleHistory,
     RuleStatus,
     ShadowResultsLog,
-)
-from ezrules.models.backend_core import (
-    Rule as RuleModel,
 )
 
 RuleRevision = namedtuple("RuleRevision", ["revision_number", "created"])
@@ -117,7 +117,7 @@ class RDBRuleManager(RuleManager):
     def get_rule_revision_list(self, rule: Rule, return_dates=False) -> list[RuleRevision]:
         revisions = (
             self.db.query(RuleHistory.version, RuleHistory.changed, RuleHistory.created_at)
-            .filter(RuleHistory.r_id == rule.r_id)
+            .filter(RuleHistory.r_id == rule.r_id, RuleHistory.o_id == self.o_id)
             .order_by(RuleHistory.version)
             .all()
         )
@@ -132,19 +132,24 @@ class RDBRuleManager(RuleManager):
 
     def load_rule(self, rule_id: int, revision_number: int | None = None) -> RuleModel:
         if revision_number is None:
-            latest_records = self.db.get(RuleModel, rule_id)
+            latest_records = (
+                self.db.query(RuleModel).filter(RuleModel.r_id == rule_id, RuleModel.o_id == self.o_id).first()
+            )
         else:
             latest_records = (
                 self.db.query(RuleHistory)
-                .filter(RuleHistory.r_id == rule_id, RuleHistory.version == revision_number)
+                .filter(
+                    RuleHistory.r_id == rule_id,
+                    RuleHistory.version == revision_number,
+                    RuleHistory.o_id == self.o_id,
+                )
                 .order_by(RuleHistory.version)
                 .one()
             )
         return latest_records
 
     def load_all_rules(self) -> list[RuleModel]:
-        org = self.db.get(Organisation, self.o_id)
-        return org.rules
+        return self.db.query(RuleModel).filter(RuleModel.o_id == self.o_id).all()
 
 
 class AbstractRuleEngineConfigProducer(ABC):
@@ -161,7 +166,8 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
     def save_config(self, rule_manager: RuleManager, changed_by: str | None = None) -> None:
         stored_rules = cast(list[RuleModel], rule_manager.load_all_rules())
         all_rules = [rule for rule in stored_rules if rule.status == RuleStatus.ACTIVE]
-        all_rules = [RuleFactory.from_json(r.__dict__) for r in all_rules]
+        list_provider = PersistentUserListManager(self.db, self.o_id)
+        all_rules = [RuleFactory.from_json(r.__dict__, list_values_provider=list_provider) for r in all_rules]
         rules_json = [RuleConverter.to_json(r) for r in all_rules]
         try:
             config_obj = (
@@ -276,7 +282,7 @@ def promote_shadow_rule_to_production(
         raise ValueError(f"Rule {r_id} is not in shadow config")
 
     # Update the rules table so the rule detail page reflects the promoted logic
-    rule = db.get(RuleModel, r_id)
+    rule = db.query(RuleModel).filter(RuleModel.r_id == r_id, RuleModel.o_id == o_id).first()
     if rule is not None:
         promoted_at = datetime.datetime.now(datetime.UTC)
         save_rule_history(

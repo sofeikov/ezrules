@@ -2,6 +2,7 @@ from collections import Counter
 from typing import Any
 
 from ezrules.core.rule import Rule, RuleFactory
+from ezrules.core.user_lists import AbstractUserListManager
 
 
 class RuleEngine:
@@ -44,7 +45,7 @@ class RuleEngine:
 
 class RuleEngineFactory:
     @staticmethod
-    def from_json(config) -> RuleEngine:
-        rules = [RuleFactory.from_json(rc) for rc in config]
+    def from_json(config, list_values_provider: AbstractUserListManager | None = None) -> RuleEngine:
+        rules = [RuleFactory.from_json(rc, list_values_provider=list_values_provider) for rc in config]
         rule_engine = RuleEngine(rules=rules)
         return rule_engine

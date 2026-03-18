@@ -108,9 +108,9 @@ def _get_spec(key: str) -> RuntimeSettingSpec:
     return spec
 
 
-def get_runtime_setting(db: Any, key: str) -> Any:
+def get_runtime_setting(db: Any, key: str, org_id: int) -> Any:
     spec = _get_spec(key)
-    setting = db.query(RuntimeSetting).filter(RuntimeSetting.key == key).first()
+    setting = db.query(RuntimeSetting).filter(RuntimeSetting.key == key, RuntimeSetting.o_id == org_id).first()
     if setting is None:
         return spec.default
 
@@ -121,15 +121,16 @@ def get_runtime_setting(db: Any, key: str) -> Any:
         return spec.default
 
 
-def set_runtime_setting(db: Any, key: str, value: Any) -> None:
+def set_runtime_setting(db: Any, key: str, value: Any, org_id: int) -> None:
     spec = _get_spec(key)
     normalized = _coerce_to_spec(spec, value)
     serialized = _serialize_value(spec.value_type, normalized)
 
-    setting = db.query(RuntimeSetting).filter(RuntimeSetting.key == key).first()
+    setting = db.query(RuntimeSetting).filter(RuntimeSetting.key == key, RuntimeSetting.o_id == org_id).first()
     if setting is None:
         setting = RuntimeSetting(
             key=key,
+            o_id=org_id,
             value_type=spec.value_type,
             value=serialized,
         )
@@ -140,9 +141,9 @@ def set_runtime_setting(db: Any, key: str, value: Any) -> None:
     setting.value = serialized
 
 
-def get_rule_quality_lookback_days(db: Any) -> int:
-    return int(get_runtime_setting(db, RULE_QUALITY_LOOKBACK_DAYS_KEY))
+def get_rule_quality_lookback_days(db: Any, org_id: int) -> int:
+    return int(get_runtime_setting(db, RULE_QUALITY_LOOKBACK_DAYS_KEY, org_id))
 
 
-def set_rule_quality_lookback_days(db: Any, value: int) -> None:
-    set_runtime_setting(db, RULE_QUALITY_LOOKBACK_DAYS_KEY, value)
+def set_rule_quality_lookback_days(db: Any, value: int, org_id: int) -> None:
+    set_runtime_setting(db, RULE_QUALITY_LOOKBACK_DAYS_KEY, value, org_id)
