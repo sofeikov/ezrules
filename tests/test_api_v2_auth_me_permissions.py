@@ -27,6 +27,7 @@ def test_me_includes_effective_permissions(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="authme@example.com",
+            o_id=1,
         )
         user.roles.append(role)
         session.add(user)

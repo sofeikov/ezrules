@@ -46,6 +46,7 @@ def api_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="testuser@example.com",
+            o_id=1,
         )
         session.add(test_user)
         session.commit()
@@ -76,6 +77,7 @@ def api_client_with_roles(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="roleuser@example.com",
+            o_id=1,
         )
         role_user.roles.append(admin_role)
         session.add(role_user)
@@ -99,6 +101,7 @@ def inactive_user_client(session):
             password=hashed_password,
             active=False,  # Inactive!
             fs_uniquifier="inactive@example.com",
+            o_id=1,
         )
         session.add(inactive_user)
         session.commit()
@@ -117,13 +120,14 @@ class TestJWTFunctions:
 
     def test_create_access_token(self):
         """Access token should contain correct payload."""
-        token = create_access_token(user_id=123, email="test@example.com", roles=["admin", "editor"])
+        token = create_access_token(user_id=123, email="test@example.com", roles=["admin", "editor"], org_id=1)
 
         payload = decode_token(token)
         assert payload is not None
         assert payload.user_id == 123
         assert payload.email == "test@example.com"
         assert payload.roles == ["admin", "editor"]
+        assert payload.org_id == 1
         assert payload.token_type == "access"
 
     def test_create_refresh_token(self):
@@ -136,6 +140,7 @@ class TestJWTFunctions:
         assert payload.token_type == "refresh"
         # Refresh tokens don't include email or roles
         assert payload.email is None
+        assert payload.org_id is None
 
     def test_decode_invalid_token(self):
         """Invalid tokens should return None."""
@@ -145,7 +150,7 @@ class TestJWTFunctions:
     def test_decode_tampered_token(self):
         """Tampered tokens should return None."""
         # Create a valid token
-        token = create_access_token(user_id=1, email="test@example.com", roles=[])
+        token = create_access_token(user_id=1, email="test@example.com", roles=[], org_id=1)
 
         # Tamper with it more significantly - change multiple characters in the signature
         # The signature is the last part after the last '.'
@@ -333,6 +338,7 @@ class TestInviteAndPasswordResetEndpoints:
             password=bcrypt.hashpw("placeholder".encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
             active=False,
             fs_uniquifier="invited_user@example.com",
+            o_id=1,
         )
         session.add(invited_user)
         session.commit()
@@ -374,6 +380,7 @@ class TestInviteAndPasswordResetEndpoints:
             password=bcrypt.hashpw("placeholder".encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
             active=False,
             fs_uniquifier="expired_invite@example.com",
+            o_id=1,
         )
         session.add(invited_user)
         session.commit()

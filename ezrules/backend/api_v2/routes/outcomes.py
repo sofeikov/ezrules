@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
@@ -25,7 +26,6 @@ from ezrules.core.audit_helpers import save_outcome_history
 from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import AllowedOutcome, User
-from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/outcomes", tags=["Outcomes"])
 
@@ -35,9 +35,9 @@ router = APIRouter(prefix="/api/v2/outcomes", tags=["Outcomes"])
 # =============================================================================
 
 
-def get_outcome_manager(db: Any) -> DatabaseOutcome:
+def get_outcome_manager(db: Any, org_id: int) -> DatabaseOutcome:
     """Get an outcome manager instance for the current organization."""
-    return DatabaseOutcome(db_session=db, o_id=app_settings.ORG_ID)
+    return DatabaseOutcome(db_session=db, o_id=org_id)
 
 
 def outcome_to_response(outcome: AllowedOutcome) -> OutcomeResponse:
@@ -59,6 +59,7 @@ def outcome_to_response(outcome: AllowedOutcome) -> OutcomeResponse:
 def list_outcomes(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_OUTCOMES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> OutcomesListResponse:
     """
@@ -68,7 +69,7 @@ def list_outcomes(
     """
     outcomes = (
         db.query(AllowedOutcome)
-        .filter(AllowedOutcome.o_id == app_settings.ORG_ID)
+        .filter(AllowedOutcome.o_id == current_org_id)
         .order_by(AllowedOutcome.severity_rank.asc(), AllowedOutcome.outcome_name.asc())
         .all()
     )
@@ -96,6 +97,7 @@ def create_outcome(
     outcome_data: OutcomeCreate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.CREATE_OUTCOME)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> OutcomeMutationResponse:
     """
@@ -104,7 +106,7 @@ def create_outcome(
     The outcome name will be converted to uppercase.
     Returns an error if the outcome already exists.
     """
-    outcome_manager = get_outcome_manager(db)
+    outcome_manager = get_outcome_manager(db, current_org_id)
     outcome_name = outcome_data.outcome_name.strip().upper()
 
     # Check if outcome already exists
@@ -121,7 +123,7 @@ def create_outcome(
     # Fetch the newly created outcome for the response
     new_outcome = (
         db.query(AllowedOutcome)
-        .filter(AllowedOutcome.outcome_name == outcome_name, AllowedOutcome.o_id == app_settings.ORG_ID)
+        .filter(AllowedOutcome.outcome_name == outcome_name, AllowedOutcome.o_id == current_org_id)
         .first()
     )
 
@@ -131,7 +133,7 @@ def create_outcome(
             ao_id=new_outcome.ao_id,
             outcome_name=outcome_name,
             action="created",
-            o_id=app_settings.ORG_ID,
+            o_id=current_org_id,
             changed_by=str(user.email) if user.email else None,
         )
         db.commit()
@@ -153,6 +155,7 @@ def delete_outcome(
     outcome_name: str,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.DELETE_OUTCOME)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> OutcomeMutationResponse:
     """
@@ -160,7 +163,7 @@ def delete_outcome(
 
     Returns 404 if the outcome doesn't exist.
     """
-    outcome_manager = get_outcome_manager(db)
+    outcome_manager = get_outcome_manager(db, current_org_id)
     outcome_name = outcome_name.strip().upper()
 
     # Check if outcome exists
@@ -173,7 +176,7 @@ def delete_outcome(
     # Get outcome ID before deletion
     outcome_obj = (
         db.query(AllowedOutcome)
-        .filter(AllowedOutcome.outcome_name == outcome_name, AllowedOutcome.o_id == app_settings.ORG_ID)
+        .filter(AllowedOutcome.outcome_name == outcome_name, AllowedOutcome.o_id == current_org_id)
         .first()
     )
     ao_id = outcome_obj.ao_id if outcome_obj else 0
@@ -183,7 +186,7 @@ def delete_outcome(
         ao_id=ao_id,
         outcome_name=outcome_name,
         action="deleted",
-        o_id=app_settings.ORG_ID,
+        o_id=current_org_id,
         changed_by=str(user.email) if user.email else None,
     )
 

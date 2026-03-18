@@ -55,6 +55,7 @@ def audit_test_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="auditadmin@example.com",
+            o_id=1,
         )
         admin_user.roles.append(admin_role)
         session.add(admin_user)
@@ -71,6 +72,7 @@ def audit_test_client(session):
         user_id=int(admin_user.id),
         email=str(admin_user.email),
         roles=roles,
+        org_id=int(admin_user.o_id),
     )
 
     client_data = {
@@ -375,6 +377,7 @@ class TestAuditPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="noperm_audit@example.com",
+            o_id=1,
         )
         session.add(no_perm_user)
         session.commit()
@@ -387,6 +390,7 @@ class TestAuditPermissions:
             user_id=int(no_perm_user.id),
             email=str(no_perm_user.email),
             roles=[],
+            org_id=int(no_perm_user.o_id),
         )
 
         with TestClient(app) as client:
@@ -407,6 +411,7 @@ class TestAuditPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="noperm_audit2@example.com",
+            o_id=1,
         )
         session.add(no_perm_user)
         session.commit()
@@ -419,6 +424,7 @@ class TestAuditPermissions:
             user_id=int(no_perm_user.id),
             email=str(no_perm_user.email),
             roles=[],
+            org_id=int(no_perm_user.o_id),
         )
 
         with TestClient(app) as client:

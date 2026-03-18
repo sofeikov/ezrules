@@ -34,6 +34,7 @@ def tested_events_field_client(session):
         password=hashed_password,
         active=True,
         fs_uniquifier=str(uuid.uuid4()),
+        o_id=1,
     )
     user.roles.append(role)
     session.add_all([role, user])
@@ -47,6 +48,7 @@ def tested_events_field_client(session):
         user_id=int(user.id),
         email=str(user.email),
         roles=[role.name for role in user.roles],
+        org_id=int(user.o_id),
     )
 
     with TestClient(app) as client:

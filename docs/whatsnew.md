@@ -1,6 +1,13 @@
 # What's New
 
 
+## Unreleased
+
+* **Org-aware manager JWTs**: Access tokens now include the authenticated user's organisation, and the API rejects access tokens whose org claim no longer matches the stored user membership.
+* **Core admin CRUD is org-scoped**: Users, outcomes, user lists, and field type configs/observations now resolve organisation context from auth instead of fixed org constants.
+* **Label usage is org-scoped**: Label assignment, CSV uploads, and label analytics now operate only on events in the caller's organisation, while the label catalog remains shared in this phase.
+* **Fresh-init user ownership**: `User.o_id` is now mandatory, and fresh database/bootstrap flows create an organisation before creating users so clean rebuilds work with org-aware auth.
+
 ## v0.24.3
 
 * **Label-aware backtesting**: Backtest task results on the Rule Detail page now include historical label counts plus stored/proposed precision, recall, and F1 by outcome→label pair when labeled events exist in the backtest window.

@@ -1,5 +1,7 @@
 import abc
 
+from sqlalchemy import func
+
 
 class LabelManager(abc.ABC):
     """Container for event labels. All labels will be managed through this interface."""
@@ -67,7 +69,7 @@ class DatabaseLabelManager(LabelManager):
         new_label = new_label.strip().upper()
 
         # Check if label already exists
-        existing = self.db_session.query(Label).filter_by(label=new_label).first()
+        existing = self.db_session.query(Label).filter(func.upper(Label.label) == new_label).first()
 
         if not existing:
             label = Label(label=new_label)
@@ -77,7 +79,8 @@ class DatabaseLabelManager(LabelManager):
             self._cached_labels = None
 
     def label_exists(self, label: str):
-        return label in self.get_all_labels()
+        normalized_label = label.strip().upper()
+        return any(existing_label.upper() == normalized_label for existing_label in self.get_all_labels())
 
     def remove_label(self, label: str):
         from ezrules.models.backend_core import Label
@@ -86,7 +89,7 @@ class DatabaseLabelManager(LabelManager):
         label = label.strip().upper()
 
         # Find and remove the label
-        existing = self.db_session.query(Label).filter_by(label=label).first()
+        existing = self.db_session.query(Label).filter(func.upper(Label.label) == label).first()
 
         if existing:
             self.db_session.delete(existing)

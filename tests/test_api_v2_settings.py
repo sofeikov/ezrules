@@ -46,6 +46,7 @@ def settings_test_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="settings_admin@example.com",
+            o_id=app_settings.ORG_ID,
         )
         user.roles.append(role)
         session.add(user)
@@ -60,6 +61,7 @@ def settings_test_client(session):
         user_id=int(user.id),
         email=str(user.email),
         roles=[role.name],
+        org_id=int(user.o_id),
     )
 
     with TestClient(app) as client:
@@ -126,6 +128,7 @@ class TestRuntimeSettings:
             password=hashed_password,
             active=True,
             fs_uniquifier="settings_read_only@example.com",
+            o_id=app_settings.ORG_ID,
         )
         user.roles.append(role)
         session.add(user)
@@ -139,6 +142,7 @@ class TestRuntimeSettings:
             user_id=int(user.id),
             email=str(user.email),
             roles=[role.name],
+            org_id=int(user.o_id),
         )
 
         with TestClient(app) as client:
@@ -363,6 +367,7 @@ class TestRuleQualityPairsSettings:
             password=hashed_password,
             active=True,
             fs_uniquifier="pairs_no_view@example.com",
+            o_id=app_settings.ORG_ID,
         )
         user.roles.append(role)
         session.add(user)
@@ -375,6 +380,7 @@ class TestRuleQualityPairsSettings:
             user_id=int(user.id),
             email=str(user.email),
             roles=[role.name],
+            org_id=int(user.o_id),
         )
 
         with TestClient(app) as client:
@@ -395,6 +401,7 @@ class TestRuleQualityPairsSettings:
             password=hashed_password,
             active=True,
             fs_uniquifier="pairs_view_only@example.com",
+            o_id=app_settings.ORG_ID,
         )
         user.roles.append(role)
         session.add(user)
@@ -418,6 +425,7 @@ class TestRuleQualityPairsSettings:
             user_id=int(user.id),
             email=str(user.email),
             roles=[role.name],
+            org_id=int(user.o_id),
         )
 
         with TestClient(app) as client:

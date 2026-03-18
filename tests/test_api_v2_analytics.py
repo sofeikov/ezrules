@@ -66,6 +66,7 @@ def analytics_test_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="analyticsuser@example.com",
+            o_id=1,
         )
         analytics_user.roles.append(analytics_role)
         session.add(analytics_user)
@@ -84,6 +85,7 @@ def analytics_test_client(session):
         user_id=int(analytics_user.id),
         email=str(analytics_user.email),
         roles=roles,
+        org_id=int(analytics_user.o_id),
     )
 
     client_data = {
@@ -1008,6 +1010,7 @@ class TestAnalyticsPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="noperm_analytics@example.com",
+            o_id=1,
         )
         session.add(no_perm_user)
         session.commit()
@@ -1020,6 +1023,7 @@ class TestAnalyticsPermissions:
             user_id=int(no_perm_user.id),
             email=str(no_perm_user.email),
             roles=[],
+            org_id=int(no_perm_user.o_id),
         )
 
         with TestClient(app) as client:
@@ -1045,6 +1049,7 @@ class TestAnalyticsPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="rulesonly_analytics@example.com",
+            o_id=1,
         )
         rules_only_user.roles.append(rules_only_role)
         session.add(rules_only_user)
@@ -1059,6 +1064,7 @@ class TestAnalyticsPermissions:
             user_id=int(rules_only_user.id),
             email=str(rules_only_user.email),
             roles=[rules_only_role.name],
+            org_id=int(rules_only_user.o_id),
         )
 
         with TestClient(app) as client:
@@ -1082,6 +1088,7 @@ class TestAnalyticsPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="rulesonly_rule_quality@example.com",
+            o_id=1,
         )
         rules_only_user.roles.append(rules_only_role)
         session.add(rules_only_user)
@@ -1095,6 +1102,7 @@ class TestAnalyticsPermissions:
             user_id=int(rules_only_user.id),
             email=str(rules_only_user.email),
             roles=[rules_only_role.name],
+            org_id=int(rules_only_user.o_id),
         )
 
         with TestClient(app) as client:

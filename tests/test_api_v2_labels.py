@@ -48,6 +48,7 @@ def labels_test_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="labeluser@example.com",
+            o_id=1,
         )
         label_user.roles.append(label_role)
         session.add(label_user)
@@ -66,6 +67,7 @@ def labels_test_client(session):
         user_id=int(label_user.id),
         email=str(label_user.email),
         roles=roles,
+        org_id=int(label_user.o_id),
     )
 
     client_data = {
@@ -412,6 +414,7 @@ class TestLabelPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="noperm_label@example.com",
+            o_id=1,
         )
         session.add(no_perm_user)
         session.commit()
@@ -424,6 +427,7 @@ class TestLabelPermissions:
             user_id=int(no_perm_user.id),
             email=str(no_perm_user.email),
             roles=[],
+            org_id=int(no_perm_user.o_id),
         )
 
         with TestClient(app) as client:
@@ -449,6 +453,7 @@ class TestLabelPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="viewonly_label@example.com",
+            o_id=1,
         )
         view_only_user.roles.append(view_only_role)
         session.add(view_only_user)
@@ -463,6 +468,7 @@ class TestLabelPermissions:
             user_id=int(view_only_user.id),
             email=str(view_only_user.email),
             roles=[view_only_role.name],
+            org_id=int(view_only_user.o_id),
         )
 
         with TestClient(app) as client:
@@ -489,6 +495,7 @@ class TestLabelPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="viewonly2_label@example.com",
+            o_id=1,
         )
         view_only_user.roles.append(view_only_role)
         session.add(view_only_user)
@@ -503,6 +510,7 @@ class TestLabelPermissions:
             user_id=int(view_only_user.id),
             email=str(view_only_user.email),
             roles=[view_only_role.name],
+            org_id=int(view_only_user.o_id),
         )
 
         with TestClient(app) as client:

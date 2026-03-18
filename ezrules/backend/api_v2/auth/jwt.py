@@ -41,7 +41,7 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 # =============================================================================
 
 
-def create_access_token(user_id: int, email: str, roles: list[str]) -> str:
+def create_access_token(user_id: int, email: str, roles: list[str], org_id: int) -> str:
     """
     Create a short-lived access token for API authentication.
 
@@ -57,6 +57,7 @@ def create_access_token(user_id: int, email: str, roles: list[str]) -> str:
         user_id: The user's database ID
         email: The user's email address
         roles: List of role names the user has
+        org_id: The organisation the user belongs to
 
     Returns:
         A signed JWT string like "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJz..."
@@ -68,6 +69,7 @@ def create_access_token(user_id: int, email: str, roles: list[str]) -> str:
         "sub": str(user_id),  # JWT standard: subject should be a string
         "email": email,
         "roles": roles,
+        "org_id": org_id,
         "type": "access",
         "iat": now,
         "exp": expire,
@@ -125,11 +127,19 @@ class TokenPayload:
     After decoding, we convert the raw dict to this class for type safety.
     """
 
-    def __init__(self, user_id: int, email: str | None, roles: list[str], token_type: str):
+    def __init__(
+        self,
+        user_id: int,
+        email: str | None,
+        roles: list[str],
+        token_type: str,
+        org_id: int | None,
+    ):
         self.user_id = user_id
         self.email = email
         self.roles = roles
         self.token_type = token_type
+        self.org_id = org_id
 
 
 def decode_token(token: str) -> TokenPayload | None:
@@ -165,11 +175,13 @@ def decode_token(token: str) -> TokenPayload | None:
         if user_id_str is None:
             return None
 
+        org_id = payload.get("org_id")
         return TokenPayload(
             user_id=int(user_id_str),
             email=payload.get("email"),
             roles=payload.get("roles", []),
             token_type=payload.get("type", "access"),
+            org_id=int(org_id) if org_id is not None else None,
         )
 
     except JWTError:

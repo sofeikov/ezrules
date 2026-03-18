@@ -72,7 +72,10 @@ def get_db() -> Any:
     concurrent requests (required for parallel Playwright test workers).
     """
     if app_settings.TESTING:
-        yield db_session
+        try:
+            yield db_session
+        finally:
+            db_session.remove()
     else:
         db = SessionLocal()
         try:
@@ -140,10 +143,16 @@ def get_current_user(
     if payload.token_type != "access":
         raise credentials_exception
 
+    if payload.org_id is None:
+        raise credentials_exception
+
     # Look up the user in the database, eagerly loading roles to avoid
     # DetachedInstanceError if the session is closed before check_permission runs
     user = db.query(User).options(joinedload(User.roles)).filter(User.id == payload.user_id).first()
     if user is None:
+        raise credentials_exception
+
+    if int(user.o_id) != payload.org_id:
         raise credentials_exception
 
     return user
@@ -217,8 +226,14 @@ def get_current_user_strict(
     if payload.token_type != "access":
         raise credentials_exception
 
+    if payload.org_id is None:
+        raise credentials_exception
+
     user = db.query(User).options(joinedload(User.roles)).filter(User.id == payload.user_id).first()
     if user is None:
+        raise credentials_exception
+
+    if int(user.o_id) != payload.org_id:
         raise credentials_exception
 
     return user
@@ -248,6 +263,13 @@ def get_current_active_user_strict(
             detail="User account is disabled",
         )
     return user
+
+
+def get_current_org_id(
+    user: User = Depends(get_current_active_user),
+) -> int:
+    """Return the authenticated user's organisation ID."""
+    return int(user.o_id)
 
 
 # =============================================================================

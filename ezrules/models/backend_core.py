@@ -108,6 +108,8 @@ class User(Base, UserMixin):
     active = Column(Boolean())
     fs_uniquifier = Column(String(64), unique=True, nullable=False)
     confirmed_at = Column(DateTime())
+    o_id = Column(Integer, ForeignKey("organisation.o_id"), nullable=False, index=True)
+    org: Mapped["Organisation"] = relationship(back_populates="users")
     roles = relationship("Role", secondary="roles_users", backref=backref("users", lazy="dynamic"))
 
 
@@ -147,6 +149,7 @@ class Organisation(Base):
     name = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
+    users: Mapped[list["User"]] = relationship(back_populates="org")
     rules: Mapped[list["Rule"]] = relationship()
     re_configs: Mapped[list["RuleEngineConfig"]] = relationship()
 

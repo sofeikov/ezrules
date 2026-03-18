@@ -52,6 +52,7 @@ def users_test_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="useradmin@example.com",
+            o_id=1,
         )
         admin_user.roles.append(admin_role)
         session.add(admin_user)
@@ -72,6 +73,7 @@ def users_test_client(session):
         user_id=int(admin_user.id),
         email=str(admin_user.email),
         roles=roles,
+        org_id=int(admin_user.o_id),
     )
 
     client_data = {
@@ -97,6 +99,7 @@ def sample_user(session):
         password=hashed_password,
         active=True,
         fs_uniquifier="sampleuser@example.com",
+        o_id=1,
     )
     session.add(user)
     session.commit()
@@ -450,6 +453,7 @@ class TestUpdateUser:
             password=hashed_password,
             active=True,
             fs_uniquifier="other@example.com",
+            o_id=1,
         )
         session.add(other_user)
         session.commit()
@@ -690,6 +694,7 @@ class TestUserPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="noperm_user@example.com",
+            o_id=1,
         )
         session.add(no_perm_user)
         session.commit()
@@ -702,6 +707,7 @@ class TestUserPermissions:
             user_id=int(no_perm_user.id),
             email=str(no_perm_user.email),
             roles=[],
+            org_id=int(no_perm_user.o_id),
         )
 
         with TestClient(app) as client:
@@ -727,6 +733,7 @@ class TestUserPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="viewonly_user@example.com",
+            o_id=1,
         )
         view_only_user.roles.append(view_only_role)
         session.add(view_only_user)
@@ -741,6 +748,7 @@ class TestUserPermissions:
             user_id=int(view_only_user.id),
             email=str(view_only_user.email),
             roles=[view_only_role.name],
+            org_id=int(view_only_user.o_id),
         )
 
         with TestClient(app) as client:
@@ -770,6 +778,7 @@ class TestUserPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="viewonly2_user@example.com",
+            o_id=1,
         )
         view_only_user.roles.append(view_only_role)
         session.add(view_only_user)
@@ -784,6 +793,7 @@ class TestUserPermissions:
             user_id=int(view_only_user.id),
             email=str(view_only_user.email),
             roles=[view_only_role.name],
+            org_id=int(view_only_user.o_id),
         )
 
         with TestClient(app) as client:
@@ -809,6 +819,7 @@ class TestUserPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="viewonly_noroles@example.com",
+            o_id=1,
         )
         view_only_user.roles.append(view_only_role)
         session.add(view_only_user)
@@ -823,6 +834,7 @@ class TestUserPermissions:
             user_id=int(view_only_user.id),
             email=str(view_only_user.email),
             roles=[view_only_role.name],
+            org_id=int(view_only_user.o_id),
         )
 
         with TestClient(app) as client:

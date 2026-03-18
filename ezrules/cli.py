@@ -48,6 +48,17 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_RESET_DEV_LABELS_CSV_PATH = PROJECT_ROOT / "test_labels.csv"
 
 
+def _get_or_create_default_organisation(db_session):
+    """Return the default organisation, creating it when needed."""
+    organisation = db_session.query(Organisation).filter_by(name="base").first()
+    if organisation is None:
+        organisation = Organisation(name="base")
+        db_session.add(organisation)
+        db_session.commit()
+        db_session.refresh(organisation)
+    return organisation
+
+
 def _drop_database(engine, db_name):
     """Drop the specified database."""
     logger.info(f"Dropping database '{db_name}'...")
@@ -115,12 +126,14 @@ def add_user(user_email, password, admin):
 
     user = None
     try:
+        organisation = _get_or_create_default_organisation(db_session)
         hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         user = User(
             email=user_email,
             password=hashed_password,
             active=True,
             fs_uniquifier=user_email,
+            o_id=int(organisation.o_id),
         )
         db_session.add(user)
         db_session.commit()
@@ -131,12 +144,7 @@ def add_user(user_email, password, admin):
         logger.info("User already exists")
         # Try to get existing user
         user = db_session.query(User).filter_by(email=user_email).first()
-
-    try:
-        db_session.add(Organisation(name="base"))
-        db_session.commit()
-    except Exception:
-        db_session.rollback()
+        _get_or_create_default_organisation(db_session)
 
     # Grant admin permissions if --admin flag is set
     if admin and user:
@@ -233,13 +241,8 @@ def init_db(auto_delete):
 
         # Create default organisation
         logger.info("Creating default organisation...")
-        existing_org = db_session.query(Organisation).filter_by(name="base").first()
-        if not existing_org:
-            db_session.add(Organisation(name="base"))
-            db_session.commit()
-            logger.info("Default organisation created")
-        else:
-            logger.info("Default organisation already exists")
+        existing_org = _get_or_create_default_organisation(db_session)
+        logger.info("Default organisation ready: %s", existing_org.name)
 
         # Initialize default permissions
         logger.info("Initializing default permissions...")
@@ -249,13 +252,13 @@ def init_db(auto_delete):
 
         # Seed default outcomes (RELEASE, HOLD, CANCEL)
         logger.info("Seeding default outcomes...")
-        outcome_manager = DatabaseOutcome(db_session=db_session, o_id=1)
+        outcome_manager = DatabaseOutcome(db_session=db_session, o_id=int(existing_org.o_id))
         outcome_manager._ensure_default_outcomes()
         logger.info("Default outcomes seeded")
 
         # Seed default user lists (MiddleAsiaCountries, NACountries, LatamCountries)
         logger.info("Seeding default user lists...")
-        user_list_manager = PersistentUserListManager(db_session=db_session, o_id=1)
+        user_list_manager = PersistentUserListManager(db_session=db_session, o_id=int(existing_org.o_id))
         user_list_manager._ensure_default_lists()
         logger.info("Default user lists seeded")
 

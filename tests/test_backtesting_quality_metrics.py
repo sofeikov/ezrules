@@ -29,6 +29,7 @@ def backtesting_quality_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="bt-quality@example.com",
+            o_id=1,
         )
         user.roles.append(role)
         session.add(user)
@@ -43,6 +44,7 @@ def backtesting_quality_client(session):
         user_id=int(user.id),
         email=str(user.email),
         roles=[item.name for item in user.roles],
+        org_id=int(user.o_id),
     )
 
     with TestClient(app) as client:

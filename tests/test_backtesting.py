@@ -40,6 +40,7 @@ def backtesting_test_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="btuser@example.com",
+            o_id=1,
         )
         user.roles.append(role)
         session.add(user)
@@ -55,6 +56,7 @@ def backtesting_test_client(session):
         user_id=int(user.id),
         email=str(user.email),
         roles=roles,
+        org_id=int(user.o_id),
     )
 
     client_data = {

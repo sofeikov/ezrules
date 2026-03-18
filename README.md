@@ -9,6 +9,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Rule Engine**: Flexible Python-based rule execution with custom logic support
 - **Management Interface**: Modern web UI for creating and managing rules
 - **Enterprise Security**: Granular role-based access control with 32 permission types; API key authentication for service-to-service integration
+- **Org-Aware Admin APIs**: Manager access tokens now carry organisation context, and core admin CRUD endpoints scope users, outcomes, user lists, field types, label assignment, and label analytics to the authenticated user's org
 - **Transaction Labeling**: Comprehensive fraud analytics with API and bulk CSV upload capabilities
 - **Analytics Dashboard**: Real-time transaction volume charts with configurable time ranges (1h, 6h, 12h, 24h, 30d)
 - **Scalable Architecture**: Unified API service with integrated rule evaluation

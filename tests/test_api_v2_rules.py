@@ -50,6 +50,7 @@ def rules_test_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="ruleuser@example.com",
+            o_id=1,
         )
         rule_user.roles.append(rule_role)
         session.add(rule_user)
@@ -70,6 +71,7 @@ def rules_test_client(session):
         user_id=int(rule_user.id),
         email=str(rule_user.email),
         roles=roles,
+        org_id=int(rule_user.o_id),
     )
 
     client_data = {
@@ -677,6 +679,7 @@ class TestRulePermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="noperm@example.com",
+            o_id=1,
         )
         session.add(no_perm_user)
         session.commit()
@@ -689,6 +692,7 @@ class TestRulePermissions:
             user_id=int(no_perm_user.id),
             email=str(no_perm_user.email),
             roles=[],
+            org_id=int(no_perm_user.o_id),
         )
 
         with TestClient(app) as client:
@@ -722,6 +726,7 @@ class TestRulePermissions:
                 password=hashed_password,
                 active=True,
                 fs_uniquifier="nopromote@example.com",
+                o_id=1,
             )
             user.roles.append(role)
             session.add(user)
@@ -745,6 +750,7 @@ class TestRulePermissions:
             user_id=int(user.id),
             email=str(user.email),
             roles=[role.name for role in user.roles],
+            org_id=int(user.o_id),
         )
 
         with TestClient(app) as client:

@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from ezrules.backend.analytics import AGGREGATION_CONFIG, get_bucket_expression
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
@@ -192,6 +193,7 @@ def get_labels_distribution(
     aggregation: str = Query(default="1h", description="Aggregation period"),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> MultiSeriesResponse:
     """
@@ -212,6 +214,7 @@ def get_labels_distribution(
         )
         .join(TestingRecordLog, TestingRecordLog.el_id == Label.el_id)
         .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.o_id == current_org_id)
         .filter(TestingRecordLog.el_id.isnot(None))
         .group_by("bucket", Label.label)
         .order_by("bucket")
@@ -267,6 +270,7 @@ def get_labeled_transaction_volume(
     aggregation: str = Query(default="1h", description="Aggregation period"),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> TimeSeriesResponse:
     """
@@ -282,6 +286,7 @@ def get_labeled_transaction_volume(
     transactions = (
         db.query(bucket_expr.label("bucket"), sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
         .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.o_id == current_org_id)
         .filter(TestingRecordLog.el_id.isnot(None))
         .group_by("bucket")
         .order_by("bucket")
@@ -307,6 +312,7 @@ def get_labeled_transaction_volume(
 def get_labels_summary(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> LabelsSummaryResponse:
     """
@@ -316,13 +322,17 @@ def get_labels_summary(
     """
     # Total labeled events
     total_labeled = (
-        db.query(sqlalchemy.func.count(TestingRecordLog.tl_id)).filter(TestingRecordLog.el_id.isnot(None)).scalar()
+        db.query(sqlalchemy.func.count(TestingRecordLog.tl_id))
+        .filter(TestingRecordLog.o_id == current_org_id)
+        .filter(TestingRecordLog.el_id.isnot(None))
+        .scalar()
     )
 
     # Label distribution (pie chart data)
     label_counts = (
         db.query(Label.label, sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
         .join(TestingRecordLog, TestingRecordLog.el_id == Label.el_id)
+        .filter(TestingRecordLog.o_id == current_org_id)
         .filter(TestingRecordLog.el_id.isnot(None))
         .group_by(Label.label)
         .order_by(sqlalchemy.desc("count"))

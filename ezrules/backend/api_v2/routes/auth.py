@@ -187,6 +187,7 @@ def login(
         user_id=int(user.id),
         email=str(user.email),
         roles=role_names,
+        org_id=int(user.o_id),
     )
     refresh_token = create_refresh_token(user_id=int(user.id))
 
@@ -450,6 +451,7 @@ def refresh_token(
         user_id=int(user.id),
         email=str(user.email),
         roles=role_names,
+        org_id=int(user.o_id),
     )
     new_refresh_token = create_refresh_token(user_id=int(user.id))
 

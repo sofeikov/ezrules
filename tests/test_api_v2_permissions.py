@@ -53,6 +53,7 @@ def permission_test_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="permadmin@example.com",
+            o_id=1,
         )
         admin_user.roles.append(admin_role)
         session.add(admin_user)
@@ -66,6 +67,7 @@ def permission_test_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="permviewer@example.com",
+            o_id=1,
         )
         viewer_user.roles.append(viewer_role)
         session.add(viewer_user)
@@ -118,6 +120,7 @@ class TestRequirePermission:
             user_id=int(admin_user.id),
             email=str(admin_user.email),
             roles=roles,
+            org_id=int(admin_user.o_id),
         )
 
         # Access /me endpoint (which is already protected, just testing auth works)
@@ -139,6 +142,7 @@ class TestRequirePermission:
             user_id=int(viewer_user.id),
             email=str(viewer_user.email),
             roles=roles,
+            org_id=int(viewer_user.o_id),
         )
 
         # Create a test app with a protected endpoint
@@ -171,6 +175,7 @@ class TestRequirePermission:
             user_id=int(viewer_user.id),
             email=str(viewer_user.email),
             roles=roles,
+            org_id=int(viewer_user.o_id),
         )
 
         # Create a test app with a protected endpoint
@@ -206,6 +211,7 @@ class TestRequirePermission:
             user_id=int(admin_user.id),
             email=str(admin_user.email),
             roles=roles,
+            org_id=int(admin_user.o_id),
         )
 
         # Create a test app with a protected endpoint
@@ -236,6 +242,7 @@ class TestRequirePermission:
             user_id=int(admin_user.id),
             email=str(admin_user.email),
             roles=roles,
+            org_id=int(admin_user.o_id),
         )
 
         # Create a test app with a protected endpoint using a non-existent action
@@ -281,6 +288,7 @@ class TestRequireAnyPermission:
             user_id=int(admin_user.id),
             email=str(admin_user.email),
             roles=roles,
+            org_id=int(admin_user.o_id),
         )
 
         # Create a test app that requires VIEW_RULES OR VIEW_OUTCOMES
@@ -315,6 +323,7 @@ class TestRequireAnyPermission:
             user_id=int(admin_user.id),
             email=str(admin_user.email),
             roles=roles,
+            org_id=int(admin_user.o_id),
         )
 
         # Create a test app that requires VIEW_RULES OR VIEW_OUTCOMES
@@ -346,6 +355,7 @@ class TestRequireAnyPermission:
             user_id=int(viewer_user.id),
             email=str(viewer_user.email),
             roles=roles,
+            org_id=int(viewer_user.o_id),
         )
 
         # Create a test app that requires VIEW_RULES OR VIEW_OUTCOMES
@@ -377,6 +387,7 @@ class TestRequireAnyPermission:
             user_id=int(viewer_user.id),
             email=str(viewer_user.email),
             roles=roles,
+            org_id=int(viewer_user.o_id),
         )
 
         test_app = FastAPI()
@@ -451,6 +462,7 @@ class TestPermissionWithAuth:
             password=hashed_password,
             active=False,
             fs_uniquifier="inactiveperm@example.com",
+            o_id=1,
         )
         session.add(inactive_user)
         session.commit()
@@ -459,6 +471,7 @@ class TestPermissionWithAuth:
             user_id=int(inactive_user.id),
             email=str(inactive_user.email),
             roles=[],
+            org_id=int(inactive_user.o_id),
         )
 
         test_app = FastAPI()

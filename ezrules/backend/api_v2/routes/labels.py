@@ -9,9 +9,11 @@ import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from sqlalchemy import func
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
@@ -33,7 +35,6 @@ from ezrules.core.audit_helpers import save_label_history
 from ezrules.core.labels import DatabaseLabelManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Label, TestingRecordLog, User
-from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/labels", tags=["Labels"])
 
@@ -43,18 +44,18 @@ router = APIRouter(prefix="/api/v2/labels", tags=["Labels"])
 # =============================================================================
 
 
-def get_label_manager(db: Any) -> DatabaseLabelManager:
+def get_label_manager(db: Any, org_id: int) -> DatabaseLabelManager:
     """Get a label manager instance for the current organization."""
-    return DatabaseLabelManager(db_session=db, o_id=app_settings.ORG_ID)
+    return DatabaseLabelManager(db_session=db, o_id=org_id)
 
 
-def get_unique_event_for_labeling(db: Any, event_id: str) -> TestingRecordLog:
+def get_unique_event_for_labeling(db: Any, event_id: str, org_id: int) -> TestingRecordLog:
     """Load a single event in the active organization or raise a precise error."""
     matches = (
         db.query(TestingRecordLog)
         .filter(
             TestingRecordLog.event_id == event_id,
-            TestingRecordLog.o_id == app_settings.ORG_ID,
+            TestingRecordLog.o_id == org_id,
         )
         .limit(2)
         .all()
@@ -80,6 +81,11 @@ def label_to_response(label: Label) -> LabelResponse:
         el_id=int(label.el_id),
         label=str(label.label),
     )
+
+
+def get_label_by_name(db: Any, label_name: str) -> Label | None:
+    """Load a label by name using case-insensitive matching."""
+    return db.query(Label).filter(func.upper(Label.label) == label_name.strip().upper()).first()
 
 
 # =============================================================================
@@ -121,6 +127,7 @@ def create_label(
     label_data: LabelCreate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.CREATE_LABEL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> LabelMutationResponse:
     """
@@ -129,7 +136,7 @@ def create_label(
     The label name will be converted to uppercase.
     Returns an error if the label already exists.
     """
-    label_manager = get_label_manager(db)
+    label_manager = get_label_manager(db, current_org_id)
     label_name = label_data.label_name.strip().upper()
 
     # Check if label already exists
@@ -144,12 +151,12 @@ def create_label(
     label_manager.add_label(label_name)
 
     # Fetch the newly created label for the response
-    new_label = db.query(Label).filter(Label.label == label_name).first()
+    new_label = get_label_by_name(db, label_name)
 
     if new_label:
         save_label_history(
             db,
-            el_id=new_label.el_id,
+            el_id=int(new_label.el_id),
             label=label_name,
             action="created",
             changed_by=str(user.email) if user.email else None,
@@ -173,6 +180,7 @@ def create_labels_bulk(
     bulk_data: LabelBulkCreate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.CREATE_LABEL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> LabelBulkCreateResponse:
     """
@@ -181,7 +189,7 @@ def create_labels_bulk(
     Label names will be converted to uppercase.
     Returns lists of successfully created and failed labels.
     """
-    label_manager = get_label_manager(db)
+    label_manager = get_label_manager(db, current_org_id)
     created = []
     failed = []
 
@@ -195,11 +203,11 @@ def create_labels_bulk(
 
     # Record audit entries for each created label
     for label_name in created:
-        label_obj = db.query(Label).filter(Label.label == label_name).first()
+        label_obj = get_label_by_name(db, label_name)
         if label_obj:
             save_label_history(
                 db,
-                el_id=label_obj.el_id,
+                el_id=int(label_obj.el_id),
                 label=label_name,
                 action="created",
                 changed_by=str(user.email) if user.email else None,
@@ -225,6 +233,7 @@ def delete_label(
     label_name: str,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.DELETE_LABEL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> LabelMutationResponse:
     """
@@ -232,7 +241,7 @@ def delete_label(
 
     Returns 404 if the label doesn't exist.
     """
-    label_manager = get_label_manager(db)
+    label_manager = get_label_manager(db, current_org_id)
     label_name = label_name.strip().upper()
 
     # Check if label exists
@@ -243,8 +252,8 @@ def delete_label(
         )
 
     # Get label ID before deletion
-    label_obj = db.query(Label).filter(Label.label == label_name).first()
-    el_id = label_obj.el_id if label_obj else 0
+    label_obj = get_label_by_name(db, label_name)
+    el_id = int(label_obj.el_id) if label_obj else 0
 
     save_label_history(
         db,
@@ -273,6 +282,7 @@ def mark_event(
     request_data: MarkEventRequest,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.CREATE_LABEL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> MarkEventResponse:
     """
@@ -283,10 +293,10 @@ def mark_event(
     event_id = request_data.event_id
     label_name = request_data.label_name.strip().upper()
 
-    event_record = get_unique_event_for_labeling(db, event_id)
+    event_record = get_unique_event_for_labeling(db, event_id, current_org_id)
 
     # Find the label by name
-    label = db.query(Label).filter_by(label=label_name).first()
+    label = get_label_by_name(db, label_name)
     if not label:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -333,6 +343,7 @@ async def upload_labels(
     file: UploadFile,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.CREATE_LABEL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UploadResult:
     """
@@ -355,7 +366,7 @@ async def upload_labels(
             detail="File is not valid UTF-8 encoded text.",
         ) from err
 
-    service = LabelUploadService(db, org_id=app_settings.ORG_ID)
+    service = LabelUploadService(db, org_id=current_org_id)
     result = service.upload_labels_from_csv(csv_content)
 
     for assignment in result.applied_assignments:

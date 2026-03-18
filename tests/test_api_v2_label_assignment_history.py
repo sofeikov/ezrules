@@ -33,6 +33,7 @@ def label_audit_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="labelaudit@example.com",
+            o_id=app_settings.ORG_ID,
         )
         user.roles.append(role)
         session.add(user)
@@ -48,6 +49,7 @@ def label_audit_client(session):
         user_id=int(user.id),
         email=str(user.email),
         roles=[role.name for role in user.roles],
+        org_id=int(user.o_id),
     )
 
     with TestClient(app) as client:

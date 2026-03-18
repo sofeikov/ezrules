@@ -42,7 +42,7 @@ class LabelUploadService:
 
     def __init__(self, db_session, org_id: int | None = None):
         self.db_session = db_session
-        self.org_id = org_id if org_id is not None else (get_organization_id() or 1)
+        self.org_id = org_id if org_id is not None else get_organization_id()
 
     def parse_csv_content(self, csv_content: str) -> tuple[list[ParsedRow], list[str]]:
         """Parse CSV content and validate format"""
@@ -72,7 +72,7 @@ class LabelUploadService:
     def get_label_cache(self) -> dict[str, Label]:
         """Get a dictionary mapping label names to Label objects"""
         all_labels = self.db_session.query(Label).all()
-        return {label.label: label for label in all_labels}
+        return {str(label.label).upper(): label for label in all_labels}
 
     def process_label_assignments(
         self, parsed_rows: list[ParsedRow], label_cache: dict[str, Label]

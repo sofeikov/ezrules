@@ -43,6 +43,7 @@ def field_types_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="ft_user@example.com",
+            o_id=1,
         )
         user.roles.append(role)
         session.add(user)
@@ -54,7 +55,7 @@ def field_types_client(session):
     PermissionManager.grant_permission(role.id, PermissionAction.MODIFY_FIELD_TYPES)
     PermissionManager.grant_permission(role.id, PermissionAction.DELETE_FIELD_TYPE)
 
-    token = create_access_token(user_id=int(user.id), email=str(user.email), roles=[role.name])
+    token = create_access_token(user_id=int(user.id), email=str(user.email), roles=[role.name], org_id=int(user.o_id))
 
     with TestClient(app) as client:
         client.test_data = {"token": token, "session": session, "org": org}  # type: ignore
@@ -265,6 +266,7 @@ class TestFieldTypePermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="noperm_ft@example.com",
+            o_id=1,
         )
         session.add(user)
         session.commit()
@@ -272,7 +274,7 @@ class TestFieldTypePermissions:
         PermissionManager.db_session = session
         PermissionManager.init_default_actions()
 
-        token = create_access_token(user_id=int(user.id), email=str(user.email), roles=[])
+        token = create_access_token(user_id=int(user.id), email=str(user.email), roles=[], org_id=int(user.o_id))
         with TestClient(app) as client:
             response = client.get("/api/v2/field-types", headers={"Authorization": f"Bearer {token}"})
             assert response.status_code == 403
@@ -288,6 +290,7 @@ class TestFieldTypePermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="viewonly_ft@example.com",
+            o_id=1,
         )
         user.roles.append(role)
         session.add(user)
@@ -297,7 +300,9 @@ class TestFieldTypePermissions:
         PermissionManager.init_default_actions()
         PermissionManager.grant_permission(role.id, PermissionAction.VIEW_FIELD_TYPES)
 
-        token = create_access_token(user_id=int(user.id), email=str(user.email), roles=[role.name])
+        token = create_access_token(
+            user_id=int(user.id), email=str(user.email), roles=[role.name], org_id=int(user.o_id)
+        )
         with TestClient(app) as client:
             response = client.post(
                 "/api/v2/field-types",

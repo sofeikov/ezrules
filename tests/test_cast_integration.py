@@ -75,7 +75,9 @@ def rules_client(session):
 
     user = session.query(User).filter(User.email == "cast@example.com").first()
     if not user:
-        user = User(email="cast@example.com", password=hashed, active=True, fs_uniquifier="cast@example.com")
+        user = User(
+            email="cast@example.com", password=hashed, active=True, fs_uniquifier="cast@example.com", o_id=org.o_id
+        )
         user.roles.append(role)
         session.add(user)
         session.commit()
@@ -84,7 +86,7 @@ def rules_client(session):
     PermissionManager.init_default_actions()
     PermissionManager.grant_permission(role.id, PermissionAction.VIEW_RULES)
 
-    token = create_access_token(user_id=int(user.id), email=str(user.email), roles=[role.name])
+    token = create_access_token(user_id=int(user.id), email=str(user.email), roles=[role.name], org_id=int(user.o_id))
 
     with TestClient(app) as client:
         client.token = token  # type: ignore[attr-defined]
