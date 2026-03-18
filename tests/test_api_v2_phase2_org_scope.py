@@ -66,7 +66,11 @@ def _create_user(
     password: str = "phase2pass",
 ) -> User:
     hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-    role = Role(name=f"phase2-role-{uuid.uuid4().hex[:8]}", description="Phase 2 org-scope role")
+    role = Role(
+        name=f"phase2-role-{uuid.uuid4().hex[:8]}",
+        description="Phase 2 org-scope role",
+        o_id=org_id,
+    )
     session.add(role)
     session.commit()
     _grant_permissions(session, role, permissions)
@@ -529,8 +533,10 @@ def test_analytics_rule_quality_and_reports_are_org_scoped(session, monkeypatch)
         permissions=[PermissionAction.VIEW_RULES, PermissionAction.VIEW_LABELS],
     )
 
-    label = Label(label=f"PHASE2_ANALYTICS_LABEL_{uuid.uuid4().hex[:6].upper()}")
-    session.add(label)
+    label_name = f"PHASE2_ANALYTICS_LABEL_{uuid.uuid4().hex[:6].upper()}"
+    org_label = Label(label=label_name, o_id=int(org.o_id))
+    other_org_label = Label(label=label_name, o_id=int(other_org.o_id))
+    session.add_all([org_label, other_org_label])
     session.commit()
 
     org_rule = _create_rule(
@@ -554,7 +560,7 @@ def test_analytics_rule_quality_and_reports_are_org_scoped(session, monkeypatch)
         event={"amount": 100},
         event_timestamp=int(now.timestamp()),
         o_id=int(org.o_id),
-        el_id=int(label.el_id),
+        el_id=int(org_label.el_id),
         created_at=now,
     )
     other_event = TestingRecordLog(
@@ -562,7 +568,7 @@ def test_analytics_rule_quality_and_reports_are_org_scoped(session, monkeypatch)
         event={"amount": 200},
         event_timestamp=int(now.timestamp()),
         o_id=int(other_org.o_id),
-        el_id=int(label.el_id),
+        el_id=int(other_org_label.el_id),
         created_at=now,
     )
     session.add_all([org_event, other_event])
@@ -574,14 +580,14 @@ def test_analytics_rule_quality_and_reports_are_org_scoped(session, monkeypatch)
             TestingResultsLog(tl_id=int(other_event.tl_id), r_id=int(other_rule.r_id), rule_result="REVIEW"),
             RuleQualityPair(
                 outcome="HOLD",
-                label=str(label.label),
+                label=label_name,
                 active=True,
                 created_by="tests",
                 o_id=int(org.o_id),
             ),
             RuleQualityPair(
                 outcome="REVIEW",
-                label=str(label.label),
+                label=label_name,
                 active=True,
                 created_by="tests",
                 o_id=int(other_org.o_id),

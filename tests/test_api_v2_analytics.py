@@ -894,7 +894,7 @@ class TestRuleQualityReports:
             label=sample_rule_quality_data["normal_label"].label,
             active=True,
             created_by="tests",
-            o_id=app_settings.ORG_ID,
+            o_id=int(analytics_test_client.test_data["org"].o_id),
         )
         session.add(extra_pair)
         session.commit()

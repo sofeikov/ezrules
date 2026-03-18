@@ -1,28 +1,27 @@
 import bcrypt
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
 from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Label, LabelHistory, Organisation, Role, TestingRecordLog, User
-from ezrules.settings import app_settings
+
+
+def _get_org(session) -> Organisation:
+    return session.query(Organisation).one()
 
 
 @pytest.fixture(scope="function")
 def label_audit_client(session):
-    org = session.query(Organisation).filter(Organisation.o_id == app_settings.ORG_ID).first()
-    if not org:
-        org = Organisation(o_id=app_settings.ORG_ID, name="Test Org")
-        session.add(org)
-        session.commit()
+    org = _get_org(session)
 
     hashed_password = bcrypt.hashpw("labelauditpass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-    role = session.query(Role).filter(Role.name == "label_audit_manager").first()
+    role = session.query(Role).filter(Role.name == "label_audit_manager", Role.o_id == org.o_id).first()
     if not role:
-        role = Role(name="label_audit_manager", description="Can manage labels and audit")
+        role = Role(name="label_audit_manager", description="Can manage labels and audit", o_id=int(org.o_id))
         session.add(role)
         session.commit()
 
@@ -33,7 +32,7 @@ def label_audit_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="labelaudit@example.com",
-            o_id=app_settings.ORG_ID,
+            o_id=int(org.o_id),
         )
         user.roles.append(role)
         session.add(user)
@@ -59,7 +58,8 @@ def label_audit_client(session):
 
 @pytest.fixture(scope="function")
 def audit_label(session):
-    label = Label(label="AUDIT_LABEL")
+    org = _get_org(session)
+    label = Label(label="AUDIT_LABEL", o_id=int(org.o_id))
     session.add(label)
     session.commit()
     return label
@@ -67,14 +67,13 @@ def audit_label(session):
 
 @pytest.fixture(scope="function")
 def audit_event(session):
-    org = session.query(Organisation).filter(Organisation.o_id == app_settings.ORG_ID).first()
-    assert org is not None
+    org = _get_org(session)
 
     event = TestingRecordLog(
         event_id="audit_event_123",
         event={"amount": 100, "currency": "USD"},
         event_timestamp=1234567890,
-        o_id=org.o_id,
+        o_id=int(org.o_id),
     )
     session.add(event)
     session.commit()

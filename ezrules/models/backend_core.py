@@ -7,6 +7,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     String,
     Text,
@@ -97,6 +98,8 @@ class UserMixin:
 
 class RolesUsers(Base):
     __tablename__ = "roles_users"
+    __table_args__ = (UniqueConstraint("user_id", "role_id", name="uq_roles_users_user_role"),)
+
     id = Column(Integer(), primary_key=True)
     user_id = Column("user_id", Integer(), ForeignKey("user.id"))
     role_id = Column("role_id", Integer(), ForeignKey("role.id"))
@@ -112,7 +115,10 @@ def _require_current_organization_id() -> int:
 
 class Role(Base, RoleMixin):
     __tablename__ = "role"
-    __table_args__ = (UniqueConstraint("o_id", "name", name="uq_role_org_name"),)
+    __table_args__ = (
+        UniqueConstraint("o_id", "name", name="uq_role_org_name"),
+        UniqueConstraint("id", "o_id", name="uq_role_id_org"),
+    )
 
     id = Column(Integer(), primary_key=True)
     name = Column(String(80), nullable=False)
@@ -130,6 +136,8 @@ class Role(Base, RoleMixin):
 
 class User(Base, UserMixin):
     __tablename__ = "user"
+    __table_args__ = (UniqueConstraint("id", "o_id", name="uq_user_id_org"),)
+
     id = Column(Integer, primary_key=True)
     email = Column(String(255), unique=True)
     username = Column(String(255), unique=True, nullable=True)
@@ -262,7 +270,10 @@ class Rule(Base):
 
 class Label(Base):
     __tablename__ = "event_labels"
-    __table_args__ = (UniqueConstraint("o_id", "label", name="uq_event_labels_org_label"),)
+    __table_args__ = (
+        UniqueConstraint("o_id", "label", name="uq_event_labels_org_label"),
+        UniqueConstraint("el_id", "o_id", name="uq_event_labels_el_id_o_id"),
+    )
 
     el_id = Column(Integer, unique=True, primary_key=True)
     label = Column(String, nullable=False)
@@ -278,6 +289,13 @@ class Label(Base):
 
 class TestingRecordLog(Base):
     __tablename__ = "testing_record_log"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["el_id", "o_id"],
+            ["event_labels.el_id", "event_labels.o_id"],
+            name="fk_testing_record_log_label_org",
+        ),
+    )
 
     tl_id = Column(
         Integer,
@@ -291,8 +309,8 @@ class TestingRecordLog(Base):
     resolved_outcome = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
-    el_id: Mapped["Label"] = mapped_column(ForeignKey("event_labels.el_id"), nullable=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    el_id: Mapped[int | None] = mapped_column(Integer(), nullable=True)
 
     testing_results: Mapped[list["TestingResultsLog"]] = relationship(
         back_populates="testing_record",

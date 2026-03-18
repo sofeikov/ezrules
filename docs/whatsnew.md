@@ -10,6 +10,7 @@
 * **Audit trail org completion**: Label, user-account, and role-permission history now carry `o_id`, and the related audit summary/count endpoints only return the caller's organisation.
 * **Backtesting/bootstrap stop assuming org 1**: Backtest workers derive org context from the selected rule/request, and `init-db`, `init-permissions`, `add-user`, `generate-random-data`, and `reset-dev` now seed roles, labels, and rule-quality defaults in the provisioned organisation instead of a fixed global org.
 * **Fresh-init user ownership**: `User.o_id` is now mandatory, and fresh database/bootstrap flows create an organisation before creating users so clean rebuilds work with org-aware auth.
+* **DB-level tenant integrity hardening**: PostgreSQL now rejects cross-org user-role links and cross-org event-label links even if someone bypasses the API, and `EZRULES_ORG_ID` is no longer a documented runtime tenant selector.
 
 ## v0.24.3
 
