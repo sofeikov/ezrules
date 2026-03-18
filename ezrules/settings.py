@@ -6,7 +6,7 @@ class Settings(BaseSettings):
 
     DB_ENDPOINT: str
     APP_SECRET: str
-    ORG_ID: int
+    ORG_ID: int = 1
     EVALUATOR_ENDPOINT: str | None = "localhost:9999"
     CELERY_BROKER_URL: str = "redis://localhost:6379"
     TESTING: bool | None = False

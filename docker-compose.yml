@@ -46,7 +46,6 @@ services:
     environment:
       EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
       EZRULES_APP_SECRET: put_your_own_secret_here
-      EZRULES_ORG_ID: 1
       EZRULES_CELERY_BROKER_URL: redis://redis:6379
 
 volumes:

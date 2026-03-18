@@ -127,7 +127,6 @@ uv sync
 cat > settings.env <<EOF
 EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules
 EZRULES_APP_SECRET=dev_secret
-EZRULES_ORG_ID=1
 EZRULES_SMTP_HOST=localhost
 EZRULES_SMTP_PORT=1025
 EZRULES_FROM_EMAIL=no-reply@ezrules.local
@@ -157,6 +156,8 @@ To generate fraud-oriented demo data for development:
 ```bash
 uv run ezrules generate-random-data --n-rules 10 --n-events 100
 ```
+
+`init-db` creates a default organisation automatically. Manager requests and API-key evaluation derive org context from the authenticated user or API key rather than a global environment variable.
 
 ## 🔐 Enterprise Security
 

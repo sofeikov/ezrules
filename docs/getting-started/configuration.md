@@ -8,7 +8,6 @@ Set these three variables first:
 
 - `EZRULES_DB_ENDPOINT`
 - `EZRULES_APP_SECRET`
-- `EZRULES_ORG_ID`
 
 If you use the Rules page "Evaluate" shortcut, set this too:
 
@@ -19,7 +18,6 @@ Example `settings.env`:
 ```bash
 EZRULES_DB_ENDPOINT=postgresql://postgres:password@localhost:5432/ezrules
 EZRULES_APP_SECRET=dev-secret-key-change-me
-EZRULES_ORG_ID=1
 EZRULES_EVALUATOR_ENDPOINT=http://localhost:8888/api/v2
 EZRULES_APP_BASE_URL=http://localhost:4200
 EZRULES_SMTP_HOST=smtp.example.com
@@ -34,6 +32,8 @@ Run the service:
 
 --8<-- "snippets/start-api.md"
 
+Fresh database bootstrap creates a default organisation automatically. Manager requests and API-key evaluation derive org context from the authenticated user or API key, not from an environment variable.
+
 ---
 
 ## Configuration Matrix
@@ -42,7 +42,6 @@ Run the service:
 |---|---|---|---|---|
 | `EZRULES_DB_ENDPOINT` | Yes | None | `postgresql://user:pass@host:5432/db` | Primary database connection |
 | `EZRULES_APP_SECRET` | Yes | None | strong random string | JWT/signing and security features |
-| `EZRULES_ORG_ID` | Yes | None | `1` | Organization context |
 | `EZRULES_EVALUATOR_ENDPOINT` | No | `localhost:9999` | `http://localhost:8888/api/v2` | Base URL used by Rules page "Evaluate" shortcut |
 | `EZRULES_TESTING` | No | `false` | `true` in tests | Testing mode |
 | `EZRULES_CELERY_BROKER_URL` | No | `redis://localhost:6379` | `redis://host:6379/0` | Celery broker for backtesting |
@@ -70,7 +69,6 @@ Example shell export:
 ```bash
 export EZRULES_DB_ENDPOINT="postgresql://postgres:mypassword@localhost:5432/ezrules"
 export EZRULES_APP_SECRET="your-secret-key"
-export EZRULES_ORG_ID="1"
 export EZRULES_EVALUATOR_ENDPOINT="http://localhost:8888/api/v2"
 export EZRULES_APP_BASE_URL="http://localhost:4200"
 export EZRULES_SMTP_HOST="smtp.example.com"
@@ -157,7 +155,6 @@ services:
     environment:
       - EZRULES_DB_ENDPOINT=postgresql://postgres:password@db:5432/ezrules
       - EZRULES_APP_SECRET=${SECRET_KEY}
-      - EZRULES_ORG_ID=1
     command: ["uv", "run", "ezrules", "api", "--port", "8888"]
 ```
 

@@ -54,7 +54,6 @@ services:
     environment:
       EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
       EZRULES_APP_SECRET: ${EZRULES_APP_SECRET}
-      EZRULES_ORG_ID: 1
     restart: "no"
 
   api:
@@ -72,7 +71,6 @@ services:
     environment:
       EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
       EZRULES_APP_SECRET: ${EZRULES_APP_SECRET}
-      EZRULES_ORG_ID: 1
       EZRULES_CELERY_BROKER_URL: redis://redis:6379
       EZRULES_SMTP_HOST: ${EZRULES_SMTP_HOST:-mailpit}
       EZRULES_SMTP_PORT: ${EZRULES_SMTP_PORT:-1025}
@@ -92,7 +90,6 @@ services:
     environment:
       EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
       EZRULES_APP_SECRET: ${EZRULES_APP_SECRET}
-      EZRULES_ORG_ID: 1
       EZRULES_CELERY_BROKER_URL: redis://redis:6379
 
   frontend:
