@@ -86,8 +86,19 @@ class DatabaseLabelManager(LabelManager):
             self._cached_labels = None
 
     def label_exists(self, label: str):
+        from ezrules.models.backend_core import Label
+
+        self._ensure_initialized()
         normalized_label = label.strip().upper()
-        return any(existing_label.upper() == normalized_label for existing_label in self.get_all_labels())
+        return (
+            self.db_session.query(Label.el_id)
+            .filter(
+                Label.o_id == self.o_id,
+                func.upper(Label.label) == normalized_label,
+            )
+            .first()
+            is not None
+        )
 
     def remove_label(self, label: str):
         from ezrules.models.backend_core import Label

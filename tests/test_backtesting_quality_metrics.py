@@ -8,7 +8,7 @@ from ezrules.backend.api_v2.routes import backtesting as backtesting_routes
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Label, Organisation, Role, TestingRecordLog, User
+from ezrules.models.backend_core import Label, Organisation, Role, RuleBackTestingResult, TestingRecordLog, User
 from ezrules.models.backend_core import Rule as RuleModel
 
 
@@ -16,9 +16,19 @@ from ezrules.models.backend_core import Rule as RuleModel
 def backtesting_quality_client(session):
     hashed_password = bcrypt.hashpw(b"btpass", bcrypt.gensalt()).decode("utf-8")
 
-    role = session.query(Role).filter(Role.name == "bt_quality_manager").first()
+    org = session.query(Organisation).filter(Organisation.o_id == 1).first()
+    if org is None:
+        org = Organisation(o_id=1, name="Backtesting Quality Org")
+        session.add(org)
+        session.commit()
+
+    role = session.query(Role).filter(Role.name == "bt_quality_manager", Role.o_id == int(org.o_id)).first()
     if role is None:
-        role = Role(name="bt_quality_manager", description="Can inspect backtesting quality metrics")
+        role = Role(
+            name="bt_quality_manager",
+            description="Can inspect backtesting quality metrics",
+            o_id=int(org.o_id),
+        )
         session.add(role)
         session.commit()
 
@@ -60,8 +70,8 @@ def labeled_backtest_fixture(session):
         session.add(org)
         session.commit()
 
-    fraud_label = Label(label="FRAUD")
-    normal_label = Label(label="NORMAL")
+    fraud_label = Label(label="FRAUD", o_id=int(org.o_id))
+    normal_label = Label(label="NORMAL", o_id=int(org.o_id))
     session.add_all([fraud_label, normal_label])
     session.commit()
 
@@ -95,11 +105,15 @@ def labeled_backtest_fixture(session):
         )
     session.commit()
 
-    return {"rule": rule}
+    return {"org": org, "rule": rule}
 
 
 def test_backtest_task_returns_label_counts_and_quality_metrics(session, labeled_backtest_fixture):
-    result = backtest_rule_change(labeled_backtest_fixture["rule"].r_id, 'if $amount > 150:\n\treturn "BLOCK"')
+    result = backtest_rule_change(
+        labeled_backtest_fixture["rule"].r_id,
+        'if $amount > 150:\n\treturn "BLOCK"',
+        int(labeled_backtest_fixture["org"].o_id),
+    )
 
     assert result["total_records"] == 6
     assert result["labeled_records"] == 4
@@ -207,6 +221,24 @@ def test_get_task_result_serializes_quality_metrics(backtesting_quality_client, 
             pass
 
     monkeypatch.setattr(backtesting_routes, "AsyncResult", FakeAsyncResult)
+
+    session = backtesting_quality_client.test_data["session"]
+    org = session.query(Organisation).filter(Organisation.o_id == 1).one()
+    rule = RuleModel(
+        rid="bt_quality_task_rule",
+        logic='return "HOLD"',
+        description="Backtesting task status rule",
+        o_id=int(org.o_id),
+    )
+    session.add(rule)
+    session.commit()
+    session.add(
+        RuleBackTestingResult(
+            r_id=int(rule.r_id),
+            task_id="fake-task-id",
+        )
+    )
+    session.commit()
 
     response = backtesting_quality_client.get(
         "/api/v2/backtesting/task/fake-task-id",

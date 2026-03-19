@@ -86,8 +86,8 @@ export class AuditTrailPage {
 
   async waitForPageToLoad() {
     await this.heading.waitFor({ state: 'visible' });
-    // Wait for loading spinner to disappear
-    await this.loadingSpinner.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    await this.ruleHistoryAccordion.waitFor({ state: 'visible', timeout: 10000 });
+    await this.fieldTypeHistoryAccordion.waitFor({ state: 'visible', timeout: 10000 });
   }
 
   async expandSection(section: 'rules' | 'config' | 'userLists' | 'outcomes' | 'labels' | 'userAccounts' | 'rolePermissions' | 'fieldTypes') {

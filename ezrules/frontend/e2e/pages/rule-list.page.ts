@@ -13,7 +13,9 @@ export class RuleListPage {
   readonly emptyStateMessage: Locator;
   readonly howToRunButton: Locator;
   readonly howToRunSection: Locator;
+  readonly evaluateEndpointCode: Locator;
   readonly curlExample: Locator;
+  readonly evaluateLink: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -23,8 +25,10 @@ export class RuleListPage {
     this.errorMessage = page.locator('text=/Error loading rules/i');
     this.emptyStateMessage = page.locator('text=/No rules found/i');
     this.howToRunButton = page.locator('button', { hasText: 'How to Run' });
-    this.howToRunSection = page.locator('div').filter({ hasText: 'How to Run' }).first();
-    this.curlExample = page.locator('pre');
+    this.howToRunSection = page.locator('.bg-blue-50');
+    this.evaluateEndpointCode = page.locator('.bg-blue-50 code').first();
+    this.curlExample = page.locator('.bg-gray-900.text-gray-100');
+    this.evaluateLink = page.getByRole('link', { name: 'Evaluate' });
   }
 
   /**
@@ -72,7 +76,6 @@ export class RuleListPage {
    * Get the evaluator endpoint displayed on the page
    */
   async getEvaluatorEndpoint(): Promise<string> {
-    const endpointText = await this.page.locator('text=/Evaluator Endpoint:/i').textContent();
-    return endpointText?.replace('Evaluator Endpoint:', '').trim() || '';
+    return ((await this.evaluateEndpointCode.textContent()) || '').trim();
   }
 }

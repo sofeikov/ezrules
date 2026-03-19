@@ -26,9 +26,6 @@
             </svg>
             New Rule
           </a>
-          <a href="{{ evaluatorEndpoint }}/evaluate" class="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
-            Evaluate
-          </a>
         </div>
       </div>
 
@@ -40,11 +37,11 @@
           </svg>
           <div class="flex-1">
             <p class="text-sm text-gray-700 mb-2">
-              <strong>Evaluator endpoint:</strong> <code class="bg-white px-2 py-1 rounded text-blue-600">{{ evaluatorEndpoint }}</code>
+              <strong>Evaluate endpoint:</strong> <code class="bg-white px-2 py-1 rounded text-blue-600">{{ evaluateEndpoint }}</code>
             </p>
             <p class="text-sm text-gray-700 mb-2">Test example:</p>
             <div class="bg-gray-900 text-gray-100 p-3 rounded text-xs font-mono overflow-x-auto">
-              curl -X POST -H "Content-Type: application/json" -d '&#123;"event_timestamp":23, "event_id":"123", "event_data":&#123;"age": 25, "amount": 9000&#125;&#125;' {{ evaluatorEndpoint }}/evaluate
+              curl -X POST -H "Content-Type: application/json" -d '&#123;"event_timestamp":23, "event_id":"123", "event_data":&#123;"age": 25, "amount": 9000&#125;&#125;' {{ evaluateEndpoint }}
             </div>
           </div>
         </div>

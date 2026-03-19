@@ -85,10 +85,11 @@ def get_task_result(
         .join(RuleModel, RuleModel.r_id == RuleBackTestingResult.r_id)
         .filter(
             RuleBackTestingResult.task_id == task_id,
+            RuleModel.o_id == current_org_id,
         )
         .first()
     )
-    if task_record is not None and int(task_record.rule.o_id) != current_org_id:
+    if task_record is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Backtest task not found",
@@ -132,8 +133,8 @@ def get_backtest_results(
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> BacktestResultsResponse:
-    rule = db.query(RuleModel).filter(RuleModel.r_id == rule_id).first()
-    if rule is not None and int(rule.o_id) != current_org_id:
+    rule = db.query(RuleModel).filter(RuleModel.r_id == rule_id, RuleModel.o_id == current_org_id).first()
+    if rule is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Rule not found",

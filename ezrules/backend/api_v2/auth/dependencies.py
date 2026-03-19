@@ -91,11 +91,54 @@ def get_db() -> Any:
 # =============================================================================
 
 
-def _bind_request_org_context(db: Any, org_id: int) -> int:
+def bind_request_org_context(db: Any, org_id: int) -> int:
     """Bind org-scoped helpers into request-local context."""
     set_organization_id(org_id)
     set_user_list_manager(PersistentUserListManager(db_session=db, o_id=org_id))
     return org_id
+
+
+def get_org_id_for_api_key(api_key: str, db: Any) -> int | None:
+    """Resolve an org ID from an API key, if the key is valid."""
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    db_key = db.query(ApiKey).filter(ApiKey.key_hash == key_hash, ApiKey.revoked_at.is_(None)).first()
+    if db_key is None:
+        return None
+    return int(db_key.o_id)
+
+
+def get_user_for_access_token(
+    token: str,
+    db: Any,
+    *,
+    load_roles: bool = False,
+    require_active: bool = False,
+) -> User | None:
+    """Resolve a user from an access token, or return None if validation fails."""
+    payload = decode_token(token)
+    if payload is None or payload.token_type != "access" or payload.org_id is None:
+        return None
+
+    query = db.query(User)
+    if load_roles:
+        query = query.options(joinedload(User.roles))
+
+    user = query.filter(User.id == payload.user_id).first()
+    if user is None:
+        return None
+    if int(user.o_id) != payload.org_id:
+        return None
+    if require_active and not user.active:
+        return None
+    return user
+
+
+def get_org_id_for_access_token(token: str, db: Any) -> int | None:
+    """Resolve an org ID from a bearer access token, if the token is valid."""
+    user = get_user_for_access_token(token, db, require_active=True)
+    if user is None:
+        return None
+    return int(user.o_id)
 
 
 def get_current_user(
@@ -142,26 +185,8 @@ def get_current_user(
     if token is None:
         raise credentials_exception
 
-    # Decode the token - this verifies signature and expiration
-    payload = decode_token(token)
-    if payload is None:
-        raise credentials_exception
-
-    # Make sure it's an access token, not a refresh token
-    # (Refresh tokens should only be accepted at /auth/refresh)
-    if payload.token_type != "access":
-        raise credentials_exception
-
-    if payload.org_id is None:
-        raise credentials_exception
-
-    # Look up the user in the database, eagerly loading roles to avoid
-    # DetachedInstanceError if the session is closed before check_permission runs
-    user = db.query(User).options(joinedload(User.roles)).filter(User.id == payload.user_id).first()
+    user = get_user_for_access_token(token, db, load_roles=True)
     if user is None:
-        raise credentials_exception
-
-    if int(user.o_id) != payload.org_id:
         raise credentials_exception
 
     return user
@@ -196,7 +221,7 @@ async def get_current_active_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is disabled",
         )
-    _bind_request_org_context(db, int(user.o_id))
+    bind_request_org_context(db, int(user.o_id))
     return user
 
 
@@ -230,21 +255,8 @@ def get_current_user_strict(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    payload = decode_token(token)
-    if payload is None:
-        raise credentials_exception
-
-    if payload.token_type != "access":
-        raise credentials_exception
-
-    if payload.org_id is None:
-        raise credentials_exception
-
-    user = db.query(User).options(joinedload(User.roles)).filter(User.id == payload.user_id).first()
+    user = get_user_for_access_token(token, db, load_roles=True)
     if user is None:
-        raise credentials_exception
-
-    if int(user.o_id) != payload.org_id:
         raise credentials_exception
 
     return user
@@ -274,7 +286,7 @@ async def get_current_active_user_strict(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is disabled",
         )
-    _bind_request_org_context(db, int(user.o_id))
+    bind_request_org_context(db, int(user.o_id))
     return user
 
 
@@ -388,21 +400,18 @@ def get_evaluator_auth(
     Raises 401 if neither is provided or if the provided credentials are invalid.
     """
     if api_key is not None:
-        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-        db_key = db.query(ApiKey).filter(ApiKey.key_hash == key_hash, ApiKey.revoked_at.is_(None)).first()
-        if db_key:
-            return int(db_key.o_id)
+        org_id = get_org_id_for_api_key(api_key, db)
+        if org_id is not None:
+            return org_id
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or revoked API key",
         )
 
     if token is not None:
-        payload = decode_token(token)
-        if payload is not None and payload.token_type == "access" and payload.org_id is not None:
-            user = db.query(User).filter(User.id == payload.user_id).first()
-            if user is not None and user.active and int(user.o_id) == payload.org_id:
-                return int(user.o_id)
+        org_id = get_org_id_for_access_token(token, db)
+        if org_id is not None:
+            return org_id
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -420,7 +429,7 @@ async def get_current_evaluator_org_id(
     db: Any = Depends(get_db),
 ) -> int:
     """Bind evaluator org context in the async request task before sync execution hops."""
-    return _bind_request_org_context(db, org_id)
+    return bind_request_org_context(db, org_id)
 
 
 def require_any_permission(*actions: PermissionAction) -> Callable[..., None]:

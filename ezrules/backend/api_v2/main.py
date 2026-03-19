@@ -4,16 +4,18 @@ FastAPI application for ezrules API v2.
 This is the main entry point for the new FastAPI-based API.
 """
 
-import hashlib
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import JSONResponse
 
-from ezrules.backend.api_v2.auth.dependencies import SessionLocal, _bind_request_org_context
-from ezrules.backend.api_v2.auth.jwt import decode_token
+from ezrules.backend.api_v2.auth.dependencies import (
+    SessionLocal,
+    bind_request_org_context,
+    get_org_id_for_access_token,
+    get_org_id_for_api_key,
+)
 from ezrules.backend.api_v2.routes import (
     analytics,
     api_keys,
@@ -33,7 +35,6 @@ from ezrules.backend.api_v2.routes import (
     users,
 )
 from ezrules.core.application_context import reset_context
-from ezrules.models.backend_core import ApiKey, User
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
@@ -73,19 +74,17 @@ def _prime_request_context_from_headers(request: StarletteRequest, db) -> None:
     """Best-effort context binding before sync dependency/route execution starts."""
     api_key = request.headers.get("X-API-Key")
     if api_key:
-        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-        db_key = db.query(ApiKey).filter(ApiKey.key_hash == key_hash, ApiKey.revoked_at.is_(None)).first()
-        if db_key is not None:
-            _bind_request_org_context(db, int(db_key.o_id))
+        org_id = get_org_id_for_api_key(api_key, db)
+        if org_id is not None:
+            bind_request_org_context(db, org_id)
             return
 
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
-        payload = decode_token(auth_header.removeprefix("Bearer ").strip())
-        if payload is not None and payload.token_type == "access" and payload.org_id is not None:
-            user = db.query(User).filter(User.id == payload.user_id).first()
-            if user is not None and user.active and int(user.o_id) == payload.org_id:
-                _bind_request_org_context(db, int(user.o_id))
+        token = auth_header.removeprefix("Bearer ").strip()
+        org_id = get_org_id_for_access_token(token, db)
+        if org_id is not None:
+            bind_request_org_context(db, org_id)
 
 
 @app.middleware("http")

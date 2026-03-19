@@ -276,3 +276,9 @@ def test_backtesting_endpoints_hide_other_org_rules(session):
             headers=_auth_headers(user),
         )
         assert results_response.status_code == 404
+
+        task_response = client.get(
+            "/api/v2/backtesting/task/phase3-task",
+            headers=_auth_headers(user),
+        )
+        assert task_response.status_code == 404

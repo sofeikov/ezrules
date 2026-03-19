@@ -11,6 +11,9 @@
 * **Backtesting/bootstrap stop assuming org 1**: Backtest workers derive org context from the selected rule/request, and `init-db`, `init-permissions`, `add-user`, `generate-random-data`, and `reset-dev` now seed roles, labels, and rule-quality defaults in the provisioned organisation instead of a fixed global org.
 * **Fresh-init user ownership**: `User.o_id` is now mandatory, and fresh database/bootstrap flows create an organisation before creating users so clean rebuilds work with org-aware auth.
 * **DB-level tenant integrity hardening**: PostgreSQL now rejects cross-org user-role links and cross-org event-label links even if someone bypasses the API, and `EZRULES_ORG_ID` is no longer a documented runtime tenant selector.
+* **Frontend runtime-config hardening**: Frontend builds now regenerate `runtime-config.js` instead of baking in stale checked-in API URLs, so the demo stack and production image no longer inherit old local dev ports.
+* **Rules page evaluate UX cleanup**: The Rules header no longer renders a dead browser link to the evaluator service, and the How to Run panel now shows the runtime manager API `/api/v2/evaluate` endpoint instead of a stale `localhost:9999` example.
+* **Backtest status refresh fix**: Rule Detail now loads task status for every backtest result card on page load, so completed backtests no longer stay stuck at `In Progress` until you expand them.
 
 ## v0.24.3
 
