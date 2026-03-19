@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { environment } from '../../environments/environment';
 import { AuthService } from '../services/auth.service';
 import { Rule, RuleService, RuleStatus } from '../services/rule.service';
 import { SidebarComponent } from '../components/sidebar.component';
@@ -13,7 +14,7 @@ import { SidebarComponent } from '../components/sidebar.component';
 })
 export class RuleListComponent implements OnInit {
   rules: Rule[] = [];
-  evaluatorEndpoint: string = '';
+  evaluateEndpoint: string = `${environment.apiUrl}/api/v2/evaluate`;
   loading: boolean = true;
   error: string | null = null;
   showHowToRun: boolean = false;
@@ -47,7 +48,6 @@ export class RuleListComponent implements OnInit {
     this.ruleService.getRules().subscribe({
       next: (response) => {
         this.rules = response.rules;
-        this.evaluatorEndpoint = response.evaluator_endpoint;
         this.loading = false;
       },
       error: (error) => {

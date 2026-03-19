@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
@@ -194,6 +195,7 @@ def role_permission_history_to_response(history: RolePermissionHistory) -> RoleP
 def get_audit_summary(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> AuditSummaryResponse:
     """
@@ -202,20 +204,29 @@ def get_audit_summary(
     Returns counts of version history entries.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    total_rule_versions = db.query(RuleHistory).count()
-    total_config_versions = db.query(RuleEngineConfigHistory).count()
+    total_rule_versions = db.query(RuleHistory).filter(RuleHistory.o_id == current_org_id).count()
+    total_config_versions = (
+        db.query(RuleEngineConfigHistory).filter(RuleEngineConfigHistory.o_id == current_org_id).count()
+    )
 
     # Count distinct rules/configs with history
-    rules_with_changes = db.query(RuleHistory.r_id).distinct().count()
-    configs_with_changes = db.query(RuleEngineConfigHistory.re_id).distinct().count()
+    rules_with_changes = db.query(RuleHistory.r_id).filter(RuleHistory.o_id == current_org_id).distinct().count()
+    configs_with_changes = (
+        db.query(RuleEngineConfigHistory.re_id)
+        .filter(RuleEngineConfigHistory.o_id == current_org_id)
+        .distinct()
+        .count()
+    )
 
-    total_user_list_actions = db.query(UserListHistory).count()
-    total_outcome_actions = db.query(OutcomeHistory).count()
-    total_label_actions = db.query(LabelHistory).count()
-    total_user_account_actions = db.query(UserAccountHistory).count()
-    total_role_permission_actions = db.query(RolePermissionHistory).count()
-    total_field_type_actions = db.query(FieldTypeHistory).count()
-    total_api_key_actions = db.query(ApiKeyHistory).count()
+    total_user_list_actions = db.query(UserListHistory).filter(UserListHistory.o_id == current_org_id).count()
+    total_outcome_actions = db.query(OutcomeHistory).filter(OutcomeHistory.o_id == current_org_id).count()
+    total_label_actions = db.query(LabelHistory).filter(LabelHistory.o_id == current_org_id).count()
+    total_user_account_actions = db.query(UserAccountHistory).filter(UserAccountHistory.o_id == current_org_id).count()
+    total_role_permission_actions = (
+        db.query(RolePermissionHistory).filter(RolePermissionHistory.o_id == current_org_id).count()
+    )
+    total_field_type_actions = db.query(FieldTypeHistory).filter(FieldTypeHistory.o_id == current_org_id).count()
+    total_api_key_actions = db.query(ApiKeyHistory).filter(ApiKeyHistory.o_id == current_org_id).count()
 
     return AuditSummaryResponse(
         total_rule_versions=total_rule_versions,
@@ -241,6 +252,7 @@ def get_audit_summary(
 def list_rule_history(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
     start_date: datetime | None = Query(default=None, description="Filter by start date"),
     end_date: datetime | None = Query(default=None, description="Filter by end date"),
@@ -254,7 +266,7 @@ def list_rule_history(
     Returns all rule changes with optional filtering.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    query = db.query(RuleHistory)
+    query = db.query(RuleHistory).filter(RuleHistory.o_id == current_org_id)
 
     # Apply filters
     if start_date:
@@ -283,6 +295,7 @@ def get_rule_audit(
     rule_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleAuditResponse:
     """
@@ -291,8 +304,13 @@ def get_rule_audit(
     Returns all versions of the rule from oldest to newest.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    rule = db.query(Rule).filter(Rule.r_id == rule_id).first()
-    history = db.query(RuleHistory).filter(RuleHistory.r_id == rule_id).order_by(RuleHistory.version.asc()).all()
+    rule = db.query(Rule).filter(Rule.r_id == rule_id, Rule.o_id == current_org_id).first()
+    history = (
+        db.query(RuleHistory)
+        .filter(RuleHistory.r_id == rule_id, RuleHistory.o_id == current_org_id)
+        .order_by(RuleHistory.version.asc())
+        .all()
+    )
 
     if not rule and not history:
         raise HTTPException(
@@ -320,6 +338,7 @@ def get_rule_audit(
 def list_config_history(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
     start_date: datetime | None = Query(default=None, description="Filter by start date"),
     end_date: datetime | None = Query(default=None, description="Filter by end date"),
@@ -333,7 +352,7 @@ def list_config_history(
     Returns all config changes with optional filtering.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    query = db.query(RuleEngineConfigHistory)
+    query = db.query(RuleEngineConfigHistory).filter(RuleEngineConfigHistory.o_id == current_org_id)
 
     # Apply filters
     if start_date:
@@ -366,6 +385,7 @@ def list_config_history(
 def list_user_list_history(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
     start_date: datetime | None = Query(default=None, description="Filter by start date"),
     end_date: datetime | None = Query(default=None, description="Filter by end date"),
@@ -379,7 +399,7 @@ def list_user_list_history(
     Returns all user list changes with optional filtering.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    query = db.query(UserListHistory)
+    query = db.query(UserListHistory).filter(UserListHistory.o_id == current_org_id)
 
     if start_date:
         query = query.filter(UserListHistory.changed >= start_date)
@@ -408,6 +428,7 @@ def list_user_list_history(
 def list_outcome_history(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
     start_date: datetime | None = Query(default=None, description="Filter by start date"),
     end_date: datetime | None = Query(default=None, description="Filter by end date"),
@@ -420,7 +441,7 @@ def list_outcome_history(
     Returns all outcome changes with optional filtering.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    query = db.query(OutcomeHistory)
+    query = db.query(OutcomeHistory).filter(OutcomeHistory.o_id == current_org_id)
 
     if start_date:
         query = query.filter(OutcomeHistory.changed >= start_date)
@@ -447,6 +468,7 @@ def list_outcome_history(
 def list_label_history(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
     start_date: datetime | None = Query(default=None, description="Filter by start date"),
     end_date: datetime | None = Query(default=None, description="Filter by end date"),
@@ -459,7 +481,7 @@ def list_label_history(
     Returns all label changes with optional filtering.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    query = db.query(LabelHistory)
+    query = db.query(LabelHistory).filter(LabelHistory.o_id == current_org_id)
 
     if start_date:
         query = query.filter(LabelHistory.changed >= start_date)
@@ -486,6 +508,7 @@ def list_label_history(
 def list_user_account_history(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
     start_date: datetime | None = Query(default=None, description="Filter by start date"),
     end_date: datetime | None = Query(default=None, description="Filter by end date"),
@@ -499,7 +522,7 @@ def list_user_account_history(
     Returns all user account changes with optional filtering.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    query = db.query(UserAccountHistory)
+    query = db.query(UserAccountHistory).filter(UserAccountHistory.o_id == current_org_id)
 
     if start_date:
         query = query.filter(UserAccountHistory.changed >= start_date)
@@ -528,6 +551,7 @@ def list_user_account_history(
 def list_role_permission_history(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
     start_date: datetime | None = Query(default=None, description="Filter by start date"),
     end_date: datetime | None = Query(default=None, description="Filter by end date"),
@@ -541,7 +565,7 @@ def list_role_permission_history(
     Returns all role and permission changes with optional filtering.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    query = db.query(RolePermissionHistory)
+    query = db.query(RolePermissionHistory).filter(RolePermissionHistory.o_id == current_org_id)
 
     if start_date:
         query = query.filter(RolePermissionHistory.changed >= start_date)
@@ -570,6 +594,7 @@ def list_role_permission_history(
 def list_field_type_history(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
     start_date: datetime | None = Query(default=None, description="Filter by start date"),
     end_date: datetime | None = Query(default=None, description="Filter by end date"),
@@ -583,7 +608,7 @@ def list_field_type_history(
     Returns all field type configuration changes with optional filtering.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    query = db.query(FieldTypeHistory)
+    query = db.query(FieldTypeHistory).filter(FieldTypeHistory.o_id == current_org_id)
 
     if start_date:
         query = query.filter(FieldTypeHistory.changed >= start_date)
@@ -612,6 +637,7 @@ def list_field_type_history(
 def list_api_key_history(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
     start_date: datetime | None = Query(default=None, description="Filter by start date"),
     end_date: datetime | None = Query(default=None, description="Filter by end date"),
@@ -624,7 +650,7 @@ def list_api_key_history(
     Returns all API key create and revoke events with optional filtering.
     Requires ACCESS_AUDIT_TRAIL permission.
     """
-    query = db.query(ApiKeyHistory)
+    query = db.query(ApiKeyHistory).filter(ApiKeyHistory.o_id == current_org_id)
 
     if start_date:
         query = query.filter(ApiKeyHistory.changed >= start_date)

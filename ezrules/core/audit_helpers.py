@@ -66,6 +66,7 @@ def save_label_history(
     el_id: int,
     label: str,
     action: str,
+    o_id: int,
     changed_by: str | None = None,
     details: str | None = None,
 ) -> None:
@@ -75,6 +76,7 @@ def save_label_history(
         label=label,
         action=action,
         details=details,
+        o_id=o_id,
         changed=datetime.datetime.now(datetime.UTC),
         changed_by=changed_by,
     )
@@ -86,6 +88,7 @@ def save_user_account_history(
     user_id: int,
     user_email: str,
     action: str,
+    o_id: int,
     changed_by: str | None = None,
     details: str | None = None,
 ) -> None:
@@ -95,6 +98,7 @@ def save_user_account_history(
         user_email=user_email,
         action=action,
         details=details,
+        o_id=o_id,
         changed=datetime.datetime.now(datetime.UTC),
         changed_by=changed_by,
     )
@@ -150,6 +154,7 @@ def save_role_history(
     role_id: int,
     role_name: str,
     action: str,
+    o_id: int,
     changed_by: str | None = None,
     details: str | None = None,
 ) -> None:
@@ -159,6 +164,7 @@ def save_role_history(
         role_name=role_name,
         action=action,
         details=details,
+        o_id=o_id,
         changed=datetime.datetime.now(datetime.UTC),
         changed_by=changed_by,
     )

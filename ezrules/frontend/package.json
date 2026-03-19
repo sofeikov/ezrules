@@ -4,7 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "node ./scripts/start-with-runtime-config.mjs",
-    "build": "ng build",
+    "build": "npm run write-runtime-config && ng build",
     "watch": "ng build --watch --configuration development",
     "write-runtime-config": "node ./scripts/write-runtime-config.mjs",
     "tdest": "ng test",

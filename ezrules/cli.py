@@ -48,6 +48,60 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_RESET_DEV_LABELS_CSV_PATH = PROJECT_ROOT / "test_labels.csv"
 
 
+def _get_or_create_default_organisation(db_session):
+    """Return the default organisation, creating it when needed."""
+    organisation = db_session.query(Organisation).filter_by(name="base").first()
+    if organisation is None:
+        organisation = Organisation(name="base")
+        db_session.add(organisation)
+        db_session.commit()
+        db_session.refresh(organisation)
+    return organisation
+
+
+def _get_or_create_role(
+    session,
+    *,
+    o_id: int,
+    name: str,
+    description: str,
+) -> Role:
+    """Return an organization-scoped role, creating it when needed."""
+    role = session.query(Role).filter(Role.o_id == o_id, Role.name == name).first()
+    if role is None:
+        role = Role(name=name, description=description, o_id=o_id)
+        session.add(role)
+        session.commit()
+    elif description and role.description != description:
+        role.description = description
+        session.commit()
+    return role
+
+
+def _ensure_default_roles(session, *, o_id: int) -> dict[str, Role]:
+    """Ensure the standard system roles exist for the given organization."""
+    PermissionManager.db_session = session
+    PermissionManager.init_default_actions()
+
+    role_specs = {
+        RoleType.ADMIN: ("admin", "Full system administrator"),
+        RoleType.READONLY: ("readonly", "Read-only access"),
+        RoleType.RULE_EDITOR: ("rule_editor", "Can create and modify rules"),
+    }
+    roles: dict[str, Role] = {}
+
+    for role_type, (name, description) in role_specs.items():
+        role = _get_or_create_role(session, o_id=o_id, name=name, description=description)
+        for permission in RoleType.get_role_permissions(role_type):
+            try:
+                PermissionManager.grant_permission(int(role.id), permission)
+            except ValueError:
+                logger.warning("Permission %s not found, skipping", permission.value)
+        roles[name] = role
+
+    return roles
+
+
 def _drop_database(engine, db_name):
     """Drop the specified database."""
     logger.info(f"Dropping database '{db_name}'...")
@@ -115,12 +169,14 @@ def add_user(user_email, password, admin):
 
     user = None
     try:
+        organisation = _get_or_create_default_organisation(db_session)
         hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         user = User(
             email=user_email,
             password=hashed_password,
             active=True,
             fs_uniquifier=user_email,
+            o_id=int(organisation.o_id),
         )
         db_session.add(user)
         db_session.commit()
@@ -131,36 +187,13 @@ def add_user(user_email, password, admin):
         logger.info("User already exists")
         # Try to get existing user
         user = db_session.query(User).filter_by(email=user_email).first()
+        _get_or_create_default_organisation(db_session)
 
-    try:
-        db_session.add(Organisation(name="base"))
-        db_session.commit()
-    except Exception:
-        db_session.rollback()
-
-    # Grant admin permissions if --admin flag is set
+        # Grant admin permissions if --admin flag is set
     if admin and user:
         logger.info("Granting admin permissions...")
 
-        # Initialize default actions
-        PermissionManager.db_session = db_session
-        PermissionManager.init_default_actions()
-
-        # Create or get admin role
-        admin_role = db_session.query(Role).filter_by(name="admin").first()
-        if not admin_role:
-            admin_role = Role(name="admin", description="Full system administrator")
-            db_session.add(admin_role)
-            db_session.commit()
-            logger.info("Created admin role")
-
-        # Grant all permissions to admin role
-        admin_permissions = RoleType.get_role_permissions(RoleType.ADMIN)
-        for permission in admin_permissions:
-            try:
-                PermissionManager.grant_permission(int(admin_role.id), permission)
-            except ValueError:
-                logger.warning(f"Permission {permission.value} not found, skipping")
+        admin_role = _ensure_default_roles(db_session, o_id=int(user.o_id))["admin"]
 
         # Assign admin role to user
         if admin_role not in user.roles:
@@ -233,13 +266,8 @@ def init_db(auto_delete):
 
         # Create default organisation
         logger.info("Creating default organisation...")
-        existing_org = db_session.query(Organisation).filter_by(name="base").first()
-        if not existing_org:
-            db_session.add(Organisation(name="base"))
-            db_session.commit()
-            logger.info("Default organisation created")
-        else:
-            logger.info("Default organisation already exists")
+        existing_org = _get_or_create_default_organisation(db_session)
+        logger.info("Default organisation ready: %s", existing_org.name)
 
         # Initialize default permissions
         logger.info("Initializing default permissions...")
@@ -247,15 +275,19 @@ def init_db(auto_delete):
         PermissionManager.init_default_actions()
         logger.info("Default permissions initialized")
 
+        logger.info("Seeding default roles...")
+        _ensure_default_roles(db_session, o_id=int(existing_org.o_id))
+        logger.info("Default roles seeded")
+
         # Seed default outcomes (RELEASE, HOLD, CANCEL)
         logger.info("Seeding default outcomes...")
-        outcome_manager = DatabaseOutcome(db_session=db_session, o_id=1)
+        outcome_manager = DatabaseOutcome(db_session=db_session, o_id=int(existing_org.o_id))
         outcome_manager._ensure_default_outcomes()
         logger.info("Default outcomes seeded")
 
         # Seed default user lists (MiddleAsiaCountries, NACountries, LatamCountries)
         logger.info("Seeding default user lists...")
-        user_list_manager = PersistentUserListManager(db_session=db_session, o_id=1)
+        user_list_manager = PersistentUserListManager(db_session=db_session, o_id=int(existing_org.o_id))
         user_list_manager._ensure_default_lists()
         logger.info("Default user lists seeded")
 
@@ -274,48 +306,8 @@ def init_permissions():
     db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
     Base.query = db_session.query_property()
 
-    PermissionManager.init_default_actions()
-
-    admin_role = db_session.query(Role).filter_by(name="admin").first()
-    if not admin_role:
-        admin_role = Role(name="admin", description="Full system administrator")
-        db_session.add(admin_role)
-        db_session.commit()
-
-    readonly_role = db_session.query(Role).filter_by(name="readonly").first()
-    if not readonly_role:
-        readonly_role = Role(name="readonly", description="Read-only access")
-        db_session.add(readonly_role)
-        db_session.commit()
-
-    rule_editor_role = db_session.query(Role).filter_by(name="rule_editor").first()
-    if not rule_editor_role:
-        rule_editor_role = Role(name="rule_editor", description="Can create and modify rules")
-        db_session.add(rule_editor_role)
-        db_session.commit()
-
-    # Get permissions for each role type using the enum
-    admin_permissions = RoleType.get_role_permissions(RoleType.ADMIN)
-    readonly_permissions = RoleType.get_role_permissions(RoleType.READONLY)
-    rule_editor_permissions = RoleType.get_role_permissions(RoleType.RULE_EDITOR)
-
-    for permission in admin_permissions:
-        try:
-            PermissionManager.grant_permission(int(admin_role.id), permission)
-        except ValueError:
-            logger.warning(f"Permission {permission.value} not found, skipping")
-
-    for permission in readonly_permissions:
-        try:
-            PermissionManager.grant_permission(int(readonly_role.id), permission)
-        except ValueError:
-            logger.warning(f"Permission {permission.value} not found, skipping")
-
-    for permission in rule_editor_permissions:
-        try:
-            PermissionManager.grant_permission(int(rule_editor_role.id), permission)
-        except ValueError:
-            logger.warning(f"Permission {permission.value} not found, skipping")
+    organisation = _get_or_create_default_organisation(db_session)
+    _ensure_default_roles(db_session, o_id=int(organisation.o_id))
 
     logger.info("Permissions initialized successfully")
 
@@ -353,18 +345,27 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
     if not 0 <= label_ratio <= 1:
         raise click.BadParameter("label-ratio must be between 0.0 and 1.0")
 
+    organisation = _get_or_create_default_organisation(db_session)
+    org_id = int(organisation.o_id)
     rng = Random()
-    user_list_manager = PersistentUserListManager(db_session=db_session, o_id=1)
+    user_list_manager = PersistentUserListManager(db_session=db_session, o_id=org_id)
     set_user_list_manager(user_list_manager)
-    set_organization_id(1)
+    set_organization_id(org_id)
     seed_demo_user_lists(user_list_manager)
 
-    fsrm: RuleManager = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db": db_session, "o_id": 1})
-    rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=1)
-    existing_rule_count = db_session.query(RuleModel).filter(RuleModel.rid.like("TestRule_%")).count()
+    fsrm: RuleManager = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db": db_session, "o_id": org_id})
+    rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=org_id)
+    existing_rule_count = (
+        db_session.query(RuleModel)
+        .filter(
+            RuleModel.o_id == org_id,
+            RuleModel.rid.like("TestRule_%"),
+        )
+        .count()
+    )
     generated_rules = build_demo_rules(n_rules=n_rules, start_index=existing_rule_count)
     for rule in generated_rules:
-        db_session.add(RuleModel(rid=rule.rid, logic=rule.logic, description=rule.description, o_id=1))
+        db_session.add(RuleModel(rid=rule.rid, logic=rule.logic, description=rule.description, o_id=org_id))
     if generated_rules:
         db_session.commit()
         logger.info(
@@ -372,11 +373,16 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
         )
 
     rule_engine_config_producer.save_config(fsrm, changed_by="cli")
-    lre = LocalRuleExecutorSQL(db=db_session, o_id=1)
+    lre = LocalRuleExecutorSQL(db=db_session, o_id=org_id)
 
     # Generate and evaluate events
     existing_event_count = (
-        db_session.query(TestingRecordLog).filter(TestingRecordLog.event_id.like("TestEvent_%")).count()
+        db_session.query(TestingRecordLog)
+        .filter(
+            TestingRecordLog.o_id == org_id,
+            TestingRecordLog.event_id.like("TestEvent_%"),
+        )
+        .count()
     )
     generated_events = build_demo_events(n_events=n_events, start_index=existing_event_count)
     for index, generated_event in enumerate(generated_events, start=1):
@@ -388,7 +394,7 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
 
         # Evaluate the event against the rules and store the results
         response = eval_and_store(lre, event, commit=False)
-        record_observations(db_session, generated_event.event_data, 1, commit=False)
+        record_observations(db_session, generated_event.event_data, org_id, commit=False)
         if index % DEMO_DATA_COMMIT_BATCH_SIZE == 0:
             db_session.commit()
         if index == n_events or index % 25 == 0:
@@ -403,18 +409,25 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
         logger.info(f"Labeling {label_ratio * 100:.1f}% of events with realistic patterns...")
 
         # Get all available labels, create defaults if none exist
-        available_labels = {label.label: label for label in db_session.query(Label).all()}
+        available_labels = {label.label: label for label in db_session.query(Label).filter(Label.o_id == org_id).all()}
         if not available_labels:
             logger.info("No labels found in database. Creating default labels...")
-            _create_default_labels(db_session)
-            available_labels = {label.label: label for label in db_session.query(Label).all()}
+            _create_default_labels(db_session, o_id=org_id)
+            available_labels = {
+                label.label: label for label in db_session.query(Label).filter(Label.o_id == org_id).all()
+            }
 
         if available_labels:
             logger.info(f"Available labels: {list(available_labels.keys())}")
 
             generated_event_ids = [generated_event.event_id for generated_event in generated_events]
             all_events = (
-                db_session.query(TestingRecordLog).filter(TestingRecordLog.event_id.in_(generated_event_ids)).all()
+                db_session.query(TestingRecordLog)
+                .filter(
+                    TestingRecordLog.o_id == org_id,
+                    TestingRecordLog.event_id.in_(generated_event_ids),
+                )
+                .all()
             )
 
             # Determine how many events to label
@@ -445,15 +458,15 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
                 _export_labels_to_csv(labeled_events, export_csv)
 
 
-def _create_default_labels(session):
+def _create_default_labels(session, *, o_id: int):
     """Create default labels in the database"""
     default_labels = ["FRAUD", "CHARGEBACK", "NORMAL"]
 
     for label_name in default_labels:
         # Check if label already exists to avoid duplicates
-        existing = session.query(Label).filter_by(label=label_name).first()
+        existing = session.query(Label).filter(Label.o_id == o_id, Label.label == label_name).first()
         if not existing:
-            label = Label(label=label_name)
+            label = Label(label=label_name, o_id=o_id)
             session.add(label)
 
     session.commit()
@@ -482,7 +495,15 @@ def _ensure_rule_quality_pair(
         .first()
         is not None
     )
-    label_exists = session.query(Label).filter(Label.label == normalized_label).first() is not None
+    label_exists = (
+        session.query(Label)
+        .filter(
+            Label.o_id == o_id,
+            Label.label == normalized_label,
+        )
+        .first()
+        is not None
+    )
     if not outcome_exists or not label_exists:
         logger.warning(
             "Skipping default rule-quality pair %s -> %s because the outcome or label is missing.",
@@ -581,20 +602,22 @@ def _invoke_reset_dev_generation(ctx, *, n_rules: int, n_events: int) -> None:
 def export_test_csv(output_file: str, n_events: int, unlabeled_only: bool):
     """Export existing events to CSV for testing label uploads"""
     logger.info("Exporting events to CSV for testing...")
+    organisation = _get_or_create_default_organisation(db_session)
+    org_id = int(organisation.o_id)
 
     # Get available labels for realistic assignment, create defaults if none exist
-    available_labels = [label.label for label in db_session.query(Label).all()]
+    available_labels = [label.label for label in db_session.query(Label).filter(Label.o_id == org_id).all()]
     if not available_labels:
         logger.info("No labels found in database. Creating default labels...")
-        _create_default_labels(db_session)
-        available_labels = [label.label for label in db_session.query(Label).all()]
+        _create_default_labels(db_session, o_id=org_id)
+        available_labels = [label.label for label in db_session.query(Label).filter(Label.o_id == org_id).all()]
 
     if not available_labels:
         logger.error("Failed to create labels in database.")
         return
 
     # Query events based on filter
-    query = db_session.query(TestingRecordLog)
+    query = db_session.query(TestingRecordLog).filter(TestingRecordLog.o_id == org_id)
     if unlabeled_only:
         query = query.filter(TestingRecordLog.el_id.is_(None))
 
@@ -646,7 +669,7 @@ def reset_dev(ctx, user_email, password, n_rules, n_events):
     _invoke_reset_dev_generation(ctx, n_rules=n_rules, n_events=n_events)
     _ensure_default_rule_quality_pairs(
         db_session,
-        o_id=app_settings.ORG_ID,
+        o_id=int(_get_or_create_default_organisation(db_session).o_id),
         created_by="cli.reset_dev",
     )
 

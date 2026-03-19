@@ -1,9 +1,49 @@
 import { test, expect } from '@playwright/test';
 import { RuleListPage } from '../pages/rule-list.page';
 import { RuleDetailPage } from '../pages/rule-detail.page';
+import { BacktestingPage } from '../pages/backtesting.page';
 import { getApiBaseUrl, getAuthToken } from '../support/config';
 
 const API_BASE = getApiBaseUrl();
+
+function buildEvaluatedEventData(eventId: string, amount: number) {
+  return {
+    amount,
+    currency: 'USD',
+    txn_type: 'card_purchase',
+    channel: 'web',
+    customer_id: `cust-${eventId}`,
+    customer_country: 'US',
+    billing_country: 'US',
+    shipping_country: 'US',
+    ip_country: 'US',
+    merchant_id: `merchant-${eventId}`,
+    merchant_category: 'electronics',
+    merchant_country: 'US',
+    email_domain: 'example.com',
+    account_age_days: 400,
+    email_age_days: 400,
+    customer_avg_amount_30d: 110,
+    customer_std_amount_30d: 25,
+    prior_chargebacks_180d: 0,
+    manual_review_hits_30d: 0,
+    decline_count_24h: 0,
+    txn_velocity_10m: 1,
+    txn_velocity_1h: 1,
+    unique_cards_24h: 1,
+    device_age_days: 100,
+    device_trust_score: 90,
+    has_3ds: 1,
+    card_present: 0,
+    is_guest_checkout: 0,
+    password_reset_age_hours: 720,
+    distance_from_home_km: 5,
+    ip_proxy_score: 0,
+    beneficiary_country: 'US',
+    beneficiary_age_days: 400,
+    local_hour: 12,
+  };
+}
 
 /**
  * E2E tests for the Rule Detail page.
@@ -17,11 +57,13 @@ const API_BASE = getApiBaseUrl();
 test.describe('Rule Detail Page', () => {
   let ruleListPage: RuleListPage;
   let ruleDetailPage: RuleDetailPage;
+  let backtestingPage: BacktestingPage;
   let testRuleId: number;
 
   test.beforeEach(async ({ page, request }) => {
     ruleListPage = new RuleListPage(page);
     ruleDetailPage = new RuleDetailPage(page);
+    backtestingPage = new BacktestingPage(page);
 
     // Create a dedicated rule via Node.js request context (no browser/CORS involved)
     const resp = await request.post(`${API_BASE}/api/v2/rules`, {
@@ -241,6 +283,40 @@ test.describe('Rule Detail Page', () => {
       // Since it's readonly, focus might move, but the handler should be present
       // We're just verifying no errors occur
       await expect(ruleDetailPage.logicTextarea).toBeDefined();
+    });
+  });
+
+  test.describe('Backtesting', () => {
+    test('should refresh completed backtest status without expanding the result card', async ({ page, request }) => {
+      const timestamp = Math.floor(Date.now() / 1000);
+
+      for (const [index, amount] of [90, 180, 260].entries()) {
+        const eventId = `e2e-backtest-${testRuleId}-${Date.now()}-${index}`;
+        const evaluateResponse = await request.post(`${API_BASE}/api/v2/evaluate`, {
+          headers: { Authorization: `Bearer ${getAuthToken()}` },
+          data: {
+            event_id: eventId,
+            event_timestamp: timestamp + index,
+            event_data: buildEvaluatedEventData(eventId, amount),
+          },
+        });
+        expect(evaluateResponse.ok()).toBeTruthy();
+      }
+
+      await ruleDetailPage.goto(testRuleId);
+      await ruleDetailPage.waitForRuleToLoad();
+      await ruleDetailPage.clickEdit();
+      await ruleDetailPage.setLogic("if $amount > 150:\n\treturn 'BLOCK'");
+
+      await backtestingPage.clickBacktest();
+      await backtestingPage.waitForBacktestResults();
+      await expect(backtestingPage.backtestItems).toHaveCount(1);
+
+      await page.reload();
+      await ruleDetailPage.waitForRuleToLoad();
+      await backtestingPage.waitForBacktestResults();
+      await expect(page.getByTestId('backtest-expanded-content')).toHaveCount(0);
+      await backtestingPage.waitForResultStatus(0, 'Completed');
     });
   });
 

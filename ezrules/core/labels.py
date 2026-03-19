@@ -1,5 +1,7 @@
 import abc
 
+from sqlalchemy import func
+
 
 class LabelManager(abc.ABC):
     """Container for event labels. All labels will be managed through this interface."""
@@ -32,11 +34,11 @@ class DatabaseLabelManager(LabelManager):
         """Ensure default labels exist in the database"""
         from ezrules.models.backend_core import Label
 
-        existing_labels = self.db_session.query(Label).count()
+        existing_labels = self.db_session.query(Label).filter(Label.o_id == self.o_id).count()
         if existing_labels == 0:
             default_labels = ["FRAUD", "CHARGEBACK", "NORMAL"]
             for label_name in default_labels:
-                label = Label(label=label_name)
+                label = Label(label=label_name, o_id=self.o_id)
                 self.db_session.add(label)
             self.db_session.commit()
 
@@ -51,7 +53,7 @@ class DatabaseLabelManager(LabelManager):
         from ezrules.models.backend_core import Label
 
         self._ensure_initialized()
-        labels = self.db_session.query(Label).all()
+        labels = self.db_session.query(Label).filter(Label.o_id == self.o_id).all()
         self._cached_labels = [label.label for label in labels]
         return self._cached_labels
 
@@ -67,17 +69,36 @@ class DatabaseLabelManager(LabelManager):
         new_label = new_label.strip().upper()
 
         # Check if label already exists
-        existing = self.db_session.query(Label).filter_by(label=new_label).first()
+        existing = (
+            self.db_session.query(Label)
+            .filter(
+                Label.o_id == self.o_id,
+                func.upper(Label.label) == new_label,
+            )
+            .first()
+        )
 
         if not existing:
-            label = Label(label=new_label)
+            label = Label(label=new_label, o_id=self.o_id)
             self.db_session.add(label)
             self.db_session.commit()
             # Invalidate cache to force reload
             self._cached_labels = None
 
     def label_exists(self, label: str):
-        return label in self.get_all_labels()
+        from ezrules.models.backend_core import Label
+
+        self._ensure_initialized()
+        normalized_label = label.strip().upper()
+        return (
+            self.db_session.query(Label.el_id)
+            .filter(
+                Label.o_id == self.o_id,
+                func.upper(Label.label) == normalized_label,
+            )
+            .first()
+            is not None
+        )
 
     def remove_label(self, label: str):
         from ezrules.models.backend_core import Label
@@ -86,7 +107,14 @@ class DatabaseLabelManager(LabelManager):
         label = label.strip().upper()
 
         # Find and remove the label
-        existing = self.db_session.query(Label).filter_by(label=label).first()
+        existing = (
+            self.db_session.query(Label)
+            .filter(
+                Label.o_id == self.o_id,
+                func.upper(Label.label) == label,
+            )
+            .first()
+        )
 
         if existing:
             self.db_session.delete(existing)

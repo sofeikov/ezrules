@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
@@ -30,8 +31,6 @@ from ezrules.models.backend_core import FieldObservation, FieldTypeConfig, User
 
 router = APIRouter(prefix="/api/v2/field-types", tags=["Field Types"])
 
-_DEFAULT_O_ID = 1
-
 
 # =============================================================================
 # LIST CONFIGS
@@ -42,10 +41,11 @@ _DEFAULT_O_ID = 1
 def list_field_type_configs(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_FIELD_TYPES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> FieldTypeConfigListResponse:
     """Return all configured field types for the organisation."""
-    configs = db.query(FieldTypeConfig).filter(FieldTypeConfig.o_id == _DEFAULT_O_ID).all()
+    configs = db.query(FieldTypeConfig).filter(FieldTypeConfig.o_id == current_org_id).all()
     return FieldTypeConfigListResponse(configs=[FieldTypeConfigResponse.model_validate(c) for c in configs])
 
 
@@ -58,10 +58,11 @@ def list_field_type_configs(
 def list_field_observations(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_FIELD_TYPES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> FieldObservationListResponse:
     """Return all auto-discovered field observations for the organisation."""
-    observations = db.query(FieldObservation).filter(FieldObservation.o_id == _DEFAULT_O_ID).all()
+    observations = db.query(FieldObservation).filter(FieldObservation.o_id == current_org_id).all()
     return FieldObservationListResponse(observations=[FieldObservationResponse.model_validate(o) for o in observations])
 
 
@@ -75,12 +76,13 @@ def upsert_field_type_config(
     data: FieldTypeConfigCreate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_FIELD_TYPES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> FieldTypeMutationResponse:
     """Create or update a field type configuration."""
     existing = (
         db.query(FieldTypeConfig)
-        .filter(FieldTypeConfig.field_name == data.field_name, FieldTypeConfig.o_id == _DEFAULT_O_ID)
+        .filter(FieldTypeConfig.field_name == data.field_name, FieldTypeConfig.o_id == current_org_id)
         .first()
     )
 
@@ -92,7 +94,7 @@ def upsert_field_type_config(
             field_name=data.field_name,
             configured_type=data.configured_type.value,
             action="updated",
-            o_id=_DEFAULT_O_ID,
+            o_id=current_org_id,
             changed_by=str(user.email),
             datetime_format=data.datetime_format,
         )
@@ -108,7 +110,7 @@ def upsert_field_type_config(
         field_name=data.field_name,
         configured_type=data.configured_type.value,
         datetime_format=data.datetime_format,
-        o_id=_DEFAULT_O_ID,
+        o_id=current_org_id,
     )
     db.add(new_config)
     save_field_type_history(
@@ -116,7 +118,7 @@ def upsert_field_type_config(
         field_name=data.field_name,
         configured_type=data.configured_type.value,
         action="created",
-        o_id=_DEFAULT_O_ID,
+        o_id=current_org_id,
         changed_by=str(user.email),
         datetime_format=data.datetime_format,
     )
@@ -141,12 +143,13 @@ def update_field_type_config(
     data: FieldTypeConfigUpdate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_FIELD_TYPES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> FieldTypeMutationResponse:
     """Update the type or datetime format for an existing field config."""
     config = (
         db.query(FieldTypeConfig)
-        .filter(FieldTypeConfig.field_name == field_name, FieldTypeConfig.o_id == _DEFAULT_O_ID)
+        .filter(FieldTypeConfig.field_name == field_name, FieldTypeConfig.o_id == current_org_id)
         .first()
     )
 
@@ -163,7 +166,7 @@ def update_field_type_config(
         field_name=field_name,
         configured_type=data.configured_type.value,
         action="updated",
-        o_id=_DEFAULT_O_ID,
+        o_id=current_org_id,
         changed_by=str(user.email),
         datetime_format=data.datetime_format,
     )
@@ -187,12 +190,13 @@ def delete_field_type_config(
     field_name: str,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.DELETE_FIELD_TYPE)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> FieldTypeMutationResponse:
     """Delete a field type configuration (field reverts to compare-as-is)."""
     config = (
         db.query(FieldTypeConfig)
-        .filter(FieldTypeConfig.field_name == field_name, FieldTypeConfig.o_id == _DEFAULT_O_ID)
+        .filter(FieldTypeConfig.field_name == field_name, FieldTypeConfig.o_id == current_org_id)
         .first()
     )
 
@@ -207,7 +211,7 @@ def delete_field_type_config(
         field_name=field_name,
         configured_type=str(config.configured_type),
         action="deleted",
-        o_id=_DEFAULT_O_ID,
+        o_id=current_org_id,
         changed_by=str(user.email),
         datetime_format=str(config.datetime_format) if config.datetime_format else None,
     )

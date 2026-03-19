@@ -96,7 +96,6 @@ It also starts Mailpit for local email capture on `http://localhost:8025`.
 ```bash
 EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules
 EZRULES_APP_SECRET=dev_secret
-EZRULES_ORG_ID=1
 EZRULES_SMTP_HOST=localhost
 EZRULES_SMTP_PORT=1025
 EZRULES_FROM_EMAIL=no-reply@ezrules.local
@@ -111,6 +110,7 @@ uv run ezrules add-user --user-email admin@example.com --password admin --admin
 ```
 
 `init-db` creates the target database (if missing), applies Alembic migrations, and seeds default data.
+It also creates the default organisation used by freshly bootstrapped environments.
 After pulling future schema changes, run `uv run alembic upgrade head` on existing databases.
 
 ### 5) Start API and frontend

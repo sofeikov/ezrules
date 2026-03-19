@@ -187,6 +187,7 @@ def login(
         user_id=int(user.id),
         email=str(user.email),
         roles=role_names,
+        org_id=int(user.o_id),
     )
     refresh_token = create_refresh_token(user_id=int(user.id))
 
@@ -260,6 +261,7 @@ def accept_invite(
         user_id=int(user.id),
         user_email=str(user.email),
         action="invitation_accepted",
+        o_id=int(user.o_id),
         changed_by=str(user.email),
     )
     db.commit()
@@ -350,6 +352,7 @@ def reset_password(
         user_id=int(user.id),
         user_email=str(user.email),
         action="password_reset",
+        o_id=int(user.o_id),
         changed_by=str(user.email),
     )
     db.commit()
@@ -450,6 +453,7 @@ def refresh_token(
         user_id=int(user.id),
         email=str(user.email),
         roles=role_names,
+        org_id=int(user.o_id),
     )
     new_refresh_token = create_refresh_token(user_id=int(user.id))
 

@@ -27,9 +27,9 @@ def backtesting_test_client(session):
         session.add(org)
         session.commit()
 
-    role = session.query(Role).filter(Role.name == "bt_manager").first()
+    role = session.query(Role).filter(Role.name == "bt_manager", Role.o_id == int(org.o_id)).first()
     if not role:
-        role = Role(name="bt_manager", description="Can manage backtests")
+        role = Role(name="bt_manager", description="Can manage backtests", o_id=int(org.o_id))
         session.add(role)
         session.commit()
 
@@ -40,6 +40,7 @@ def backtesting_test_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="btuser@example.com",
+            o_id=1,
         )
         user.roles.append(role)
         session.add(user)
@@ -55,6 +56,7 @@ def backtesting_test_client(session):
         user_id=int(user.id),
         email=str(user.email),
         roles=roles,
+        org_id=int(user.o_id),
     )
 
     client_data = {
@@ -115,7 +117,7 @@ class TestBacktestTaskDirect:
         session.commit()
 
         # Run the task directly
-        result = backtest_rule_change(sample_rule_for_bt.r_id, 'if $amount > 150:\n\treturn "BLOCK"')
+        result = backtest_rule_change(sample_rule_for_bt.r_id, 'if $amount > 150:\n\treturn "BLOCK"', int(org.o_id))
 
         assert "error" not in result
         assert "stored_result" in result
@@ -137,7 +139,7 @@ class TestBacktestTaskDirect:
         celery_app.conf.task_always_eager = True
         celery_app.conf.task_eager_propagates = True
 
-        result = backtest_rule_change(99999, "return True")
+        result = backtest_rule_change(99999, "return True", 1)
 
         assert "error" in result
         assert "not found" in result["error"]
@@ -219,9 +221,7 @@ class TestBacktestGetEndpoint:
             headers={"Authorization": f"Bearer {token}"},
         )
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["results"] == []
+        assert response.status_code == 404
 
     def test_get_results_returns_most_recent(self, backtesting_test_client, sample_rule_for_bt):
         """Should return 3 most recent results."""
@@ -269,7 +269,7 @@ class TestBacktestChunkedEvaluation:
             session.add(record)
         session.commit()
 
-        result = backtest_rule_change(sample_rule_for_bt.r_id, 'if $amount > 50:\n\treturn "FLAG"')
+        result = backtest_rule_change(sample_rule_for_bt.r_id, 'if $amount > 50:\n\treturn "FLAG"', int(org.o_id))
 
         assert "error" not in result
         assert result["total_records"] == 50

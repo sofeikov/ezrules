@@ -336,6 +336,18 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     this.backtestingService.getBacktestResults(ruleId).subscribe({
       next: (response) => {
         this.backtestResults = response.results;
+        const currentTaskIds = new Set(response.results.map((result) => result.task_id));
+
+        for (const taskId of Array.from(this.backtestTaskResults.keys())) {
+          if (!currentTaskIds.has(taskId)) {
+            this.backtestTaskResults.delete(taskId);
+            this.stopPolling(taskId);
+          }
+        }
+
+        for (const result of response.results) {
+          this.loadTaskResult(result.task_id);
+        }
       },
       error: (error) => {
         console.error('Error loading backtest results:', error);

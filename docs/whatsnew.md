@@ -1,6 +1,20 @@
 # What's New
 
 
+## Unreleased
+
+* **Org-aware manager JWTs**: Access tokens now include the authenticated user's organisation, and the API rejects access tokens whose org claim no longer matches the stored user membership.
+* **Core admin CRUD is org-scoped**: Users, outcomes, user lists, and field type configs/observations now resolve organisation context from auth instead of fixed org constants.
+* **Roles and labels are org-owned**: `Role` and `Label` now belong to an organisation, the same role/label name can exist in different orgs, and user-role assignment rejects cross-org roles.
+* **Label usage is org-scoped**: Label CRUD, assignment, CSV uploads, rule-quality label options, and label analytics now operate only on the caller's organisation.
+* **Audit trail org completion**: Label, user-account, and role-permission history now carry `o_id`, and the related audit summary/count endpoints only return the caller's organisation.
+* **Backtesting/bootstrap stop assuming org 1**: Backtest workers derive org context from the selected rule/request, and `init-db`, `init-permissions`, `add-user`, `generate-random-data`, and `reset-dev` now seed roles, labels, and rule-quality defaults in the provisioned organisation instead of a fixed global org.
+* **Fresh-init user ownership**: `User.o_id` is now mandatory, and fresh database/bootstrap flows create an organisation before creating users so clean rebuilds work with org-aware auth.
+* **DB-level tenant integrity hardening**: PostgreSQL now rejects cross-org user-role links and cross-org event-label links even if someone bypasses the API, and `EZRULES_ORG_ID` is no longer a documented runtime tenant selector.
+* **Frontend runtime-config hardening**: Frontend builds now regenerate `runtime-config.js` instead of baking in stale checked-in API URLs, so the demo stack and production image no longer inherit old local dev ports.
+* **Rules page evaluate UX cleanup**: The Rules header no longer renders a dead browser link to the evaluator service, and the How to Run panel now shows the runtime manager API `/api/v2/evaluate` endpoint instead of a stale `localhost:9999` example.
+* **Backtest status refresh fix**: Rule Detail now loads task status for every backtest result card on page load, so completed backtests no longer stay stuck at `In Progress` until you expand them.
+
 ## v0.24.3
 
 * **Label-aware backtesting**: Backtest task results on the Rule Detail page now include historical label counts plus stored/proposed precision, recall, and F1 by outcome→label pair when labeled events exist in the backtest window.

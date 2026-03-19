@@ -9,6 +9,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Rule Engine**: Flexible Python-based rule execution with custom logic support
 - **Management Interface**: Modern web UI for creating and managing rules
 - **Enterprise Security**: Granular role-based access control with 32 permission types; API key authentication for service-to-service integration
+- **Org-Aware Admin APIs**: Manager access tokens now carry organisation context, and manager APIs resolve rules, users, roles, labels, settings, analytics, tested events, backtesting history, and audit reads against the authenticated user's org
 - **Transaction Labeling**: Comprehensive fraud analytics with API and bulk CSV upload capabilities
 - **Analytics Dashboard**: Real-time transaction volume charts with configurable time ranges (1h, 6h, 12h, 24h, 30d)
 - **Scalable Architecture**: Unified API service with integrated rule evaluation
@@ -21,7 +22,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Rule Lifecycle Controls**: Rules now support `draft`, `active`, and `archived` states with explicit promotion and approver tracking (`effective_from`, `approved_by`, `approved_at`)
 - **Permission-Aware Promotion UI**: Draft and shadow promotion controls are only shown to users who hold the `promote_rules` permission
 - **Revision Rollback**: Restore logic and description from a historical rule revision into a new draft version directly from the history timeline, without deleting any audit history
-- **Backtesting**: Test rule changes against historical data before deployment, with outcome counts plus label-aware precision/recall/F1 when labeled history exists
+- **Backtesting**: Test rule changes against historical data before deployment, with outcome counts plus label-aware precision/recall/F1 when labeled history exists; backtests and stored history are scoped to the selected rule's organisation
 - **CLI Tools**: Command-line interface for database management and realistic test data generation
 
 ## 🏗️ Architecture
@@ -126,7 +127,6 @@ uv sync
 cat > settings.env <<EOF
 EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules
 EZRULES_APP_SECRET=dev_secret
-EZRULES_ORG_ID=1
 EZRULES_SMTP_HOST=localhost
 EZRULES_SMTP_PORT=1025
 EZRULES_FROM_EMAIL=no-reply@ezrules.local
@@ -156,6 +156,8 @@ To generate fraud-oriented demo data for development:
 ```bash
 uv run ezrules generate-random-data --n-rules 10 --n-events 100
 ```
+
+`init-db` creates a default organisation automatically. Manager requests and API-key evaluation derive org context from the authenticated user or API key rather than a global environment variable.
 
 ## 🔐 Enterprise Security
 
@@ -209,7 +211,7 @@ The system supports 32 granular permission types:
 
 ### Default Roles
 
-Three pre-configured roles are available:
+Three pre-configured roles are created per organisation:
 
 - **Admin**: Full system access with all permissions
 - **Rule Editor**: Can create and modify rules, deploy drafts to shadow, and view outcomes and lists; promotion remains a separate permission
@@ -217,7 +219,7 @@ Three pre-configured roles are available:
 
 ### Role Assignment
 
-Users can be assigned to roles through the database or programmatically. The permission system supports:
+Users can be assigned to roles through the database or programmatically. Roles are organisation-owned, so the same role name can exist in different orgs, but a user can only be assigned roles from their own organisation. The permission system supports:
 
 - Multiple roles per user
 - Organization-scoped data model (`o_id`) used by core entities
@@ -238,6 +240,8 @@ curl -X POST http://localhost:8888/api/v2/labels/mark-event \
 ```
 
 **Bulk CSV Upload**: Upload CSV files from the **Labels** page for batch labeling with per-row success/error reporting (no header row)
+
+Labels are organisation-owned in API v2. The same label name can exist in different orgs, and label CRUD, labeling analytics, and curated outcome→label settings resolve against the caller's organisation.
 ```csv
 txn_456,NORMAL
 txn_789,CHARGEBACK

@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
@@ -116,6 +117,7 @@ def now_utc_naive() -> datetime:
 def list_users(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_USERS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UsersListResponse:
     """
@@ -124,7 +126,7 @@ def list_users(
     Returns a list of all users with their roles.
     Requires VIEW_USERS permission.
     """
-    users = db.query(User).all()
+    users = db.query(User).filter(User.o_id == current_org_id).all()
     users_data = [user_to_list_item(u) for u in users]
     return UsersListResponse(users=users_data)
 
@@ -139,6 +141,7 @@ def get_user(
     user_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_USERS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserResponse:
     """
@@ -147,7 +150,7 @@ def get_user(
     Returns full user details including roles.
     Requires VIEW_USERS permission.
     """
-    target_user = db.query(User).filter(User.id == user_id).first()
+    target_user = db.query(User).filter(User.id == user_id, User.o_id == current_org_id).first()
 
     if not target_user:
         raise HTTPException(
@@ -168,6 +171,7 @@ def create_user(
     user_data: UserCreate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.CREATE_USER)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserMutationResponse:
     """
@@ -191,11 +195,12 @@ def create_user(
         password=hash_password(user_data.password),
         active=True,
         fs_uniquifier=str(uuid.uuid4()),
+        o_id=current_org_id,
     )
 
     # Assign roles if provided
     if user_data.role_ids:
-        roles = db.query(Role).filter(Role.id.in_(user_data.role_ids)).all()
+        roles = db.query(Role).filter(Role.o_id == current_org_id, Role.id.in_(user_data.role_ids)).all()
         if len(roles) != len(user_data.role_ids):
             found_ids = {r.id for r in roles}
             missing_ids = [rid for rid in user_data.role_ids if rid not in found_ids]
@@ -215,6 +220,7 @@ def create_user(
         user_id=int(new_user.id),
         user_email=str(new_user.email),
         action="created",
+        o_id=current_org_id,
         changed_by=str(user.email),
     )
     db.commit()
@@ -236,6 +242,7 @@ def invite_user(
     invite_data: UserInvite,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.CREATE_USER)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserInviteResponse:
     """
@@ -246,6 +253,13 @@ def invite_user(
     """
     email = str(invite_data.email).strip().lower()
     existing_user = db.query(User).filter(User.email == email).first()
+
+    if existing_user and int(existing_user.o_id) != current_org_id:
+        return UserInviteResponse(
+            success=False,
+            message="Email already exists",
+            error=f"A user with email '{email}' already exists",
+        )
 
     if existing_user and existing_user.active:
         return UserInviteResponse(
@@ -261,6 +275,7 @@ def invite_user(
             password=hash_password(secrets.token_urlsafe(32)),
             active=False,
             fs_uniquifier=str(uuid.uuid4()),
+            o_id=current_org_id,
         )
         db.add(target_user)
         db.flush()
@@ -268,7 +283,7 @@ def invite_user(
         target_user.active = False
 
     if invite_data.role_ids:
-        roles = db.query(Role).filter(Role.id.in_(invite_data.role_ids)).all()
+        roles = db.query(Role).filter(Role.o_id == current_org_id, Role.id.in_(invite_data.role_ids)).all()
         if len(roles) != len(invite_data.role_ids):
             found_ids = {int(r.id) for r in roles}
             missing_ids = [rid for rid in invite_data.role_ids if rid not in found_ids]
@@ -291,7 +306,7 @@ def invite_user(
     invitation = Invitation(
         gid=str(uuid.uuid4()),
         email=email,
-        o_id=app_settings.ORG_ID,
+        o_id=current_org_id,
         user_id=int(target_user.id),
         token_hash=hash_token(invite_token),
         invited_by=str(user.email),
@@ -317,6 +332,7 @@ def invite_user(
         user_id=int(target_user.id),
         user_email=str(target_user.email),
         action="invited",
+        o_id=current_org_id,
         changed_by=str(user.email),
         details=f"invited_by={user.email}",
     )
@@ -339,6 +355,7 @@ def update_user(
     user_data: UserUpdate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_USER)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserMutationResponse:
     """
@@ -347,7 +364,7 @@ def update_user(
     Requires MODIFY_USER permission.
     Cannot deactivate yourself.
     """
-    target_user = db.query(User).filter(User.id == user_id).first()
+    target_user = db.query(User).filter(User.id == user_id, User.o_id == current_org_id).first()
 
     if not target_user:
         raise HTTPException(
@@ -398,6 +415,7 @@ def update_user(
             user_id=int(target_user.id),
             user_email=str(target_user.email),
             action="updated",
+            o_id=int(target_user.o_id),
             changed_by=str(user.email),
             details="; ".join(changes),
         )
@@ -420,6 +438,7 @@ def delete_user(
     user_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.DELETE_USER)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserMutationResponse:
     """
@@ -436,7 +455,7 @@ def delete_user(
             error="You cannot delete your own account",
         )
 
-    target_user = db.query(User).filter(User.id == user_id).first()
+    target_user = db.query(User).filter(User.id == user_id, User.o_id == current_org_id).first()
 
     if not target_user:
         raise HTTPException(
@@ -452,6 +471,7 @@ def delete_user(
         user_id=target_id,
         user_email=target_email,
         action="deleted",
+        o_id=int(target_user.o_id),
         changed_by=str(user.email),
     )
 
@@ -480,6 +500,7 @@ def assign_role(
     role_data: AssignRoleRequest,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MANAGE_USER_ROLES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RoleAssignmentResponse:
     """
@@ -487,7 +508,7 @@ def assign_role(
 
     Requires MANAGE_USER_ROLES permission.
     """
-    target_user = db.query(User).filter(User.id == user_id).first()
+    target_user = db.query(User).filter(User.id == user_id, User.o_id == current_org_id).first()
 
     if not target_user:
         raise HTTPException(
@@ -495,7 +516,7 @@ def assign_role(
             detail=f"User with id {user_id} not found",
         )
 
-    role = db.query(Role).filter(Role.id == role_data.role_id).first()
+    role = db.query(Role).filter(Role.id == role_data.role_id, Role.o_id == current_org_id).first()
 
     if not role:
         raise HTTPException(
@@ -521,6 +542,7 @@ def assign_role(
         user_id=int(target_user.id),
         user_email=str(target_user.email),
         action="role_assigned",
+        o_id=int(target_user.o_id),
         changed_by=str(user.email),
         details=f"role: {role.name}",
     )
@@ -544,6 +566,7 @@ def remove_role(
     role_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MANAGE_USER_ROLES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RoleAssignmentResponse:
     """
@@ -551,7 +574,7 @@ def remove_role(
 
     Requires MANAGE_USER_ROLES permission.
     """
-    target_user = db.query(User).filter(User.id == user_id).first()
+    target_user = db.query(User).filter(User.id == user_id, User.o_id == current_org_id).first()
 
     if not target_user:
         raise HTTPException(
@@ -559,7 +582,7 @@ def remove_role(
             detail=f"User with id {user_id} not found",
         )
 
-    role = db.query(Role).filter(Role.id == role_id).first()
+    role = db.query(Role).filter(Role.id == role_id, Role.o_id == current_org_id).first()
 
     if not role:
         raise HTTPException(
@@ -585,6 +608,7 @@ def remove_role(
         user_id=int(target_user.id),
         user_email=str(target_user.email),
         action="role_removed",
+        o_id=int(target_user.o_id),
         changed_by=str(user.email),
         details=f"role: {role.name}",
     )

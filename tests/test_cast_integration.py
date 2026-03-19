@@ -17,7 +17,6 @@ from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
 from ezrules.models.backend_core import FieldTypeConfig, Organisation, Role, Rule, User
-from ezrules.settings import app_settings
 
 
 # =============================================================================
@@ -28,21 +27,6 @@ from ezrules.settings import app_settings
 def _get_or_create_org(session):
     """Return the single org created by the conftest session fixture."""
     return session.query(Organisation).one()
-
-
-def _get_or_create_settings_org(session):
-    """Return or create an org whose o_id matches app_settings.ORG_ID.
-
-    The /rules/test endpoint uses app_settings.ORG_ID to load cast configs.
-    Postgres sequences do not roll back with transactions, so the org created
-    by conftest may have a different o_id; this helper ensures o_id=1 exists.
-    """
-    org = session.query(Organisation).filter(Organisation.o_id == app_settings.ORG_ID).first()
-    if not org:
-        org = Organisation(o_id=app_settings.ORG_ID, name="Settings Org")
-        session.add(org)
-        session.commit()
-    return org
 
 
 def _setup_rule_engine(session, org, rid, r_id):
@@ -59,23 +43,24 @@ def _setup_rule_engine(session, org, rid, r_id):
 def rules_client(session):
     """Authenticated test client with VIEW_RULES permission.
 
-    Uses the org whose o_id matches app_settings.ORG_ID so that FieldTypeConfig
-    rows added in tests are visible to the /rules/test endpoint.
+    Uses the test session org so FieldTypeConfig rows are visible to /rules/test
+    through the authenticated org context.
     """
     hashed = bcrypt.hashpw("castpass".encode(), bcrypt.gensalt()).decode()
 
-    # /rules/test loads configs keyed by app_settings.ORG_ID; ensure that org exists.
-    org = _get_or_create_settings_org(session)
+    org = _get_or_create_org(session)
 
-    role = session.query(Role).filter(Role.name == "cast_tester").first()
+    role = session.query(Role).filter(Role.name == "cast_tester", Role.o_id == org.o_id).first()
     if not role:
-        role = Role(name="cast_tester")
+        role = Role(name="cast_tester", o_id=int(org.o_id))
         session.add(role)
         session.commit()
 
     user = session.query(User).filter(User.email == "cast@example.com").first()
     if not user:
-        user = User(email="cast@example.com", password=hashed, active=True, fs_uniquifier="cast@example.com")
+        user = User(
+            email="cast@example.com", password=hashed, active=True, fs_uniquifier="cast@example.com", o_id=org.o_id
+        )
         user.roles.append(role)
         session.add(user)
         session.commit()
@@ -84,7 +69,7 @@ def rules_client(session):
     PermissionManager.init_default_actions()
     PermissionManager.grant_permission(role.id, PermissionAction.VIEW_RULES)
 
-    token = create_access_token(user_id=int(user.id), email=str(user.email), roles=[role.name])
+    token = create_access_token(user_id=int(user.id), email=str(user.email), roles=[role.name], org_id=int(user.o_id))
 
     with TestClient(app) as client:
         client.token = token  # type: ignore[attr-defined]

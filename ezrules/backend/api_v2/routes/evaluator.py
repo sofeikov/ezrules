@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ezrules.backend import data_utils
-from ezrules.backend.api_v2.auth.dependencies import get_db, get_evaluator_auth
+from ezrules.backend.api_v2.auth.dependencies import get_current_evaluator_org_id, get_db
 from ezrules.backend.api_v2.schemas.evaluator import EvaluateRequest, EvaluateResponse
 from ezrules.backend.data_utils import Event
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
@@ -26,18 +26,24 @@ _lre: LocalRuleExecutorSQL | None = None
 _shadow_lre: LocalRuleExecutorSQL | None = None
 
 
-def _get_rule_executor(db=Depends(get_db)) -> LocalRuleExecutorSQL:  # noqa: B008
+def _get_rule_executor(
+    current_org_id: int = Depends(get_current_evaluator_org_id),
+    db=Depends(get_db),  # noqa: B008
+) -> LocalRuleExecutorSQL:
     """Return the test-injected executor or a request-scoped production executor."""
     if app_settings.TESTING and _lre is not None:
         return _lre
-    return LocalRuleExecutorSQL(db=db, o_id=app_settings.ORG_ID)
+    return LocalRuleExecutorSQL(db=db, o_id=current_org_id)
 
 
-def _get_shadow_executor(db=Depends(get_db)) -> LocalRuleExecutorSQL:  # noqa: B008
+def _get_shadow_executor(
+    current_org_id: int = Depends(get_current_evaluator_org_id),
+    db=Depends(get_db),  # noqa: B008
+) -> LocalRuleExecutorSQL:
     """Return the test-injected shadow executor or a request-scoped production executor."""
     if app_settings.TESTING and _shadow_lre is not None:
         return _shadow_lre
-    return LocalRuleExecutorSQL(db=db, o_id=app_settings.ORG_ID, label="shadow")
+    return LocalRuleExecutorSQL(db=db, o_id=current_org_id, label="shadow")
 
 
 @router.post("/evaluate", response_model=EvaluateResponse)
@@ -46,7 +52,7 @@ def evaluate(
     lre: LocalRuleExecutorSQL = Depends(_get_rule_executor),
     shadow_lre: LocalRuleExecutorSQL = Depends(_get_shadow_executor),
     db: Any = Depends(get_db),
-    _: None = Depends(get_evaluator_auth),
+    _: int = Depends(get_current_evaluator_org_id),
 ) -> EvaluateResponse:
     """
     Evaluate an event against the current rule engine configuration.

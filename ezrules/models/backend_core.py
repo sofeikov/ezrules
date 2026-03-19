@@ -7,6 +7,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     String,
     Text,
@@ -20,6 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
+from ezrules.core.application_context import get_organization_id
 from ezrules.models.database import Base
 
 
@@ -50,13 +52,28 @@ class RoleMixin:
     """
 
     def __eq__(self, other):
-        return self.name == other or self.name == getattr(other, "name", None)
+        if isinstance(other, str):
+            return self.name == other
+
+        other_name = getattr(other, "name", None)
+        if other_name is None:
+            return False
+
+        self_id = getattr(self, "id", None)
+        other_id = getattr(other, "id", None)
+        if self_id is not None and other_id is not None:
+            return self_id == other_id
+
+        return self.name == other_name and getattr(self, "o_id", None) == getattr(other, "o_id", None)
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash(self.name)
+        role_id = getattr(self, "id", None)
+        if role_id is not None:
+            return hash(role_id)
+        return hash((self.name, getattr(self, "o_id", None)))
 
 
 class UserMixin:
@@ -81,21 +98,46 @@ class UserMixin:
 
 class RolesUsers(Base):
     __tablename__ = "roles_users"
+    __table_args__ = (UniqueConstraint("user_id", "role_id", name="uq_roles_users_user_role"),)
+
     id = Column(Integer(), primary_key=True)
     user_id = Column("user_id", Integer(), ForeignKey("user.id"))
     role_id = Column("role_id", Integer(), ForeignKey("role.id"))
 
 
+def _require_current_organization_id() -> int:
+    """Resolve org ownership from explicit context when a caller omits o_id."""
+    org_id = get_organization_id()
+    if org_id is None:
+        raise RuntimeError("An organization context is required when o_id is not provided explicitly.")
+    return org_id
+
+
 class Role(Base, RoleMixin):
     __tablename__ = "role"
+    __table_args__ = (
+        UniqueConstraint("o_id", "name", name="uq_role_org_name"),
+        UniqueConstraint("id", "o_id", name="uq_role_id_org"),
+    )
+
     id = Column(Integer(), primary_key=True)
-    name = Column(String(80), unique=True)
+    name = Column(String(80), nullable=False)
     description = Column(String(255))
     permissions = Column(MutableList.as_mutable(AsaList()), nullable=True)
+    o_id = Column(
+        Integer(),
+        ForeignKey("organisation.o_id"),
+        nullable=False,
+        index=True,
+        default=_require_current_organization_id,
+    )
+    org: Mapped["Organisation"] = relationship(back_populates="roles")
 
 
 class User(Base, UserMixin):
     __tablename__ = "user"
+    __table_args__ = (UniqueConstraint("id", "o_id", name="uq_user_id_org"),)
+
     id = Column(Integer, primary_key=True)
     email = Column(String(255), unique=True)
     username = Column(String(255), unique=True, nullable=True)
@@ -108,6 +150,8 @@ class User(Base, UserMixin):
     active = Column(Boolean())
     fs_uniquifier = Column(String(64), unique=True, nullable=False)
     confirmed_at = Column(DateTime())
+    o_id = Column(Integer, ForeignKey("organisation.o_id"), nullable=False, index=True)
+    org: Mapped["Organisation"] = relationship(back_populates="users")
     roles = relationship("Role", secondary="roles_users", backref=backref("users", lazy="dynamic"))
 
 
@@ -147,6 +191,9 @@ class Organisation(Base):
     name = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
+    users: Mapped[list["User"]] = relationship(back_populates="org")
+    roles: Mapped[list["Role"]] = relationship(back_populates="org")
+    labels: Mapped[list["Label"]] = relationship(back_populates="org")
     rules: Mapped[list["Rule"]] = relationship()
     re_configs: Mapped[list["RuleEngineConfig"]] = relationship()
 
@@ -158,13 +205,14 @@ class RuntimeSetting(Base):
     __tablename__ = "runtime_settings"
 
     key = Column(String(100), primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), primary_key=True)
     value_type = Column(String(20), nullable=False)
     value = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
 
     def __repr__(self):
-        return f"<RuntimeSetting key={self.key} value_type={self.value_type} value={self.value}>"
+        return f"<RuntimeSetting key={self.key} o_id={self.o_id} value_type={self.value_type} value={self.value}>"
 
 
 class RuleEngineConfig(Base):
@@ -222,13 +270,32 @@ class Rule(Base):
 
 class Label(Base):
     __tablename__ = "event_labels"
+    __table_args__ = (
+        UniqueConstraint("o_id", "label", name="uq_event_labels_org_label"),
+        UniqueConstraint("el_id", "o_id", name="uq_event_labels_el_id_o_id"),
+    )
 
     el_id = Column(Integer, unique=True, primary_key=True)
-    label = Column(String, unique=True, nullable=False)
+    label = Column(String, nullable=False)
+    o_id = Column(
+        Integer(),
+        ForeignKey("organisation.o_id"),
+        nullable=False,
+        index=True,
+        default=_require_current_organization_id,
+    )
+    org: Mapped["Organisation"] = relationship(back_populates="labels")
 
 
 class TestingRecordLog(Base):
     __tablename__ = "testing_record_log"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["el_id", "o_id"],
+            ["event_labels.el_id", "event_labels.o_id"],
+            name="fk_testing_record_log_label_org",
+        ),
+    )
 
     tl_id = Column(
         Integer,
@@ -242,8 +309,8 @@ class TestingRecordLog(Base):
     resolved_outcome = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"))
-    el_id: Mapped["Label"] = mapped_column(ForeignKey("event_labels.el_id"), nullable=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    el_id: Mapped[int | None] = mapped_column(Integer(), nullable=True)
 
     testing_results: Mapped[list["TestingResultsLog"]] = relationship(
         back_populates="testing_record",
@@ -441,6 +508,7 @@ class LabelHistory(Base):
     label = Column(String, nullable=False)
     action = Column(String, nullable=False)  # created, deleted
     details = Column(String, nullable=True)
+    o_id = Column(Integer, nullable=False)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
 
@@ -455,6 +523,7 @@ class UserAccountHistory(Base):
         String, nullable=False
     )  # created, updated, deleted, activated, deactivated, role_assigned, role_removed
     details = Column(String, nullable=True)
+    o_id = Column(Integer, nullable=False)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
 
@@ -467,6 +536,7 @@ class RolePermissionHistory(Base):
     role_name = Column(String, nullable=False)
     action = Column(String, nullable=False)  # created, updated, deleted, permissions_updated
     details = Column(String, nullable=True)
+    o_id = Column(Integer, nullable=False)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
 

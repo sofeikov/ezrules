@@ -47,6 +47,7 @@ def user_lists_test_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="listadmin@example.com",
+            o_id=1,
         )
         admin_user.roles.append(admin_role)
         session.add(admin_user)
@@ -66,6 +67,7 @@ def user_lists_test_client(session):
         user_id=int(admin_user.id),
         email=str(admin_user.email),
         roles=roles,
+        org_id=int(admin_user.o_id),
     )
 
     client_data = {
@@ -504,6 +506,7 @@ class TestUserListPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="noperm_list@example.com",
+            o_id=1,
         )
         session.add(no_perm_user)
         session.commit()
@@ -516,6 +519,7 @@ class TestUserListPermissions:
             user_id=int(no_perm_user.id),
             email=str(no_perm_user.email),
             roles=[],
+            org_id=int(no_perm_user.o_id),
         )
 
         with TestClient(app) as client:
@@ -541,6 +545,7 @@ class TestUserListPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="viewonly_list@example.com",
+            o_id=1,
         )
         view_only_user.roles.append(view_only_role)
         session.add(view_only_user)
@@ -555,6 +560,7 @@ class TestUserListPermissions:
             user_id=int(view_only_user.id),
             email=str(view_only_user.email),
             roles=[view_only_role.name],
+            org_id=int(view_only_user.o_id),
         )
 
         with TestClient(app) as client:
@@ -581,6 +587,7 @@ class TestUserListPermissions:
             password=hashed_password,
             active=True,
             fs_uniquifier="viewonly2_list@example.com",
+            o_id=1,
         )
         view_only_user.roles.append(view_only_role)
         session.add(view_only_user)
@@ -595,6 +602,7 @@ class TestUserListPermissions:
             user_id=int(view_only_user.id),
             email=str(view_only_user.email),
             roles=[view_only_role.name],
+            org_id=int(view_only_user.o_id),
         )
 
         with TestClient(app) as client:

@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 
 /**
  * Page Object Model for the Backtesting UI on the Rule Detail page.
@@ -40,6 +40,10 @@ export class BacktestingPage {
   async getResultStatus(index: number): Promise<string> {
     const badge = this.page.locator(`[data-testid="backtest-status-${index}"]`);
     return ((await badge.textContent()) || '').trim();
+  }
+
+  async waitForResultStatus(index: number, status: string) {
+    await expect(this.page.getByTestId(`backtest-status-${index}`)).toHaveText(status, { timeout: 15000 });
   }
 
   async waitForExpandedContent() {

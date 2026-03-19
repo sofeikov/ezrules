@@ -89,6 +89,11 @@ jobs:
         nohup uv run ezrules api --port 8888 > /tmp/ezrules-api.log 2>&1 &
         echo $! > /tmp/ezrules-api.pid
 
+    - name: Start Celery worker
+      run: |
+        nohup uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo > /tmp/ezrules-worker.log 2>&1 &
+        echo $! > /tmp/ezrules-worker.pid
+
     - name: Wait for API service
       run: |
         for i in {1..30}; do
@@ -99,6 +104,18 @@ jobs:
         done
         echo "API did not become ready in time"
         cat /tmp/ezrules-api.log || true
+        exit 1
+
+    - name: Wait for Celery worker
+      run: |
+        for i in {1..30}; do
+          if grep -q "ready" /tmp/ezrules-worker.log 2>/dev/null; then
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "Worker did not become ready in time"
+        cat /tmp/ezrules-worker.log || true
         exit 1
 
     - name: Wait for Mailpit
@@ -151,4 +168,7 @@ jobs:
         fi
         if [ -f /tmp/ezrules-api.pid ]; then
           kill "$(cat /tmp/ezrules-api.pid)" || true
+        fi
+        if [ -f /tmp/ezrules-worker.pid ]; then
+          kill "$(cat /tmp/ezrules-worker.pid)" || true
         fi

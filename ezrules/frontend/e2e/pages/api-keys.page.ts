@@ -35,7 +35,8 @@ export class ApiKeysPage {
   }
 
   async waitForLoad() {
-    await this.loadingSpinner.waitFor({ state: 'hidden', timeout: 10000 });
+    await this.heading.waitFor({ state: 'visible', timeout: 10000 });
+    await this.createBtn.waitFor({ state: 'visible', timeout: 10000 });
   }
 
   async getKeyCount(): Promise<number> {

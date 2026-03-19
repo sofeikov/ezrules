@@ -16,8 +16,9 @@ export default defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
 
-  /* File-level parallelism — all test files create/delete their own data */
-  workers: process.env.CI ? 4 : 4,
+  /* Keep local runs aligned with CI's single-worker invocation to avoid
+   * overloading the dev API/database pool during full-suite browser runs. */
+  workers: process.env.CI ? 4 : 1,
 
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [

@@ -43,6 +43,7 @@ def ft_audit_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="ft_audit@example.com",
+            o_id=1,
         )
         user.roles.append(role)
         session.add(user)
@@ -55,7 +56,7 @@ def ft_audit_client(session):
     PermissionManager.grant_permission(role.id, PermissionAction.DELETE_FIELD_TYPE)
     PermissionManager.grant_permission(role.id, PermissionAction.ACCESS_AUDIT_TRAIL)
 
-    token = create_access_token(user_id=int(user.id), email=str(user.email), roles=[role.name])
+    token = create_access_token(user_id=int(user.id), email=str(user.email), roles=[role.name], org_id=int(user.o_id))
 
     with TestClient(app) as client:
         client.test_data = {"token": token, "session": session, "org": org}  # type: ignore

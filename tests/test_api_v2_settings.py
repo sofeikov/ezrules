@@ -21,21 +21,19 @@ from ezrules.models.backend_core import (
 from ezrules.settings import app_settings
 
 
-def _ensure_org(session) -> None:
-    org = session.query(Organisation).filter(Organisation.o_id == app_settings.ORG_ID).first()
-    if org is None:
-        session.add(Organisation(o_id=app_settings.ORG_ID, name="Test Org"))
-        session.commit()
+def _get_org(session) -> Organisation:
+    return session.query(Organisation).one()
 
 
 @pytest.fixture(scope="function")
 def settings_test_client(session):
     """Create a test client with a settings-admin user."""
     hashed_password = bcrypt.hashpw("settingspass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    org = _get_org(session)
 
-    role = session.query(Role).filter(Role.name == "settings_admin").first()
+    role = session.query(Role).filter(Role.name == "settings_admin", Role.o_id == org.o_id).first()
     if not role:
-        role = Role(name="settings_admin", description="Can view and manage runtime settings")
+        role = Role(name="settings_admin", description="Can view and manage runtime settings", o_id=int(org.o_id))
         session.add(role)
         session.commit()
 
@@ -46,6 +44,7 @@ def settings_test_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="settings_admin@example.com",
+            o_id=int(org.o_id),
         )
         user.roles.append(role)
         session.add(user)
@@ -60,6 +59,7 @@ def settings_test_client(session):
         user_id=int(user.id),
         email=str(user.email),
         roles=[role.name],
+        org_id=int(user.o_id),
     )
 
     with TestClient(app) as client:
@@ -116,8 +116,9 @@ class TestRuntimeSettings:
 
     def test_update_runtime_settings_without_manage_permission(self, session):
         hashed_password = bcrypt.hashpw("settingsreadpass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        org = _get_org(session)
 
-        role = Role(name="settings_read_only", description="Can only view settings")
+        role = Role(name="settings_read_only", description="Can only view settings", o_id=int(org.o_id))
         session.add(role)
         session.commit()
 
@@ -126,6 +127,7 @@ class TestRuntimeSettings:
             password=hashed_password,
             active=True,
             fs_uniquifier="settings_read_only@example.com",
+            o_id=int(org.o_id),
         )
         user.roles.append(role)
         session.add(user)
@@ -139,6 +141,7 @@ class TestRuntimeSettings:
             user_id=int(user.id),
             email=str(user.email),
             roles=[role.name],
+            org_id=int(user.o_id),
         )
 
         with TestClient(app) as client:
@@ -155,13 +158,13 @@ class TestOutcomeHierarchySettings:
     def test_list_outcome_hierarchy(self, settings_test_client):
         token = settings_test_client.test_data["token"]
         session = settings_test_client.test_data["session"]
+        org = _get_org(session)
 
-        _ensure_org(session)
         session.add_all(
             [
-                AllowedOutcome(outcome_name="CANCEL", severity_rank=1, o_id=app_settings.ORG_ID),
-                AllowedOutcome(outcome_name="HOLD", severity_rank=2, o_id=app_settings.ORG_ID),
-                AllowedOutcome(outcome_name="RELEASE", severity_rank=3, o_id=app_settings.ORG_ID),
+                AllowedOutcome(outcome_name="CANCEL", severity_rank=1, o_id=int(org.o_id)),
+                AllowedOutcome(outcome_name="HOLD", severity_rank=2, o_id=int(org.o_id)),
+                AllowedOutcome(outcome_name="RELEASE", severity_rank=3, o_id=int(org.o_id)),
             ]
         )
         session.commit()
@@ -180,12 +183,12 @@ class TestOutcomeHierarchySettings:
         token = settings_test_client.test_data["token"]
         session = settings_test_client.test_data["session"]
         user = settings_test_client.test_data["user"]
+        org = _get_org(session)
 
-        _ensure_org(session)
         outcomes = [
-            AllowedOutcome(outcome_name="CANCEL", severity_rank=1, o_id=app_settings.ORG_ID),
-            AllowedOutcome(outcome_name="HOLD", severity_rank=2, o_id=app_settings.ORG_ID),
-            AllowedOutcome(outcome_name="RELEASE", severity_rank=3, o_id=app_settings.ORG_ID),
+            AllowedOutcome(outcome_name="CANCEL", severity_rank=1, o_id=int(org.o_id)),
+            AllowedOutcome(outcome_name="HOLD", severity_rank=2, o_id=int(org.o_id)),
+            AllowedOutcome(outcome_name="RELEASE", severity_rank=3, o_id=int(org.o_id)),
         ]
         session.add_all(outcomes)
         session.commit()
@@ -203,7 +206,7 @@ class TestOutcomeHierarchySettings:
         session.expire_all()
         stored = (
             session.query(AllowedOutcome)
-            .filter(AllowedOutcome.o_id == app_settings.ORG_ID)
+            .filter(AllowedOutcome.o_id == int(org.o_id))
             .order_by(AllowedOutcome.severity_rank.asc())
             .all()
         )
@@ -223,11 +226,11 @@ class TestOutcomeHierarchySettings:
     def test_update_outcome_hierarchy_requires_full_set(self, settings_test_client):
         token = settings_test_client.test_data["token"]
         session = settings_test_client.test_data["session"]
+        org = _get_org(session)
 
-        _ensure_org(session)
         outcomes = [
-            AllowedOutcome(outcome_name="CANCEL", severity_rank=1, o_id=app_settings.ORG_ID),
-            AllowedOutcome(outcome_name="HOLD", severity_rank=2, o_id=app_settings.ORG_ID),
+            AllowedOutcome(outcome_name="CANCEL", severity_rank=1, o_id=int(org.o_id)),
+            AllowedOutcome(outcome_name="HOLD", severity_rank=2, o_id=int(org.o_id)),
         ]
         session.add_all(outcomes)
         session.commit()
@@ -254,15 +257,14 @@ class TestRuleQualityPairsSettings:
     def test_create_update_delete_rule_quality_pair(self, settings_test_client):
         token = settings_test_client.test_data["token"]
         session = settings_test_client.test_data["session"]
-
-        _ensure_org(session)
+        org = _get_org(session)
 
         outcome = AllowedOutcome(
             outcome_name="SETTINGS_OUTCOME",
             severity_rank=10,
-            o_id=app_settings.ORG_ID,
+            o_id=int(org.o_id),
         )
-        label = Label(label="SETTINGS_LABEL")
+        label = Label(label="SETTINGS_LABEL", o_id=int(org.o_id))
         session.add_all([outcome, label])
         session.commit()
 
@@ -304,14 +306,14 @@ class TestRuleQualityPairsSettings:
     def test_rule_quality_pair_options(self, settings_test_client):
         token = settings_test_client.test_data["token"]
         session = settings_test_client.test_data["session"]
+        org = _get_org(session)
 
-        _ensure_org(session)
         outcome = AllowedOutcome(
             outcome_name="SETTINGS_OUTCOME_OPTIONS",
             severity_rank=11,
-            o_id=app_settings.ORG_ID,
+            o_id=int(org.o_id),
         )
-        label = Label(label="SETTINGS_LABEL_OPTIONS")
+        label = Label(label="SETTINGS_LABEL_OPTIONS", o_id=int(org.o_id))
         session.add_all([outcome, label])
         session.commit()
 
@@ -327,14 +329,14 @@ class TestRuleQualityPairsSettings:
     def test_create_rule_quality_pair_duplicate_returns_conflict(self, settings_test_client):
         token = settings_test_client.test_data["token"]
         session = settings_test_client.test_data["session"]
+        org = _get_org(session)
 
-        _ensure_org(session)
         outcome = AllowedOutcome(
             outcome_name="SETTINGS_OUTCOME_DUP",
             severity_rank=12,
-            o_id=app_settings.ORG_ID,
+            o_id=int(org.o_id),
         )
-        label = Label(label="SETTINGS_LABEL_DUP")
+        label = Label(label="SETTINGS_LABEL_DUP", o_id=int(org.o_id))
         session.add_all([outcome, label])
         session.commit()
 
@@ -354,7 +356,8 @@ class TestRuleQualityPairsSettings:
 
     def test_list_rule_quality_pairs_requires_view_roles_permission(self, session):
         hashed_password = bcrypt.hashpw("pairsreadonlypass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-        role = Role(name="pairs_no_view", description="No view role permission")
+        org = _get_org(session)
+        role = Role(name="pairs_no_view", description="No view role permission", o_id=int(org.o_id))
         session.add(role)
         session.commit()
 
@@ -363,6 +366,7 @@ class TestRuleQualityPairsSettings:
             password=hashed_password,
             active=True,
             fs_uniquifier="pairs_no_view@example.com",
+            o_id=int(org.o_id),
         )
         user.roles.append(role)
         session.add(user)
@@ -375,6 +379,7 @@ class TestRuleQualityPairsSettings:
             user_id=int(user.id),
             email=str(user.email),
             roles=[role.name],
+            org_id=int(user.o_id),
         )
 
         with TestClient(app) as client:
@@ -386,7 +391,8 @@ class TestRuleQualityPairsSettings:
 
     def test_mutate_rule_quality_pairs_requires_manage_permissions(self, session):
         hashed_password = bcrypt.hashpw("pairsviewonlypass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-        role = Role(name="pairs_view_only", description="Can view settings only")
+        org = _get_org(session)
+        role = Role(name="pairs_view_only", description="Can view settings only", o_id=int(org.o_id))
         session.add(role)
         session.commit()
 
@@ -395,6 +401,7 @@ class TestRuleQualityPairsSettings:
             password=hashed_password,
             active=True,
             fs_uniquifier="pairs_view_only@example.com",
+            o_id=int(org.o_id),
         )
         user.roles.append(role)
         session.add(user)
@@ -404,13 +411,12 @@ class TestRuleQualityPairsSettings:
         PermissionManager.init_default_actions()
         PermissionManager.grant_permission(role.id, PermissionAction.VIEW_ROLES)
 
-        _ensure_org(session)
         outcome = AllowedOutcome(
             outcome_name="SETTINGS_OUTCOME_PERM",
             severity_rank=13,
-            o_id=app_settings.ORG_ID,
+            o_id=int(org.o_id),
         )
-        label = Label(label="SETTINGS_LABEL_PERM")
+        label = Label(label="SETTINGS_LABEL_PERM", o_id=int(org.o_id))
         session.add_all([outcome, label])
         session.commit()
 
@@ -418,6 +424,7 @@ class TestRuleQualityPairsSettings:
             user_id=int(user.id),
             email=str(user.email),
             roles=[role.name],
+            org_id=int(user.o_id),
         )
 
         with TestClient(app) as client:

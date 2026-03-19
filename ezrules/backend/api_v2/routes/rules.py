@@ -15,6 +15,7 @@ from sqlalchemy.exc import NoResultFound
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
@@ -47,6 +48,7 @@ from ezrules.core.rule_updater import (
     save_rule_history,
 )
 from ezrules.core.type_casting import CastError, cast_event
+from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.backend_core import RuleEngineConfig, RuleHistory, RuleStatus, User
 from ezrules.settings import app_settings
@@ -62,17 +64,19 @@ HISTORY_LIMIT_DEFAULT = 10
 # =============================================================================
 
 
-def get_rule_manager(db: Any) -> RDBRuleManager:
+def get_rule_manager(db: Any, org_id: int) -> RDBRuleManager:
     """Get a rule manager instance for the current organization."""
-    # For now, use o_id=1 as default. In multi-tenant setup, this would come from user context.
-    o_id = 1
-    return RDBRuleManager(db=db, o_id=o_id)
+    return RDBRuleManager(db=db, o_id=org_id)
 
 
-def get_config_producer(db: Any) -> RDBRuleEngineConfigProducer:
+def get_config_producer(db: Any, org_id: int) -> RDBRuleEngineConfigProducer:
     """Get a config producer instance for updating rule engine config."""
-    o_id = 1
-    return RDBRuleEngineConfigProducer(db=db, o_id=o_id)
+    return RDBRuleEngineConfigProducer(db=db, o_id=org_id)
+
+
+def get_list_provider(db: Any, org_id: int) -> PersistentUserListManager:
+    """Get an org-scoped user-list provider for rule compilation/execution."""
+    return PersistentUserListManager(db_session=db, o_id=org_id)
 
 
 def is_active(rule: RuleModel) -> bool:
@@ -114,6 +118,7 @@ def rule_to_response(rule: RuleModel, revisions: list[RuleRevisionSummary] | Non
 def list_rules(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RulesListResponse:
     """
@@ -121,7 +126,7 @@ def list_rules(
 
     Returns a list of all rules in the system, along with the evaluator endpoint URL.
     """
-    rule_manager = get_rule_manager(db)
+    rule_manager = get_rule_manager(db, current_org_id)
     rules = rule_manager.load_all_rules()
 
     # Determine which rules are in shadow config
@@ -129,7 +134,7 @@ def list_rules(
     try:
         shadow_config = (
             db.query(RuleEngineConfig)
-            .where(RuleEngineConfig.label == "shadow", RuleEngineConfig.o_id == app_settings.ORG_ID)
+            .where(RuleEngineConfig.label == "shadow", RuleEngineConfig.o_id == current_org_id)
             .one()
         )
         shadow_r_ids = {int(r["r_id"]) for r in shadow_config.config if "r_id" in r}
@@ -168,6 +173,7 @@ def get_rule(
     rule_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleResponse:
     """
@@ -175,7 +181,7 @@ def get_rule(
 
     Returns the rule details including its revision history.
     """
-    rule_manager = get_rule_manager(db)
+    rule_manager = get_rule_manager(db, current_org_id)
     rule = rule_manager.load_rule(rule_id)  # type: ignore[arg-type]
 
     if rule is None:
@@ -208,6 +214,7 @@ def get_rule_revision(
     revision_number: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleResponse:
     """
@@ -215,7 +222,7 @@ def get_rule_revision(
 
     Returns the rule as it existed at the specified revision.
     """
-    rule_manager = get_rule_manager(db)
+    rule_manager = get_rule_manager(db, current_org_id)
 
     try:
         rule = rule_manager.load_rule(rule_id, revision_number=revision_number)  # type: ignore[arg-type]
@@ -252,6 +259,7 @@ def get_rule_history(
     limit: int = Query(default=HISTORY_LIMIT_DEFAULT, ge=1, le=100, description="Max revisions to return"),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleHistoryResponse:
     """
@@ -260,7 +268,7 @@ def get_rule_history(
     Returns the most recent revisions (up to `limit`) plus the current version.
     Useful for showing a diff timeline of rule changes.
     """
-    rule_manager = get_rule_manager(db)
+    rule_manager = get_rule_manager(db, current_org_id)
 
     latest_version = rule_manager.load_rule(rule_id)  # type: ignore[arg-type]
     if latest_version is None:
@@ -269,7 +277,10 @@ def get_rule_history(
             detail="Rule not found",
         )
     latest_history_entry = (
-        db.query(RuleHistory).filter(RuleHistory.r_id == rule_id).order_by(RuleHistory.version.desc()).first()
+        db.query(RuleHistory)
+        .filter(RuleHistory.r_id == rule_id, RuleHistory.o_id == current_org_id)
+        .order_by(RuleHistory.version.desc())
+        .first()
     )
     current_created_at = latest_history_entry.changed if latest_history_entry is not None else latest_version.created_at
 
@@ -329,6 +340,7 @@ def create_rule(
     rule_data: RuleCreate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.CREATE_RULE)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleMutationResponse:
     """
@@ -344,7 +356,7 @@ def create_rule(
             "logic": rule_data.logic,
             "description": rule_data.description,
         }
-        RuleFactory.from_json(rule_config)
+        RuleFactory.from_json(rule_config, list_values_provider=get_list_provider(db, current_org_id))
     except Exception as e:
         return RuleMutationResponse(
             success=False,
@@ -353,7 +365,7 @@ def create_rule(
         )
 
     # Create and persist the new rule
-    rule_manager = get_rule_manager(db)
+    rule_manager = get_rule_manager(db, current_org_id)
     new_rule = RuleModel(
         rid=rule_data.rid,
         logic=rule_data.logic,
@@ -383,6 +395,7 @@ def update_rule(
     rule_data: RuleUpdate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleMutationResponse:
     """
@@ -391,14 +404,14 @@ def update_rule(
     Only provided fields will be updated. The rule logic will be validated
     before saving.
     """
-    rule_manager = get_rule_manager(db)
+    rule_manager = get_rule_manager(db, current_org_id)
     rule = rule_manager.load_rule(rule_id)  # type: ignore[arg-type]
     if rule is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Rule not found",
         )
-    config_producer = get_config_producer(db)
+    config_producer = get_config_producer(db, current_org_id)
     if rule.status == RuleStatus.ARCHIVED:
         return RuleMutationResponse(
             success=False,
@@ -417,7 +430,7 @@ def update_rule(
             "logic": new_logic,
             "description": new_description,
         }
-        RuleFactory.from_json(rule_config)
+        RuleFactory.from_json(rule_config, list_values_provider=get_list_provider(db, current_org_id))
     except Exception as e:
         return RuleMutationResponse(
             success=False,
@@ -475,13 +488,14 @@ def delete_rule(
     rule_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.DELETE_RULE)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> None:
     """
     Delete a rule and keep its audit history.
     """
-    rule_manager = get_rule_manager(db)
-    config_producer = get_config_producer(db)
+    rule_manager = get_rule_manager(db, current_org_id)
+    config_producer = get_config_producer(db, current_org_id)
     rule = rule_manager.load_rule(rule_id)
 
     if rule is None:
@@ -502,7 +516,7 @@ def delete_rule(
     )
 
     # Remove from shadow config if present.
-    remove_rule_from_shadow(db, o_id=app_settings.ORG_ID, r_id=rule_id, changed_by=str(user.email))
+    remove_rule_from_shadow(db, o_id=current_org_id, r_id=rule_id, changed_by=str(user.email))
 
     # Delete the rule (DB cascade handles backtesting results)
     db.delete(rule)
@@ -522,11 +536,12 @@ def promote_rule(
     rule_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.PROMOTE_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleMutationResponse:
     """Promote a draft rule to active and record approver metadata."""
-    rule_manager = get_rule_manager(db)
-    config_producer = get_config_producer(db)
+    rule_manager = get_rule_manager(db, current_org_id)
+    config_producer = get_config_producer(db, current_org_id)
     rule = rule_manager.load_rule(rule_id)
     if rule is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
@@ -565,11 +580,12 @@ def archive_rule(
     rule_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleMutationResponse:
     """Archive a rule and remove it from production config if active."""
-    rule_manager = get_rule_manager(db)
-    config_producer = get_config_producer(db)
+    rule_manager = get_rule_manager(db, current_org_id)
+    config_producer = get_config_producer(db, current_org_id)
     rule = rule_manager.load_rule(rule_id)
     if rule is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
@@ -588,7 +604,7 @@ def archive_rule(
     rule_manager.save_rule(rule)
 
     # Archived rules must not remain deployable in shadow.
-    remove_rule_from_shadow(db, o_id=app_settings.ORG_ID, r_id=rule_id, changed_by=str(user.email))
+    remove_rule_from_shadow(db, o_id=current_org_id, r_id=rule_id, changed_by=str(user.email))
 
     if was_active:
         config_producer.save_config(rule_manager, changed_by=str(user.email))
@@ -606,11 +622,12 @@ def rollback_rule(
     rollback_data: RuleRollbackRequest,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleMutationResponse:
     """Create a new draft version from a historical revision."""
-    rule_manager = get_rule_manager(db)
-    config_producer = get_config_producer(db)
+    rule_manager = get_rule_manager(db, current_org_id)
+    config_producer = get_config_producer(db, current_org_id)
     rule = rule_manager.load_rule(rule_id)  # type: ignore[arg-type]
 
     if rule is None:
@@ -639,7 +656,8 @@ def rollback_rule(
                 "rid": rule.rid,
                 "logic": target_revision.logic,
                 "description": target_revision.description,
-            }
+            },
+            list_values_provider=get_list_provider(db, current_org_id),
         )
     except Exception as e:
         return RuleMutationResponse(
@@ -693,6 +711,8 @@ def verify_rule(
     request: RuleVerifyRequest,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
 ) -> RuleVerifyResponse:
     """
     Verify rule syntax and extract parameters.
@@ -703,7 +723,11 @@ def verify_rule(
     This does NOT save the rule - it's just for validation.
     """
     try:
-        rule = Rule(rid="", logic=request.rule_source)
+        rule = Rule(
+            rid="",
+            logic=request.rule_source,
+            list_values_provider=get_list_provider(db, current_org_id),
+        )
         params = sorted(rule.get_rule_params(), key=str)
         return RuleVerifyResponse(params=params)
     except Exception:
@@ -721,6 +745,7 @@ def test_rule(
     request: RuleTestRequest,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleTestResponse:
     """
@@ -743,10 +768,10 @@ def test_rule(
         )
 
     # Record field observations from the raw test JSON (pre-cast types)
-    record_observations(db, test_object, app_settings.ORG_ID)
+    record_observations(db, test_object, current_org_id)
 
     # Apply field type casting
-    configs = load_cast_configs(db, app_settings.ORG_ID)
+    configs = load_cast_configs(db, current_org_id)
     try:
         test_object = cast_event(test_object, configs)
     except CastError as exc:
@@ -758,7 +783,11 @@ def test_rule(
 
     # Compile the rule
     try:
-        rule = Rule(rid="", logic=request.rule_source)
+        rule = Rule(
+            rid="",
+            logic=request.rule_source,
+            list_values_provider=get_list_provider(db, current_org_id),
+        )
     except SyntaxError:
         return RuleTestResponse(
             status="error",
@@ -793,6 +822,7 @@ def deploy_to_shadow(
     request: ShadowDeployRequest = None,  # type: ignore[assignment]
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> ShadowDeployResponse:
     """Deploy a rule to the shadow config for live observation.
@@ -807,14 +837,14 @@ def deploy_to_shadow(
     if request is None:
         request = ShadowDeployRequest()
 
-    rule_manager = get_rule_manager(db)
+    rule_manager = get_rule_manager(db, current_org_id)
     rule = rule_manager.load_rule(rule_id)  # type: ignore[arg-type]
     if rule is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
 
     deploy_rule_to_shadow(
         db,
-        o_id=app_settings.ORG_ID,
+        o_id=current_org_id,
         rule_model=rule,
         changed_by=str(user.email),
         logic_override=request.logic,
@@ -832,12 +862,13 @@ def remove_from_shadow(
     rule_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> ShadowDeployResponse:
     """Remove a rule from the shadow config."""
     from ezrules.backend.api_v2.routes import evaluator as evaluator_module
 
-    remove_rule_from_shadow(db, o_id=app_settings.ORG_ID, r_id=rule_id, changed_by=str(user.email))
+    remove_rule_from_shadow(db, o_id=current_org_id, r_id=rule_id, changed_by=str(user.email))
 
     # Invalidate shadow executor so it reloads on next request
     evaluator_module._shadow_lre = None
@@ -850,6 +881,7 @@ def promote_to_production(
     rule_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.PROMOTE_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> ShadowDeployResponse:
     """Promote a rule from shadow config into the production config."""
@@ -858,7 +890,7 @@ def promote_to_production(
     try:
         promote_shadow_rule_to_production(
             db,
-            o_id=app_settings.ORG_ID,
+            o_id=current_org_id,
             r_id=rule_id,
             changed_by=str(user.email),
             approved_by=int(user.id),

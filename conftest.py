@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
@@ -64,8 +65,13 @@ def session(connection):
     Session = sessionmaker(bind=connection)
     session = Session()
 
-    org = Organisation(name="test_org")
+    org = Organisation(o_id=1, name="test_org")
     session.add(org)
+    session.commit()
+    session.execute(
+        text("SELECT setval(pg_get_serial_sequence('organisation', 'o_id'), :current_id, true)"),
+        {"current_id": int(org.o_id)},
+    )
     session.commit()
 
     admin_email = "admin@test_org.com"
@@ -76,6 +82,7 @@ def session(connection):
             password=admin_password,
             active=True,
             fs_uniquifier=admin_email,
+            o_id=int(org.o_id),
         )
     )
     session.commit()

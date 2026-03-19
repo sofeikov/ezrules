@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { RuleListPage } from '../pages/rule-list.page';
+import { getApiBaseUrl } from '../support/config';
+
+const API_BASE = getApiBaseUrl();
 
 /**
  * E2E tests for the Rule List page.
@@ -29,6 +32,13 @@ test.describe('Rule List Page', () => {
       await rulePage.goto();
       const description = page.locator('text=Manage and monitor your business rules');
       await expect(description).toBeVisible();
+    });
+
+    test('should not display a broken Evaluate header link', async () => {
+      await rulePage.goto();
+      await rulePage.waitForRulesToLoad();
+
+      await expect(rulePage.evaluateLink).toHaveCount(0);
     });
   });
 
@@ -120,42 +130,39 @@ test.describe('Rule List Page', () => {
       await rulePage.goto();
       await rulePage.waitForRulesToLoad();
 
-      // Section should be hidden initially
-      const howToRunContent = page.locator('.bg-blue-50').filter({ hasText: 'Evaluator endpoint:' });
-      await expect(howToRunContent).not.toBeVisible();
+      await expect(rulePage.howToRunSection).not.toBeVisible();
 
       // Click to show
       await rulePage.toggleHowToRun();
-      await expect(howToRunContent).toBeVisible();
+      await expect(rulePage.howToRunSection).toBeVisible();
 
       // Click to hide
       await rulePage.toggleHowToRun();
-      await expect(howToRunContent).not.toBeVisible();
+      await expect(rulePage.howToRunSection).not.toBeVisible();
     });
 
-    test('should display evaluator endpoint in How to Run section', async ({ page }) => {
+    test('should display the runtime evaluate endpoint in How to Run section', async () => {
       await rulePage.goto();
       await rulePage.waitForRulesToLoad();
 
       await rulePage.toggleHowToRun();
 
-      const endpointCode = page.locator('code.bg-white.px-2');
-      await expect(endpointCode).toBeVisible();
-      await expect(endpointCode).toContainText('localhost:9999');
+      await expect(rulePage.evaluateEndpointCode).toBeVisible();
+      await expect(rulePage.evaluateEndpointCode).toHaveText(`${API_BASE}/api/v2/evaluate`);
     });
 
-    test('should display curl example in How to Run section', async ({ page }) => {
+    test('should display curl example with the runtime evaluate endpoint', async () => {
       await rulePage.goto();
       await rulePage.waitForRulesToLoad();
 
       await rulePage.toggleHowToRun();
 
-      const curlExample = page.locator('.bg-gray-900.text-gray-100');
-      await expect(curlExample).toBeVisible();
-      await expect(curlExample).toContainText('curl');
-      await expect(curlExample).toContainText('-X POST');
-      await expect(curlExample).toContainText('Content-Type: application/json');
-      await expect(curlExample).toContainText('localhost:9999/evaluate');
+      await expect(rulePage.curlExample).toBeVisible();
+      await expect(rulePage.curlExample).toContainText('curl');
+      await expect(rulePage.curlExample).toContainText('-X POST');
+      await expect(rulePage.curlExample).toContainText('Content-Type: application/json');
+      await expect(rulePage.curlExample).toContainText(`${API_BASE}/api/v2/evaluate`);
+      await expect(rulePage.curlExample).not.toContainText('localhost:9999');
     });
   });
 

@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from sqlalchemy.exc import NoResultFound
 
 from ezrules.core.rule_engine import RuleEngineFactory
+from ezrules.core.user_lists import PersistentUserListManager
 
 
 class AbstractRuleExecutor(ABC):
@@ -46,4 +47,7 @@ class LocalRuleExecutorSQL(AbstractRuleExecutor):
 
         if latest_record_version != self._current_rule_version:
             self._current_rule_version = latest_record_version
-            self.rule_engine = RuleEngineFactory.from_json(latest_config)
+            self.rule_engine = RuleEngineFactory.from_json(
+                latest_config,
+                list_values_provider=PersistentUserListManager(self.db, self.o_id),
+            )

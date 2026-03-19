@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from ezrules.backend.analytics import AGGREGATION_CONFIG, get_bucket_expression
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
@@ -78,6 +79,7 @@ def get_transaction_volume(
     aggregation: str = Query(default="1h", description="Aggregation period"),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> TimeSeriesResponse:
     """
@@ -93,6 +95,7 @@ def get_transaction_volume(
     transactions = (
         db.query(bucket_expr.label("bucket"), sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
         .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.o_id == current_org_id)
         .group_by("bucket")
         .order_by("bucket")
         .all()
@@ -118,6 +121,7 @@ def get_outcomes_distribution(
     aggregation: str = Query(default="1h", description="Aggregation period"),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_OUTCOMES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> MultiSeriesResponse:
     """
@@ -138,6 +142,7 @@ def get_outcomes_distribution(
         )
         .join(TestingRecordLog, TestingRecordLog.tl_id == TestingResultsLog.tl_id)
         .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.o_id == current_org_id)
         .group_by("bucket", TestingResultsLog.rule_result)
         .order_by("bucket")
         .all()
@@ -192,6 +197,7 @@ def get_labels_distribution(
     aggregation: str = Query(default="1h", description="Aggregation period"),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> MultiSeriesResponse:
     """
@@ -212,6 +218,8 @@ def get_labels_distribution(
         )
         .join(TestingRecordLog, TestingRecordLog.el_id == Label.el_id)
         .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.o_id == current_org_id)
+        .filter(Label.o_id == current_org_id)
         .filter(TestingRecordLog.el_id.isnot(None))
         .group_by("bucket", Label.label)
         .order_by("bucket")
@@ -267,6 +275,7 @@ def get_labeled_transaction_volume(
     aggregation: str = Query(default="1h", description="Aggregation period"),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> TimeSeriesResponse:
     """
@@ -282,6 +291,7 @@ def get_labeled_transaction_volume(
     transactions = (
         db.query(bucket_expr.label("bucket"), sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
         .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.o_id == current_org_id)
         .filter(TestingRecordLog.el_id.isnot(None))
         .group_by("bucket")
         .order_by("bucket")
@@ -307,6 +317,7 @@ def get_labeled_transaction_volume(
 def get_labels_summary(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> LabelsSummaryResponse:
     """
@@ -316,13 +327,18 @@ def get_labels_summary(
     """
     # Total labeled events
     total_labeled = (
-        db.query(sqlalchemy.func.count(TestingRecordLog.tl_id)).filter(TestingRecordLog.el_id.isnot(None)).scalar()
+        db.query(sqlalchemy.func.count(TestingRecordLog.tl_id))
+        .filter(TestingRecordLog.o_id == current_org_id)
+        .filter(TestingRecordLog.el_id.isnot(None))
+        .scalar()
     )
 
     # Label distribution (pie chart data)
     label_counts = (
         db.query(Label.label, sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
         .join(TestingRecordLog, TestingRecordLog.el_id == Label.el_id)
+        .filter(TestingRecordLog.o_id == current_org_id)
+        .filter(Label.o_id == current_org_id)
         .filter(TestingRecordLog.el_id.isnot(None))
         .group_by(Label.label)
         .order_by(sqlalchemy.desc("count"))
@@ -394,6 +410,7 @@ def get_rule_quality(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
     __: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleQualityResponse:
     """
@@ -403,12 +420,14 @@ def get_rule_quality(
     where each pair treats one rule outcome as a "predicted positive" signal and
     one ground-truth label as the "actual positive" class.
     """
-    applied_lookback_days = lookback_days if lookback_days is not None else get_rule_quality_lookback_days(db)
+    applied_lookback_days = (
+        lookback_days if lookback_days is not None else get_rule_quality_lookback_days(db, current_org_id)
+    )
     freeze_at = datetime.datetime.utcnow()
     max_tl_id = get_rule_quality_snapshot_max_tl_id(
         db,
         freeze_at=freeze_at,
-        o_id=app_settings.ORG_ID,
+        o_id=current_org_id,
     )
     payload = compute_rule_quality_metrics(
         db,
@@ -416,8 +435,8 @@ def get_rule_quality(
         lookback_days=applied_lookback_days,
         freeze_at=freeze_at,
         max_tl_id=max_tl_id,
-        o_id=app_settings.ORG_ID,
-        curated_pairs=get_active_rule_quality_pairs(db, o_id=app_settings.ORG_ID),
+        o_id=current_org_id,
+        curated_pairs=get_active_rule_quality_pairs(db, o_id=current_org_id),
     )
     return RuleQualityResponse(**payload)
 
@@ -428,20 +447,23 @@ def request_rule_quality_report(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
     __: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleQualityReportTaskResponse:
     """Create or reuse a rule-quality report request."""
     applied_lookback_days = (
-        request_data.lookback_days if request_data.lookback_days is not None else get_rule_quality_lookback_days(db)
+        request_data.lookback_days
+        if request_data.lookback_days is not None
+        else get_rule_quality_lookback_days(db, current_org_id)
     )
-    active_pairs = get_active_rule_quality_pairs(db, o_id=app_settings.ORG_ID)
+    active_pairs = get_active_rule_quality_pairs(db, o_id=current_org_id)
     pair_set_hash = compute_rule_quality_pairs_hash(active_pairs)
     now = datetime.datetime.utcnow()
 
     if not request_data.force_refresh:
         cached_report = (
             db.query(RuleQualityReport)
-            .filter(RuleQualityReport.o_id == app_settings.ORG_ID)
+            .filter(RuleQualityReport.o_id == current_org_id)
             .filter(RuleQualityReport.min_support == request_data.min_support)
             .filter(RuleQualityReport.lookback_days == applied_lookback_days)
             .filter(RuleQualityReport.pair_set_hash == pair_set_hash)
@@ -460,7 +482,7 @@ def request_rule_quality_report(
     max_tl_id = get_rule_quality_snapshot_max_tl_id(
         db,
         freeze_at=freeze_at,
-        o_id=app_settings.ORG_ID,
+        o_id=current_org_id,
     )
 
     report = RuleQualityReport(
@@ -472,7 +494,7 @@ def request_rule_quality_report(
         pair_set_hash=pair_set_hash,
         pair_set=[{"outcome": outcome, "label": label} for outcome, label in active_pairs],
         requested_by=str(user.email),
-        o_id=app_settings.ORG_ID,
+        o_id=current_org_id,
     )
     db.add(report)
     db.commit()
@@ -492,13 +514,14 @@ def get_rule_quality_report(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
     __: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleQualityReportTaskResponse:
     """Return current status (and result when available) for a rule-quality report."""
     report = (
         db.query(RuleQualityReport)
         .filter(RuleQualityReport.rqr_id == report_id)
-        .filter(RuleQualityReport.o_id == app_settings.ORG_ID)
+        .filter(RuleQualityReport.o_id == current_org_id)
         .first()
     )
     if report is None:
@@ -518,7 +541,7 @@ def get_rule_quality_report(
         refreshed = (
             db.query(RuleQualityReport)
             .filter(RuleQualityReport.rqr_id == report_id)
-            .filter(RuleQualityReport.o_id == app_settings.ORG_ID)
+            .filter(RuleQualityReport.o_id == current_org_id)
             .first()
         )
         if refreshed is not None:

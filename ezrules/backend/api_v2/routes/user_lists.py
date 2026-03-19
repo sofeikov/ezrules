@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
@@ -33,9 +34,6 @@ from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import User, UserList, UserListEntry
 
 router = APIRouter(prefix="/api/v2/user-lists", tags=["User Lists"])
-
-# Default organization ID (in multi-tenant setup, this would come from user context)
-DEFAULT_ORG_ID = 1
 
 
 # =============================================================================
@@ -97,6 +95,7 @@ def entry_to_response(entry: UserListEntry) -> UserListEntryResponse:
 def list_user_lists(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_LISTS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserListsListResponse:
     """
@@ -105,7 +104,7 @@ def list_user_lists(
     Returns a list of all user lists with entry counts.
     Requires VIEW_LISTS permission.
     """
-    lists = db.query(UserList).filter(UserList.o_id == DEFAULT_ORG_ID).all()
+    lists = db.query(UserList).filter(UserList.o_id == current_org_id).all()
     lists_data = [list_to_response(ul) for ul in lists]
     return UserListsListResponse(lists=lists_data)
 
@@ -120,6 +119,7 @@ def get_user_list(
     list_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_LISTS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserListDetailResponse:
     """
@@ -132,7 +132,7 @@ def get_user_list(
         db.query(UserList)
         .filter(
             UserList.ul_id == list_id,
-            UserList.o_id == DEFAULT_ORG_ID,
+            UserList.o_id == current_org_id,
         )
         .first()
     )
@@ -156,6 +156,7 @@ def create_user_list(
     list_data: UserListCreate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.CREATE_LIST)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserListMutationResponse:
     """
@@ -169,7 +170,7 @@ def create_user_list(
         db.query(UserList)
         .filter(
             UserList.list_name == list_data.name,
-            UserList.o_id == DEFAULT_ORG_ID,
+            UserList.o_id == current_org_id,
         )
         .first()
     )
@@ -184,7 +185,7 @@ def create_user_list(
     # Create the new list
     new_list = UserList(
         list_name=list_data.name,
-        o_id=DEFAULT_ORG_ID,
+        o_id=current_org_id,
     )
 
     db.add(new_list)
@@ -196,7 +197,7 @@ def create_user_list(
         ul_id=int(new_list.ul_id),
         list_name=str(new_list.list_name),
         action="created",
-        o_id=DEFAULT_ORG_ID,
+        o_id=current_org_id,
         changed_by=str(user.email) if user.email else None,
     )
     db.commit()
@@ -219,6 +220,7 @@ def update_user_list(
     list_data: UserListUpdate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_LIST)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserListMutationResponse:
     """
@@ -230,7 +232,7 @@ def update_user_list(
         db.query(UserList)
         .filter(
             UserList.ul_id == list_id,
-            UserList.o_id == DEFAULT_ORG_ID,
+            UserList.o_id == current_org_id,
         )
         .first()
     )
@@ -247,7 +249,7 @@ def update_user_list(
             db.query(UserList)
             .filter(
                 UserList.list_name == list_data.name,
-                UserList.o_id == DEFAULT_ORG_ID,
+                UserList.o_id == current_org_id,
                 UserList.ul_id != list_id,
             )
             .first()
@@ -268,7 +270,7 @@ def update_user_list(
             ul_id=user_list.ul_id,
             list_name=list_data.name,
             action="renamed",
-            o_id=DEFAULT_ORG_ID,
+            o_id=current_org_id,
             changed_by=str(user.email) if user.email else None,
             details=f"Renamed from '{old_name}' to '{list_data.name}'",
         )
@@ -293,6 +295,7 @@ def delete_user_list(
     list_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.DELETE_LIST)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserListMutationResponse:
     """
@@ -305,7 +308,7 @@ def delete_user_list(
         db.query(UserList)
         .filter(
             UserList.ul_id == list_id,
-            UserList.o_id == DEFAULT_ORG_ID,
+            UserList.o_id == current_org_id,
         )
         .first()
     )
@@ -324,7 +327,7 @@ def delete_user_list(
         ul_id=ul_id,
         list_name=list_name,
         action="deleted",
-        o_id=DEFAULT_ORG_ID,
+        o_id=current_org_id,
         changed_by=str(user.email) if user.email else None,
     )
 
@@ -348,6 +351,7 @@ def get_list_entries(
     list_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_LISTS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserListDetailResponse:
     """
@@ -359,7 +363,7 @@ def get_list_entries(
         db.query(UserList)
         .filter(
             UserList.ul_id == list_id,
-            UserList.o_id == DEFAULT_ORG_ID,
+            UserList.o_id == current_org_id,
         )
         .first()
     )
@@ -384,6 +388,7 @@ def add_entry(
     entry_data: UserListEntryCreate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_LIST)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserListEntryMutationResponse:
     """
@@ -395,7 +400,7 @@ def add_entry(
         db.query(UserList)
         .filter(
             UserList.ul_id == list_id,
-            UserList.o_id == DEFAULT_ORG_ID,
+            UserList.o_id == current_org_id,
         )
         .first()
     )
@@ -437,7 +442,7 @@ def add_entry(
         ul_id=list_id,
         list_name=str(user_list.list_name),
         action="entry_added",
-        o_id=DEFAULT_ORG_ID,
+        o_id=current_org_id,
         changed_by=str(user.email) if user.email else None,
         details=f"Added entry '{entry_data.value}'",
     )
@@ -463,6 +468,7 @@ def bulk_add_entries(
     bulk_data: UserListEntryBulkCreate,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_LIST)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserListEntryBulkResponse:
     """
@@ -475,7 +481,7 @@ def bulk_add_entries(
         db.query(UserList)
         .filter(
             UserList.ul_id == list_id,
-            UserList.o_id == DEFAULT_ORG_ID,
+            UserList.o_id == current_org_id,
         )
         .first()
     )
@@ -516,7 +522,7 @@ def bulk_add_entries(
             ul_id=list_id,
             list_name=str(user_list.list_name),
             action="entries_bulk_added",
-            o_id=DEFAULT_ORG_ID,
+            o_id=current_org_id,
             changed_by=str(user.email) if user.email else None,
             details=f"Added {len(added)} entries, skipped {len(skipped)}",
         )
@@ -542,6 +548,7 @@ def delete_entry(
     entry_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MODIFY_LIST)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UserListEntryMutationResponse:
     """
@@ -554,7 +561,7 @@ def delete_entry(
         db.query(UserList)
         .filter(
             UserList.ul_id == list_id,
-            UserList.o_id == DEFAULT_ORG_ID,
+            UserList.o_id == current_org_id,
         )
         .first()
     )
@@ -588,7 +595,7 @@ def delete_entry(
         ul_id=list_id,
         list_name=str(user_list.list_name),
         action="entry_removed",
-        o_id=DEFAULT_ORG_ID,
+        o_id=current_org_id,
         changed_by=str(user.email) if user.email else None,
         details=f"Removed entry '{entry_value}'",
     )

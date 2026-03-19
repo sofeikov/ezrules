@@ -4,8 +4,14 @@ from datetime import datetime
 from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import func
 
-from ezrules.backend.api_v2.auth.dependencies import get_current_active_user, get_db, require_permission
+from ezrules.backend.api_v2.auth.dependencies import (
+    get_current_active_user,
+    get_current_org_id,
+    get_db,
+    require_permission,
+)
 from ezrules.backend.api_v2.schemas.settings import (
     OutcomeHierarchyItem,
     OutcomeHierarchyResponse,
@@ -42,10 +48,10 @@ def _serialize_rule_quality_pair(pair: RuleQualityPair) -> RuleQualityPairRespon
     )
 
 
-def _list_outcomes_in_severity_order(db: Any) -> list[AllowedOutcome]:
+def _list_outcomes_in_severity_order(db: Any, org_id: int) -> list[AllowedOutcome]:
     return (
         db.query(AllowedOutcome)
-        .filter(AllowedOutcome.o_id == app_settings.ORG_ID)
+        .filter(AllowedOutcome.o_id == org_id)
         .order_by(AllowedOutcome.severity_rank.asc(), AllowedOutcome.outcome_name.asc())
         .all()
     )
@@ -63,11 +69,12 @@ def _serialize_outcome(outcome: AllowedOutcome) -> OutcomeHierarchyItem:
 def get_runtime_settings(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuntimeSettingsResponse:
     """Return current runtime settings that can be tuned without redeploying."""
     return RuntimeSettingsResponse(
-        rule_quality_lookback_days=get_rule_quality_lookback_days(db),
+        rule_quality_lookback_days=get_rule_quality_lookback_days(db, current_org_id),
         default_rule_quality_lookback_days=app_settings.RULE_QUALITY_LOOKBACK_DAYS,
     )
 
@@ -77,14 +84,15 @@ def update_runtime_settings(
     request_data: RuntimeSettingsUpdateRequest,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MANAGE_PERMISSIONS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuntimeSettingsResponse:
     """Update runtime settings values."""
-    set_rule_quality_lookback_days(db, request_data.rule_quality_lookback_days)
+    set_rule_quality_lookback_days(db, request_data.rule_quality_lookback_days, current_org_id)
     db.commit()
 
     return RuntimeSettingsResponse(
-        rule_quality_lookback_days=get_rule_quality_lookback_days(db),
+        rule_quality_lookback_days=get_rule_quality_lookback_days(db, current_org_id),
         default_rule_quality_lookback_days=app_settings.RULE_QUALITY_LOOKBACK_DAYS,
     )
 
@@ -93,11 +101,12 @@ def update_runtime_settings(
 def get_outcome_hierarchy(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> OutcomeHierarchyResponse:
     """Return the configured outcome severity ordering used for conflict resolution."""
     return OutcomeHierarchyResponse(
-        outcomes=[_serialize_outcome(outcome) for outcome in _list_outcomes_in_severity_order(db)],
+        outcomes=[_serialize_outcome(outcome) for outcome in _list_outcomes_in_severity_order(db, current_org_id)],
     )
 
 
@@ -106,10 +115,11 @@ def update_outcome_hierarchy(
     request_data: OutcomeHierarchyUpdateRequest,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MANAGE_PERMISSIONS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> OutcomeHierarchyResponse:
     """Replace the full ordered outcome hierarchy for the current organization."""
-    outcomes = _list_outcomes_in_severity_order(db)
+    outcomes = _list_outcomes_in_severity_order(db, current_org_id)
     current_ids = [int(outcome.ao_id) for outcome in outcomes]
     requested_ids = [int(ao_id) for ao_id in request_data.ordered_ao_ids]
 
@@ -146,13 +156,13 @@ def update_outcome_hierarchy(
             ao_id=int(outcome.ao_id),
             outcome_name=str(outcome.outcome_name),
             action="reordered",
-            o_id=app_settings.ORG_ID,
+            o_id=current_org_id,
             changed_by=str(user.email) if user.email else None,
         )
 
     db.commit()
     return OutcomeHierarchyResponse(
-        outcomes=[_serialize_outcome(outcome) for outcome in _list_outcomes_in_severity_order(db)],
+        outcomes=[_serialize_outcome(outcome) for outcome in _list_outcomes_in_severity_order(db, current_org_id)],
     )
 
 
@@ -160,11 +170,12 @@ def update_outcome_hierarchy(
 def list_rule_quality_pairs(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleQualityPairsListResponse:
     pairs = (
         db.query(RuleQualityPair)
-        .filter(RuleQualityPair.o_id == app_settings.ORG_ID)
+        .filter(RuleQualityPair.o_id == current_org_id)
         .order_by(RuleQualityPair.outcome.asc(), RuleQualityPair.label.asc())
         .all()
     )
@@ -177,16 +188,20 @@ def list_rule_quality_pairs(
 def get_rule_quality_pair_options(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleQualityPairOptionsResponse:
     outcomes = [
         str(item.outcome_name)
         for item in db.query(AllowedOutcome)
-        .filter(AllowedOutcome.o_id == app_settings.ORG_ID)
+        .filter(AllowedOutcome.o_id == current_org_id)
         .order_by(AllowedOutcome.severity_rank.asc(), AllowedOutcome.outcome_name.asc())
         .all()
     ]
-    labels = [str(item.label) for item in db.query(Label).order_by(Label.label.asc()).all()]
+    labels = [
+        str(item.label)
+        for item in db.query(Label).filter(Label.o_id == current_org_id).order_by(Label.label.asc()).all()
+    ]
     return RuleQualityPairOptionsResponse(
         outcomes=outcomes,
         labels=labels,
@@ -198,6 +213,7 @@ def create_rule_quality_pair(
     request_data: RuleQualityPairCreateRequest,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MANAGE_PERMISSIONS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleQualityPairResponse:
     outcome = request_data.outcome.strip()
@@ -205,7 +221,7 @@ def create_rule_quality_pair(
 
     outcome_exists = (
         db.query(AllowedOutcome)
-        .filter(AllowedOutcome.o_id == app_settings.ORG_ID)
+        .filter(AllowedOutcome.o_id == current_org_id)
         .filter(AllowedOutcome.outcome_name == outcome)
         .first()
         is not None
@@ -216,7 +232,15 @@ def create_rule_quality_pair(
             detail=f"Unknown outcome '{outcome}'",
         )
 
-    label_exists = db.query(Label).filter(Label.label == label).first() is not None
+    label_exists = (
+        db.query(Label)
+        .filter(
+            Label.o_id == current_org_id,
+            func.upper(Label.label) == label.upper(),
+        )
+        .first()
+        is not None
+    )
     if not label_exists:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -225,7 +249,7 @@ def create_rule_quality_pair(
 
     existing = (
         db.query(RuleQualityPair)
-        .filter(RuleQualityPair.o_id == app_settings.ORG_ID)
+        .filter(RuleQualityPair.o_id == current_org_id)
         .filter(RuleQualityPair.outcome == outcome)
         .filter(RuleQualityPair.label == label)
         .first()
@@ -241,7 +265,7 @@ def create_rule_quality_pair(
         label=label,
         active=True,
         created_by=str(user.email),
-        o_id=app_settings.ORG_ID,
+        o_id=current_org_id,
     )
     db.add(pair)
     db.commit()
@@ -255,12 +279,13 @@ def update_rule_quality_pair(
     request_data: RuleQualityPairUpdateRequest,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MANAGE_PERMISSIONS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleQualityPairResponse:
     pair = (
         db.query(RuleQualityPair)
         .filter(RuleQualityPair.rqp_id == pair_id)
-        .filter(RuleQualityPair.o_id == app_settings.ORG_ID)
+        .filter(RuleQualityPair.o_id == current_org_id)
         .first()
     )
     if pair is None:
@@ -277,12 +302,13 @@ def delete_rule_quality_pair(
     pair_id: int,
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.MANAGE_PERMISSIONS)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> Response:
     pair = (
         db.query(RuleQualityPair)
         .filter(RuleQualityPair.rqp_id == pair_id)
-        .filter(RuleQualityPair.o_id == app_settings.ORG_ID)
+        .filter(RuleQualityPair.o_id == current_org_id)
         .first()
     )
     if pair is None:

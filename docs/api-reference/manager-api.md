@@ -28,7 +28,16 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 ### Token usage
 
 - Send access token as `Authorization: Bearer <access_token>`
+- Access tokens include an `org_id` claim. Manager requests reject tokens whose `org_id` no longer matches the authenticated user's stored organisation.
 - `POST /api/v2/evaluate` requires either an `X-API-Key` header (recommended for service-to-service) or a valid Bearer token
+
+### Organisation scoping
+
+- Users belong to exactly one organisation.
+- The current organisation for manager requests comes from the authenticated user, not a request body parameter.
+- Manager routes now scope rules, tested events, shadow, outcomes, users, roles, labels, user lists, field types, settings, analytics, API keys, backtesting history, and audit/history reads to the caller's organisation.
+- Roles and labels are organisation-owned catalogs, so the same role/label names can exist in different organisations.
+- User-role assignment is same-org only.
 
 ### Session revocation (logout)
 
@@ -108,20 +117,20 @@ Rule lifecycle fields on rule responses:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/outcomes` | Bearer + permission | List allowed outcomes in severity order |
-| `POST` | `/api/v2/outcomes` | Bearer + permission | Create allowed outcome |
-| `DELETE` | `/api/v2/outcomes/{outcome_name}` | Bearer + permission | Delete outcome |
+| `GET` | `/api/v2/outcomes` | Bearer + permission | List allowed outcomes in severity order for the caller's org |
+| `POST` | `/api/v2/outcomes` | Bearer + permission | Create allowed outcome in the caller's org |
+| `DELETE` | `/api/v2/outcomes/{outcome_name}` | Bearer + permission | Delete outcome from the caller's org |
 
 ### Labels
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/labels` | Bearer + permission | List labels |
-| `POST` | `/api/v2/labels` | Bearer + permission | Create label |
-| `POST` | `/api/v2/labels/bulk` | Bearer + permission | Create labels in bulk |
-| `POST` | `/api/v2/labels/mark-event` | Bearer + permission | Mark single event; returns `409` if the current org has duplicate `event_id`s |
-| `POST` | `/api/v2/labels/upload` | Bearer + permission | CSV upload (`multipart/form-data`) with row-level success/error reporting |
-| `DELETE` | `/api/v2/labels/{label_name}` | Bearer + permission | Delete label |
+| `GET` | `/api/v2/labels` | Bearer + permission | List labels in the caller's org |
+| `POST` | `/api/v2/labels` | Bearer + permission | Create label in the caller's org |
+| `POST` | `/api/v2/labels/bulk` | Bearer + permission | Create labels in bulk in the caller's org |
+| `POST` | `/api/v2/labels/mark-event` | Bearer + permission | Mark single event in the caller's org; returns `409` if that org has duplicate `event_id`s |
+| `POST` | `/api/v2/labels/upload` | Bearer + permission | CSV upload for events in the caller's org (`multipart/form-data`) with row-level success/error reporting |
+| `DELETE` | `/api/v2/labels/{label_name}` | Bearer + permission | Delete label from the caller's org |
 
 ### Analytics
 
@@ -129,9 +138,9 @@ Rule lifecycle fields on rule responses:
 |---|---|---|---|
 | `GET` | `/api/v2/analytics/transaction-volume` | Bearer + permission | Time-series event volume |
 | `GET` | `/api/v2/analytics/outcomes-distribution` | Bearer + permission | Outcome trends |
-| `GET` | `/api/v2/analytics/labels-summary` | Bearer + permission | Total labeled summary |
-| `GET` | `/api/v2/analytics/labels-distribution` | Bearer + permission | Label trends |
-| `GET` | `/api/v2/analytics/labeled-transaction-volume` | Bearer + permission | Time-series labeled event volume |
+| `GET` | `/api/v2/analytics/labels-summary` | Bearer + permission | Total labeled summary for the caller's org |
+| `GET` | `/api/v2/analytics/labels-distribution` | Bearer + permission | Label trends for the caller's org |
+| `GET` | `/api/v2/analytics/labeled-transaction-volume` | Bearer + permission | Time-series labeled event volume for the caller's org |
 | `GET` | `/api/v2/analytics/rule-quality` | Bearer + `VIEW_RULES` + `VIEW_LABELS` | Synchronous snapshot precision/recall report for configured curated pairs (includes `freeze_at`) |
 | `POST` | `/api/v2/analytics/rule-quality/reports` | Bearer + `VIEW_RULES` + `VIEW_LABELS` | Return existing snapshot by filters, or generate a new one only when `force_refresh=true` |
 | `GET` | `/api/v2/analytics/rule-quality/reports/{report_id}` | Bearer + `VIEW_RULES` + `VIEW_LABELS` | Poll async report status/result |
@@ -152,7 +161,7 @@ Rule quality query params:
 | `GET` | `/api/v2/settings/outcome-hierarchy` | Bearer + `VIEW_ROLES` | Read ordered outcome severity hierarchy |
 | `PUT` | `/api/v2/settings/outcome-hierarchy` | Bearer + `MANAGE_PERMISSIONS` | Replace ordered outcome severity hierarchy |
 | `GET` | `/api/v2/settings/rule-quality-pairs` | Bearer + `VIEW_ROLES` | List configured curated outcome→label pairs |
-| `GET` | `/api/v2/settings/rule-quality-pairs/options` | Bearer + `VIEW_ROLES` | List available outcomes and labels for pair creation |
+| `GET` | `/api/v2/settings/rule-quality-pairs/options` | Bearer + `VIEW_ROLES` | List available outcomes and labels for pair creation in the caller's org |
 | `POST` | `/api/v2/settings/rule-quality-pairs` | Bearer + `MANAGE_PERMISSIONS` | Create curated pair |
 | `PUT` | `/api/v2/settings/rule-quality-pairs/{pair_id}` | Bearer + `MANAGE_PERMISSIONS` | Toggle pair active/inactive |
 | `DELETE` | `/api/v2/settings/rule-quality-pairs/{pair_id}` | Bearer + `MANAGE_PERMISSIONS` | Delete curated pair |
@@ -165,73 +174,74 @@ Outcome hierarchy notes:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/users` | Bearer + permission | List users |
-| `GET` | `/api/v2/users/{user_id}` | Bearer + permission | Get user details |
-| `POST` | `/api/v2/users` | Bearer + permission | Create user |
-| `POST` | `/api/v2/users/invite` | Bearer + permission | Invite user by email and send activation link |
-| `PUT` | `/api/v2/users/{user_id}` | Bearer + permission | Update user |
-| `DELETE` | `/api/v2/users/{user_id}` | Bearer + permission | Delete user |
-| `POST` | `/api/v2/users/{user_id}/roles` | Bearer + permission | Assign role to user |
-| `DELETE` | `/api/v2/users/{user_id}/roles/{role_id}` | Bearer + permission | Remove role from user |
+| `GET` | `/api/v2/users` | Bearer + permission | List users in the caller's org |
+| `GET` | `/api/v2/users/{user_id}` | Bearer + permission | Get user details in the caller's org |
+| `POST` | `/api/v2/users` | Bearer + permission | Create user in the caller's org |
+| `POST` | `/api/v2/users/invite` | Bearer + permission | Invite user into the caller's org and send activation link |
+| `PUT` | `/api/v2/users/{user_id}` | Bearer + permission | Update user in the caller's org |
+| `DELETE` | `/api/v2/users/{user_id}` | Bearer + permission | Delete user in the caller's org |
+| `POST` | `/api/v2/users/{user_id}/roles` | Bearer + permission | Assign role to user in the caller's org (cross-org role IDs return `404`) |
+| `DELETE` | `/api/v2/users/{user_id}/roles/{role_id}` | Bearer + permission | Remove role from user in the caller's org |
 | `GET` | `/api/v2/roles/permissions` | Bearer + permission | List all available permissions |
-| `GET` | `/api/v2/roles` | Bearer + permission | List roles |
-| `GET` | `/api/v2/roles/{role_id}` | Bearer + permission | Get role details |
-| `POST` | `/api/v2/roles` | Bearer + permission | Create role |
-| `PUT` | `/api/v2/roles/{role_id}` | Bearer + permission | Update role |
-| `DELETE` | `/api/v2/roles/{role_id}` | Bearer + permission | Delete role |
-| `GET` | `/api/v2/roles/{role_id}/permissions` | Bearer + permission | Get role permissions |
-| `PUT` | `/api/v2/roles/{role_id}/permissions` | Bearer + permission | Update role permissions |
+| `GET` | `/api/v2/roles` | Bearer + permission | List roles in the caller's org |
+| `GET` | `/api/v2/roles/{role_id}` | Bearer + permission | Get role details in the caller's org |
+| `POST` | `/api/v2/roles` | Bearer + permission | Create role in the caller's org |
+| `PUT` | `/api/v2/roles/{role_id}` | Bearer + permission | Update role in the caller's org |
+| `DELETE` | `/api/v2/roles/{role_id}` | Bearer + permission | Delete role from the caller's org |
+| `GET` | `/api/v2/roles/{role_id}/permissions` | Bearer + permission | Get role permissions in the caller's org |
+| `PUT` | `/api/v2/roles/{role_id}/permissions` | Bearer + permission | Update role permissions in the caller's org |
 
 ### User Lists
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/user-lists` | Bearer + permission | List user lists |
-| `GET` | `/api/v2/user-lists/{list_id}` | Bearer + permission | Get user list details |
-| `POST` | `/api/v2/user-lists` | Bearer + permission | Create user list |
-| `PUT` | `/api/v2/user-lists/{list_id}` | Bearer + permission | Update list metadata |
-| `DELETE` | `/api/v2/user-lists/{list_id}` | Bearer + permission | Delete list |
-| `GET` | `/api/v2/user-lists/{list_id}/entries` | Bearer + permission | Get list entries |
-| `POST` | `/api/v2/user-lists/{list_id}/entries` | Bearer + permission | Add one entry |
-| `POST` | `/api/v2/user-lists/{list_id}/entries/bulk` | Bearer + permission | Add entries in bulk |
-| `DELETE` | `/api/v2/user-lists/{list_id}/entries/{entry_id}` | Bearer + permission | Remove one entry |
+| `GET` | `/api/v2/user-lists` | Bearer + permission | List user lists in the caller's org |
+| `GET` | `/api/v2/user-lists/{list_id}` | Bearer + permission | Get user list details in the caller's org |
+| `POST` | `/api/v2/user-lists` | Bearer + permission | Create user list in the caller's org |
+| `PUT` | `/api/v2/user-lists/{list_id}` | Bearer + permission | Update list metadata in the caller's org |
+| `DELETE` | `/api/v2/user-lists/{list_id}` | Bearer + permission | Delete list in the caller's org |
+| `GET` | `/api/v2/user-lists/{list_id}/entries` | Bearer + permission | Get list entries in the caller's org |
+| `POST` | `/api/v2/user-lists/{list_id}/entries` | Bearer + permission | Add one entry in the caller's org |
+| `POST` | `/api/v2/user-lists/{list_id}/entries/bulk` | Bearer + permission | Add entries in bulk in the caller's org |
+| `DELETE` | `/api/v2/user-lists/{list_id}/entries/{entry_id}` | Bearer + permission | Remove one entry from the caller's org list |
 
 ### Field Types
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/field-types` | Bearer + permission | List all configured field types |
-| `GET` | `/api/v2/field-types/observations` | Bearer + permission | List auto-discovered field observations |
-| `POST` | `/api/v2/field-types` | Bearer + permission | Create or update a field type config (upsert) |
-| `PUT` | `/api/v2/field-types/{field_name}` | Bearer + permission | Update type or datetime format for existing config |
-| `DELETE` | `/api/v2/field-types/{field_name}` | Bearer + permission | Delete a field type config |
+| `GET` | `/api/v2/field-types` | Bearer + permission | List all configured field types for the caller's org |
+| `GET` | `/api/v2/field-types/observations` | Bearer + permission | List auto-discovered field observations for the caller's org |
+| `POST` | `/api/v2/field-types` | Bearer + permission | Create or update a field type config (upsert) in the caller's org |
+| `PUT` | `/api/v2/field-types/{field_name}` | Bearer + permission | Update type or datetime format for existing config in the caller's org |
+| `DELETE` | `/api/v2/field-types/{field_name}` | Bearer + permission | Delete a field type config from the caller's org |
 
 ### Audit
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/audit` | Bearer + permission | Summary |
+| `GET` | `/api/v2/audit` | Bearer + permission | Summary for the caller's org |
 | `GET` | `/api/v2/audit/rules` | Bearer + permission | Rule history (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/rules/{rule_id}` | Bearer + permission | Full history for one rule |
 | `GET` | `/api/v2/audit/config` | Bearer + permission | Config history (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/user-lists` | Bearer + permission | User-list history |
 | `GET` | `/api/v2/audit/outcomes` | Bearer + permission | Outcome history |
-| `GET` | `/api/v2/audit/labels` | Bearer + permission | Label history, including manual/CSV assignment details |
-| `GET` | `/api/v2/audit/users` | Bearer + permission | User-account history (`limit`, `offset`, filters) |
-| `GET` | `/api/v2/audit/roles` | Bearer + permission | Role/permission history (`limit`, `offset`, filters) |
+| `GET` | `/api/v2/audit/labels` | Bearer + permission | Label history for the caller's org, including manual/CSV assignment details |
+| `GET` | `/api/v2/audit/users` | Bearer + permission | User-account history for the caller's org (`limit`, `offset`, filters) |
+| `GET` | `/api/v2/audit/roles` | Bearer + permission | Role/permission history for the caller's org (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/field-types` | Bearer + permission | Field type config history (`limit`, `offset`, `field_name` filter) |
 
 ### Backtesting
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `POST` | `/api/v2/backtesting` | Bearer + permission | Trigger async backtest |
+| `POST` | `/api/v2/backtesting` | Bearer + permission | Trigger async backtest for a rule in the caller's org |
 | `GET` | `/api/v2/backtesting/task/{task_id}` | Bearer + permission | Task status/result, including outcome counts/rates plus label counts and quality metrics for labeled history |
-| `GET` | `/api/v2/backtesting/{rule_id}` | Bearer + permission | Backtest history for rule |
+| `GET` | `/api/v2/backtesting/{rule_id}` | Bearer + permission | Backtest history for a rule visible to the caller's org |
 
 Backtest task result note:
 - `GET /api/v2/backtesting/task/{task_id}` returns raw outcome counts/rates over the full backtest window.
 - When labeled historical events exist, it also returns `labeled_records`, `label_counts`, and stored/proposed outcome→label quality summaries and pair metrics (`precision`, `recall`, `f1`, `true_positive`, `false_positive`, `false_negative`).
+- Backtest workers derive organisation context from the selected rule/request rather than a fixed app-wide org setting.
 
 ### API Keys
 

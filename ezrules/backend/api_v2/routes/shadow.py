@@ -11,6 +11,7 @@ from sqlalchemy.exc import NoResultFound
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
+    get_current_org_id,
     get_db,
     require_permission,
 )
@@ -25,7 +26,6 @@ from ezrules.backend.api_v2.schemas.shadow import (
 )
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import RuleEngineConfig, ShadowResultsLog, TestingRecordLog, TestingResultsLog, User
-from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/shadow", tags=["Shadow"])
 
@@ -34,6 +34,7 @@ router = APIRouter(prefix="/api/v2/shadow", tags=["Shadow"])
 def get_shadow_config(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> ShadowConfigResponse:
     """Return the current shadow config — which rules are in shadow and their versions."""
@@ -42,7 +43,7 @@ def get_shadow_config(
             db.query(RuleEngineConfig)
             .where(
                 RuleEngineConfig.label == "shadow",
-                RuleEngineConfig.o_id == app_settings.ORG_ID,
+                RuleEngineConfig.o_id == current_org_id,
             )
             .one()
         )
@@ -66,18 +67,25 @@ def get_shadow_results(
     limit: int = Query(default=50, ge=1, le=200, description="Max results to return"),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> ShadowResultsResponse:
     """Return recent shadow evaluation results joined with event metadata."""
     rows = (
         db.query(ShadowResultsLog, TestingRecordLog)
         .join(TestingRecordLog, ShadowResultsLog.tl_id == TestingRecordLog.tl_id)
+        .filter(TestingRecordLog.o_id == current_org_id)
         .order_by(ShadowResultsLog.sr_id.desc())
         .limit(limit)
         .all()
     )
 
-    total = db.query(ShadowResultsLog).count()
+    total = (
+        db.query(ShadowResultsLog)
+        .join(TestingRecordLog, ShadowResultsLog.tl_id == TestingRecordLog.tl_id)
+        .filter(TestingRecordLog.o_id == current_org_id)
+        .count()
+    )
 
     results = [
         ShadowResultItem(
@@ -99,6 +107,7 @@ def get_shadow_results(
 def get_shadow_stats(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> ShadowStatsResponse:
     """Return shadow vs production outcome counts per rule for the same events."""
@@ -110,10 +119,12 @@ def get_shadow_stats(
             func.coalesce(TestingResultsLog.rule_result, "None").label("prod_result"),
             func.count().label("cnt"),
         )
+        .join(TestingRecordLog, ShadowResultsLog.tl_id == TestingRecordLog.tl_id)
         .outerjoin(
             TestingResultsLog,
             (ShadowResultsLog.tl_id == TestingResultsLog.tl_id) & (ShadowResultsLog.r_id == TestingResultsLog.r_id),
         )
+        .filter(TestingRecordLog.o_id == current_org_id)
         .group_by(
             ShadowResultsLog.r_id,
             ShadowResultsLog.rule_result,

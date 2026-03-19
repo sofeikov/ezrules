@@ -53,6 +53,7 @@ def shadow_test_client(session):
             password=hashed_password,
             active=True,
             fs_uniquifier="shadowuser@example.com",
+            o_id=1,
         )
         shadow_user.roles.append(shadow_role)
         session.add(shadow_user)
@@ -69,6 +70,7 @@ def shadow_test_client(session):
         user_id=int(shadow_user.id),
         email=str(shadow_user.email),
         roles=roles,
+        org_id=int(shadow_user.o_id),
     )
 
     client_data = {
@@ -392,6 +394,7 @@ class TestPromoteFromShadow:
                 password=hashed_password,
                 active=True,
                 fs_uniquifier="shadow-nopromote@example.com",
+                o_id=1,
             )
             user.roles.append(role)
             session.add(user)
@@ -406,6 +409,7 @@ class TestPromoteFromShadow:
             user_id=int(user.id),
             email=str(user.email),
             roles=[role.name for role in user.roles],
+            org_id=int(user.o_id),
         )
 
         with TestClient(app) as client:

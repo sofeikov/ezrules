@@ -10,6 +10,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import JSONResponse
 
+from ezrules.backend.api_v2.auth.dependencies import (
+    SessionLocal,
+    bind_request_org_context,
+    get_org_id_for_access_token,
+    get_org_id_for_api_key,
+)
 from ezrules.backend.api_v2.routes import (
     analytics,
     api_keys,
@@ -28,8 +34,7 @@ from ezrules.backend.api_v2.routes import (
     user_lists,
     users,
 )
-from ezrules.core.application_context import set_organization_id, set_user_list_manager
-from ezrules.core.user_lists import PersistentUserListManager
+from ezrules.core.application_context import reset_context
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
@@ -65,25 +70,35 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
 app.add_middleware(BodySizeLimitMiddleware)
 
 
+def _prime_request_context_from_headers(request: StarletteRequest, db) -> None:
+    """Best-effort context binding before sync dependency/route execution starts."""
+    api_key = request.headers.get("X-API-Key")
+    if api_key:
+        org_id = get_org_id_for_api_key(api_key, db)
+        if org_id is not None:
+            bind_request_org_context(db, org_id)
+            return
+
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.removeprefix("Bearer ").strip()
+        org_id = get_org_id_for_access_token(token, db)
+        if org_id is not None:
+            bind_request_org_context(db, org_id)
+
+
 @app.middleware("http")
 async def cleanup_scoped_db_session(request: StarletteRequest, call_next):
-    """Release any connection checked out via the global scoped session."""
+    """Release request-local context and any checked-out scoped DB session."""
+    context_db = db_session if app_settings.TESTING else SessionLocal()
     try:
+        _prime_request_context_from_headers(request, context_db)
         return await call_next(request)
     finally:
+        reset_context()
         if not app_settings.TESTING:
+            context_db.close()
             db_session.remove()
-
-
-# =============================================================================
-# INITIALIZE APPLICATION CONTEXT
-# =============================================================================
-# Set up the user list manager so rule parsing can resolve @ListName references.
-# Without this, the AtNotationConverter falls back to the StaticUserListManager
-# which only knows about a few hardcoded lists.
-_user_list_manager = PersistentUserListManager(db_session=db_session, o_id=app_settings.ORG_ID)
-set_organization_id(app_settings.ORG_ID)
-set_user_list_manager(_user_list_manager)
 
 
 @app.get("/ping")
