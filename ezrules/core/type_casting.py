@@ -20,10 +20,24 @@ class FieldCastConfig:
     field_name: str
     field_type: FieldType
     datetime_format: str | None = None  # strptime format string; None means ISO 8601
+    required: bool = False
 
 
 class CastError(Exception):
     """Raised when a field value cannot be cast to the configured type."""
+
+
+class RequiredFieldError(Exception):
+    """Raised when a configured required field is missing or null."""
+
+    def __init__(self, field_names: list[str]):
+        self.field_names = sorted(field_names)
+        if len(self.field_names) == 1:
+            message = f"Required field '{self.field_names[0]}' is missing or null"
+        else:
+            joined = ", ".join(f"'{field_name}'" for field_name in self.field_names)
+            message = f"Required fields {joined} are missing or null"
+        super().__init__(message)
 
 
 def _cast_value(value: Any, config: FieldCastConfig) -> Any:
@@ -82,4 +96,29 @@ def cast_event(event: dict[str, Any], configs: list[FieldCastConfig]) -> dict[st
     Raises CastError if a configured field value cannot be cast to the configured type.
     """
     config_map = {c.field_name: c for c in configs}
-    return {key: _cast_value(value, config_map[key]) if key in config_map else value for key, value in event.items()}
+    return {
+        key: _cast_value(value, config_map[key]) if key in config_map and value is not None else value
+        for key, value in event.items()
+    }
+
+
+def find_missing_fields(event: dict[str, Any], field_names: list[str] | set[str] | tuple[str, ...]) -> list[str]:
+    """Return referenced fields that are either absent or explicitly null."""
+    ordered_fields = sorted(set(field_names))
+    return [field_name for field_name in ordered_fields if field_name not in event or event[field_name] is None]
+
+
+def validate_required_fields(event: dict[str, Any], configs: list[FieldCastConfig]) -> None:
+    """Ensure all configured required fields exist and are non-null."""
+    missing_required_fields = find_missing_fields(
+        event,
+        [config.field_name for config in configs if config.required],
+    )
+    if missing_required_fields:
+        raise RequiredFieldError(missing_required_fields)
+
+
+def normalize_event(event: dict[str, Any], configs: list[FieldCastConfig]) -> dict[str, Any]:
+    """Validate required fields, then cast present non-null configured values."""
+    validate_required_fields(event, configs)
+    return cast_event(event, configs)

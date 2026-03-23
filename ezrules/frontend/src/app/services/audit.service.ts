@@ -129,6 +129,7 @@ export interface FieldTypeHistoryEntry {
   id: number;
   field_name: string;
   configured_type: string;
+  required: boolean;
   datetime_format: string | null;
   action: string;
   details: string | null;

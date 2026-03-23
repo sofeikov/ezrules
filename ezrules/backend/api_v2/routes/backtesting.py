@@ -25,6 +25,30 @@ from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.backend_core import RuleBackTestingResult, User
 
 router = APIRouter(prefix="/api/v2/backtesting", tags=["Backtesting"])
+_EAGER_BACKTEST_RESULTS: dict[str, dict[str, Any]] = {}
+
+
+def _build_task_result_response(data: dict[str, Any]) -> BacktestTaskResult:
+    if "error" in data:
+        return BacktestTaskResult(status="FAILURE", error=str(data["error"]))
+
+    return BacktestTaskResult(
+        status="SUCCESS",
+        stored_result=data.get("stored_result"),
+        proposed_result=data.get("proposed_result"),
+        stored_result_rate=data.get("stored_result_rate"),
+        proposed_result_rate=data.get("proposed_result_rate"),
+        total_records=data.get("total_records"),
+        eligible_records=data.get("eligible_records"),
+        skipped_records=data.get("skipped_records"),
+        labeled_records=data.get("labeled_records"),
+        label_counts=data.get("label_counts"),
+        stored_quality_summary=data.get("stored_quality_summary"),
+        proposed_quality_summary=data.get("proposed_quality_summary"),
+        stored_quality_metrics=data.get("stored_quality_metrics"),
+        proposed_quality_metrics=data.get("proposed_quality_metrics"),
+        warnings=data.get("warnings"),
+    )
 
 
 @router.post("", response_model=BacktestTriggerResponse)
@@ -55,6 +79,8 @@ def trigger_backtest(
         ) from e
 
     task = backtest_rule_change.delay(request.r_id, request.new_rule_logic, current_org_id)
+    if celery_app.conf.task_always_eager and task.id and isinstance(task.result, dict):
+        _EAGER_BACKTEST_RESULTS[str(task.id)] = task.result
 
     bt_result = RuleBackTestingResult(
         r_id=request.r_id,
@@ -95,6 +121,10 @@ def get_task_result(
             detail="Backtest task not found",
         )
 
+    eager_result = _EAGER_BACKTEST_RESULTS.get(task_id)
+    if eager_result is not None:
+        return _build_task_result_response(eager_result)
+
     result = AsyncResult(task_id, app=celery_app)
 
     if result.state == "PENDING":
@@ -105,22 +135,9 @@ def get_task_result(
 
     if result.state == "SUCCESS":
         data = result.result
-        if isinstance(data, dict) and "error" in data:
-            return BacktestTaskResult(status="FAILURE", error=data["error"])
-        return BacktestTaskResult(
-            status="SUCCESS",
-            stored_result=data.get("stored_result"),
-            proposed_result=data.get("proposed_result"),
-            stored_result_rate=data.get("stored_result_rate"),
-            proposed_result_rate=data.get("proposed_result_rate"),
-            total_records=data.get("total_records"),
-            labeled_records=data.get("labeled_records"),
-            label_counts=data.get("label_counts"),
-            stored_quality_summary=data.get("stored_quality_summary"),
-            proposed_quality_summary=data.get("proposed_quality_summary"),
-            stored_quality_metrics=data.get("stored_quality_metrics"),
-            proposed_quality_metrics=data.get("proposed_quality_metrics"),
-        )
+        if isinstance(data, dict):
+            return _build_task_result_response(data)
+        return BacktestTaskResult(status="FAILURE", error="Backtest task returned an invalid result payload")
 
     return BacktestTaskResult(status=result.state)
 

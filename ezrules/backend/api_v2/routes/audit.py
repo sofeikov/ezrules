@@ -153,6 +153,7 @@ def field_type_history_to_response(history: FieldTypeHistory) -> FieldTypeHistor
         id=int(history.id),
         field_name=str(history.field_name),
         configured_type=str(history.configured_type),
+        required=bool(history.required),
         datetime_format=str(history.datetime_format) if history.datetime_format else None,
         action=str(history.action),
         details=str(history.details) if history.details else None,

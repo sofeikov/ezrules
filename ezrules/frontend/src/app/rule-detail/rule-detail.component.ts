@@ -30,6 +30,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   private autoFilledTestJson: string = '';
   testResult: any = null;
   testError: string | null = null;
+  verifyWarnings: string[] = [];
   testing: boolean = false;
 
   // Revision view properties
@@ -131,12 +132,17 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     });
   }
 
-  fillInExampleParams(): void {
-    if (!this.rule) return;
+  fillInExampleParams(ruleSource?: string): void {
+    const source = ruleSource ?? this.rule?.logic;
+    if (!source?.trim()) {
+      this.verifyWarnings = [];
+      return;
+    }
 
-    this.ruleService.verifyRule(this.rule.logic).pipe(
+    this.ruleService.verifyRule(source).pipe(
       switchMap((response) => {
-        if (!response.params.length && /\$[A-Za-z_]/.test(this.rule?.logic ?? '')) {
+        this.verifyWarnings = response.warnings ?? [];
+        if (!response.params.length && /\$[A-Za-z_]/.test(source)) {
           return of<string | null>(null);
         }
 
@@ -151,9 +157,17 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
         }
       },
       error: (error) => {
+        this.verifyWarnings = [];
         console.error('Error verifying rule:', error);
       }
     });
+  }
+
+  handleEditedLogicChange(): void {
+    if (!this.isEditMode) {
+      return;
+    }
+    this.fillInExampleParams(this.editedLogic);
   }
 
   testRule(): void {
@@ -209,6 +223,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       this.editedLogic = this.rule.logic;
       this.saveError = null;
       this.saveSuccess = false;
+      this.fillInExampleParams(this.editedLogic);
     }
     this.isEditMode = !this.isEditMode;
   }
@@ -220,6 +235,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     if (this.rule) {
       this.editedDescription = this.rule.description;
       this.editedLogic = this.rule.logic;
+      this.fillInExampleParams();
     }
   }
 
@@ -340,7 +356,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
 
         for (const taskId of Array.from(this.backtestTaskResults.keys())) {
           if (!currentTaskIds.has(taskId)) {
-            this.backtestTaskResults.delete(taskId);
+            this.removeBacktestTaskResult(taskId);
             this.stopPolling(taskId);
           }
         }
@@ -358,7 +374,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   loadTaskResult(taskId: string): void {
     this.backtestingService.getTaskResult(taskId).subscribe({
       next: (result) => {
-        this.backtestTaskResults.set(taskId, result);
+        this.setBacktestTaskResult(taskId, result);
         if (result.status === 'PENDING') {
           this.startPolling(taskId);
         } else {
@@ -476,7 +492,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     const interval = setInterval(() => {
       this.backtestingService.getTaskResult(taskId).subscribe({
         next: (result) => {
-          this.backtestTaskResults.set(taskId, result);
+          this.setBacktestTaskResult(taskId, result);
           if (result.status !== 'PENDING') {
             this.stopPolling(taskId);
           }
@@ -485,7 +501,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
           this.stopPolling(taskId);
         }
       });
-    }, 3000);
+    }, 1000);
     this.pollingIntervals.set(taskId, interval);
   }
 
@@ -495,5 +511,17 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       clearInterval(interval);
       this.pollingIntervals.delete(taskId);
     }
+  }
+
+  private setBacktestTaskResult(taskId: string, result: BacktestTaskResult): void {
+    const nextResults = new Map(this.backtestTaskResults);
+    nextResults.set(taskId, result);
+    this.backtestTaskResults = nextResults;
+  }
+
+  private removeBacktestTaskResult(taskId: string): void {
+    const nextResults = new Map(this.backtestTaskResults);
+    nextResults.delete(taskId);
+    this.backtestTaskResults = nextResults;
   }
 }

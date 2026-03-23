@@ -15,14 +15,14 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Scalable Architecture**: Unified API service with integrated rule evaluation
 - **Database Integration**: PostgreSQL backend with SQLAlchemy ORM and full audit history
 - **Audit Trail**: Change tracking for rules, user lists, outcomes, labels, and field type configurations, with per-change user attribution and explicit rule lifecycle actions (`promoted`, `deactivated`, `rolled_back`, `deleted`)
-- **Field Type Management**: Auto-discovers JSON field types from live traffic and test payloads; configurable type casting (integer, float, string, boolean, datetime) applied before rule evaluation so comparisons behave correctly regardless of how values arrive in JSON
+- **Field Type Management**: Auto-discovers JSON field types from live traffic and test payloads; configurable type casting plus optional required/non-null field contracts are applied before rule evaluation so comparisons behave correctly and invalid live events fail fast
 - **Outcome Resolution Hierarchy**: Configure outcome severity order in Settings so conflicting rule hits resolve to one persisted winning outcome
 - **Tested Events View**: Inspect the latest stored transactions, their final resolved outcomes, the raw event payload, every rule that fired for each event, see referenced payload fields highlighted inline inside the JSON with hover-based rule focus, jump straight from a trigger to the rule detail page, and refresh the list without reloading the whole app
 - **Shadow Deployment**: Deploy rules to a shadow environment that observes live traffic without affecting production outcomes; promote validated shadows to production in one step
 - **Rule Lifecycle Controls**: Rules now support `draft`, `active`, and `archived` states with explicit promotion and approver tracking (`effective_from`, `approved_by`, `approved_at`)
 - **Permission-Aware Promotion UI**: Draft and shadow promotion controls are only shown to users who hold the `promote_rules` permission
 - **Revision Rollback**: Restore logic and description from a historical rule revision into a new draft version directly from the history timeline, without deleting any audit history
-- **Backtesting**: Test rule changes against historical data before deployment, with outcome counts plus label-aware precision/recall/F1 when labeled history exists; backtests and stored history are scoped to the selected rule's organisation
+- **Backtesting**: Test rule changes against historical data before deployment, with outcome counts plus label-aware precision/recall/F1 when labeled history exists; backtests use a common eligible subset when proposed logic references newly introduced fields and report skipped historical records explicitly
 - **CLI Tools**: Command-line interface for database management and realistic test data generation
 
 ## 🏗️ Architecture

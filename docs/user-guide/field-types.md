@@ -6,15 +6,15 @@ Use this guide when you need to ensure event fields are compared with the right 
 
 Event payloads arrive as JSON. JSON does not distinguish between `"1000"` (a string) and `1000` (a number). If a rule compares `$amount > 500`, the result depends on whether `amount` is stored as an integer or as a string — and string comparison produces different, often wrong, ordering.
 
-Field type management lets you declare the intended type for each field. ezrules will cast values to that type before rule execution, so comparisons behave as expected.
+Field type management lets you declare the intended type for each field. ezrules will cast values to that type before rule execution, so comparisons behave as expected. You can also mark a field as required, which makes missing or `null` live events fail fast before any rules run.
 
 ---
 
 ## How It Works
 
 1. **Observation** — every event that passes through `/api/v2/evaluate` or the **Test Rule** panel records the JSON types it sees for each field. This happens automatically with no configuration.
-2. **Configuration** — once you see which types a field carries, you declare its canonical type in **Settings → Field Types**.
-3. **Casting** — at evaluation time, each configured field's value is cast before rule execution. Unconfigured fields pass through unchanged.
+2. **Configuration** — once you see which types a field carries, you declare its canonical type in **Settings → Field Types** and optionally mark it as **required and non-null**.
+3. **Validation + Casting** — at evaluation time, required fields are checked first. Then each configured non-null field value is cast before rule execution. Unconfigured fields pass through unchanged.
 4. **Audit** — every create, update, and delete of a field type configuration is recorded in the audit trail.
 
 ---
@@ -49,15 +49,17 @@ The fastest way to configure a field is from the **Observed Fields** table, whic
 1. Find the row for the field you want to configure.
 2. Click **Configure** — the form at the top of the page will be pre-filled with the field name and a suggested type.
 3. Adjust the type if needed.
-4. For `datetime`, enter a format string (Python `strptime` notation, for example `%Y-%m-%dT%H:%M:%S`).
-5. Click **Save Configuration**.
+4. If the field must always be present on live events, enable **Required and non-null**.
+5. For `datetime`, enter a format string (Python `strptime` notation, for example `%Y-%m-%dT%H:%M:%S`).
+6. Click **Save Configuration**.
 
 ### Manually
 
 1. Enter the field name in **Field Name** (must match the exact key used in event payloads).
 2. Select the target type.
-3. For `datetime`, fill in the **Datetime Format** field.
-4. Click **Save Configuration**.
+3. If the field is mandatory for live traffic, enable **Required and non-null**.
+4. For `datetime`, fill in the **Datetime Format** field.
+5. Click **Save Configuration**.
 
 If a configuration already exists for that field name, it will be updated in place.
 
@@ -82,7 +84,7 @@ A field may appear in multiple rows if it has been seen with different types (fo
 
 ## Editing a Configuration
 
-Configured fields appear in the **Configured Fields** table with their current type and format. To change a configuration, use the form at the top of the page:
+Configured fields appear in the **Configured Fields** table with their current type, required/optional status, and format. To change a configuration, use the form at the top of the page:
 
 1. Enter (or pre-fill from observations) the same field name.
 2. Select the new type.
@@ -94,19 +96,22 @@ Configured fields appear in the **Configured Fields** table with their current t
 
 In the **Configured Fields** table, click **Delete** next to the field you want to remove. Confirm the prompt.
 
-After deletion, the field reverts to `compare_as_is` behavior — values pass through without casting.
+After deletion, the field reverts to `compare_as_is` behavior — values pass through without casting and are no longer treated as required.
 
 ---
 
 ## Effect on Rule Evaluation
 
-Once a field is configured, casting happens silently before rule execution:
+Once a field is configured, normalization happens before rule execution:
 
-- `/api/v2/evaluate` — values are cast before rules run. If casting fails (for example a non-numeric string cast to `integer`), the request returns `HTTP 400` with a description of which field failed.
-- **Test Rule** panel — values are cast before the rule is tested. If casting fails, an error message is shown in the result panel.
+- `/api/v2/evaluate` — required fields are validated first, then values are cast before rules run. If a required field is missing/`null`, or if casting fails (for example a non-numeric string cast to `integer`), the request returns `HTTP 400` with a description of which field failed.
+- **Test Rule** panel — the same required-field validation and casting rules apply before the rule is tested. Errors are shown inline in the result panel.
 
 !!! warning "CastError on invalid values"
     If an event arrives with a value that cannot be cast to the configured type, evaluation will be rejected with an error. Ensure upstream systems send values consistent with the configured types, or use `compare_as_is` to bypass casting.
+
+!!! warning "Required fields are an ingest contract"
+    If you enable `required` for a field, live evaluation rejects any event where that field is absent or `null`. Use this only for fields your upstream systems always send.
 
 ---
 
@@ -136,8 +141,8 @@ Field type endpoints require the `Bearer` token and appropriate permissions.
 |---|---|---|---|
 | `GET` | `/api/v2/field-types` | `VIEW_FIELD_TYPES` | List all configured field types |
 | `GET` | `/api/v2/field-types/observations` | `VIEW_FIELD_TYPES` | List all field observations |
-| `POST` | `/api/v2/field-types` | `MODIFY_FIELD_TYPES` | Create or update a field type config |
-| `PUT` | `/api/v2/field-types/{field_name}` | `MODIFY_FIELD_TYPES` | Update an existing config |
+| `POST` | `/api/v2/field-types` | `MODIFY_FIELD_TYPES` | Create or update a field type config, including `required` |
+| `PUT` | `/api/v2/field-types/{field_name}` | `MODIFY_FIELD_TYPES` | Update an existing config, including `required` |
 | `DELETE` | `/api/v2/field-types/{field_name}` | `DELETE_FIELD_TYPE` | Delete a field type config |
 
 ### Example: configure a field via API
@@ -146,7 +151,7 @@ Field type endpoints require the `Bearer` token and appropriate permissions.
 curl -X POST http://localhost:8888/api/v2/field-types \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"field_name": "amount", "configured_type": "float"}'
+  -d '{"field_name": "amount", "configured_type": "float", "required": true}'
 ```
 
 ### Example: configure a datetime field

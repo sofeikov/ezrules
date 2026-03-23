@@ -21,6 +21,7 @@ export class RuleCreateComponent {
   testJson: string = '';
   testResult: any = null;
   testError: string | null = null;
+  verifyWarnings: string[] = [];
   testing: boolean = false;
   saving: boolean = false;
   saveError: string | null = null;
@@ -47,11 +48,13 @@ export class RuleCreateComponent {
   fillInExampleParams(): void {
     if (!this.logic.trim()) {
       this.testJson = '';
+      this.verifyWarnings = [];
       return;
     }
 
     this.ruleService.verifyRule(this.logic).pipe(
       switchMap((response) => {
+        this.verifyWarnings = response.warnings ?? [];
         if (!response.params.length && /\$[A-Za-z_]/.test(this.logic)) {
           return of<string | null>(null);
         }
@@ -65,6 +68,7 @@ export class RuleCreateComponent {
         }
       },
       error: (error) => {
+        this.verifyWarnings = [];
         console.error('Error verifying rule:', error);
       }
     });

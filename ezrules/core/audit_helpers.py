@@ -114,12 +114,14 @@ def save_field_type_history(
     changed_by: str | None = None,
     details: str | None = None,
     datetime_format: str | None = None,
+    required: bool = False,
 ) -> None:
     """Record an audit entry for a field type config action."""
     history = FieldTypeHistory(
         field_name=field_name,
         configured_type=configured_type,
         datetime_format=datetime_format,
+        required=required,
         action=action,
         details=details,
         o_id=o_id,

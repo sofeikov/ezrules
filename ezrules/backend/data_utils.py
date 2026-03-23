@@ -29,6 +29,9 @@ class Event(BaseModel):
 def eval_and_store(lre, event: Event, commit: bool = True):
     db_session = lre.db
     outcome_manager = DatabaseOutcome(db_session=db_session, o_id=lre.o_id)
+    response = lre.evaluate_rules(event.event_data)
+    resolved_outcome = outcome_manager.resolve_outcome(response["outcome_counters"])
+
     # Convert Unix timestamp to datetime for created_at
     created_at_datetime = datetime.fromtimestamp(event.event_timestamp)
     tl = TestingRecordLog(
@@ -43,8 +46,6 @@ def eval_and_store(lre, event: Event, commit: bool = True):
         db_session.commit()
     else:
         db_session.flush()
-    response = lre.evaluate_rules(event.event_data)
-    resolved_outcome = outcome_manager.resolve_outcome(response["outcome_counters"])
     tl.outcome_counters = response["outcome_counters"]
     tl.resolved_outcome = resolved_outcome
     for r_id, result in response["rule_results"].items():

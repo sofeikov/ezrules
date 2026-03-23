@@ -57,10 +57,13 @@ class BacktestTaskResult(BaseModel):
     stored_result_rate: dict[str, float] | None = None
     proposed_result_rate: dict[str, float] | None = None
     total_records: int | None = None
+    eligible_records: int | None = None
+    skipped_records: int | None = None
     labeled_records: int | None = None
     label_counts: dict[str, int] | None = None
     stored_quality_summary: BacktestQualitySummary | None = None
     proposed_quality_summary: BacktestQualitySummary | None = None
     stored_quality_metrics: list[BacktestQualityMetric] | None = None
     proposed_quality_metrics: list[BacktestQualityMetric] | None = None
+    warnings: list[str] | None = None
     error: str | None = None
