@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from typing import Any
 
 from celery.result import AsyncResult
@@ -25,7 +26,8 @@ from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.backend_core import RuleBackTestingResult, User
 
 router = APIRouter(prefix="/api/v2/backtesting", tags=["Backtesting"])
-_EAGER_BACKTEST_RESULTS: dict[str, dict[str, Any]] = {}
+_MAX_EAGER_BACKTEST_RESULTS = 128
+_EAGER_BACKTEST_RESULTS: OrderedDict[str, dict[str, Any]] = OrderedDict()
 
 
 def _build_task_result_response(data: dict[str, Any]) -> BacktestTaskResult:
@@ -49,6 +51,13 @@ def _build_task_result_response(data: dict[str, Any]) -> BacktestTaskResult:
         proposed_quality_metrics=data.get("proposed_quality_metrics"),
         warnings=data.get("warnings"),
     )
+
+
+def _store_eager_backtest_result(task_id: str, result: dict[str, Any]) -> None:
+    _EAGER_BACKTEST_RESULTS[task_id] = result
+    _EAGER_BACKTEST_RESULTS.move_to_end(task_id)
+    while len(_EAGER_BACKTEST_RESULTS) > _MAX_EAGER_BACKTEST_RESULTS:
+        _EAGER_BACKTEST_RESULTS.popitem(last=False)
 
 
 @router.post("", response_model=BacktestTriggerResponse)
@@ -80,7 +89,7 @@ def trigger_backtest(
 
     task = backtest_rule_change.delay(request.r_id, request.new_rule_logic, current_org_id)
     if celery_app.conf.task_always_eager and task.id and isinstance(task.result, dict):
-        _EAGER_BACKTEST_RESULTS[str(task.id)] = task.result
+        _store_eager_backtest_result(str(task.id), task.result)
 
     bt_result = RuleBackTestingResult(
         r_id=request.r_id,

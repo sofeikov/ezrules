@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { diffLines, Change } from 'diff';
-import { of } from 'rxjs';
+import { of, Subscription } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { RuleDetail, RuleRevisionDetail, RuleService, ShadowDeployResponse, ShadowRuleItem, UpdateRuleRequest } from '../services/rule.service';
 import {
@@ -60,6 +60,9 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   backtestError: string | null = null;
   backtestDiffs: Map<string, Change[]> = new Map();
   private pollingIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
+  private verifyDebounceHandle: ReturnType<typeof setTimeout> | null = null;
+  private verifyRequestSequence: number = 0;
+  private verifySubscription: Subscription | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -91,6 +94,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.cancelPendingVerify();
     this.pollingIntervals.forEach(interval => clearInterval(interval));
     this.pollingIntervals.clear();
   }
@@ -133,16 +137,34 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   }
 
   fillInExampleParams(ruleSource?: string): void {
-    const source = ruleSource ?? this.rule?.logic;
-    if (!source?.trim()) {
-      this.verifyWarnings = [];
+    const requestId = this.cancelPendingVerify();
+    this.runFillInExampleParams(ruleSource ?? this.rule?.logic ?? '', requestId);
+  }
+
+  private queueFillInExampleParams(ruleSource: string): void {
+    const requestId = this.cancelPendingVerify();
+    this.verifyDebounceHandle = setTimeout(() => {
+      this.verifyDebounceHandle = null;
+      this.runFillInExampleParams(ruleSource, requestId);
+    }, 250);
+  }
+
+  private runFillInExampleParams(ruleSource: string, requestId: number): void {
+    if (!ruleSource.trim()) {
+      if (requestId === this.verifyRequestSequence) {
+        this.verifyWarnings = [];
+      }
       return;
     }
 
-    this.ruleService.verifyRule(source).pipe(
+    this.verifySubscription = this.ruleService.verifyRule(ruleSource).pipe(
       switchMap((response) => {
+        if (requestId !== this.verifyRequestSequence) {
+          return of<string | null>(null);
+        }
+
         this.verifyWarnings = response.warnings ?? [];
-        if (!response.params.length && /\$[A-Za-z_]/.test(source)) {
+        if (!response.params.length && /\$[A-Za-z_]/.test(ruleSource)) {
           return of<string | null>(null);
         }
 
@@ -150,6 +172,10 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       })
     ).subscribe({
       next: (response) => {
+        if (requestId !== this.verifyRequestSequence) {
+          return;
+        }
+
         const canApplyAutoFill = this.testJson === '' || this.testJson === this.autoFilledTestJson;
         if (response !== null && canApplyAutoFill) {
           this.testJson = response;
@@ -157,6 +183,10 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
         }
       },
       error: (error) => {
+        if (requestId !== this.verifyRequestSequence) {
+          return;
+        }
+
         this.verifyWarnings = [];
         console.error('Error verifying rule:', error);
       }
@@ -167,7 +197,18 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     if (!this.isEditMode) {
       return;
     }
-    this.fillInExampleParams(this.editedLogic);
+    this.queueFillInExampleParams(this.editedLogic);
+  }
+
+  private cancelPendingVerify(): number {
+    if (this.verifyDebounceHandle) {
+      clearTimeout(this.verifyDebounceHandle);
+      this.verifyDebounceHandle = null;
+    }
+    this.verifySubscription?.unsubscribe();
+    this.verifySubscription = null;
+    this.verifyRequestSequence += 1;
+    return this.verifyRequestSequence;
   }
 
   testRule(): void {
