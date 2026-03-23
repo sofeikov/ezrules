@@ -1,7 +1,7 @@
 # What's New
 
 
-## Unreleased
+## v1.1.0
 
 * **Org-aware manager JWTs**: Access tokens now include the authenticated user's organisation, and the API rejects access tokens whose org claim no longer matches the stored user membership.
 * **Core admin CRUD is org-scoped**: Users, outcomes, user lists, and field type configs/observations now resolve organisation context from auth instead of fixed org constants.
