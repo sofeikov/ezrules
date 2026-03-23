@@ -3,6 +3,7 @@
 
 ## Unreleased
 
+* **Rule rollouts with stable traffic bucketing**: Active rules can now serve a candidate version to a configurable percentage of live traffic, compare candidate vs control on the same evaluated events, and promote or remove the rollout from a dedicated **Rule Rollouts** page.
 * **Org-aware manager JWTs**: Access tokens now include the authenticated user's organisation, and the API rejects access tokens whose org claim no longer matches the stored user membership.
 * **Core admin CRUD is org-scoped**: Users, outcomes, user lists, and field type configs/observations now resolve organisation context from auth instead of fixed org constants.
 * **Roles and labels are org-owned**: `Role` and `Label` now belong to an organisation, the same role/label name can exist in different orgs, and user-role assignment rejects cross-org roles.

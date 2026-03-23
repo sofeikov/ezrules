@@ -4,6 +4,8 @@ Shadow deployment lets you run a candidate rule version against live production 
 
 Use shadow deployment when you want to validate a rule change on current traffic — not historical traffic — before promoting it.
 
+If you need the candidate version to affect some live traffic, use [Rule Rollouts](rule-rollouts.md) instead.
+
 ---
 
 ## Backtesting vs Shadow Deployment

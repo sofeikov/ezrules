@@ -58,6 +58,8 @@ nav:
       - For Analysts: user-guide/analyst-guide.md
       - For Administrators: user-guide/admin-guide.md
       - Creating Rules: user-guide/creating-rules.md
+      - Shadow Deployment: user-guide/shadow-deployment.md
+      - Rule Rollouts: user-guide/rule-rollouts.md
       - Labels and Lists: user-guide/labels-and-lists.md
       - Field Type Management: user-guide/field-types.md
       - Monitoring & Analytics: user-guide/monitoring.md

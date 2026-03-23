@@ -55,6 +55,26 @@
         </div>
       </div>
 
+      <!-- Rollout Deploy Success -->
+      <div *ngIf="rolloutDeploySuccess && !loading" class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-emerald-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="text-sm font-medium text-emerald-800">Rule rollout updated successfully!</p>
+        </div>
+      </div>
+
+      <!-- Rollout Deploy Error -->
+      <div *ngIf="rolloutDeployError && !loading" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="text-sm font-medium text-red-800">{{ rolloutDeployError }}</p>
+        </div>
+      </div>
+
       <!-- Save Success Message -->
       <div *ngIf="saveSuccess && !loading" class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
         <div class="flex items-center">
@@ -87,8 +107,11 @@
             <div class="flex justify-between items-center mb-4">
               <div class="flex items-center gap-3">
                 <h2 class="text-xl font-semibold text-gray-900">Rule Details</h2>
-                <span *ngIf="rule.in_shadow && !isRevisionView" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800" data-testid="shadow-active-badge">
+                <span *ngIf="shadowEntry && !isRevisionView" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800" data-testid="shadow-active-badge">
                   Shadow version active
+                </span>
+                <span *ngIf="rolloutEntry && !isRevisionView" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800" data-testid="rollout-active-badge">
+                  {{ rolloutEntry.traffic_percent }}% rollout active
                 </span>
               </div>
               <div *ngIf="!isEditMode && !isRevisionView" class="flex gap-2">
@@ -190,6 +213,15 @@
                   data-testid="deploy-to-shadow-button"
                 >
                   Deploy to Shadow
+                </button>
+                <button
+                  *ngIf="rule.status === 'active' && canPromoteRules"
+                  (click)="openRolloutDialog()"
+                  [disabled]="saving || deployingToRollout"
+                  class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  data-testid="deploy-to-rollout-button"
+                >
+                  {{ rolloutEntry ? 'Update Rollout' : 'Start Rollout' }}
                 </button>
                 <button
                   (click)="cancelEdit()"
@@ -616,6 +648,67 @@
       >
         <span *ngIf="!deployingToShadow">Deploy to Shadow</span>
         <span *ngIf="deployingToShadow">Deploying...</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Start Rollout Dialog -->
+<div *ngIf="showRolloutDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" data-testid="deploy-rollout-dialog">
+  <div class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ rolloutEntry ? 'Update Rollout' : 'Start Rollout' }}</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      Serve this candidate version to a stable percentage of live traffic while the current production version remains the control.
+    </p>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Traffic Percent</label>
+      <input
+        type="number"
+        min="1"
+        max="100"
+        [(ngModel)]="rolloutTrafficPercent"
+        class="w-32 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+      />
+    </div>
+
+    <div class="mb-6">
+      <h4 class="text-sm font-medium text-gray-700 mb-2">Logic changes (production → candidate):</h4>
+      <div *ngIf="computeRolloutDiff().length === 1 && !computeRolloutDiff()[0].added && !computeRolloutDiff()[0].removed"
+           class="bg-gray-50 border border-gray-200 rounded p-3">
+        <p class="text-xs text-gray-500">Logic is identical to the current production version.</p>
+      </div>
+
+      <div *ngIf="computeRolloutDiff().length > 1 || computeRolloutDiff()[0]?.added || computeRolloutDiff()[0]?.removed"
+           class="border border-gray-200 rounded overflow-hidden font-mono text-xs">
+        <div class="bg-gray-100 px-3 py-1.5 border-b border-gray-200 flex gap-4 text-gray-600">
+          <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 bg-red-200 border border-red-400 rounded-sm"></span> production</span>
+          <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 bg-green-200 border border-green-400 rounded-sm"></span> candidate</span>
+        </div>
+        <div class="max-h-64 overflow-y-auto">
+          <div *ngFor="let chunk of computeRolloutDiff()"
+               [class]="chunk.added ? 'bg-green-50 text-green-900' : chunk.removed ? 'bg-red-50 text-red-900' : 'bg-white text-gray-700'"
+               class="px-3 py-0.5 whitespace-pre-wrap leading-5">
+            <span class="select-none mr-1 opacity-60">{{ chunk.added ? '+' : chunk.removed ? '-' : ' ' }}</span>{{ chunk.value }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex gap-3 justify-end">
+      <button
+        (click)="closeRolloutDialog()"
+        [disabled]="deployingToRollout"
+        class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:cursor-not-allowed"
+      >
+        Cancel
+      </button>
+      <button
+        (click)="confirmDeployToRollout()"
+        [disabled]="deployingToRollout || rolloutTrafficPercent < 1 || rolloutTrafficPercent > 100"
+        class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+      >
+        <span *ngIf="!deployingToRollout">{{ rolloutEntry ? 'Update Rollout' : 'Start Rollout' }}</span>
+        <span *ngIf="deployingToRollout">Saving...</span>
       </button>
     </div>
   </div>

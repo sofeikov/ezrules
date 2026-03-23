@@ -61,7 +61,7 @@ By the end of this page, you should have:
 
 1. Open [http://localhost:4200](http://localhost:4200)
 2. Sign in with your created user
-3. Confirm sidebar shows: **Dashboard**, **Rules**, **Labels**, **Outcomes**, **Analytics**, **Rule Quality**
+3. Confirm sidebar shows: **Dashboard**, **Rules**, **Shadow Rules**, **Rule Rollouts**, **Labels**, **Outcomes**, **Analytics**, **Rule Quality**
 
 ---
 
@@ -134,6 +134,7 @@ You can also upload a small `event_id,label_name` CSV in **Labels** and recheck 
 
 - [Analyst Guide](../user-guide/analyst-guide.md)
 - [Creating Rules](../user-guide/creating-rules.md)
+- [Rule Rollouts](../user-guide/rule-rollouts.md)
 - [Monitoring & Analytics](../user-guide/monitoring.md)
 - [Integration Quickstart](integration-quickstart.md)
 - [Troubleshooting](../troubleshooting.md)

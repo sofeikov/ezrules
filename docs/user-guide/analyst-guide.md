@@ -127,7 +127,7 @@ Relevant endpoints:
 
 - Start conservative, then tighten thresholds with data.
 - Label quickly and consistently with team-agreed definitions.
-- Backtest for initial calibration on historical data; shadow deploy to validate on current traffic before promoting.
+- Backtest for initial calibration on historical data; shadow deploy for observe-only validation or use a rollout when you need gradual live exposure before a full promote.
 - If a change degrades outcomes, roll back from the rule history timeline instead of manually retyping old logic.
 - Review trends on a fixed cadence (daily/weekly).
 
@@ -188,6 +188,7 @@ if $user_id not in @trusted_users:
 
 - **[Creating Rules](creating-rules.md)** - Rule syntax and patterns
 - **[Shadow Deployment](shadow-deployment.md)** - Validate rule changes on live traffic before promoting
+- **[Rule Rollouts](rule-rollouts.md)** - Shift a candidate rule onto a stable percentage of live traffic
 - **[Labels and Lists](labels-and-lists.md)** - Labels, lists, and outcomes in one workflow
 - **[Monitoring & Analytics](monitoring.md)** - Dashboard metrics
 

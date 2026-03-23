@@ -27,6 +27,7 @@ from ezrules.backend.api_v2.routes import (
     labels,
     outcomes,
     roles,
+    rollouts,
     rules,
     settings,
     shadow,
@@ -162,6 +163,9 @@ app.include_router(field_types.router)
 
 # Shadow routes: /api/v2/shadow/*
 app.include_router(shadow.router)
+
+# Rollout routes: /api/v2/rollouts/*
+app.include_router(rollouts.router)
 
 # API Key routes: /api/v2/api-keys/*
 app.include_router(api_keys.router)

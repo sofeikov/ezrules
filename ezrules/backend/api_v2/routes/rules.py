@@ -19,6 +19,7 @@ from ezrules.backend.api_v2.auth.dependencies import (
     get_db,
     require_permission,
 )
+from ezrules.backend.api_v2.schemas.rollouts import RolloutDeployRequest, RolloutDeployResponse
 from ezrules.backend.api_v2.schemas.rules import (
     RuleCreate,
     RuleHistoryEntry,
@@ -40,17 +41,24 @@ from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import Rule, RuleFactory
 from ezrules.core.rule_updater import (
+    ROLLOUT_CONFIG_LABEL,
+    SHADOW_CONFIG_LABEL,
     RDBRuleEngineConfigProducer,
     RDBRuleManager,
+    deploy_rule_to_rollout,
     deploy_rule_to_shadow,
+    get_candidate_deployment_label,
+    list_candidate_deployments,
+    promote_rollout_rule_to_production,
     promote_shadow_rule_to_production,
+    remove_rule_from_rollout,
     remove_rule_from_shadow,
     save_rule_history,
 )
 from ezrules.core.type_casting import CastError, cast_event
 from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import RuleEngineConfig, RuleHistory, RuleStatus, User
+from ezrules.models.backend_core import RuleHistory, RuleStatus, User
 from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/rules", tags=["Rules"])
@@ -109,6 +117,16 @@ def rule_to_response(rule: RuleModel, revisions: list[RuleRevisionSummary] | Non
     )
 
 
+def ensure_no_active_candidate_deployment(db: Any, org_id: int, rule_id: int) -> None:
+    deployment_label = get_candidate_deployment_label(db, o_id=org_id, r_id=rule_id)
+    if deployment_label is None:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"Rule has an active {deployment_label} deployment. Remove or promote it before changing the base rule.",
+    )
+
+
 # =============================================================================
 # LIST RULES
 # =============================================================================
@@ -129,17 +147,16 @@ def list_rules(
     rule_manager = get_rule_manager(db, current_org_id)
     rules = rule_manager.load_all_rules()
 
-    # Determine which rules are in shadow config
-    shadow_r_ids: set[int] = set()
-    try:
-        shadow_config = (
-            db.query(RuleEngineConfig)
-            .where(RuleEngineConfig.label == "shadow", RuleEngineConfig.o_id == current_org_id)
-            .one()
-        )
-        shadow_r_ids = {int(r["r_id"]) for r in shadow_config.config if "r_id" in r}
-    except Exception:
-        pass
+    shadow_r_ids = {
+        int(entry["r_id"])
+        for entry in list_candidate_deployments(db, current_org_id, SHADOW_CONFIG_LABEL)
+        if "r_id" in entry
+    }
+    rollout_entries = {
+        int(entry["r_id"]): entry
+        for entry in list_candidate_deployments(db, current_org_id, ROLLOUT_CONFIG_LABEL)
+        if "r_id" in entry
+    }
 
     rules_data = [
         RuleListItem(
@@ -153,6 +170,10 @@ def list_rules(
             approved_at=rule.approved_at if rule.approved_at is not None else None,  # type: ignore[arg-type]
             created_at=rule.created_at,  # type: ignore[arg-type]
             in_shadow=int(rule.r_id) in shadow_r_ids,
+            in_rollout=int(rule.r_id) in rollout_entries,
+            rollout_percent=int(rollout_entries[int(rule.r_id)]["traffic_percent"])
+            if int(rule.r_id) in rollout_entries and rollout_entries[int(rule.r_id)].get("traffic_percent") is not None
+            else None,
         )
         for rule in rules
     ]
@@ -411,6 +432,7 @@ def update_rule(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Rule not found",
         )
+    ensure_no_active_candidate_deployment(db, current_org_id, rule_id)
     config_producer = get_config_producer(db, current_org_id)
     if rule.status == RuleStatus.ARCHIVED:
         return RuleMutationResponse(
@@ -503,6 +525,7 @@ def delete_rule(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Rule not found",
         )
+    ensure_no_active_candidate_deployment(db, current_org_id, rule_id)
 
     was_active = is_active(rule)
 
@@ -545,6 +568,7 @@ def promote_rule(
     rule = rule_manager.load_rule(rule_id)
     if rule is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
+    ensure_no_active_candidate_deployment(db, current_org_id, rule_id)
     if rule.status == RuleStatus.ARCHIVED:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archived rules cannot be promoted")
     if rule.status == RuleStatus.ACTIVE:
@@ -589,6 +613,7 @@ def archive_rule(
     rule = rule_manager.load_rule(rule_id)
     if rule is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
+    ensure_no_active_candidate_deployment(db, current_org_id, rule_id)
     if rule.status == RuleStatus.ARCHIVED:
         return RuleMutationResponse(success=True, message="Rule already archived", rule=rule_to_response(rule))
 
@@ -635,6 +660,7 @@ def rollback_rule(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Rule not found",
         )
+    ensure_no_active_candidate_deployment(db, current_org_id, rule_id)
 
     if rollback_data.revision_number == int(rule.version):
         raise HTTPException(
@@ -841,15 +867,20 @@ def deploy_to_shadow(
     rule = rule_manager.load_rule(rule_id)  # type: ignore[arg-type]
     if rule is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
+    if rule.status == RuleStatus.ARCHIVED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archived rules cannot be deployed")
 
-    deploy_rule_to_shadow(
-        db,
-        o_id=current_org_id,
-        rule_model=rule,
-        changed_by=str(user.email),
-        logic_override=request.logic,
-        description_override=request.description,
-    )
+    try:
+        deploy_rule_to_shadow(
+            db,
+            o_id=current_org_id,
+            rule_model=rule,
+            changed_by=str(user.email),
+            logic_override=request.logic,
+            description_override=request.description,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     # Invalidate shadow executor so it reloads on next request
     evaluator_module._shadow_lre = None
@@ -903,3 +934,77 @@ def promote_to_production(
     evaluator_module._shadow_lre = None
 
     return ShadowDeployResponse(success=True, message=f"Rule {rule_id} promoted to production")
+
+
+@router.post("/{rule_id}/rollout", response_model=RolloutDeployResponse)
+def deploy_to_rollout(
+    rule_id: int,
+    request: RolloutDeployRequest,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.PROMOTE_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> RolloutDeployResponse:
+    rule_manager = get_rule_manager(db, current_org_id)
+    rule = rule_manager.load_rule(rule_id)  # type: ignore[arg-type]
+    if rule is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
+    if rule.status != RuleStatus.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only active rules can be rolled out")
+
+    try:
+        deploy_rule_to_rollout(
+            db,
+            o_id=current_org_id,
+            rule_model=rule,
+            traffic_percent=request.traffic_percent,
+            changed_by=str(user.email),
+            logic_override=request.logic,
+            description_override=request.description,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return RolloutDeployResponse(
+        success=True,
+        message=f"Rule {rule.rid} rollout set to {request.traffic_percent}%",
+    )
+
+
+@router.delete("/{rule_id}/rollout", response_model=RolloutDeployResponse)
+def remove_from_rollout(
+    rule_id: int,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.PROMOTE_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> RolloutDeployResponse:
+    remove_rule_from_rollout(db, o_id=current_org_id, r_id=rule_id, changed_by=str(user.email))
+    return RolloutDeployResponse(success=True, message=f"Rule {rule_id} removed from rollout")
+
+
+@router.post("/{rule_id}/rollout/promote", response_model=RolloutDeployResponse)
+def promote_rollout_to_production(
+    rule_id: int,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.PROMOTE_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> RolloutDeployResponse:
+    from ezrules.backend.api_v2.routes import evaluator as evaluator_module
+
+    try:
+        promote_rollout_rule_to_production(
+            db,
+            o_id=current_org_id,
+            r_id=rule_id,
+            changed_by=str(user.email),
+            approved_by=int(user.id),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    evaluator_module._lre = None
+    evaluator_module._shadow_lre = None
+
+    return RolloutDeployResponse(success=True, message=f"Rule {rule_id} rollout promoted to production")
