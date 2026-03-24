@@ -8,11 +8,13 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     String,
     Text,
     UnicodeText,
     UniqueConstraint,
+    text,
     types,
 )
 from sqlalchemy import (
@@ -98,7 +100,10 @@ class UserMixin:
 
 class RolesUsers(Base):
     __tablename__ = "roles_users"
-    __table_args__ = (UniqueConstraint("user_id", "role_id", name="uq_roles_users_user_role"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "role_id", name="uq_roles_users_user_role"),
+        Index("ix_roles_users_role_id_user_id", "role_id", "user_id"),
+    )
 
     id = Column(Integer(), primary_key=True)
     user_id = Column("user_id", Integer(), ForeignKey("user.id"))
@@ -170,6 +175,7 @@ class Action(Base):
 
 class RoleActions(Base):
     __tablename__ = "role_actions"
+    __table_args__ = (Index("ix_role_actions_role_id_action_id_resource_id", "role_id", "action_id", "resource_id"),)
 
     id = Column(Integer, primary_key=True)
     role_id = Column(Integer, ForeignKey("role.id"), nullable=False)
@@ -295,6 +301,9 @@ class TestingRecordLog(Base):
             ["event_labels.el_id", "event_labels.o_id"],
             name="fk_testing_record_log_label_org",
         ),
+        Index("ix_testing_record_log_o_id_event_id", "o_id", "event_id"),
+        Index("ix_testing_record_log_o_id_tl_id", "o_id", "tl_id"),
+        Index("ix_testing_record_log_o_id_created_at", "o_id", "created_at"),
     )
 
     tl_id = Column(
@@ -321,6 +330,7 @@ class TestingRecordLog(Base):
 
 class TestingResultsLog(Base):
     __tablename__ = "testing_results_log"
+    __table_args__ = (Index("ix_testing_results_log_tl_id_r_id", "tl_id", "r_id"),)
 
     tr_id = Column(Integer, unique=True, primary_key=True)
     tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id", ondelete="CASCADE"))
@@ -343,12 +353,16 @@ class ShadowResultsLog(Base):
 
 class RuleDeploymentResultsLog(Base):
     __tablename__ = "rule_deployment_results_log"
+    __table_args__ = (
+        Index("ix_rule_deployment_results_log_o_id_mode_dr_id", "o_id", "mode", "dr_id"),
+        Index("ix_rule_deployment_results_log_o_id_r_id", "o_id", "r_id"),
+    )
 
     dr_id = Column(Integer, unique=True, primary_key=True)
     tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id", ondelete="CASCADE"))
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
-    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False, index=True)
-    mode = Column(String(20), nullable=False, index=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    mode = Column(String(20), nullable=False)
     selected_variant = Column(String(20), nullable=False)
     traffic_percent = Column(Integer, nullable=True)
     bucket = Column(Integer, nullable=True)
@@ -410,6 +424,10 @@ class UserListEntry(Base):
 
 class RuleBackTestingResult(Base):
     __tablename__ = "rule_backtesting_results"
+    __table_args__ = (
+        Index("ix_rule_backtesting_results_task_id", "task_id"),
+        Index("ix_rule_backtesting_results_r_id_created_at", "r_id", "created_at"),
+    )
 
     bt_id = Column(Integer, unique=True, primary_key=True)
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id", ondelete="CASCADE"))
@@ -423,7 +441,10 @@ class RuleBackTestingResult(Base):
 
 class RuleQualityPair(Base):
     __tablename__ = "rule_quality_pairs"
-    __table_args__ = (UniqueConstraint("o_id", "outcome", "label", name="uq_rule_quality_pairs_org_outcome_label"),)
+    __table_args__ = (
+        UniqueConstraint("o_id", "outcome", "label", name="uq_rule_quality_pairs_org_outcome_label"),
+        Index("ix_rule_quality_pairs_o_id_active", "o_id", "active"),
+    )
 
     rqp_id = Column(Integer, unique=True, primary_key=True)
     outcome = Column(String(255), nullable=False)
@@ -439,6 +460,17 @@ class RuleQualityPair(Base):
 
 class RuleQualityReport(Base):
     __tablename__ = "rule_quality_reports"
+    __table_args__ = (
+        Index(
+            "ix_rule_quality_reports_cache_lookup",
+            "o_id",
+            "min_support",
+            "lookback_days",
+            "pair_set_hash",
+            "status",
+            "created_at",
+        ),
+    )
 
     rqr_id = Column(Integer, unique=True, primary_key=True)
     task_id = Column(String(50), nullable=True, index=True)
@@ -462,6 +494,7 @@ class RuleQualityReport(Base):
 
 class RuleHistory(Base):
     __tablename__ = "rules_history"
+    __table_args__ = (Index("ix_rules_history_o_id_changed", "o_id", "changed"),)
 
     r_id = Column(Integer, primary_key=True)
     version = Column(Integer, primary_key=True)
@@ -482,6 +515,7 @@ class RuleHistory(Base):
 
 class RuleEngineConfigHistory(Base):
     __tablename__ = "rule_engine_config_history"
+    __table_args__ = (Index("ix_rule_engine_config_history_o_id_changed", "o_id", "changed"),)
 
     re_id = Column(Integer, primary_key=True)
     version = Column(Integer, primary_key=True)
@@ -494,6 +528,7 @@ class RuleEngineConfigHistory(Base):
 
 class UserListHistory(Base):
     __tablename__ = "user_list_history"
+    __table_args__ = (Index("ix_user_list_history_o_id_ul_id_changed", "o_id", "ul_id", "changed"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     ul_id = Column(Integer, nullable=False)
@@ -507,6 +542,7 @@ class UserListHistory(Base):
 
 class OutcomeHistory(Base):
     __tablename__ = "outcome_history"
+    __table_args__ = (Index("ix_outcome_history_o_id_changed", "o_id", "changed"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     ao_id = Column(Integer, nullable=False)
@@ -519,6 +555,7 @@ class OutcomeHistory(Base):
 
 class LabelHistory(Base):
     __tablename__ = "label_history"
+    __table_args__ = (Index("ix_label_history_o_id_changed", "o_id", "changed"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     el_id = Column(Integer, nullable=False)
@@ -532,6 +569,7 @@ class LabelHistory(Base):
 
 class UserAccountHistory(Base):
     __tablename__ = "user_account_history"
+    __table_args__ = (Index("ix_user_account_history_o_id_user_id_changed", "o_id", "user_id", "changed"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, nullable=False)
@@ -547,6 +585,7 @@ class UserAccountHistory(Base):
 
 class RolePermissionHistory(Base):
     __tablename__ = "role_permission_history"
+    __table_args__ = (Index("ix_role_permission_history_o_id_role_id_changed", "o_id", "role_id", "changed"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     role_id = Column(Integer, nullable=False)
@@ -560,6 +599,7 @@ class RolePermissionHistory(Base):
 
 class FieldTypeHistory(Base):
     __tablename__ = "field_type_history"
+    __table_args__ = (Index("ix_field_type_history_o_id_field_name_changed", "o_id", "field_name", "changed"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     field_name = Column(String, nullable=False)
@@ -648,6 +688,7 @@ class PasswordResetToken(Base):
 
 class ApiKey(Base):
     __tablename__ = "api_keys"
+    __table_args__ = (Index("ix_api_keys_active_key_hash", "key_hash", postgresql_where=text("revoked_at IS NULL")),)
 
     id = Column(Integer, primary_key=True)
     gid = Column(String(36), unique=True, nullable=False, index=True)
@@ -662,6 +703,7 @@ class ApiKey(Base):
 
 class ApiKeyHistory(Base):
     __tablename__ = "api_key_history"
+    __table_args__ = (Index("ix_api_key_history_o_id_changed", "o_id", "changed"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     api_key_gid = Column(String(36), nullable=False, index=True)
