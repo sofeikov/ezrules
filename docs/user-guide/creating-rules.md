@@ -156,6 +156,8 @@ For higher-stakes changes, add a shadow validation step before promoting to prod
 
 Shadow deployment gives you live-traffic validation without any production impact. See [Shadow Deployment](shadow-deployment.md) for the full workflow.
 
+If you want to move beyond observe-only validation, use [Rule Rollouts](rule-rollouts.md) to serve the candidate logic to a controlled percentage of live traffic while the current production version remains the control.
+
 ---
 
 ## Review History and Roll Back Safely

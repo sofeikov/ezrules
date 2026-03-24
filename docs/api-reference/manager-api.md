@@ -89,6 +89,9 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 | `POST` | `/api/v2/rules/{rule_id}/shadow` | Bearer + `MODIFY_RULE` | Deploy rule to shadow |
 | `DELETE` | `/api/v2/rules/{rule_id}/shadow` | Bearer + `MODIFY_RULE` | Remove rule from shadow |
 | `POST` | `/api/v2/rules/{rule_id}/shadow/promote` | Bearer + `PROMOTE_RULES` | Promote shadow rule to production |
+| `POST` | `/api/v2/rules/{rule_id}/rollout` | Bearer + `PROMOTE_RULES` | Start or update a live traffic rollout for an active rule |
+| `DELETE` | `/api/v2/rules/{rule_id}/rollout` | Bearer + `PROMOTE_RULES` | Remove a rollout |
+| `POST` | `/api/v2/rules/{rule_id}/rollout/promote` | Bearer + `PROMOTE_RULES` | Promote rollout candidate to full production |
 
 Rule lifecycle fields on rule responses:
 - `status`: `draft`, `active`, or `archived`
@@ -98,6 +101,7 @@ Rule lifecycle fields on rule responses:
 - `POST /api/v2/rules/{id}/rollback` restores the selected historical revision's logic and description into a brand new draft version, preserving the full revision chain.
 - Rule audit entries (`GET /api/v2/audit/rules*`) now include `action` (`updated`, `promoted`, `deactivated`, `rolled_back`, `deleted`) and `to_status` to show lifecycle transitions such as `draft -> active`.
 - Deleting a rule preserves its history so `GET /api/v2/audit/rules/{rule_id}` remains available after deletion.
+- Rules with an active shadow deployment or rollout cannot be edited, archived, deleted, directly promoted, or rolled back until the candidate deployment is removed or promoted.
 
 ### Shadow
 
@@ -106,6 +110,14 @@ Rule lifecycle fields on rule responses:
 | `GET` | `/api/v2/shadow` | Bearer + `VIEW_RULES` | Current shadow config (rules + version) |
 | `GET` | `/api/v2/shadow/results` | Bearer + `VIEW_RULES` | Recent shadow evaluation results (`?limit=50`) |
 | `GET` | `/api/v2/shadow/stats` | Bearer + `VIEW_RULES` | Per-rule shadow vs production outcome comparison |
+
+### Rollouts
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/rollouts` | Bearer + `VIEW_RULES` | Current rollout config (rules + traffic percent + version) |
+| `GET` | `/api/v2/rollouts/results` | Bearer + `VIEW_RULES` | Recent rollout comparison records (`?limit=50`) |
+| `GET` | `/api/v2/rollouts/stats` | Bearer + `VIEW_RULES` | Per-rule candidate vs control outcomes plus served split counts |
 
 ### Tested Events
 

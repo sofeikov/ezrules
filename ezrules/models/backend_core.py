@@ -341,6 +341,23 @@ class ShadowResultsLog(Base):
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
 
 
+class RuleDeploymentResultsLog(Base):
+    __tablename__ = "rule_deployment_results_log"
+
+    dr_id = Column(Integer, unique=True, primary_key=True)
+    tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id", ondelete="CASCADE"))
+    r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False, index=True)
+    mode = Column(String(20), nullable=False, index=True)
+    selected_variant = Column(String(20), nullable=False)
+    traffic_percent = Column(Integer, nullable=True)
+    bucket = Column(Integer, nullable=True)
+    control_result = Column(String, nullable=True)
+    candidate_result = Column(String, nullable=True)
+    returned_result = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+
+
 class AllowedOutcome(Base):
     __tablename__ = "allowed_outcomes"
     __table_args__ = (UniqueConstraint("o_id", "severity_rank", name="uq_allowed_outcomes_org_severity_rank"),)

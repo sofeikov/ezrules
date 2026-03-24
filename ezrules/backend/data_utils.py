@@ -26,16 +26,24 @@ class Event(BaseModel):
         return value
 
 
-def eval_and_store(lre, event: Event, commit: bool = True):
-    db_session = lre.db
-    outcome_manager = DatabaseOutcome(db_session=db_session, o_id=lre.o_id)
-    response = lre.evaluate_rules(event.event_data)
-    resolved_outcome = outcome_manager.resolve_outcome(response["outcome_counters"])
+def eval_and_store(lre, event: Event, response: dict | None = None, commit: bool = True):
+    if response is None:
+        response = lre.evaluate_rules(event.event_data)
+    response, tl_id = store_eval_result(
+        db_session=lre.db,
+        o_id=lre.o_id,
+        event=event,
+        response=response,
+        commit=commit,
+    )
+    return response, tl_id
 
-    # Convert Unix timestamp to datetime for created_at
+
+def store_eval_result(db_session, o_id: int, event: Event, response: dict, commit: bool = True):
+    outcome_manager = DatabaseOutcome(db_session=db_session, o_id=o_id)
     created_at_datetime = datetime.fromtimestamp(event.event_timestamp)
     tl = TestingRecordLog(
-        o_id=lre.o_id,
+        o_id=o_id,
         event=event.event_data,
         event_timestamp=event.event_timestamp,
         event_id=event.event_id,
@@ -46,6 +54,8 @@ def eval_and_store(lre, event: Event, commit: bool = True):
         db_session.commit()
     else:
         db_session.flush()
+
+    resolved_outcome = outcome_manager.resolve_outcome(response["outcome_counters"])
     tl.outcome_counters = response["outcome_counters"]
     tl.resolved_outcome = resolved_outcome
     for r_id, result in response["rule_results"].items():

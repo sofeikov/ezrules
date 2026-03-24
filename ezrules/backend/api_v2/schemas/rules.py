@@ -106,6 +106,8 @@ class RuleListItem(BaseModel):
     approved_at: datetime | None = Field(None, description="When the rule was approved for activation")
     created_at: datetime | None = None
     in_shadow: bool = False
+    in_rollout: bool = False
+    rollout_percent: int | None = None
 
     model_config = {"from_attributes": True}
 

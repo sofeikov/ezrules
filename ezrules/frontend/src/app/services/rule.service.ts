@@ -16,6 +16,8 @@ export interface Rule {
   approved_at: string | null;
   created_at: string | null;
   in_shadow?: boolean;
+  in_rollout?: boolean;
+  rollout_percent?: number | null;
 }
 
 export interface RuleRevision {
@@ -139,6 +141,64 @@ export interface ShadowStatsResponse {
   rules: ShadowRuleStatsItem[];
 }
 
+export interface RolloutDeployResponse {
+  success: boolean;
+  message: string;
+  error?: string | null;
+}
+
+export interface RolloutRuleItem {
+  r_id: number;
+  rid: string;
+  description: string;
+  logic: string;
+  traffic_percent: number;
+}
+
+export interface RolloutConfigResponse {
+  rules: RolloutRuleItem[];
+  version: number;
+}
+
+export interface RolloutResultItem {
+  dr_id: number;
+  tl_id: number;
+  r_id: number;
+  selected_variant: string;
+  traffic_percent: number | null;
+  bucket: number | null;
+  control_result: string | null;
+  candidate_result: string | null;
+  returned_result: string | null;
+  event_id: string;
+  event_timestamp: number;
+  created_at: string | null;
+}
+
+export interface RolloutResultsResponse {
+  results: RolloutResultItem[];
+  total: number;
+}
+
+export interface RolloutOutcomeCount {
+  outcome: string;
+  count: number;
+}
+
+export interface RolloutRuleStatsItem {
+  r_id: number;
+  traffic_percent: number;
+  total: number;
+  served_candidate: number;
+  served_control: number;
+  candidate_outcomes: RolloutOutcomeCount[];
+  control_outcomes: RolloutOutcomeCount[];
+}
+
+export interface RolloutStatsResponse {
+  rules: RolloutRuleStatsItem[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -202,6 +262,27 @@ export class RuleService {
     return this.http.post<ShadowDeployResponse>(`${this.apiUrl}/${ruleId}/shadow/promote`, {});
   }
 
+  deployToRollout(
+    ruleId: number,
+    logic: string,
+    description: string,
+    trafficPercent: number
+  ): Observable<RolloutDeployResponse> {
+    return this.http.post<RolloutDeployResponse>(`${this.apiUrl}/${ruleId}/rollout`, {
+      logic,
+      description,
+      traffic_percent: trafficPercent
+    });
+  }
+
+  removeFromRollout(ruleId: number): Observable<RolloutDeployResponse> {
+    return this.http.delete<RolloutDeployResponse>(`${this.apiUrl}/${ruleId}/rollout`);
+  }
+
+  promoteRollout(ruleId: number): Observable<RolloutDeployResponse> {
+    return this.http.post<RolloutDeployResponse>(`${this.apiUrl}/${ruleId}/rollout/promote`, {});
+  }
+
   promoteRule(ruleId: number): Observable<UpdateRuleResponse> {
     return this.http.post<UpdateRuleResponse>(`${this.apiUrl}/${ruleId}/promote`, {});
   }
@@ -226,5 +307,19 @@ export class RuleService {
 
   getShadowStats(): Observable<ShadowStatsResponse> {
     return this.http.get<ShadowStatsResponse>(`${environment.apiUrl}/api/v2/shadow/stats`);
+  }
+
+  getRolloutConfig(): Observable<RolloutConfigResponse> {
+    return this.http.get<RolloutConfigResponse>(`${environment.apiUrl}/api/v2/rollouts`);
+  }
+
+  getRolloutResults(limit: number = 50): Observable<RolloutResultsResponse> {
+    return this.http.get<RolloutResultsResponse>(`${environment.apiUrl}/api/v2/rollouts/results`, {
+      params: { limit: limit.toString() }
+    });
+  }
+
+  getRolloutStats(): Observable<RolloutStatsResponse> {
+    return this.http.get<RolloutStatsResponse>(`${environment.apiUrl}/api/v2/rollouts/stats`);
   }
 }

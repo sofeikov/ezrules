@@ -1,0 +1,262 @@
+<div class="flex min-h-screen bg-gray-50">
+  <app-sidebar></app-sidebar>
+
+  <div class="ml-64 flex-1">
+    <div class="p-8">
+      <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Rule Rollouts</h1>
+        <p class="text-gray-600 mt-1">Candidate rule versions serving a percentage of live traffic</p>
+      </div>
+
+      <div *ngIf="actionSuccess" class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="text-sm font-medium text-green-800">{{ actionSuccess }}</p>
+        </div>
+      </div>
+
+      <div *ngIf="actionError" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="text-sm font-medium text-red-800">{{ actionError }}</p>
+        </div>
+      </div>
+
+      <div *ngIf="loading" class="flex justify-center items-center py-20">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+      </div>
+
+      <div *ngIf="error && !loading" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <p class="text-sm font-medium text-red-800">{{ error }}</p>
+      </div>
+
+      <div *ngIf="!loading && !error">
+        <div *ngIf="rolloutConfig.rules.length === 0" class="text-center py-20" data-testid="rollouts-empty-state">
+          <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <h3 class="mt-4 text-lg font-medium text-gray-900">No active rollouts</h3>
+          <p class="mt-2 text-sm text-gray-500">Start a rollout from an active rule to shift traffic gradually.</p>
+          <a routerLink="/rules" class="mt-6 inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
+            Go to Rules
+          </a>
+        </div>
+
+        <div *ngIf="rolloutConfig.rules.length > 0">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Active Rollouts</h2>
+            <span class="text-sm text-gray-400">Config version {{ rolloutConfig.version }}</span>
+          </div>
+
+          <div class="space-y-4" data-testid="rollouts-table">
+            <div *ngFor="let item of getRuleStats()" class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div class="px-6 py-4 flex items-start justify-between gap-4 border-b border-gray-100">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 mb-1 flex-wrap">
+                    <span class="font-mono text-sm font-semibold text-gray-900">{{ item.rule.rid }}</span>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800">
+                      {{ item.rule.traffic_percent }}% rollout
+                    </span>
+                    <span class="text-xs text-gray-400">{{ item.stats?.total ?? 0 }} events compared</span>
+                  </div>
+                  <p class="text-sm text-gray-500 truncate">{{ item.rule.description }}</p>
+                </div>
+                <div class="flex items-center gap-3 shrink-0">
+                  <button
+                    (click)="editRollout(item.rule)"
+                    class="px-3 py-1.5 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    *ngIf="canPromoteRules"
+                    (click)="openPromoteDialog(item.rule)"
+                    class="px-3 py-1.5 text-sm text-green-600 border border-green-200 rounded-lg hover:bg-green-50 transition-colors"
+                    data-testid="promote-rollout-button"
+                  >
+                    Promote
+                  </button>
+                  <button
+                    (click)="removeFromRollout(item.rule)"
+                    class="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                    data-testid="remove-rollout-button"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+
+              <div class="px-6 py-3 bg-gray-50 border-b border-gray-100">
+                <code class="text-xs font-mono text-gray-500">{{ item.rule.logic | slice:0:120 }}{{ item.rule.logic.length > 120 ? '…' : '' }}</code>
+              </div>
+
+              <div class="px-6 py-4 space-y-4">
+                <div *ngIf="item.stats" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div class="border border-gray-200 rounded-lg p-4">
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Served Split</p>
+                    <div class="space-y-2">
+                      <div class="flex justify-between text-sm text-gray-600">
+                        <span>Candidate served</span>
+                        <span>{{ item.stats.served_candidate }}</span>
+                      </div>
+                      <div class="flex justify-between text-sm text-gray-600">
+                        <span>Control served</span>
+                        <span>{{ item.stats.served_control }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="border border-gray-200 rounded-lg p-4">
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Rollout Target</p>
+                    <div class="flex items-center gap-3">
+                      <div class="flex-1 bg-gray-100 rounded-full h-2">
+                        <div class="bg-emerald-500 h-2 rounded-full" [style.width.%]="item.rule.traffic_percent"></div>
+                      </div>
+                      <span class="text-sm font-medium text-gray-700">{{ item.rule.traffic_percent }}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p *ngIf="!item.stats || item.stats.total === 0" class="text-sm text-gray-400 italic">No rollout evaluations yet.</p>
+
+                <div *ngIf="item.stats && item.stats.total > 0" class="grid grid-cols-2 gap-8">
+                  <div>
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Control Outcomes</p>
+                    <div class="space-y-2">
+                      <div *ngFor="let outcome of item.stats.control_outcomes" class="flex items-center gap-2">
+                        <span class="text-xs text-gray-600 w-20 truncate">{{ outcome.outcome }}</span>
+                        <div class="flex-1 bg-gray-100 rounded-full h-1.5">
+                          <div class="bg-sky-400 h-1.5 rounded-full" [style.width.%]="(outcome.count / item.stats.total) * 100"></div>
+                        </div>
+                        <span class="text-xs text-gray-500 w-14 text-right">{{ outcome.count }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p class="text-xs font-semibold text-emerald-500 uppercase tracking-wide mb-3">Candidate Outcomes</p>
+                    <div class="space-y-2">
+                      <div *ngFor="let outcome of item.stats.candidate_outcomes" class="flex items-center gap-2">
+                        <span class="text-xs text-gray-600 w-20 truncate">{{ outcome.outcome }}</span>
+                        <div class="flex-1 bg-gray-100 rounded-full h-1.5">
+                          <div class="bg-emerald-400 h-1.5 rounded-full" [style.width.%]="(outcome.count / item.stats.total) * 100"></div>
+                        </div>
+                        <span class="text-xs text-gray-500 w-14 text-right">{{ outcome.count }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="showPromoteDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" data-testid="promote-rollout-dialog">
+  <div class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">Promote Rollout to Production</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      Promote <strong>{{ promoteTarget?.rid }}</strong> and replace the current production version with the candidate logic.
+    </p>
+
+    <div class="mb-6">
+      <h4 class="text-sm font-medium text-gray-700 mb-2">Logic changes (production → rollout):</h4>
+
+      <div *ngIf="loadingProductionRule" class="flex items-center gap-2 text-sm text-gray-500 py-4">
+        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+        Loading production logic...
+      </div>
+
+      <div *ngIf="!loadingProductionRule && !productionRule" class="bg-gray-50 border border-gray-200 rounded p-3">
+        <p class="text-xs text-gray-500 mb-2">Could not load production rule — showing rollout logic:</p>
+        <pre class="text-xs font-mono text-gray-700 whitespace-pre-wrap">{{ promoteTarget?.logic }}</pre>
+      </div>
+
+      <div *ngIf="!loadingProductionRule && productionRule">
+        <div *ngIf="promoteDiffIsIdentical"
+             class="bg-gray-50 border border-gray-200 rounded p-3">
+          <p class="text-xs text-gray-500">Logic is identical to current production version.</p>
+        </div>
+
+        <div *ngIf="promoteDiffHasChanges"
+             class="border border-gray-200 rounded overflow-hidden font-mono text-xs">
+          <div class="bg-gray-100 px-3 py-1.5 border-b border-gray-200 flex gap-4 text-gray-600">
+            <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 bg-red-200 border border-red-400 rounded-sm"></span> production</span>
+            <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 bg-green-200 border border-green-400 rounded-sm"></span> rollout (incoming)</span>
+          </div>
+          <div class="max-h-64 overflow-y-auto">
+            <div *ngFor="let chunk of promoteDiff"
+                 [class]="chunk.added ? 'bg-green-50 text-green-900' : chunk.removed ? 'bg-red-50 text-red-900' : 'bg-white text-gray-700'"
+                 class="px-3 py-0.5 whitespace-pre-wrap leading-5">
+              <span class="select-none mr-1 opacity-60">{{ chunk.added ? '+' : chunk.removed ? '-' : ' ' }}</span>{{ chunk.value }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="promoteError" class="bg-red-50 border border-red-200 rounded p-3 mb-4">
+      <p class="text-sm text-red-800">{{ promoteError }}</p>
+    </div>
+
+    <div class="flex gap-3 justify-end">
+      <button
+        (click)="closePromoteDialog()"
+        [disabled]="promoting"
+        class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:cursor-not-allowed"
+        data-testid="cancel-promote-rollout-button"
+      >
+        Cancel
+      </button>
+      <button
+        (click)="confirmPromote()"
+        [disabled]="promoting"
+        class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+        data-testid="confirm-promote-rollout-button"
+      >
+        <span *ngIf="!promoting">Yes, Promote</span>
+        <span *ngIf="promoting">Promoting...</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="showRemoveDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" data-testid="remove-rollout-dialog">
+  <div class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full mx-4">
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">Remove Rollout</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      Remove <strong>{{ removeTarget?.rid }}</strong> from live rollout traffic?
+      This will stop serving the candidate version and clear the rollout comparison history for this candidate.
+    </p>
+
+    <div *ngIf="removeError" class="bg-red-50 border border-red-200 rounded p-3 mb-4">
+      <p class="text-sm text-red-800">{{ removeError }}</p>
+    </div>
+
+    <div class="flex gap-3 justify-end">
+      <button
+        (click)="closeRemoveDialog()"
+        [disabled]="removing"
+        class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:cursor-not-allowed"
+        data-testid="cancel-remove-rollout-button"
+      >
+        Cancel
+      </button>
+      <button
+        (click)="confirmRemove()"
+        [disabled]="removing"
+        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+        data-testid="confirm-remove-rollout-button"
+      >
+        <span *ngIf="!removing">Yes, Remove</span>
+        <span *ngIf="removing">Removing...</span>
+      </button>
+    </div>
+  </div>
+</div>

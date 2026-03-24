@@ -5,7 +5,16 @@ import { FormsModule } from '@angular/forms';
 import { diffLines, Change } from 'diff';
 import { of, Subscription } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
-import { RuleDetail, RuleRevisionDetail, RuleService, ShadowDeployResponse, ShadowRuleItem, UpdateRuleRequest } from '../services/rule.service';
+import {
+  RolloutDeployResponse,
+  RolloutRuleItem,
+  RuleDetail,
+  RuleRevisionDetail,
+  RuleService,
+  ShadowDeployResponse,
+  ShadowRuleItem,
+  UpdateRuleRequest
+} from '../services/rule.service';
 import {
   BacktestingService,
   BacktestQualityMetric,
@@ -13,6 +22,7 @@ import {
   BacktestResultItem,
   BacktestTaskResult
 } from '../services/backtesting.service';
+import { AuthService } from '../services/auth.service';
 import { RuleTestDataService } from '../services/rule-test-data.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
@@ -52,6 +62,14 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   shadowDeploySuccess: boolean = false;
   shadowDeployError: string | null = null;
 
+  rolloutEntry: RolloutRuleItem | null = null;
+  showRolloutDialog: boolean = false;
+  deployingToRollout: boolean = false;
+  rolloutDeploySuccess: boolean = false;
+  rolloutDeployError: string | null = null;
+  rolloutTrafficPercent: number = 10;
+  canPromoteRules: boolean = false;
+
   // Backtesting properties
   backtestResults: BacktestResultItem[] = [];
   backtestTaskResults: Map<string, BacktestTaskResult> = new Map();
@@ -69,10 +87,12 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     private router: Router,
     private ruleService: RuleService,
     private backtestingService: BacktestingService,
-    private ruleTestDataService: RuleTestDataService
+    private ruleTestDataService: RuleTestDataService,
+    private authService: AuthService
   ) { }
 
   ngOnInit(): void {
+    this.loadPermissions();
     const ruleId = this.route.snapshot.paramMap.get('id');
     const revision = this.route.snapshot.paramMap.get('revision');
     if (ruleId && revision) {
@@ -89,6 +109,11 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
         this.isEditMode = true;
         this.editedLogic = nav.logic;
         this.editedDescription = nav.description;
+      } else if (nav?.rolloutEditMode) {
+        this.isEditMode = true;
+        this.editedLogic = nav.logic;
+        this.editedDescription = nav.description;
+        this.rolloutTrafficPercent = nav.trafficPercent ?? 10;
       }
     }
   }
@@ -97,6 +122,17 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     this.cancelPendingVerify();
     this.pollingIntervals.forEach(interval => clearInterval(interval));
     this.pollingIntervals.clear();
+  }
+
+  loadPermissions(): void {
+    this.authService.hasPermission('promote_rules').subscribe({
+      next: (hasPermission) => {
+        this.canPromoteRules = hasPermission;
+      },
+      error: () => {
+        this.canPromoteRules = false;
+      }
+    });
   }
 
   loadRule(ruleId: number): void {
@@ -109,6 +145,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
         this.loading = false;
         this.fillInExampleParams();
         this.loadShadowEntry(rule.r_id);
+        this.loadRolloutEntry(rule.r_id);
       },
       error: (error) => {
         this.error = 'Failed to load rule. Please try again.';
@@ -262,8 +299,11 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       // Entering edit mode - copy current values
       this.editedDescription = this.rule.description;
       this.editedLogic = this.rule.logic;
+      this.rolloutTrafficPercent = this.rolloutEntry?.traffic_percent ?? 10;
       this.saveError = null;
       this.saveSuccess = false;
+      this.rolloutDeployError = null;
+      this.rolloutDeploySuccess = false;
       this.fillInExampleParams(this.editedLogic);
     }
     this.isEditMode = !this.isEditMode;
@@ -276,6 +316,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     if (this.rule) {
       this.editedDescription = this.rule.description;
       this.editedLogic = this.rule.logic;
+      this.rolloutTrafficPercent = this.rolloutEntry?.traffic_percent ?? 10;
       this.fillInExampleParams();
     }
   }
@@ -362,6 +403,57 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
         this.shadowDeployError = error.error?.detail || 'Failed to deploy to shadow. Please try again.';
       }
     });
+  }
+
+  loadRolloutEntry(ruleId: number): void {
+    this.ruleService.getRolloutConfig().subscribe({
+      next: (config) => {
+        this.rolloutEntry = config.rules.find(r => r.r_id === ruleId) || null;
+      },
+      error: () => {
+        this.rolloutEntry = null;
+      }
+    });
+  }
+
+  openRolloutDialog(): void {
+    this.showRolloutDialog = true;
+  }
+
+  closeRolloutDialog(): void {
+    this.showRolloutDialog = false;
+  }
+
+  computeRolloutDiff(): Change[] {
+    return diffLines(this.rule?.logic || '', this.editedLogic);
+  }
+
+  confirmDeployToRollout(): void {
+    if (!this.rule) return;
+
+    this.deployingToRollout = true;
+    this.rolloutDeploySuccess = false;
+    this.rolloutDeployError = null;
+
+    this.ruleService
+      .deployToRollout(this.rule.r_id, this.editedLogic, this.editedDescription, this.rolloutTrafficPercent)
+      .subscribe({
+        next: (response: RolloutDeployResponse) => {
+          this.deployingToRollout = false;
+          this.closeRolloutDialog();
+          if (response.success) {
+            this.rolloutDeploySuccess = true;
+            this.loadRule(this.rule!.r_id);
+          } else {
+            this.rolloutDeployError = response.error || 'Failed to start rollout';
+          }
+        },
+        error: (error) => {
+          this.deployingToRollout = false;
+          this.closeRolloutDialog();
+          this.rolloutDeployError = error.error?.detail || 'Failed to start rollout. Please try again.';
+        }
+      });
   }
 
   // Backtesting methods

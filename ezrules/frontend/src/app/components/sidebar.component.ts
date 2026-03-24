@@ -37,6 +37,13 @@ import { AuthService } from '../services/auth.service';
           <span>Shadow Rules</span>
         </a>
 
+        <a href="/rule-rollouts" [ngClass]="linkClasses('/rule-rollouts')">
+          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span>Rule Rollouts</span>
+        </a>
+
         <a href="/labels" [ngClass]="linkClasses('/labels')">
           <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5a2 2 0 012 2v13a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm7.75 4.25a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />

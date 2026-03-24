@@ -19,6 +19,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Outcome Resolution Hierarchy**: Configure outcome severity order in Settings so conflicting rule hits resolve to one persisted winning outcome
 - **Tested Events View**: Inspect the latest stored transactions, their final resolved outcomes, the raw event payload, every rule that fired for each event, see referenced payload fields highlighted inline inside the JSON with hover-based rule focus, jump straight from a trigger to the rule detail page, and refresh the list without reloading the whole app
 - **Shadow Deployment**: Deploy rules to a shadow environment that observes live traffic without affecting production outcomes; promote validated shadows to production in one step
+- **Rule Rollouts**: Shift a candidate rule onto a stable percentage of live traffic with deterministic bucketing, compare candidate vs control on the same events, and promote when the rollout looks good
 - **Rule Lifecycle Controls**: Rules now support `draft`, `active`, and `archived` states with explicit promotion and approver tracking (`effective_from`, `approved_by`, `approved_at`)
 - **Permission-Aware Promotion UI**: Draft and shadow promotion controls are only shown to users who hold the `promote_rules` permission
 - **Revision Rollback**: Restore logic and description from a historical rule revision into a new draft version directly from the history timeline, without deleting any audit history
