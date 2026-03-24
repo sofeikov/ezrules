@@ -3,10 +3,10 @@ FastAPI routes for shadow deployment overview and results.
 """
 
 from collections import defaultdict
-from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import exists, func, literal, select, union_all
 from sqlalchemy.exc import NoResultFound
 
 from ezrules.backend.api_v2.auth.dependencies import (
@@ -37,72 +37,58 @@ from ezrules.models.backend_core import (
 router = APIRouter(prefix="/api/v2/shadow", tags=["Shadow"])
 
 
-def _load_shadow_entries(db: Any, current_org_id: int) -> list[dict[str, Any]]:
-    new_rows = (
-        db.query(RuleDeploymentResultsLog, TestingRecordLog)
+def _shadow_entries_subquery(current_org_id: int):
+    new_entries = (
+        select(
+            RuleDeploymentResultsLog.dr_id.label("log_id"),
+            RuleDeploymentResultsLog.tl_id.label("tl_id"),
+            RuleDeploymentResultsLog.r_id.label("r_id"),
+            func.coalesce(RuleDeploymentResultsLog.candidate_result, literal("None")).label("shadow_result"),
+            func.coalesce(RuleDeploymentResultsLog.control_result, literal("None")).label("prod_result"),
+            TestingRecordLog.event_id.label("event_id"),
+            TestingRecordLog.event_timestamp.label("event_timestamp"),
+            RuleDeploymentResultsLog.created_at.label("created_at"),
+        )
         .join(TestingRecordLog, RuleDeploymentResultsLog.tl_id == TestingRecordLog.tl_id)
-        .filter(
+        .where(
+            RuleDeploymentResultsLog.o_id == current_org_id,
+            RuleDeploymentResultsLog.mode == "shadow",
+            TestingRecordLog.o_id == current_org_id,
+        )
+    )
+
+    matching_shared_log_exists = exists(
+        select(1).where(
+            RuleDeploymentResultsLog.tl_id == ShadowResultsLog.tl_id,
+            RuleDeploymentResultsLog.r_id == ShadowResultsLog.r_id,
             RuleDeploymentResultsLog.o_id == current_org_id,
             RuleDeploymentResultsLog.mode == "shadow",
         )
-        .all()
-    )
+    ).correlate(ShadowResultsLog)
 
-    entries = [
-        {
-            "log_id": int(log.dr_id),
-            "tl_id": int(log.tl_id),
-            "r_id": int(log.r_id),
-            "shadow_result": str(log.candidate_result) if log.candidate_result is not None else "None",
-            "prod_result": str(log.control_result) if log.control_result is not None else "None",
-            "event_id": str(tl.event_id),
-            "event_timestamp": int(tl.event_timestamp),
-            "created_at": log.created_at,
-        }
-        for log, tl in new_rows
-    ]
-
-    existing_pairs = {(entry["tl_id"], entry["r_id"]) for entry in entries}
-
-    legacy_rows = (
-        db.query(ShadowResultsLog, TestingRecordLog, TestingResultsLog.rule_result)
+    legacy_entries = (
+        select(
+            ShadowResultsLog.sr_id.label("log_id"),
+            ShadowResultsLog.tl_id.label("tl_id"),
+            ShadowResultsLog.r_id.label("r_id"),
+            func.coalesce(ShadowResultsLog.rule_result, literal("None")).label("shadow_result"),
+            func.coalesce(TestingResultsLog.rule_result, literal("None")).label("prod_result"),
+            TestingRecordLog.event_id.label("event_id"),
+            TestingRecordLog.event_timestamp.label("event_timestamp"),
+            ShadowResultsLog.created_at.label("created_at"),
+        )
         .join(TestingRecordLog, ShadowResultsLog.tl_id == TestingRecordLog.tl_id)
         .outerjoin(
             TestingResultsLog,
             (TestingResultsLog.tl_id == ShadowResultsLog.tl_id) & (TestingResultsLog.r_id == ShadowResultsLog.r_id),
         )
-        .filter(TestingRecordLog.o_id == current_org_id)
-        .all()
+        .where(
+            TestingRecordLog.o_id == current_org_id,
+            ~matching_shared_log_exists,
+        )
     )
 
-    for shadow_log, tl, prod_result in legacy_rows:
-        pair = (int(shadow_log.tl_id), int(shadow_log.r_id))
-        if pair in existing_pairs:
-            continue
-        entries.append(
-            {
-                "log_id": int(shadow_log.sr_id),
-                "tl_id": int(shadow_log.tl_id),
-                "r_id": int(shadow_log.r_id),
-                "shadow_result": str(shadow_log.rule_result),
-                "prod_result": str(prod_result) if prod_result is not None else "None",
-                "event_id": str(tl.event_id),
-                "event_timestamp": int(tl.event_timestamp),
-                "created_at": shadow_log.created_at,
-            }
-        )
-
-    return entries
-
-
-def _sort_shadow_entries(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    def sort_key(entry: dict[str, Any]) -> tuple[datetime, int]:
-        created_at = entry["created_at"] or datetime.min.replace(tzinfo=UTC)
-        if created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=UTC)
-        return (created_at, entry["log_id"])
-
-    return sorted(entries, key=sort_key, reverse=True)
+    return union_all(new_entries, legacy_entries).subquery("shadow_entries")
 
 
 @router.get("", response_model=ShadowConfigResponse)
@@ -146,20 +132,34 @@ def get_shadow_results(
     db: Any = Depends(get_db),
 ) -> ShadowResultsResponse:
     """Return recent shadow evaluation results joined with event metadata."""
-    entries = _sort_shadow_entries(_load_shadow_entries(db, current_org_id))
-    total = len(entries)
+    shadow_entries = _shadow_entries_subquery(current_org_id)
+    rows = (
+        db.query(
+            shadow_entries.c.log_id,
+            shadow_entries.c.tl_id,
+            shadow_entries.c.r_id,
+            shadow_entries.c.shadow_result,
+            shadow_entries.c.event_id,
+            shadow_entries.c.event_timestamp,
+            shadow_entries.c.created_at,
+        )
+        .order_by(shadow_entries.c.created_at.desc(), shadow_entries.c.log_id.desc())
+        .limit(limit)
+        .all()
+    )
+    total = db.query(func.count()).select_from(shadow_entries).scalar() or 0
 
     results = [
         ShadowResultItem(
-            sr_id=int(entry["log_id"]),
-            tl_id=int(entry["tl_id"]),
-            r_id=int(entry["r_id"]),
-            rule_result=str(entry["shadow_result"]),
-            event_id=str(entry["event_id"]),
-            event_timestamp=int(entry["event_timestamp"]),
-            created_at=entry["created_at"],
+            sr_id=int(row.log_id),
+            tl_id=int(row.tl_id),
+            r_id=int(row.r_id),
+            rule_result=str(row.shadow_result),
+            event_id=str(row.event_id),
+            event_timestamp=int(row.event_timestamp),
+            created_at=row.created_at,
         )
-        for entry in entries[:limit]
+        for row in rows
     ]
 
     return ShadowResultsResponse(results=results, total=total)
@@ -173,13 +173,29 @@ def get_shadow_stats(
     db: Any = Depends(get_db),
 ) -> ShadowStatsResponse:
     """Return shadow vs production outcome counts per rule for the same events."""
+    shadow_entries = _shadow_entries_subquery(current_org_id)
+    rows = (
+        db.query(
+            shadow_entries.c.r_id,
+            shadow_entries.c.shadow_result,
+            shadow_entries.c.prod_result,
+            func.count().label("cnt"),
+        )
+        .group_by(
+            shadow_entries.c.r_id,
+            shadow_entries.c.shadow_result,
+            shadow_entries.c.prod_result,
+        )
+        .all()
+    )
+
     shadow_by_rule: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     prod_by_rule: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
-    for entry in _load_shadow_entries(db, current_org_id):
-        r_id = int(entry["r_id"])
-        shadow_by_rule[r_id][str(entry["shadow_result"])] += 1
-        prod_by_rule[r_id][str(entry["prod_result"])] += 1
+    for row in rows:
+        r_id = int(row.r_id)
+        shadow_by_rule[r_id][str(row.shadow_result)] += int(row.cnt)
+        prod_by_rule[r_id][str(row.prod_result)] += int(row.cnt)
 
     all_r_ids = set(shadow_by_rule) | set(prod_by_rule)
 

@@ -7,6 +7,7 @@ service-to-service / internal use.
 """
 
 import hashlib
+import logging
 from collections import Counter
 from typing import Any
 
@@ -33,6 +34,7 @@ from ezrules.models.backend_core import RuleDeploymentResultsLog, ShadowResultsL
 from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2", tags=["Evaluator"])
+logger = logging.getLogger(__name__)
 
 _lre: LocalRuleExecutorSQL | None = None
 _shadow_lre: LocalRuleExecutorSQL | None = None
@@ -159,6 +161,7 @@ def evaluate(
     result = _build_response_from_all_results(merged_all_results)
 
     try:
+        # `result` already contains the merged served outcome; passing it avoids a second rule evaluation.
         result, tl_id = data_utils.eval_and_store(lre, event, response=result)
     except Exception as exc:
         raise HTTPException(
@@ -185,7 +188,19 @@ def evaluate(
                 )
             db.commit()
         except Exception:
-            db.rollback()
+            logger.exception(
+                "Failed to persist rollout comparison logs for event_id=%s org_id=%s",
+                event.event_id,
+                lre.o_id,
+            )
+            try:
+                db.rollback()
+            except Exception:
+                logger.exception(
+                    "Failed to rollback rollout comparison log transaction for event_id=%s org_id=%s",
+                    event.event_id,
+                    lre.o_id,
+                )
 
     # Best-effort shadow evaluation — never fails the main request
     try:
@@ -213,7 +228,19 @@ def evaluate(
             )
         db.commit()
     except Exception:
-        db.rollback()
+        logger.exception(
+            "Failed to persist shadow comparison logs for event_id=%s org_id=%s",
+            event.event_id,
+            lre.o_id,
+        )
+        try:
+            db.rollback()
+        except Exception:
+            logger.exception(
+                "Failed to rollback shadow comparison log transaction for event_id=%s org_id=%s",
+                event.event_id,
+                lre.o_id,
+            )
 
     record_observations(db, request_data.event_data, lre.o_id)
 

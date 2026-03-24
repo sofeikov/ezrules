@@ -6,6 +6,7 @@ from collections import defaultdict
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
@@ -112,11 +113,24 @@ def get_rollout_stats(
     rollout_entries = {
         int(entry["r_id"]): entry for entry in list_candidate_deployments(db, current_org_id, ROLLOUT_CONFIG_LABEL)
     }
-    logs = (
+    rows = (
         db.query(RuleDeploymentResultsLog)
+        .with_entities(
+            RuleDeploymentResultsLog.r_id,
+            RuleDeploymentResultsLog.selected_variant,
+            func.coalesce(RuleDeploymentResultsLog.candidate_result, "None").label("candidate_result"),
+            func.coalesce(RuleDeploymentResultsLog.control_result, "None").label("control_result"),
+            func.count().label("cnt"),
+        )
         .filter(
             RuleDeploymentResultsLog.o_id == current_org_id,
             RuleDeploymentResultsLog.mode == "split",
+        )
+        .group_by(
+            RuleDeploymentResultsLog.r_id,
+            RuleDeploymentResultsLog.selected_variant,
+            func.coalesce(RuleDeploymentResultsLog.candidate_result, "None"),
+            func.coalesce(RuleDeploymentResultsLog.control_result, "None"),
         )
         .all()
     )
@@ -127,15 +141,16 @@ def get_rollout_stats(
     served_control: dict[int, int] = defaultdict(int)
     total_by_rule: dict[int, int] = defaultdict(int)
 
-    for log in logs:
-        r_id = int(log.r_id)
-        total_by_rule[r_id] += 1
-        candidate_outcomes[r_id][str(log.candidate_result) if log.candidate_result is not None else "None"] += 1
-        control_outcomes[r_id][str(log.control_result) if log.control_result is not None else "None"] += 1
-        if log.selected_variant == "candidate":
-            served_candidate[r_id] += 1
+    for row in rows:
+        r_id = int(row.r_id)
+        count = int(row.cnt)
+        total_by_rule[r_id] += count
+        candidate_outcomes[r_id][str(row.candidate_result)] += count
+        control_outcomes[r_id][str(row.control_result)] += count
+        if row.selected_variant == "candidate":
+            served_candidate[r_id] += count
         else:
-            served_control[r_id] += 1
+            served_control[r_id] += count
 
     def sorted_outcomes(counts: dict[str, int]) -> list[RolloutOutcomeCount]:
         return sorted(

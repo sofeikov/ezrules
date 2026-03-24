@@ -6,6 +6,9 @@ export class RolloutsPage {
   readonly emptyState: Locator;
   readonly rolloutsTable: Locator;
   readonly promoteDialog: Locator;
+  readonly removeDialog: Locator;
+  readonly cancelPromoteButton: Locator;
+  readonly cancelRemoveButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -13,6 +16,9 @@ export class RolloutsPage {
     this.emptyState = page.locator('[data-testid="rollouts-empty-state"]');
     this.rolloutsTable = page.locator('[data-testid="rollouts-table"]');
     this.promoteDialog = page.locator('[data-testid="promote-rollout-dialog"]');
+    this.removeDialog = page.locator('[data-testid="remove-rollout-dialog"]');
+    this.cancelPromoteButton = page.locator('[data-testid="cancel-promote-rollout-button"]');
+    this.cancelRemoveButton = page.locator('[data-testid="cancel-remove-rollout-button"]');
   }
 
   async goto() {
@@ -36,6 +42,14 @@ export class RolloutsPage {
   }
 
   async clickCancelPromoteButton() {
-    await this.page.getByRole('button', { name: 'Cancel' }).click();
+    await this.cancelPromoteButton.click();
+  }
+
+  async clickRemoveButton(index: number = 0) {
+    await this.page.locator('[data-testid="remove-rollout-button"]').nth(index).click();
+  }
+
+  async clickCancelRemoveButton() {
+    await this.cancelRemoveButton.click();
   }
 }

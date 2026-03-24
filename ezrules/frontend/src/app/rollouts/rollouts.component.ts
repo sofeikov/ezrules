@@ -31,6 +31,12 @@ export class RolloutsComponent implements OnInit {
   promoteError: string | null = null;
   productionRule: RuleDetail | null = null;
   loadingProductionRule: boolean = false;
+  promoteDiff: Change[] = [];
+
+  showRemoveDialog: boolean = false;
+  removeTarget: RolloutRuleItem | null = null;
+  removing: boolean = false;
+  removeError: string | null = null;
 
   actionSuccess: string | null = null;
   actionError: string | null = null;
@@ -93,10 +99,12 @@ export class RolloutsComponent implements OnInit {
     this.promoteError = null;
     this.productionRule = null;
     this.loadingProductionRule = true;
+    this.promoteDiff = [];
     this.ruleService.getRule(rule.r_id).subscribe({
       next: (response) => {
         this.productionRule = response;
         this.loadingProductionRule = false;
+        this.promoteDiff = diffLines(response.logic, rule.logic);
       },
       error: () => {
         this.loadingProductionRule = false;
@@ -109,11 +117,57 @@ export class RolloutsComponent implements OnInit {
     this.promoteTarget = null;
     this.promoteError = null;
     this.productionRule = null;
+    this.promoteDiff = [];
+    this.promoting = false;
   }
 
-  computePromoteDiff(): Change[] {
-    if (!this.productionRule || !this.promoteTarget) return [];
-    return diffLines(this.productionRule.logic, this.promoteTarget.logic);
+  get promoteDiffIsIdentical(): boolean {
+    return this.promoteDiff.length === 1 && !this.promoteDiff[0].added && !this.promoteDiff[0].removed;
+  }
+
+  get promoteDiffHasChanges(): boolean {
+    return this.promoteDiff.length > 1 || !!this.promoteDiff[0]?.added || !!this.promoteDiff[0]?.removed;
+  }
+
+  openRemoveDialog(rule: RolloutRuleItem): void {
+    this.showRemoveDialog = true;
+    this.removeTarget = rule;
+    this.removeError = null;
+    this.removing = false;
+  }
+
+  closeRemoveDialog(): void {
+    this.showRemoveDialog = false;
+    this.removeTarget = null;
+    this.removeError = null;
+    this.removing = false;
+  }
+
+  confirmRemove(): void {
+    if (!this.removeTarget) {
+      return;
+    }
+
+    this.removing = true;
+    this.removeError = null;
+
+    this.ruleService.removeFromRollout(this.removeTarget.r_id).subscribe({
+      next: (res) => {
+        this.removing = false;
+        if (res.success) {
+          this.closeRemoveDialog();
+          this.actionSuccess = res.message;
+          this.actionError = null;
+          this.loadData();
+        } else {
+          this.removeError = res.error || 'Remove failed';
+        }
+      },
+      error: (err) => {
+        this.removing = false;
+        this.removeError = err.error?.detail || 'Failed to remove rollout.';
+      }
+    });
   }
 
   confirmPromote(): void {
@@ -152,20 +206,7 @@ export class RolloutsComponent implements OnInit {
   }
 
   removeFromRollout(rule: RolloutRuleItem): void {
-    this.ruleService.removeFromRollout(rule.r_id).subscribe({
-      next: (res) => {
-        if (res.success) {
-          this.actionSuccess = res.message;
-          this.actionError = null;
-          this.loadData();
-        } else {
-          this.actionError = res.error || 'Remove failed';
-        }
-      },
-      error: (err) => {
-        this.actionError = err.error?.detail || 'Failed to remove rollout.';
-      }
-    });
+    this.openRemoveDialog(rule);
   }
 
   getRuleStats(): { rule: RolloutRuleItem; stats: RolloutRuleStatsItem | null }[] {

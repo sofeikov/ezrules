@@ -180,19 +180,19 @@
       </div>
 
       <div *ngIf="!loadingProductionRule && productionRule">
-        <div *ngIf="computePromoteDiff().length === 1 && !computePromoteDiff()[0].added && !computePromoteDiff()[0].removed"
+        <div *ngIf="promoteDiffIsIdentical"
              class="bg-gray-50 border border-gray-200 rounded p-3">
           <p class="text-xs text-gray-500">Logic is identical to current production version.</p>
         </div>
 
-        <div *ngIf="computePromoteDiff().length > 1 || computePromoteDiff()[0]?.added || computePromoteDiff()[0]?.removed"
+        <div *ngIf="promoteDiffHasChanges"
              class="border border-gray-200 rounded overflow-hidden font-mono text-xs">
           <div class="bg-gray-100 px-3 py-1.5 border-b border-gray-200 flex gap-4 text-gray-600">
             <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 bg-red-200 border border-red-400 rounded-sm"></span> production</span>
             <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 bg-green-200 border border-green-400 rounded-sm"></span> rollout (incoming)</span>
           </div>
           <div class="max-h-64 overflow-y-auto">
-            <div *ngFor="let chunk of computePromoteDiff()"
+            <div *ngFor="let chunk of promoteDiff"
                  [class]="chunk.added ? 'bg-green-50 text-green-900' : chunk.removed ? 'bg-red-50 text-red-900' : 'bg-white text-gray-700'"
                  class="px-3 py-0.5 whitespace-pre-wrap leading-5">
               <span class="select-none mr-1 opacity-60">{{ chunk.added ? '+' : chunk.removed ? '-' : ' ' }}</span>{{ chunk.value }}</div>
@@ -210,6 +210,7 @@
         (click)="closePromoteDialog()"
         [disabled]="promoting"
         class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:cursor-not-allowed"
+        data-testid="cancel-promote-rollout-button"
       >
         Cancel
       </button>
@@ -217,9 +218,44 @@
         (click)="confirmPromote()"
         [disabled]="promoting"
         class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+        data-testid="confirm-promote-rollout-button"
       >
         <span *ngIf="!promoting">Yes, Promote</span>
         <span *ngIf="promoting">Promoting...</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="showRemoveDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" data-testid="remove-rollout-dialog">
+  <div class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full mx-4">
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">Remove Rollout</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      Remove <strong>{{ removeTarget?.rid }}</strong> from live rollout traffic?
+      This will stop serving the candidate version and clear the rollout comparison history for this candidate.
+    </p>
+
+    <div *ngIf="removeError" class="bg-red-50 border border-red-200 rounded p-3 mb-4">
+      <p class="text-sm text-red-800">{{ removeError }}</p>
+    </div>
+
+    <div class="flex gap-3 justify-end">
+      <button
+        (click)="closeRemoveDialog()"
+        [disabled]="removing"
+        class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:cursor-not-allowed"
+        data-testid="cancel-remove-rollout-button"
+      >
+        Cancel
+      </button>
+      <button
+        (click)="confirmRemove()"
+        [disabled]="removing"
+        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+        data-testid="confirm-remove-rollout-button"
+      >
+        <span *ngIf="!removing">Yes, Remove</span>
+        <span *ngIf="removing">Removing...</span>
       </button>
     </div>
   </div>
