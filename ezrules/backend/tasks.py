@@ -8,6 +8,7 @@ from ezrules.backend.rule_quality import (
     get_active_rule_quality_pairs,
     normalize_rule_quality_pairs,
 )
+from ezrules.backend.utils import load_cast_configs
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
 from ezrules.core.rule import Rule, RuleFactory
 from ezrules.core.user_lists import PersistentUserListManager
@@ -31,7 +32,7 @@ def backtest_rule_change(r_id: int, new_rule_logic: str, org_id: int):
     set_user_list_manager(list_provider)
 
     try:
-        stored_rule = RuleFactory.from_json(rule_obj.__dict__)
+        stored_rule = RuleFactory.from_json(rule_obj.__dict__, list_values_provider=list_provider)
     except Exception as e:
         return {"error": f"Failed to compile stored rule: {e!s}"}
 
@@ -54,12 +55,14 @@ def backtest_rule_change(r_id: int, new_rule_logic: str, org_id: int):
         int(label_id): str(label_name)
         for label_id, label_name in db_session.query(Label.el_id, Label.label).filter(Label.o_id == org_id)
     }
+    configs = load_cast_configs(db_session, org_id)
 
     return compute_backtest_metrics(
         stored_rule=stored_rule,
         proposed_rule=proposed_rule,
         test_records=query.yield_per(5000),
         label_lookup=label_lookup,
+        configs=configs,
     )
 
 

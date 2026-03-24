@@ -89,6 +89,7 @@ def upsert_field_type_config(
     if existing:
         existing.configured_type = data.configured_type.value
         existing.datetime_format = data.datetime_format
+        existing.required = data.required
         save_field_type_history(
             db,
             field_name=data.field_name,
@@ -97,6 +98,7 @@ def upsert_field_type_config(
             o_id=current_org_id,
             changed_by=str(user.email),
             datetime_format=data.datetime_format,
+            required=data.required,
         )
         db.commit()
         db.refresh(existing)
@@ -110,6 +112,7 @@ def upsert_field_type_config(
         field_name=data.field_name,
         configured_type=data.configured_type.value,
         datetime_format=data.datetime_format,
+        required=data.required,
         o_id=current_org_id,
     )
     db.add(new_config)
@@ -121,6 +124,7 @@ def upsert_field_type_config(
         o_id=current_org_id,
         changed_by=str(user.email),
         datetime_format=data.datetime_format,
+        required=data.required,
     )
     db.commit()
     db.refresh(new_config)
@@ -161,6 +165,7 @@ def update_field_type_config(
 
     config.configured_type = data.configured_type.value
     config.datetime_format = data.datetime_format
+    config.required = data.required
     save_field_type_history(
         db,
         field_name=field_name,
@@ -169,6 +174,7 @@ def update_field_type_config(
         o_id=current_org_id,
         changed_by=str(user.email),
         datetime_format=data.datetime_format,
+        required=data.required,
     )
     db.commit()
     db.refresh(config)
@@ -214,6 +220,7 @@ def delete_field_type_config(
         o_id=current_org_id,
         changed_by=str(user.email),
         datetime_format=str(config.datetime_format) if config.datetime_format else None,
+        required=bool(config.required),
     )
     db.delete(config)
     db.commit()

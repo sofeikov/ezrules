@@ -53,6 +53,9 @@ Checkpoint:
     The **Test Rule** panel applies the same field type casting as live evaluation. If you have configured field types (under **Settings → Field Types**), values will be cast before the rule runs. Test JSON also contributes to field observations, helping you discover which types your fields carry.
     See [Field Type Management](field-types.md) for details.
 
+!!! tip "Warnings for unseen fields"
+    The rule editor warns when your logic references fields that have never been observed in live traffic or rule-test payloads. This does not block saving, but it is a sign that backtests may skip older records that do not contain the new field.
+
 Example payload:
 
 ```json

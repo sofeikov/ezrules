@@ -565,6 +565,7 @@ class FieldTypeHistory(Base):
     field_name = Column(String, nullable=False)
     configured_type = Column(String, nullable=False)
     datetime_format = Column(String, nullable=True)
+    required = Column(Boolean, nullable=False, default=False)
     action = Column(String, nullable=False)  # created, updated, deleted
     details = Column(String, nullable=True)
     o_id = Column(Integer, nullable=False)
@@ -578,6 +579,7 @@ class FieldTypeConfig(Base):
     field_name = Column(String, primary_key=True)
     configured_type = Column(String, nullable=False)
     datetime_format = Column(String, nullable=True)
+    required = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     updated_at = Column(
         DateTime,

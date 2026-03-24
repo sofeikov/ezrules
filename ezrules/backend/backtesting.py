@@ -7,6 +7,14 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
+from ezrules.core.rule import MissingFieldLookupError
+from ezrules.core.type_casting import (
+    CastError,
+    FieldCastConfig,
+    RequiredFieldError,
+    find_missing_fields,
+    normalize_event,
+)
 from ezrules.models.backend_core import TestingRecordLog
 
 
@@ -123,22 +131,69 @@ def _build_quality_metrics(
     }
 
 
+def _extract_runtime_missing_field(exc: KeyError, event: dict[str, Any]) -> str | None:
+    if not exc.args:
+        return None
+    missing_field = exc.args[0]
+    if isinstance(missing_field, str) and missing_field not in event:
+        return missing_field
+    return None
+
+
 def compute_backtest_metrics(
     *,
     stored_rule: Any,
     proposed_rule: Any,
     test_records: Iterable[TestingRecordLog],
     label_lookup: dict[int, str],
+    configs: list[FieldCastConfig],
 ) -> dict[str, Any]:
+    stored_rule_fields = set(stored_rule.get_rule_params())
+    proposed_rule_fields = set(proposed_rule.get_rule_params())
+    referenced_fields = sorted(stored_rule_fields | proposed_rule_fields)
     total_records = 0
+    skipped_records = 0
     labeled_records = 0
     label_counts: Counter[str] = Counter()
     quality_outcomes: set[str] = set()
+    missing_field_counts: Counter[str] = Counter()
+    normalization_failures: Counter[str] = Counter()
 
     stored_metrics = _RuleMetricsAccumulator()
     proposed_metrics = _RuleMetricsAccumulator()
 
     for record in test_records:
+        raw_payload = record.event if isinstance(record.event, dict) else {}
+        raw_event = dict(raw_payload)
+
+        missing_fields = find_missing_fields(raw_event, referenced_fields)
+        if missing_fields:
+            skipped_records += 1
+            missing_field_counts.update(missing_fields)
+            continue
+
+        try:
+            normalized_event = normalize_event(raw_event, configs)
+        except (CastError, RequiredFieldError) as exc:
+            skipped_records += 1
+            normalization_failures[str(exc)] += 1
+            continue
+
+        try:
+            stored_outcome = stored_rule(normalized_event)
+            proposed_outcome = proposed_rule(normalized_event)
+        except MissingFieldLookupError as exc:
+            skipped_records += 1
+            missing_field_counts[exc.field_name] += 1
+            continue
+        except KeyError as exc:
+            missing_field = _extract_runtime_missing_field(exc, normalized_event)
+            if missing_field is None:
+                raise
+            skipped_records += 1
+            missing_field_counts[missing_field] += 1
+            continue
+
         total_records += 1
 
         label_name: str | None = None
@@ -147,9 +202,6 @@ def compute_backtest_metrics(
             if label_name is not None:
                 labeled_records += 1
                 label_counts[label_name] += 1
-
-        stored_outcome = stored_rule(record.event)
-        proposed_outcome = proposed_rule(record.event)
 
         stored_outcome_name = str(stored_outcome) if stored_outcome is not None else None
         proposed_outcome_name = str(proposed_outcome) if proposed_outcome is not None else None
@@ -180,16 +232,35 @@ def compute_backtest_metrics(
         label_counts=label_counts,
     )
 
+    warnings: list[str] = []
+    if skipped_records:
+        warnings.append(
+            f"Skipped {skipped_records} historical record(s) from the comparison because they were not eligible."
+        )
+    if missing_field_counts:
+        impacted_fields = ", ".join(
+            f"{field_name} ({missing_field_counts[field_name]})" for field_name in sorted(missing_field_counts)
+        )
+        warnings.append(f"Records missing or null for referenced fields were excluded: {impacted_fields}.")
+    if normalization_failures:
+        warnings.extend(
+            f"Records excluded by live normalization rules: {message} ({count})."
+            for message, count in normalization_failures.items()
+        )
+
     return {
         "stored_result": _sorted_counts(stored_metrics.outcome_counts),
         "proposed_result": _sorted_counts(proposed_metrics.outcome_counts),
         "stored_result_rate": _count_rates(stored_metrics.outcome_counts, total_records),
         "proposed_result_rate": _count_rates(proposed_metrics.outcome_counts, total_records),
         "total_records": total_records,
+        "eligible_records": total_records,
+        "skipped_records": skipped_records,
         "labeled_records": labeled_records,
         "label_counts": _sorted_counts(label_counts),
         "stored_quality_metrics": stored_quality_metrics,
         "proposed_quality_metrics": proposed_quality_metrics,
         "stored_quality_summary": stored_quality_summary,
         "proposed_quality_summary": proposed_quality_summary,
+        "warnings": warnings,
     }

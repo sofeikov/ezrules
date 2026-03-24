@@ -83,7 +83,7 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 | `POST` | `/api/v2/rules/{rule_id}/promote` | Bearer + `PROMOTE_RULES` | Promote draft rule to active |
 | `POST` | `/api/v2/rules/{rule_id}/archive` | Bearer + `MODIFY_RULE` | Archive rule |
 | `POST` | `/api/v2/rules/{rule_id}/rollback` | Bearer + `MODIFY_RULE` | Create a new draft version from a historical revision (`revision_number` in body) |
-| `POST` | `/api/v2/rules/verify` | Bearer + permission | Verify rule source and extracted params |
+| `POST` | `/api/v2/rules/verify` | Bearer + permission | Verify rule source, extracted params, and advisory warnings for unseen fields |
 | `POST` | `/api/v2/rules/test` | Bearer + permission | Test rule payload |
 | `GET` | `/api/v2/rules/{rule_id}/history` | Bearer + permission | Revision list |
 | `POST` | `/api/v2/rules/{rule_id}/shadow` | Bearer + `MODIFY_RULE` | Deploy rule to shadow |
@@ -223,9 +223,12 @@ Outcome hierarchy notes:
 |---|---|---|---|
 | `GET` | `/api/v2/field-types` | Bearer + permission | List all configured field types for the caller's org |
 | `GET` | `/api/v2/field-types/observations` | Bearer + permission | List auto-discovered field observations for the caller's org |
-| `POST` | `/api/v2/field-types` | Bearer + permission | Create or update a field type config (upsert) in the caller's org |
-| `PUT` | `/api/v2/field-types/{field_name}` | Bearer + permission | Update type or datetime format for existing config in the caller's org |
+| `POST` | `/api/v2/field-types` | Bearer + permission | Create or update a field type config (upsert) in the caller's org, including `required` |
+| `PUT` | `/api/v2/field-types/{field_name}` | Bearer + permission | Update type, `required`, or datetime format for existing config in the caller's org |
 | `DELETE` | `/api/v2/field-types/{field_name}` | Bearer + permission | Delete a field type config from the caller's org |
+
+Field type config note:
+- Config payloads now include `required: bool`. When `required=true`, live evaluation rejects events where that field is missing or `null`.
 
 ### Audit
 
@@ -247,11 +250,12 @@ Outcome hierarchy notes:
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | `POST` | `/api/v2/backtesting` | Bearer + permission | Trigger async backtest for a rule in the caller's org |
-| `GET` | `/api/v2/backtesting/task/{task_id}` | Bearer + permission | Task status/result, including outcome counts/rates plus label counts and quality metrics for labeled history |
+| `GET` | `/api/v2/backtesting/task/{task_id}` | Bearer + permission | Task status/result, including outcome counts/rates, `eligible_records`, `skipped_records`, warnings, plus label counts and quality metrics for labeled history |
 | `GET` | `/api/v2/backtesting/{rule_id}` | Bearer + permission | Backtest history for a rule visible to the caller's org |
 
 Backtest task result note:
-- `GET /api/v2/backtesting/task/{task_id}` returns raw outcome counts/rates over the full backtest window.
+- `GET /api/v2/backtesting/task/{task_id}` returns raw outcome counts/rates over the eligible comparison subset used by both stored and proposed logic.
+- Results now include `eligible_records`, `skipped_records`, and `warnings` when historical records were excluded because a referenced field was missing/null or live normalization rules would have rejected the event.
 - When labeled historical events exist, it also returns `labeled_records`, `label_counts`, and stored/proposed outcome→label quality summaries and pair metrics (`precision`, `recall`, `f1`, `true_positive`, `false_positive`, `false_negative`).
 - Backtest workers derive organisation context from the selected rule/request rather than a fixed app-wide org setting.
 
@@ -271,6 +275,7 @@ Backtest task result note:
 
 Evaluator storage note:
 - `POST /api/v2/evaluate` persists events and per-rule results, which can then be reviewed via `GET /api/v2/tested-events`.
+- If required-field validation or strict rule lookup fails, the request returns `400` and nothing is persisted.
 
 ## API Conventions
 

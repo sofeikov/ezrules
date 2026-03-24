@@ -19,7 +19,7 @@ from ezrules.backend.api_v2.schemas.evaluator import EvaluateRequest, EvaluateRe
 from ezrules.backend.data_utils import Event
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.utils import load_cast_configs, record_observations
-from ezrules.core.rule import RuleFactory
+from ezrules.core.rule import MissingFieldLookupError, RuleFactory
 from ezrules.core.rule_updater import (
     DEPLOYMENT_MODE_SHADOW,
     DEPLOYMENT_MODE_SPLIT,
@@ -28,7 +28,7 @@ from ezrules.core.rule_updater import (
     ROLLOUT_CONFIG_LABEL,
     list_candidate_deployments,
 )
-from ezrules.core.type_casting import CastError, cast_event
+from ezrules.core.type_casting import CastError, RequiredFieldError, normalize_event
 from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import RuleDeploymentResultsLog, ShadowResultsLog
 from ezrules.settings import app_settings
@@ -97,8 +97,8 @@ def evaluate(
     """
     configs = load_cast_configs(db, lre.o_id)
     try:
-        event_data = cast_event(request_data.event_data, configs)
-    except CastError as exc:
+        event_data = normalize_event(request_data.event_data, configs)
+    except (CastError, RequiredFieldError) as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
@@ -111,6 +111,11 @@ def evaluate(
     )
     try:
         production_result = lre.evaluate_rules(event.event_data)
+    except MissingFieldLookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

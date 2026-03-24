@@ -37,7 +37,7 @@
              ================================================================ -->
         <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Configure Field Type</h2>
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
             <div class="md:col-span-1">
               <label class="block text-xs font-medium text-gray-600 mb-1">Field name</label>
               <input
@@ -56,6 +56,17 @@
               >
                 <option *ngFor="let t of fieldTypeOptions" [value]="t">{{ t }}</option>
               </select>
+            </div>
+            <div class="md:col-span-1">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Presence contract</label>
+              <label class="flex items-center gap-2 h-10 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  [(ngModel)]="newRequired"
+                  class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                Required and non-null
+              </label>
             </div>
             <div class="md:col-span-1" *ngIf="newConfiguredType === 'datetime'">
               <label class="block text-xs font-medium text-gray-600 mb-1">Datetime format (optional)</label>
@@ -103,6 +114,7 @@
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Field</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Required</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Datetime format</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Updated</th>
                 <th class="px-6 py-3"></th>
@@ -113,6 +125,14 @@
                 <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ config.field_name }}</td>
                 <td class="px-6 py-4 text-sm text-gray-700">
                   <span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-mono">{{ config.configured_type }}</span>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-700">
+                  <span
+                    class="px-2 py-0.5 rounded text-xs font-medium"
+                    [ngClass]="config.required ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'"
+                  >
+                    {{ config.required ? 'required' : 'optional' }}
+                  </span>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-500 font-mono">{{ config.datetime_format || '—' }}</td>
                 <td class="px-6 py-4 text-sm text-gray-500">{{ formatLastSeen(config.updated_at) }}</td>

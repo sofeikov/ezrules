@@ -466,7 +466,9 @@
                   <tr *ngFor="let entry of fieldTypeHistory" class="hover:bg-gray-50">
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">{{ entry.field_name }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {{ entry.configured_type }}<span *ngIf="entry.datetime_format" class="text-gray-400 ml-1">({{ entry.datetime_format }})</span>
+                      {{ entry.configured_type }}
+                      <span *ngIf="entry.required" class="ml-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">required</span>
+                      <span *ngIf="entry.datetime_format" class="text-gray-400 ml-1">({{ entry.datetime_format }})</span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm">
                       <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"

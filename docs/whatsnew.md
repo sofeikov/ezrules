@@ -1,7 +1,7 @@
 # What's New
 
 
-## Unreleased
+## v1.1.0
 
 * **Rule rollouts with stable traffic bucketing**: Active rules can now serve a candidate version to a configurable percentage of live traffic, compare candidate vs control on the same evaluated events, and promote or remove the rollout from a dedicated **Rule Rollouts** page.
 * **Org-aware manager JWTs**: Access tokens now include the authenticated user's organisation, and the API rejects access tokens whose org claim no longer matches the stored user membership.
@@ -15,6 +15,10 @@
 * **Frontend runtime-config hardening**: Frontend builds now regenerate `runtime-config.js` instead of baking in stale checked-in API URLs, so the demo stack and production image no longer inherit old local dev ports.
 * **Rules page evaluate UX cleanup**: The Rules header no longer renders a dead browser link to the evaluator service, and the How to Run panel now shows the runtime manager API `/api/v2/evaluate` endpoint instead of a stale `localhost:9999` example.
 * **Backtest status refresh fix**: Rule Detail now loads task status for every backtest result card on page load, so completed backtests no longer stay stuck at `In Progress` until you expand them.
+* **Required field contracts**: Field type settings now support a `required` flag. Live `/api/v2/evaluate` requests reject events with missing or `null` values for required fields before any rule runs or storage occurs.
+* **Strict lookup error clarity**: When a rule references a non-required field that is absent from an event, live evaluation now returns a clear `400` lookup error instead of a generic internal failure, and the **Test Rule** panel shows the same reason inline.
+* **Rule verify warnings**: `POST /api/v2/rules/verify` now returns advisory warnings for referenced fields that have never been observed in traffic or rule-test payloads, and the Angular create/detail editors surface those warnings while you edit.
+* **Backtest eligibility reporting**: Backtests now apply the same field normalization rules as live evaluation, compare stored vs proposed logic on a shared eligible subset, and report `eligible_records`, `skipped_records`, and explanatory warnings when older traffic is excluded.
 
 ## v0.24.3
 

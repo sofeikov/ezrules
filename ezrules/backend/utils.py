@@ -64,6 +64,7 @@ def load_cast_configs(db: Any, o_id: int) -> list[FieldCastConfig]:
             field_name=row.field_name,
             field_type=FieldType(row.configured_type),
             datetime_format=row.datetime_format,
+            required=bool(row.required),
         )
         for row in rows
     ]

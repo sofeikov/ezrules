@@ -145,6 +145,7 @@ class RuleVerifyResponse(BaseModel):
     """Response for rule verification."""
 
     params: list[str] = Field(default_factory=list, description="Parameters extracted from the rule")
+    warnings: list[str] = Field(default_factory=list, description="Advisory warnings about referenced fields")
 
 
 class RuleTestResponse(BaseModel):
