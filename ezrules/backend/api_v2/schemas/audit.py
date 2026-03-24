@@ -215,6 +215,7 @@ class FieldTypeHistoryEntry(BaseModel):
     id: int = Field(..., description="History entry ID")
     field_name: str = Field(..., description="Field name")
     configured_type: str = Field(..., description="The configured type at the time of the action")
+    required: bool = Field(default=False, description="Whether the field was configured as required at the time")
     datetime_format: str | None = Field(default=None, description="Datetime format string, if applicable")
     action: str = Field(..., description="Action type (created, updated, deleted)")
     details: str | None = Field(default=None, description="Additional details about the action")

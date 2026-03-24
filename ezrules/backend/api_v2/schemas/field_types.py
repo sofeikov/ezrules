@@ -12,6 +12,7 @@ from ezrules.core.type_casting import FieldType
 class FieldTypeConfigCreate(BaseModel):
     field_name: str = Field(..., min_length=1, description="Event field name to configure")
     configured_type: FieldType = Field(..., description="Type to cast this field to")
+    required: bool = Field(default=False, description="Whether this field must be present and non-null on live events")
     datetime_format: str | None = Field(
         default=None,
         description="strptime format string, only used when configured_type is datetime. Defaults to ISO 8601.",
@@ -22,6 +23,7 @@ class FieldTypeConfigCreate(BaseModel):
             "example": {
                 "field_name": "amount",
                 "configured_type": "float",
+                "required": False,
                 "datetime_format": None,
             }
         }
@@ -30,6 +32,7 @@ class FieldTypeConfigCreate(BaseModel):
 
 class FieldTypeConfigUpdate(BaseModel):
     configured_type: FieldType = Field(..., description="Type to cast this field to")
+    required: bool = Field(default=False, description="Whether this field must be present and non-null on live events")
     datetime_format: str | None = Field(
         default=None,
         description="strptime format string, only used when configured_type is datetime. Defaults to ISO 8601.",
@@ -44,6 +47,7 @@ class FieldTypeConfigUpdate(BaseModel):
 class FieldTypeConfigResponse(BaseModel):
     field_name: str
     configured_type: str
+    required: bool = False
     datetime_format: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

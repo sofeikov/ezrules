@@ -50,6 +50,7 @@ class Rule:
         self._compiled_rule = None
         # AST representation of the compiled function
         self._rule_ast = None
+        self._rule_params: set[str] = set()
         # Trigger the rule compilation
         self._post_process_logic = None
         self.logic = logic
@@ -89,15 +90,28 @@ class Rule:
         self._compiled_rule, self._rule_ast = self.compile_function(code)
         self._source = logic
         self._post_process_logic = code
+        self._rule_params = self._extract_rule_params()
 
-    def get_rule_params(self):
+    def _extract_rule_params(self) -> set[str]:
         pe = RuleParamExtractor()
         pe.visit(self._rule_ast)
         return pe.params
 
+    def get_rule_params(self):
+        return set(self._rule_params)
+
     def __call__(self, t) -> Any:
         """Executes rule logic."""
-        return self.logic(t)
+        try:
+            return self.logic(t)
+        except KeyError as exc:
+            missing_field = exc.args[0] if exc.args else None
+            if isinstance(missing_field, str) and missing_field in self._rule_params:
+                raise MissingFieldLookupError(
+                    field_name=missing_field,
+                    rule_identifier=self.rid or self.r_id,
+                ) from exc
+            raise
 
     def __repr__(self) -> str:
         """Print rule in a human readable format."""
@@ -143,3 +157,16 @@ class RuleConverter:
 class StoredRule(NamedTuple):
     rule: Rule
     rule_model: RuleModel
+
+
+class MissingFieldLookupError(Exception):
+    """Raised when strict rule lookup references a field absent from the event."""
+
+    def __init__(self, field_name: str, rule_identifier: str | int | None):
+        self.field_name = field_name
+        self.rule_identifier = rule_identifier
+        if rule_identifier is None or rule_identifier == "":
+            message = f"Rule lookup failed: field '{field_name}' is missing from the event"
+        else:
+            message = f"Rule '{rule_identifier}' lookup failed: field '{field_name}' is missing from the event"
+        super().__init__(message)

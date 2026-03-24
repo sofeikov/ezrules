@@ -21,6 +21,7 @@ export class FieldTypesComponent implements OnInit {
   // Create / upsert form
   newFieldName = '';
   newConfiguredType = 'string';
+  newRequired = false;
   newDatetimeFormat = '';
 
   readonly fieldTypeOptions = [
@@ -79,6 +80,7 @@ export class FieldTypesComponent implements OnInit {
       .upsertConfig(
         this.newFieldName.trim(),
         this.newConfiguredType,
+        this.newRequired,
         this.newConfiguredType === 'datetime' ? this.newDatetimeFormat.trim() || null : null
       )
       .subscribe({
@@ -86,6 +88,7 @@ export class FieldTypesComponent implements OnInit {
           if (response.success) {
             this.newFieldName = '';
             this.newConfiguredType = 'string';
+            this.newRequired = false;
             this.newDatetimeFormat = '';
             this.loadData();
           } else {
@@ -113,6 +116,7 @@ export class FieldTypesComponent implements OnInit {
   prefillFromObservation(obs: FieldObservation): void {
     this.newFieldName = obs.field_name;
     this.newConfiguredType = this.jsonTypeToFieldType[obs.observed_json_type] ?? 'compare_as_is';
+    this.newRequired = false;
     this.newDatetimeFormat = '';
     this.createError = null;
     // Scroll to / focus the form

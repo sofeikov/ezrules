@@ -93,15 +93,31 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
 
 `resolved_outcome` is the highest-severity outcome after applying the ordering configured under **Settings → Outcome Resolution**.
 
-#### Field Type Casting
+#### Field Normalization
 
-Before rules are executed, `event_data` values are cast to their configured types (see [Field Type Management](../user-guide/field-types.md)). Unconfigured fields pass through unchanged.
+Before rules are executed, ezrules validates configured required fields and then casts present non-null values to their configured types (see [Field Type Management](../user-guide/field-types.md)). Unconfigured fields pass through unchanged.
+
+If a field is configured with `required=true`, the event is rejected when that field is missing or explicitly `null`:
+
+```json
+{
+  "detail": "Required field 'amount' is missing or null"
+}
+```
 
 If a value cannot be cast to the configured type, the request is rejected with `400`:
 
 ```json
 {
   "detail": "Cannot cast field 'amount' value 'not-a-number' to integer"
+}
+```
+
+If rule logic references a field that is absent from `event_data`, the request is also rejected with `400` and no event is stored:
+
+```json
+{
+  "detail": "Rule 'RULE_123' lookup failed: field 'country' is missing from the event"
 }
 ```
 
@@ -112,7 +128,7 @@ Field observations are also recorded on each successful call, contributing to th
 | Status | Meaning |
 |---|---|
 | `200` | Evaluation completed |
-| `400` | Field type casting failed (value incompatible with configured type) |
+| `400` | Required field validation failed, strict field lookup failed, or field type casting failed |
 | `401` | Missing, invalid, or revoked credentials |
 | `413` | Request body exceeds the configured size limit (default 1 MB) |
 | `422` | Invalid request payload (schema/validation error) |

@@ -16,7 +16,8 @@ from ezrules.backend.api_v2.schemas.evaluator import EvaluateRequest, EvaluateRe
 from ezrules.backend.data_utils import Event
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.utils import load_cast_configs, record_observations
-from ezrules.core.type_casting import CastError, cast_event
+from ezrules.core.rule import MissingFieldLookupError
+from ezrules.core.type_casting import CastError, RequiredFieldError, normalize_event
 from ezrules.models.backend_core import ShadowResultsLog
 from ezrules.settings import app_settings
 
@@ -63,8 +64,8 @@ def evaluate(
     """
     configs = load_cast_configs(db, lre.o_id)
     try:
-        event_data = cast_event(request_data.event_data, configs)
-    except CastError as exc:
+        event_data = normalize_event(request_data.event_data, configs)
+    except (CastError, RequiredFieldError) as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
@@ -77,6 +78,11 @@ def evaluate(
     )
     try:
         result, tl_id = data_utils.eval_and_store(lre, event)
+    except MissingFieldLookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

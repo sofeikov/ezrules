@@ -34,6 +34,7 @@ export interface RulesResponse {
 
 export interface VerifyRuleResponse {
   params: string[];
+  warnings: string[];
 }
 
 export interface TestRuleResponse {

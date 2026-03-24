@@ -38,7 +38,7 @@ from ezrules.backend.api_v2.schemas.rules import (
 from ezrules.backend.api_v2.schemas.shadow import ShadowDeployRequest, ShadowDeployResponse
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.core.rule import Rule, RuleFactory
+from ezrules.core.rule import MissingFieldLookupError, Rule, RuleFactory
 from ezrules.core.rule_updater import (
     RDBRuleEngineConfigProducer,
     RDBRuleManager,
@@ -47,10 +47,10 @@ from ezrules.core.rule_updater import (
     remove_rule_from_shadow,
     save_rule_history,
 )
-from ezrules.core.type_casting import CastError, cast_event
+from ezrules.core.type_casting import CastError, RequiredFieldError, normalize_event
 from ezrules.core.user_lists import PersistentUserListManager
+from ezrules.models.backend_core import FieldObservation, RuleEngineConfig, RuleHistory, RuleStatus, User
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import RuleEngineConfig, RuleHistory, RuleStatus, User
 from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/rules", tags=["Rules"])
@@ -77,6 +77,28 @@ def get_config_producer(db: Any, org_id: int) -> RDBRuleEngineConfigProducer:
 def get_list_provider(db: Any, org_id: int) -> PersistentUserListManager:
     """Get an org-scoped user-list provider for rule compilation/execution."""
     return PersistentUserListManager(db_session=db, o_id=org_id)
+
+
+def build_rule_warnings(db: Any, org_id: int, referenced_fields: list[str]) -> list[str]:
+    """Return advisory warnings for fields the rule references but traffic has never observed."""
+    if not referenced_fields:
+        return []
+
+    observed_fields = {
+        str(field_name)
+        for (field_name,) in db.query(FieldObservation.field_name)
+        .filter(FieldObservation.o_id == org_id, FieldObservation.field_name.in_(referenced_fields))
+        .distinct()
+        .all()
+    }
+    unseen_fields = [field_name for field_name in referenced_fields if field_name not in observed_fields]
+    return [
+        (
+            f"Field '{field_name}' has not been observed in traffic or test payloads yet. "
+            "Backtests will skip historical events where it is missing or null."
+        )
+        for field_name in unseen_fields
+    ]
 
 
 def is_active(rule: RuleModel) -> bool:
@@ -729,10 +751,10 @@ def verify_rule(
             list_values_provider=get_list_provider(db, current_org_id),
         )
         params = sorted(rule.get_rule_params(), key=str)
-        return RuleVerifyResponse(params=params)
+        return RuleVerifyResponse(params=params, warnings=build_rule_warnings(db, current_org_id, params))
     except Exception:
         # Return empty params if rule can't be compiled
-        return RuleVerifyResponse(params=[])
+        return RuleVerifyResponse(params=[], warnings=[])
 
 
 # =============================================================================
@@ -773,11 +795,11 @@ def test_rule(
     # Apply field type casting
     configs = load_cast_configs(db, current_org_id)
     try:
-        test_object = cast_event(test_object, configs)
-    except CastError as exc:
+        test_object = normalize_event(test_object, configs)
+    except (CastError, RequiredFieldError) as exc:
         return RuleTestResponse(
             status="error",
-            reason=f"Type casting failed: {exc!s}",
+            reason=f"Event normalization failed: {exc!s}",
             rule_outcome=None,
         )
 
@@ -802,6 +824,12 @@ def test_rule(
             status="ok",
             reason="ok",
             rule_outcome=str(rule_outcome) if rule_outcome is not None else None,
+        )
+    except MissingFieldLookupError as exc:
+        return RuleTestResponse(
+            status="error",
+            reason=str(exc),
+            rule_outcome=None,
         )
     except Exception as e:
         return RuleTestResponse(

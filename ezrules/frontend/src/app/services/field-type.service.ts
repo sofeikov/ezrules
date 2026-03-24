@@ -7,6 +7,7 @@ import { environment } from '../../environments/environment';
 export interface FieldTypeConfig {
   field_name: string;
   configured_type: string;
+  required: boolean;
   datetime_format: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -55,11 +56,13 @@ export class FieldTypeService {
   upsertConfig(
     field_name: string,
     configured_type: string,
+    required: boolean,
     datetime_format: string | null
   ): Observable<FieldTypeMutationResponse> {
     return this.http.post<FieldTypeMutationResponse>(this.apiUrl, {
       field_name,
       configured_type,
+      required,
       datetime_format: datetime_format || null,
     });
   }
