@@ -1,8 +1,8 @@
 """Add rollout comparison logging table.
 
-Revision ID: 20260322_0015
-Revises: 20260318_0014
-Create Date: 2026-03-22 10:00:00.000000
+Revision ID: 20260324_0016
+Revises: 20260322_0015
+Create Date: 2026-03-24 10:00:00.000000
 """
 
 from __future__ import annotations
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = "20260322_0015"
-down_revision = "20260318_0014"
+revision = "20260324_0016"
+down_revision = "20260322_0015"
 branch_labels = None
 depends_on = None
 
