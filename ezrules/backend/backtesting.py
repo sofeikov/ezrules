@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
+from ezrules.core.rule import MissingFieldLookupError
 from ezrules.core.type_casting import (
     CastError,
     FieldCastConfig,
@@ -130,6 +131,15 @@ def _build_quality_metrics(
     }
 
 
+def _extract_runtime_missing_field(exc: KeyError, event: dict[str, Any]) -> str | None:
+    if not exc.args:
+        return None
+    missing_field = exc.args[0]
+    if isinstance(missing_field, str) and missing_field not in event:
+        return missing_field
+    return None
+
+
 def compute_backtest_metrics(
     *,
     stored_rule: Any,
@@ -138,7 +148,9 @@ def compute_backtest_metrics(
     label_lookup: dict[int, str],
     configs: list[FieldCastConfig],
 ) -> dict[str, Any]:
-    referenced_fields = sorted(set(stored_rule.get_rule_params()) | set(proposed_rule.get_rule_params()))
+    stored_rule_fields = set(stored_rule.get_rule_params())
+    proposed_rule_fields = set(proposed_rule.get_rule_params())
+    referenced_fields = sorted(stored_rule_fields | proposed_rule_fields)
     total_records = 0
     skipped_records = 0
     labeled_records = 0
@@ -167,6 +179,21 @@ def compute_backtest_metrics(
             normalization_failures[str(exc)] += 1
             continue
 
+        try:
+            stored_outcome = stored_rule(normalized_event)
+            proposed_outcome = proposed_rule(normalized_event)
+        except MissingFieldLookupError as exc:
+            skipped_records += 1
+            missing_field_counts[exc.field_name] += 1
+            continue
+        except KeyError as exc:
+            missing_field = _extract_runtime_missing_field(exc, normalized_event)
+            if missing_field is None:
+                raise
+            skipped_records += 1
+            missing_field_counts[missing_field] += 1
+            continue
+
         total_records += 1
 
         label_name: str | None = None
@@ -175,9 +202,6 @@ def compute_backtest_metrics(
             if label_name is not None:
                 labeled_records += 1
                 label_counts[label_name] += 1
-
-        stored_outcome = stored_rule(normalized_event)
-        proposed_outcome = proposed_rule(normalized_event)
 
         stored_outcome_name = str(stored_outcome) if stored_outcome is not None else None
         proposed_outcome_name = str(proposed_outcome) if proposed_outcome is not None else None
