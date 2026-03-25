@@ -17,7 +17,6 @@ from ezrules.backend.data_utils import Event, eval_and_store
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.utils import record_observations
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
-from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import RoleType
 from ezrules.core.rule_updater import (
@@ -46,6 +45,8 @@ logger = logging.getLogger(__name__)
 DEMO_DATA_COMMIT_BATCH_SIZE = 50
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_RESET_DEV_LABELS_CSV_PATH = PROJECT_ROOT / "test_labels.csv"
+DEFAULT_RESET_DEV_OUTCOMES = ("CANCEL", "HOLD", "RELEASE")
+DEFAULT_RESET_DEV_LABELS = ("FRAUD", "CHARGEBACK", "NORMAL")
 
 
 def _get_or_create_default_organisation(db_session):
@@ -100,6 +101,53 @@ def _ensure_default_roles(session, *, o_id: int) -> dict[str, Role]:
         roles[name] = role
 
     return roles
+
+
+def _create_default_labels(session, *, o_id: int) -> list[str]:
+    created_labels: list[str] = []
+    for label_name in DEFAULT_RESET_DEV_LABELS:
+        existing = session.query(Label).filter(Label.o_id == o_id, Label.label == label_name).first()
+        if existing is None:
+            session.add(Label(label=label_name, o_id=o_id))
+            created_labels.append(label_name)
+    session.commit()
+    return created_labels
+
+
+def _create_default_outcomes(session, *, o_id: int) -> list[str]:
+    created_outcomes: list[str] = []
+    for severity_rank, outcome_name in enumerate(DEFAULT_RESET_DEV_OUTCOMES, start=1):
+        existing = (
+            session.query(AllowedOutcome)
+            .filter(AllowedOutcome.o_id == o_id, AllowedOutcome.outcome_name == outcome_name)
+            .first()
+        )
+        if existing is not None:
+            if existing.severity_rank != severity_rank:
+                existing.severity_rank = severity_rank
+                session.commit()
+            continue
+
+        session.add(
+            AllowedOutcome(
+                outcome_name=outcome_name,
+                severity_rank=severity_rank,
+                o_id=o_id,
+            )
+        )
+        created_outcomes.append(outcome_name)
+    session.commit()
+    return created_outcomes
+
+
+def _seed_reset_dev_catalogs(session, *, o_id: int) -> None:
+    created_outcomes = _create_default_outcomes(session, o_id=o_id)
+    created_labels = _create_default_labels(session, o_id=o_id)
+    logger.info(
+        "Reset-dev ensured demo catalogs. Outcomes created: %s. Labels created: %s.",
+        created_outcomes or "none",
+        created_labels or "none",
+    )
 
 
 def _drop_database(engine, db_name):
@@ -279,12 +327,6 @@ def init_db(auto_delete):
         _ensure_default_roles(db_session, o_id=int(existing_org.o_id))
         logger.info("Default roles seeded")
 
-        # Seed default outcomes (RELEASE, HOLD, CANCEL)
-        logger.info("Seeding default outcomes...")
-        outcome_manager = DatabaseOutcome(db_session=db_session, o_id=int(existing_org.o_id))
-        outcome_manager._ensure_default_outcomes()
-        logger.info("Default outcomes seeded")
-
         # Seed default user lists (MiddleAsiaCountries, NACountries, LatamCountries)
         logger.info("Seeding default user lists...")
         user_list_manager = PersistentUserListManager(db_session=db_session, o_id=int(existing_org.o_id))
@@ -408,14 +450,9 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
     if label_ratio > 0 and generated_events:
         logger.info(f"Labeling {label_ratio * 100:.1f}% of events with realistic patterns...")
 
-        # Get all available labels, create defaults if none exist
         available_labels = {label.label: label for label in db_session.query(Label).filter(Label.o_id == org_id).all()}
         if not available_labels:
-            logger.info("No labels found in database. Creating default labels...")
-            _create_default_labels(db_session, o_id=org_id)
-            available_labels = {
-                label.label: label for label in db_session.query(Label).filter(Label.o_id == org_id).all()
-            }
+            logger.info("No labels found in database. Skipping demo label assignment and CSV export.")
 
         if available_labels:
             logger.info(f"Available labels: {list(available_labels.keys())}")
@@ -456,21 +493,6 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
             # Export to CSV if requested
             if export_csv and labeled_events:
                 _export_labels_to_csv(labeled_events, export_csv)
-
-
-def _create_default_labels(session, *, o_id: int):
-    """Create default labels in the database"""
-    default_labels = ["FRAUD", "CHARGEBACK", "NORMAL"]
-
-    for label_name in default_labels:
-        # Check if label already exists to avoid duplicates
-        existing = session.query(Label).filter(Label.o_id == o_id, Label.label == label_name).first()
-        if not existing:
-            label = Label(label=label_name, o_id=o_id)
-            session.add(label)
-
-    session.commit()
-    logger.info(f"Created default labels: {default_labels}")
 
 
 def _determine_realistic_label(event_data: dict, available_labels) -> str | None:
@@ -605,15 +627,10 @@ def export_test_csv(output_file: str, n_events: int, unlabeled_only: bool):
     organisation = _get_or_create_default_organisation(db_session)
     org_id = int(organisation.o_id)
 
-    # Get available labels for realistic assignment, create defaults if none exist
+    # Get available labels for realistic assignment
     available_labels = [label.label for label in db_session.query(Label).filter(Label.o_id == org_id).all()]
     if not available_labels:
-        logger.info("No labels found in database. Creating default labels...")
-        _create_default_labels(db_session, o_id=org_id)
-        available_labels = [label.label for label in db_session.query(Label).filter(Label.o_id == org_id).all()]
-
-    if not available_labels:
-        logger.error("Failed to create labels in database.")
+        logger.warning("No labels found in database. Create labels in the UI or API before exporting a label CSV.")
         return
 
     # Query events based on filter
@@ -664,12 +681,15 @@ def reset_dev(ctx, user_email, password, n_rules, n_events):
     logger.info(f"Step 2/3: Creating admin user {user_email}...")
     ctx.invoke(add_user, user_email=user_email, password=password, admin=True)
 
+    org_id = int(_get_or_create_default_organisation(db_session).o_id)
+    _seed_reset_dev_catalogs(db_session, o_id=org_id)
+
     # Step 3: generate fake data
     logger.info(f"Step 3/3: Generating fake data ({n_rules} rules, {n_events} events)...")
     _invoke_reset_dev_generation(ctx, n_rules=n_rules, n_events=n_events)
     _ensure_default_rule_quality_pairs(
         db_session,
-        o_id=int(_get_or_create_default_organisation(db_session).o_id),
+        o_id=org_id,
         created_by="cli.reset_dev",
     )
 
