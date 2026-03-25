@@ -1,5 +1,8 @@
 # What's New
 
+## v1.1.2
+
+* **Removed implicit runtime label/outcome bootstrap**: `init-db` and the database-backed label/outcome managers no longer auto-create default outcomes or labels during normal application flows. `reset-dev` still seeds the demo catalogs and curated outcome→label pairs for local demo/test environments.
 
 ## v1.2.1
 
@@ -7,6 +10,7 @@
 * **Read-only management states**: Rules, users, roles, labels, outcomes, user lists, field types, settings, shadow rules, and rollout views now hide mutating controls when the matching create/modify/delete permission is missing, while still allowing permitted read access.
 
 ## v1.1.0
+
 
 * **Rule rollouts with stable traffic bucketing**: Active rules can now serve a candidate version to a configurable percentage of live traffic, compare candidate vs control on the same evaluated events, and promote or remove the rollout from a dedicated **Rule Rollouts** page.
 * **Org-aware manager JWTs**: Access tokens now include the authenticated user's organisation, and the API rejects access tokens whose org claim no longer matches the stored user membership.

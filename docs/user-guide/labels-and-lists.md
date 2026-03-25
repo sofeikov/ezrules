@@ -14,7 +14,11 @@ If you keep these three clean, your rules become much easier to operate and tune
 
 Labels tell you what actually happened after investigation. They are essential for measuring false positives and false negatives.
 
-### Built-in Labels
+### Common Label Catalog
+
+ezrules does not auto-create labels for you. Create the names you actually use in your operation through the **Labels** page or the labels API.
+
+Common examples:
 
 - `FRAUD`
 - `CHARGEBACK`

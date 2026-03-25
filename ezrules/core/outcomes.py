@@ -3,9 +3,6 @@ from collections.abc import Mapping
 
 from sqlalchemy import func
 
-DEFAULT_OUTCOME_HIERARCHY = ["CANCEL", "HOLD", "RELEASE"]
-DEFAULT_OUTCOME_SEVERITY = {outcome: index for index, outcome in enumerate(DEFAULT_OUTCOME_HIERARCHY, start=1)}
-
 
 class Outcome(abc.ABC):
     """Container for allowed outcomes. All new rules return statements will be checked against it."""
@@ -27,57 +24,16 @@ class Outcome(abc.ABC):
         """Remove an outcome from the list"""
 
 
-class FixedOutcome(Outcome):
-    def __init__(self):
-        self.outcomes = list(DEFAULT_OUTCOME_HIERARCHY)
-
-    def get_allowed_outcomes(self):
-        return self.outcomes
-
-    def add_outcome(self, new_outcome: str):
-        self.outcomes.append(new_outcome.upper())
-
-    def is_allowed_outcome(self, outcome: str):
-        return outcome in self.outcomes
-
-    def remove_outcome(self, outcome: str):
-        if outcome in self.outcomes:
-            self.outcomes.remove(outcome)
-
-
 class DatabaseOutcome(Outcome):
     def __init__(self, db_session, o_id: int):
         self.db_session = db_session
         self.o_id = o_id
         self._cached_outcomes = None
-        self._initialized = False
-
-    def _ensure_default_outcomes(self):
-        """Ensure default outcomes exist in the database"""
-        from ezrules.models.backend_core import AllowedOutcome
-
-        existing_outcomes = self.db_session.query(AllowedOutcome).filter_by(o_id=self.o_id).count()
-        if existing_outcomes == 0:
-            for severity_rank, outcome_name in enumerate(DEFAULT_OUTCOME_HIERARCHY, start=1):
-                outcome = AllowedOutcome(
-                    outcome_name=outcome_name,
-                    severity_rank=severity_rank,
-                    o_id=self.o_id,
-                )
-                self.db_session.add(outcome)
-            self.db_session.commit()
-
-    def _ensure_initialized(self):
-        """Ensure the database has been initialized with default outcomes"""
-        if not self._initialized:
-            self._ensure_default_outcomes()
-            self._initialized = True
 
     def _load_outcomes_from_db(self):
         """Load outcomes from database and cache them"""
         from ezrules.models.backend_core import AllowedOutcome
 
-        self._ensure_initialized()
         outcomes = (
             self.db_session.query(AllowedOutcome)
             .filter_by(o_id=self.o_id)
@@ -115,7 +71,6 @@ class DatabaseOutcome(Outcome):
     def add_outcome(self, new_outcome: str):
         from ezrules.models.backend_core import AllowedOutcome
 
-        self._ensure_initialized()
         new_outcome = new_outcome.upper()
 
         # Check if outcome already exists
@@ -139,7 +94,6 @@ class DatabaseOutcome(Outcome):
     def remove_outcome(self, outcome: str):
         from ezrules.models.backend_core import AllowedOutcome
 
-        self._ensure_initialized()
         outcome = outcome.upper()
 
         # Find and remove the outcome
