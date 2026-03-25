@@ -2,6 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
+import { AuthService } from '../services/auth.service';
+import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { SidebarComponent } from '../components/sidebar.component';
 import {
   OutcomeHierarchyItem,
@@ -33,13 +35,27 @@ export class SettingsComponent implements OnInit {
   newPairOutcome: string = '';
   newPairLabel: string = '';
   hierarchyDirty: boolean = false;
+  canManagePermissions: boolean = false;
 
   constructor(
     private runtimeSettingsService: RuntimeSettingsService,
+    private authService: AuthService,
   ) {}
 
   ngOnInit(): void {
+    this.loadPermissions();
     this.loadSettings();
+  }
+
+  loadPermissions(): void {
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        this.canManagePermissions = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.managePermissions);
+      },
+      error: () => {
+        this.canManagePermissions = false;
+      }
+    });
   }
 
   loadSettings(): void {
@@ -77,6 +93,10 @@ export class SettingsComponent implements OnInit {
   }
 
   save(): void {
+    if (!this.canManagePermissions) {
+      return;
+    }
+
     this.error = null;
     this.success = null;
 
@@ -101,6 +121,10 @@ export class SettingsComponent implements OnInit {
   }
 
   addPair(): void {
+    if (!this.canManagePermissions) {
+      return;
+    }
+
     this.error = null;
     this.success = null;
     if (!this.newPairOutcome || !this.newPairLabel) {
@@ -125,6 +149,10 @@ export class SettingsComponent implements OnInit {
   }
 
   onPairActiveChange(pair: RuleQualityPair, event: Event): void {
+    if (!this.canManagePermissions) {
+      return;
+    }
+
     const active = (event.target as HTMLInputElement).checked;
     this.error = null;
     this.success = null;
@@ -143,6 +171,10 @@ export class SettingsComponent implements OnInit {
   }
 
   deletePair(pair: RuleQualityPair): void {
+    if (!this.canManagePermissions) {
+      return;
+    }
+
     this.error = null;
     this.success = null;
     this.pairBusyIds.add(pair.rqpId);
@@ -180,6 +212,10 @@ export class SettingsComponent implements OnInit {
   }
 
   saveOutcomeHierarchy(): void {
+    if (!this.canManagePermissions) {
+      return;
+    }
+
     this.error = null;
     this.success = null;
 
@@ -202,5 +238,9 @@ export class SettingsComponent implements OnInit {
         this.hierarchySaving = false;
       }
     });
+  }
+
+  showReadOnlyNotice(): boolean {
+    return !this.canManagePermissions;
   }
 }

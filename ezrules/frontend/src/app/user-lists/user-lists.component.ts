@@ -2,6 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { AuthService } from '../services/auth.service';
+import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { UserListService, UserListItem, UserListDetail } from '../services/user-list.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
@@ -24,11 +26,30 @@ export class UserListsComponent implements OnInit {
   deleteListError: string | null = null;
   createEntryError: string | null = null;
   deleteEntryError: string | null = null;
+  canCreateList: boolean = false;
+  canModifyList: boolean = false;
+  canDeleteList: boolean = false;
 
-  constructor(private userListService: UserListService) { }
+  constructor(private userListService: UserListService, private authService: AuthService) { }
 
   ngOnInit(): void {
+    this.loadPermissions();
     this.loadLists();
+  }
+
+  loadPermissions(): void {
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        this.canCreateList = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.createList);
+        this.canModifyList = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyList);
+        this.canDeleteList = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.deleteList);
+      },
+      error: () => {
+        this.canCreateList = false;
+        this.canModifyList = false;
+        this.canDeleteList = false;
+      }
+    });
   }
 
   loadLists(): void {
@@ -135,5 +156,9 @@ export class UserListsComponent implements OnInit {
         this.deleteEntryError = `Failed to delete entry "${entryValue}". Please try again.`;
       }
     });
+  }
+
+  showReadOnlyNotice(): boolean {
+    return !this.canCreateList && !this.canModifyList && !this.canDeleteList;
   }
 }

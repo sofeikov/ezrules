@@ -3,7 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { AuthService } from '../services/auth.service';
 import { RoleService, PermissionItem } from '../services/role.service';
+import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { SidebarComponent } from '../components/sidebar.component';
 
 interface PermissionGroup {
@@ -38,16 +40,30 @@ export class RolePermissionsComponent implements OnInit {
   error: string | null = null;
   saveError: string | null = null;
   saveSuccess: boolean = false;
+  canManagePermissions: boolean = false;
   private saveSuccessTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private route: ActivatedRoute,
-    private roleService: RoleService
+    private roleService: RoleService,
+    private authService: AuthService
   ) { }
 
   ngOnInit(): void {
     this.roleId = Number(this.route.snapshot.paramMap.get('id'));
+    this.loadPermissions();
     this.loadData();
+  }
+
+  loadPermissions(): void {
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        this.canManagePermissions = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.managePermissions);
+      },
+      error: () => {
+        this.canManagePermissions = false;
+      }
+    });
   }
 
   loadData(): void {
@@ -118,6 +134,10 @@ export class RolePermissionsComponent implements OnInit {
   }
 
   togglePermission(permId: number): void {
+    if (!this.canManagePermissions) {
+      return;
+    }
+
     if (this.selectedPermissionIds.has(permId)) {
       this.selectedPermissionIds.delete(permId);
     } else {
@@ -146,6 +166,10 @@ export class RolePermissionsComponent implements OnInit {
   }
 
   savePermissions(): void {
+    if (!this.canManagePermissions) {
+      return;
+    }
+
     this.saving = true;
     this.saveError = null;
     this.saveSuccess = false;

@@ -4,6 +4,7 @@ import { Router, RouterModule } from '@angular/router';
 import { diffLines, Change } from 'diff';
 import { SidebarComponent } from '../components/sidebar.component';
 import { AuthService } from '../services/auth.service';
+import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import {
   RuleDetail,
   RuleService,
@@ -36,6 +37,7 @@ export class ShadowRulesComponent implements OnInit {
   // Action feedback
   actionSuccess: string | null = null;
   actionError: string | null = null;
+  canModifyRules: boolean = false;
   canPromoteRules: boolean = false;
 
   constructor(
@@ -50,11 +52,13 @@ export class ShadowRulesComponent implements OnInit {
   }
 
   loadPermissions(): void {
-    this.authService.hasPermission('promote_rules').subscribe({
-      next: (hasPermission) => {
-        this.canPromoteRules = hasPermission;
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        this.canModifyRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyRule);
+        this.canPromoteRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.promoteRules);
       },
       error: () => {
+        this.canModifyRules = false;
         this.canPromoteRules = false;
       }
     });
@@ -142,12 +146,20 @@ export class ShadowRulesComponent implements OnInit {
   }
 
   editShadowRule(rule: ShadowRuleItem): void {
+    if (!this.canModifyRules) {
+      return;
+    }
+
     this.router.navigate(['/rules', rule.r_id], {
       state: { shadowEditMode: true, logic: rule.logic, description: rule.description },
     });
   }
 
   removeFromShadow(rule: ShadowRuleItem): void {
+    if (!this.canModifyRules) {
+      return;
+    }
+
     this.ruleService.removeFromShadow(rule.r_id).subscribe({
       next: (res) => {
         if (res.success) {
@@ -170,5 +182,9 @@ export class ShadowRulesComponent implements OnInit {
       rule,
       stats: this.shadowStats.rules.find(s => s.r_id === rule.r_id) ?? null,
     }));
+  }
+
+  showReadOnlyNotice(): boolean {
+    return !this.canModifyRules && !this.canPromoteRules;
   }
 }

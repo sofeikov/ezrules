@@ -21,7 +21,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Shadow Deployment**: Deploy rules to a shadow environment that observes live traffic without affecting production outcomes; promote validated shadows to production in one step
 - **Rule Rollouts**: Shift a candidate rule onto a stable percentage of live traffic with deterministic bucketing, compare candidate vs control on the same events, and promote when the rollout looks good
 - **Rule Lifecycle Controls**: Rules now support `draft`, `active`, and `archived` states with explicit promotion and approver tracking (`effective_from`, `approved_by`, `approved_at`)
-- **Permission-Aware Promotion UI**: Draft and shadow promotion controls are only shown to users who hold the `promote_rules` permission
+- **Permission-Aware UI**: Navigation, route access, and mutating controls are filtered against the current user's effective permissions; direct links now land on an explicit access-denied page, and view-only users see read-only states instead of clickable controls that fail with `403`
 - **Revision Rollback**: Restore logic and description from a historical rule revision into a new draft version directly from the history timeline, without deleting any audit history
 - **Backtesting**: Test rule changes against historical data before deployment, with outcome counts plus label-aware precision/recall/F1 when labeled history exists; backtests use a common eligible subset when proposed logic references newly introduced fields and report skipped historical records explicitly
 - **CLI Tools**: Command-line interface for database management and realistic test data generation
@@ -163,6 +163,12 @@ uv run ezrules generate-random-data --n-rules 10 --n-events 100
 ## 🔐 Enterprise Security
 
 ezrules includes a comprehensive role-based access control system designed for enterprise compliance requirements.
+
+The management UI consumes the authenticated user's effective permissions from `GET /api/v2/auth/me` and uses them to:
+
+- hide pages the user cannot access from the sidebar
+- redirect direct URL access to an explicit access-denied screen that names the missing permission
+- render view-only pages in read-only mode by hiding mutating controls the API would reject
 
 ### Permission Types
 

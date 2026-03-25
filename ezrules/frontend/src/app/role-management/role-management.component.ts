@@ -2,8 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { AuthService } from '../services/auth.service';
 import { RoleService, RoleListItem } from '../services/role.service';
 import { UserService, UserListItem } from '../services/user.service';
+import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -27,14 +29,41 @@ export class RoleManagementComponent implements OnInit {
   deleteRoleError: string | null = null;
   assignError: string | null = null;
   removeRoleError: string | null = null;
+  canViewUsers: boolean = false;
+  canCreateRole: boolean = false;
+  canDeleteRole: boolean = false;
+  canManageUserRoles: boolean = false;
+  canManagePermissions: boolean = false;
 
   constructor(
     private roleService: RoleService,
-    private userService: UserService
+    private userService: UserService,
+    private authService: AuthService
   ) { }
 
   ngOnInit(): void {
-    this.loadData();
+    this.loadPermissions();
+  }
+
+  loadPermissions(): void {
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        this.canViewUsers = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.viewUsers);
+        this.canCreateRole = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.createRole);
+        this.canDeleteRole = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.deleteRole);
+        this.canManageUserRoles = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.manageUserRoles);
+        this.canManagePermissions = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.managePermissions);
+        this.loadData();
+      },
+      error: () => {
+        this.canViewUsers = false;
+        this.canCreateRole = false;
+        this.canDeleteRole = false;
+        this.canManageUserRoles = false;
+        this.canManagePermissions = false;
+        this.loadData();
+      }
+    });
   }
 
   loadData(): void {
@@ -61,6 +90,13 @@ export class RoleManagementComponent implements OnInit {
         this.loading = false;
       }
     });
+
+    if (!this.canViewUsers) {
+      this.users = [];
+      usersLoaded = true;
+      checkDone();
+      return;
+    }
 
     this.userService.getUsers().subscribe({
       next: (users) => {
@@ -155,5 +191,13 @@ export class RoleManagementComponent implements OnInit {
 
   getUsersWithRoles(): UserListItem[] {
     return this.users.filter(u => u.roles.length > 0);
+  }
+
+  showReadOnlyNotice(): boolean {
+    return !this.canCreateRole && !this.canDeleteRole && !this.canManageUserRoles && !this.canManagePermissions;
+  }
+
+  permissionsLinkLabel(): string {
+    return this.canManagePermissions ? 'Manage Permissions' : 'View Permissions';
   }
 }

@@ -2,7 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { AuthService } from '../services/auth.service';
 import { UserService, UserListItem, RoleListItem } from '../services/user.service';
+import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -28,11 +30,40 @@ export class UserManagementComponent implements OnInit {
   inviteMessage: string | null = null;
   actionError: string | null = null;
 
-  constructor(private userService: UserService) { }
+  canViewRoles: boolean = false;
+  canCreateUser: boolean = false;
+  canModifyUser: boolean = false;
+  canDeleteUser: boolean = false;
+  canManageUserRoles: boolean = false;
+
+  constructor(private userService: UserService, private authService: AuthService) { }
 
   ngOnInit(): void {
+    this.loadPermissions();
     this.loadUsers();
-    this.loadRoles();
+  }
+
+  loadPermissions(): void {
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        this.canViewRoles = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.viewRoles);
+        this.canCreateUser = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.createUser);
+        this.canModifyUser = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyUser);
+        this.canDeleteUser = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.deleteUser);
+        this.canManageUserRoles = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.manageUserRoles);
+
+        if (this.canViewRoles) {
+          this.loadRoles();
+        }
+      },
+      error: () => {
+        this.canViewRoles = false;
+        this.canCreateUser = false;
+        this.canModifyUser = false;
+        this.canDeleteUser = false;
+        this.canManageUserRoles = false;
+      }
+    });
   }
 
   loadUsers(): void {
@@ -215,5 +246,9 @@ export class UserManagementComponent implements OnInit {
   getAvailableRoles(user: UserListItem): RoleListItem[] {
     const assignedIds = new Set(user.roles.map(r => r.id));
     return this.roles.filter(r => !assignedIds.has(r.id));
+  }
+
+  showReadOnlyNotice(): boolean {
+    return !this.canCreateUser && !this.canModifyUser && !this.canDeleteUser && !this.canManageUserRoles;
   }
 }

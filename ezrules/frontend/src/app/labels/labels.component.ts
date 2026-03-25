@@ -1,6 +1,8 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '../services/auth.service';
+import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { LabelService, LabelUploadResult } from '../services/label.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
@@ -23,11 +25,27 @@ export class LabelsComponent implements OnInit {
   uploadResult: LabelUploadResult | null = null;
   selectedCsvFile: File | null = null;
   uploading: boolean = false;
+  canCreateLabel: boolean = false;
+  canDeleteLabel: boolean = false;
 
-  constructor(private labelService: LabelService) { }
+  constructor(private labelService: LabelService, private authService: AuthService) { }
 
   ngOnInit(): void {
+    this.loadPermissions();
     this.loadLabels();
+  }
+
+  loadPermissions(): void {
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        this.canCreateLabel = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.createLabel);
+        this.canDeleteLabel = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.deleteLabel);
+      },
+      error: () => {
+        this.canCreateLabel = false;
+        this.canDeleteLabel = false;
+      }
+    });
   }
 
   loadLabels(): void {
@@ -115,5 +133,9 @@ export class LabelsComponent implements OnInit {
     if (this.csvFileInput?.nativeElement) {
       this.csvFileInput.nativeElement.value = '';
     }
+  }
+
+  showReadOnlyNotice(): boolean {
+    return !this.canCreateLabel && !this.canDeleteLabel;
   }
 }

@@ -1,6 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '../services/auth.service';
+import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { FieldTypeService, FieldTypeConfig, FieldObservation } from '../services/field-type.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
@@ -17,6 +19,8 @@ export class FieldTypesComponent implements OnInit {
   error: string | null = null;
   createError: string | null = null;
   deleteError: string | null = null;
+  canModifyFieldTypes: boolean = false;
+  canDeleteFieldType: boolean = false;
 
   // Create / upsert form
   newFieldName = '';
@@ -41,10 +45,24 @@ export class FieldTypesComponent implements OnInit {
     bool: 'boolean',
   };
 
-  constructor(private fieldTypeService: FieldTypeService) {}
+  constructor(private fieldTypeService: FieldTypeService, private authService: AuthService) {}
 
   ngOnInit(): void {
+    this.loadPermissions();
     this.loadData();
+  }
+
+  loadPermissions(): void {
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        this.canModifyFieldTypes = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyFieldTypes);
+        this.canDeleteFieldType = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.deleteFieldType);
+      },
+      error: () => {
+        this.canModifyFieldTypes = false;
+        this.canDeleteFieldType = false;
+      }
+    });
   }
 
   loadData(): void {
@@ -130,5 +148,9 @@ export class FieldTypesComponent implements OnInit {
   formatLastSeen(dateStr: string | null): string {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleString();
+  }
+
+  showReadOnlyNotice(): boolean {
+    return !this.canModifyFieldTypes && !this.canDeleteFieldType;
   }
 }

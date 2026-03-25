@@ -35,6 +35,12 @@
       </div>
 
       <div *ngIf="!loading && !error">
+        <div *ngIf="showReadOnlyNotice()" class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+          <p class="text-sm font-medium text-amber-800">
+            Read-only mode. Rollout edit, removal, and promotion controls are hidden for your current permissions.
+          </p>
+        </div>
+
         <div *ngIf="rolloutConfig.rules.length === 0" class="text-center py-20" data-testid="rollouts-empty-state">
           <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -67,6 +73,7 @@
                 </div>
                 <div class="flex items-center gap-3 shrink-0">
                   <button
+                    *ngIf="canModifyRules"
                     (click)="editRollout(item.rule)"
                     class="px-3 py-1.5 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
                   >
@@ -81,6 +88,7 @@
                     Promote
                   </button>
                   <button
+                    *ngIf="canPromoteRules"
                     (click)="removeFromRollout(item.rule)"
                     class="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
                     data-testid="remove-rollout-button"

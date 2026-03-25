@@ -31,11 +31,16 @@
       </div>
 
       <div *ngIf="!loading && !error">
+        <div *ngIf="showReadOnlyNotice()" class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+          <p class="text-sm font-medium text-amber-800">
+            Read-only mode. Field-type configuration controls are hidden for your current permissions.
+          </p>
+        </div>
 
         <!-- ================================================================
              SECTION 1: Configure a field type
              ================================================================ -->
-        <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <div *ngIf="canModifyFieldTypes" class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Configure Field Type</h2>
           <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
             <div class="md:col-span-1">
@@ -138,6 +143,7 @@
                 <td class="px-6 py-4 text-sm text-gray-500">{{ formatLastSeen(config.updated_at) }}</td>
                 <td class="px-6 py-4 text-right">
                   <button
+                    *ngIf="canDeleteFieldType"
                     (click)="deleteConfig(config.field_name)"
                     class="px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
                   >
@@ -189,6 +195,7 @@
                 <td class="px-6 py-4 text-sm text-gray-500">{{ formatLastSeen(obs.last_seen) }}</td>
                 <td class="px-6 py-4 text-right">
                   <button
+                    *ngIf="canModifyFieldTypes"
                     (click)="prefillFromObservation(obs)"
                     class="px-3 py-1 text-sm border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
                   >

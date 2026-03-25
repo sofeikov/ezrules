@@ -21,6 +21,10 @@
       </div>
 
       <div *ngIf="!loading" class="space-y-6">
+        <div *ngIf="showReadOnlyNotice()" class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4">
+          Settings are in read-only mode. Reordering outcomes and changing runtime defaults or curated pairs requires permission-management access.
+        </div>
+
         <div class="bg-white rounded-lg shadow border border-gray-200">
           <div class="p-6 border-b border-gray-200">
             <h2 class="text-lg font-semibold text-gray-900">Outcome Resolution</h2>
@@ -50,7 +54,7 @@
                   </div>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div *ngIf="canManagePermissions" class="flex items-center gap-2">
                   <button
                     type="button"
                     class="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
@@ -78,6 +82,7 @@
                 Top of the list is the most severe outcome. New outcomes are appended to the bottom by default.
               </p>
               <button
+                *ngIf="canManagePermissions"
                 id="settings-saveOutcomeHierarchy"
                 type="button"
                 class="bg-amber-600 text-white px-4 py-2 rounded-md hover:bg-amber-700 disabled:opacity-50"
@@ -116,6 +121,7 @@
 
             <div class="pt-2">
               <button
+                *ngIf="canManagePermissions"
                 id="settings-saveRuntimeSettings"
                 type="button"
                 class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
@@ -135,7 +141,7 @@
           </div>
 
           <div class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end mb-5">
+            <div *ngIf="canManagePermissions" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end mb-5">
               <div>
                 <label for="settings-pairOutcome" class="block text-sm font-medium text-gray-700 mb-2">Outcome</label>
                 <select
@@ -188,12 +194,13 @@
                         [id]="'settings-pair-active-' + pair.rqpId"
                         type="checkbox"
                         [checked]="pair.active"
-                        [disabled]="isPairBusy(pair.rqpId)"
+                        [disabled]="isPairBusy(pair.rqpId) || !canManagePermissions"
                         (change)="onPairActiveChange(pair, $event)"
                       />
                     </td>
                     <td class="px-4 py-3">
                       <button
+                        *ngIf="canManagePermissions"
                         [id]="'settings-pair-delete-' + pair.rqpId"
                         type="button"
                         class="text-red-600 hover:text-red-700 disabled:opacity-50"

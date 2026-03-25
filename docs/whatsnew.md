@@ -1,6 +1,11 @@
 # What's New
 
 
+## v1.2.1
+
+* **Permission-aware navigation and route access**: The Angular app now hides sidebar entries for pages the current user cannot access and redirects direct deep links to an explicit access-denied page instead of letting the user discover the problem through a later `403`.
+* **Read-only management states**: Rules, users, roles, labels, outcomes, user lists, field types, settings, shadow rules, and rollout views now hide mutating controls when the matching create/modify/delete permission is missing, while still allowing permitted read access.
+
 ## v1.1.0
 
 * **Rule rollouts with stable traffic bucketing**: Active rules can now serve a candidate version to a configurable percentage of live traffic, compare candidate vs control on the same evaluated events, and promote or remove the rollout from a dedicated **Rule Rollouts** page.

@@ -25,10 +25,16 @@
       </div>
 
       <div *ngIf="!loading && !error">
+        <div *ngIf="showReadOnlyNotice()" class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+          <p class="text-sm font-medium text-amber-800">
+            Read-only mode. Role creation, assignment, deletion, and permission changes are hidden for your current permissions.
+          </p>
+        </div>
+
         <!-- Top Forms Row -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <!-- Create Role Form -->
-          <div class="bg-white border border-gray-200 rounded-lg p-6">
+          <div *ngIf="canCreateRole" class="bg-white border border-gray-200 rounded-lg p-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-4">Create New Role</h2>
             <div class="space-y-3">
               <div>
@@ -60,7 +66,7 @@
           </div>
 
           <!-- Assign Role to User Form -->
-          <div class="bg-white border border-gray-200 rounded-lg p-6">
+          <div *ngIf="canManageUserRoles && canViewUsers" class="bg-white border border-gray-200 rounded-lg p-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-4">Assign Role to User</h2>
             <div class="space-y-3">
               <div>
@@ -136,9 +142,10 @@
                       [href]="'/role_management/' + role.id + '/permissions'"
                       class="px-3 py-1 text-xs border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
                     >
-                      Manage Permissions
+                      {{ permissionsLinkLabel() }}
                     </a>
                     <button
+                      *ngIf="canDeleteRole"
                       (click)="deleteRole(role.id, role.name)"
                       [disabled]="role.user_count > 0"
                       [ngClass]="{
@@ -163,7 +170,7 @@
         </div>
 
         <!-- Users and Role Assignments Table -->
-        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div *ngIf="canViewUsers" class="bg-white border border-gray-200 rounded-lg overflow-hidden">
           <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
             <h2 class="text-lg font-semibold text-gray-900">Users and Role Assignments</h2>
             <p class="text-sm text-gray-600 mt-1">Users with at least one role assigned</p>
@@ -193,6 +200,7 @@
                     >
                       {{ role.name }}
                       <button
+                        *ngIf="canManageUserRoles"
                         (click)="removeRoleFromUser(user.id, role.id, role.name, user.email)"
                         class="ml-1 text-blue-600 hover:text-blue-900"
                         title="Remove role"

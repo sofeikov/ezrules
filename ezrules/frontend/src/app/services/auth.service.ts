@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, tap, catchError, throwError, of } from 'rxjs';
-import { finalize, map, shareReplay } from 'rxjs/operators';
+import { finalize, map, shareReplay, switchMap } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { environment } from '../../environments/environment';
 
@@ -52,6 +52,14 @@ export class AuthService {
     return localStorage.getItem(this.REFRESH_TOKEN_KEY);
   }
 
+  getCurrentUserSnapshot(): AuthUser | null {
+    return this.currentUser.value;
+  }
+
+  private setCurrentUser(user: AuthUser | null): void {
+    this.currentUser.next(user);
+  }
+
   login(email: string, password: string): Observable<TokenResponse> {
     // Backend expects OAuth2 form data (username + password)
     const formData = new URLSearchParams();
@@ -64,10 +72,15 @@ export class AuthService {
       tap(response => {
         localStorage.setItem(this.ACCESS_TOKEN_KEY, response.access_token);
         localStorage.setItem(this.REFRESH_TOKEN_KEY, response.refresh_token);
-        this.currentUser.next(null);
+        this.setCurrentUser(null);
         this.currentUserRequest$ = null;
         this.loggedIn.next(true);
-      })
+      }),
+      switchMap((response) => this.http.get<AuthUser>(`${this.AUTH_URL}/me`).pipe(
+        tap((user) => this.setCurrentUser(user)),
+        map(() => response),
+        catchError(() => of(response))
+      ))
     );
   }
 
@@ -103,7 +116,7 @@ export class AuthService {
     }
     localStorage.removeItem(this.ACCESS_TOKEN_KEY);
     localStorage.removeItem(this.REFRESH_TOKEN_KEY);
-    this.currentUser.next(null);
+    this.setCurrentUser(null);
     this.currentUserRequest$ = null;
     this.loggedIn.next(false);
     this.router.navigate(['/login']);
@@ -121,7 +134,13 @@ export class AuthService {
     }
 
     this.currentUserRequest$ = this.http.get<AuthUser>(`${this.AUTH_URL}/me`).pipe(
-      tap(user => this.currentUser.next(user)),
+      tap(user => this.setCurrentUser(user)),
+      catchError((error) => {
+        if (error.status === 401) {
+          this.setCurrentUser(null);
+        }
+        return throwError(() => error);
+      }),
       finalize(() => {
         this.currentUserRequest$ = null;
       }),

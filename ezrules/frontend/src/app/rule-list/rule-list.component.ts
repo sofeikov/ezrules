@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { environment } from '../../environments/environment';
 import { AuthService } from '../services/auth.service';
+import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { Rule, RuleService, RuleStatus } from '../services/rule.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
@@ -20,6 +21,8 @@ export class RuleListComponent implements OnInit {
   showHowToRun: boolean = false;
   actionError: string | null = null;
   actionLoading: Record<number, 'promote' | 'archive'> = {};
+  canCreateRules: boolean = false;
+  canModifyRules: boolean = false;
   canPromoteRules: boolean = false;
 
   constructor(private ruleService: RuleService, private authService: AuthService) { }
@@ -30,11 +33,15 @@ export class RuleListComponent implements OnInit {
   }
 
   loadPermissions(): void {
-    this.authService.hasPermission('promote_rules').subscribe({
-      next: (hasPermission) => {
-        this.canPromoteRules = hasPermission;
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        this.canCreateRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.createRule);
+        this.canModifyRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyRule);
+        this.canPromoteRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.promoteRules);
       },
       error: () => {
+        this.canCreateRules = false;
+        this.canModifyRules = false;
         this.canPromoteRules = false;
       }
     });
@@ -115,7 +122,7 @@ export class RuleListComponent implements OnInit {
   }
 
   canArchive(rule: Rule): boolean {
-    return rule.status !== 'archived';
+    return this.canModifyRules && rule.status !== 'archived';
   }
 
   statusLabel(status: RuleStatus): string {
@@ -138,5 +145,9 @@ export class RuleListComponent implements OnInit {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+  }
+
+  showReadOnlyNotice(): boolean {
+    return !this.canCreateRules && !this.canModifyRules && !this.canPromoteRules;
   }
 }

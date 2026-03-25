@@ -27,8 +27,14 @@
       </div>
 
       <div *ngIf="!loading && !error">
+        <div *ngIf="showReadOnlyNotice()" class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+          <p class="text-sm font-medium text-amber-800">
+            Read-only mode. Outcome creation and deletion controls are hidden for your current permissions.
+          </p>
+        </div>
+
         <!-- Create Outcome Form -->
-        <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <div *ngIf="canCreateOutcome" class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
           <h2 class="text-lg font-semibold text-gray-900 mb-4">Add New Outcome</h2>
           <div class="flex gap-3">
             <input
@@ -84,6 +90,7 @@
                 </p>
               </div>
               <button
+                *ngIf="canDeleteOutcome"
                 (click)="deleteOutcome(outcome.outcome_name)"
                 class="px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
               >
