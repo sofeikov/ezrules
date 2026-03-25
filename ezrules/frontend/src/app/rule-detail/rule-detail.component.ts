@@ -23,6 +23,7 @@ import {
   BacktestTaskResult
 } from '../services/backtesting.service';
 import { AuthService } from '../services/auth.service';
+import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { RuleTestDataService } from '../services/rule-test-data.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
@@ -68,6 +69,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   rolloutDeploySuccess: boolean = false;
   rolloutDeployError: string | null = null;
   rolloutTrafficPercent: number = 10;
+  canModifyRules: boolean = false;
   canPromoteRules: boolean = false;
 
   // Backtesting properties
@@ -125,12 +127,18 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   }
 
   loadPermissions(): void {
-    this.authService.hasPermission('promote_rules').subscribe({
-      next: (hasPermission) => {
-        this.canPromoteRules = hasPermission;
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        this.canModifyRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyRule);
+        this.canPromoteRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.promoteRules);
+        if (!this.canModifyRules) {
+          this.isEditMode = false;
+        }
       },
       error: () => {
+        this.canModifyRules = false;
         this.canPromoteRules = false;
+        this.isEditMode = false;
       }
     });
   }
@@ -295,6 +303,10 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   }
 
   toggleEditMode(): void {
+    if (!this.canModifyRules) {
+      return;
+    }
+
     if (!this.isEditMode && this.rule) {
       // Entering edit mode - copy current values
       this.editedDescription = this.rule.description;
@@ -322,6 +334,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   }
 
   saveRule(): void {
+    if (!this.canModifyRules) return;
     if (!this.rule) return;
 
     this.saving = true;
@@ -368,6 +381,10 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   }
 
   openDeployToShadowDialog(): void {
+    if (!this.canModifyRules) {
+      return;
+    }
+
     this.showDeployToShadowDialog = true;
   }
 
@@ -459,6 +476,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   // Backtesting methods
 
   triggerBacktest(): void {
+    if (!this.canModifyRules) return;
     if (!this.rule || !this.editedLogic) return;
 
     this.backtesting = true;
@@ -656,5 +674,9 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     const nextResults = new Map(this.backtestTaskResults);
     nextResults.delete(taskId);
     this.backtestTaskResults = nextResults;
+  }
+
+  showReadOnlyNotice(): boolean {
+    return !this.isRevisionView && !this.canModifyRules && !this.canPromoteRules;
   }
 }

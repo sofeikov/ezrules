@@ -20,7 +20,7 @@
             </svg>
             How to Run
           </button>
-          <a routerLink="/rules/create" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <a *ngIf="canCreateRules" routerLink="/rules/create" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
             <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
@@ -48,7 +48,11 @@
       </div>
 
       <!-- Loading State -->
-      <div *ngIf="loading" class="flex justify-center items-center py-20">
+      <div
+        class="flex justify-center items-center py-20"
+        [class.hidden]="!loading"
+        [attr.aria-hidden]="!loading"
+      >
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
 
@@ -64,6 +68,12 @@
 
       <!-- Rules Grid -->
       <div *ngIf="!loading && !error">
+        <div *ngIf="showReadOnlyNotice()" class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+          <p class="text-sm font-medium text-amber-800">
+            Read-only mode. Rule creation and lifecycle actions are hidden for your current permissions.
+          </p>
+        </div>
+
         <!-- Summary -->
         <div class="mb-6 flex items-center justify-between">
           <p class="text-sm text-gray-600">
@@ -87,8 +97,10 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           <h3 class="mt-4 text-lg font-medium text-gray-900">No rules found</h3>
-          <p class="mt-2 text-sm text-gray-500">Get started by creating your first rule.</p>
-          <a routerLink="/rules/create" class="mt-6 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          <p class="mt-2 text-sm text-gray-500">
+            {{ canCreateRules ? 'Get started by creating your first rule.' : 'No rules are visible for your current organisation.' }}
+          </p>
+          <a *ngIf="canCreateRules" routerLink="/rules/create" class="mt-6 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
@@ -148,7 +160,7 @@
                       <span *ngIf="isActionLoading(rule.r_id, 'archive')">Archiving...</span>
                     </button>
                     <a [routerLink]="['/rules', rule.r_id]" class="text-blue-600 hover:text-blue-800 text-sm font-medium">View</a>
-                    <a [routerLink]="['/rules', rule.r_id]" class="text-gray-600 hover:text-gray-800 text-sm font-medium">Edit</a>
+                    <a *ngIf="canModifyRules" [routerLink]="['/rules', rule.r_id]" class="text-gray-600 hover:text-gray-800 text-sm font-medium">Edit</a>
                   </div>
                 </td>
               </tr>

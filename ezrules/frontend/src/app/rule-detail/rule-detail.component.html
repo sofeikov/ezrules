@@ -98,6 +98,12 @@
         </div>
       </div>
 
+      <div *ngIf="showReadOnlyNotice() && !loading && rule" class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+        <p class="text-sm font-medium text-amber-800">
+          Read-only mode. Editing, draft deployment, and rollout controls are hidden for your current permissions.
+        </p>
+      </div>
+
       <!-- Rule Details -->
       <div *ngIf="!loading && !error && rule" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Left Column - Rule Details -->
@@ -114,7 +120,7 @@
                   {{ rolloutEntry.traffic_percent }}% rollout active
                 </span>
               </div>
-              <div *ngIf="!isEditMode && !isRevisionView" class="flex gap-2">
+              <div *ngIf="!isEditMode && !isRevisionView && canModifyRules" class="flex gap-2">
                 <button
                   (click)="toggleEditMode()"
                   class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
@@ -333,7 +339,7 @@
           </div>
 
           <!-- Backtest Changes Button (edit mode only) -->
-          <div *ngIf="isEditMode && !isRevisionView" class="bg-white border border-gray-200 rounded-lg p-6">
+          <div *ngIf="isEditMode && !isRevisionView && canModifyRules" class="bg-white border border-gray-200 rounded-lg p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Backtest Changes</h2>
             <p class="text-sm text-gray-600 mb-4">Compare the current rule logic against your proposed changes using recent event data.</p>
 

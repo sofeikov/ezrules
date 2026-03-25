@@ -24,33 +24,147 @@ import { ForgotPasswordComponent } from './forgot-password/forgot-password.compo
 import { ResetPasswordComponent } from './reset-password/reset-password.component';
 import { AcceptInviteComponent } from './accept-invite/accept-invite.component';
 import { SettingsComponent } from './settings/settings.component';
+import { AccessDeniedComponent } from './access-denied/access-denied.component';
+import { permissionGuard } from './auth/permission.guard';
+import { ROUTE_PERMISSION_REQUIREMENTS } from './auth/permissions';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'forgot-password', component: ForgotPasswordComponent },
   { path: 'reset-password', component: ResetPasswordComponent },
   { path: 'accept-invite', component: AcceptInviteComponent },
-  { path: '', component: DashboardComponent, canActivate: [authGuard] },
-  { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
-  { path: 'rules', component: RuleListComponent, canActivate: [authGuard] },
-  { path: 'rules/create', component: RuleCreateComponent, canActivate: [authGuard] },
-  { path: 'rules/:id/history', component: RuleHistoryComponent, canActivate: [authGuard] },
-  { path: 'rules/:id/revisions/:revision', component: RuleDetailComponent, canActivate: [authGuard] },
-  { path: 'rules/:id', component: RuleDetailComponent, canActivate: [authGuard] },
-  { path: 'labels', component: LabelsComponent, canActivate: [authGuard] },
-  { path: 'outcomes', component: OutcomesComponent, canActivate: [authGuard] },
-  { path: 'tested-events', component: TestedEventsComponent, canActivate: [authGuard] },
-  { path: 'user-lists', component: UserListsComponent, canActivate: [authGuard] },
-  { path: 'label_analytics', component: LabelAnalyticsComponent, canActivate: [authGuard] },
-  { path: 'rule-quality', component: RuleQualityComponent, canActivate: [authGuard] },
-  { path: 'settings', component: SettingsComponent, canActivate: [authGuard] },
-  { path: 'management/users', component: UserManagementComponent, canActivate: [authGuard] },
-  { path: 'role_management', component: RoleManagementComponent, canActivate: [authGuard] },
-  { path: 'role_management/:id/permissions', component: RolePermissionsComponent, canActivate: [authGuard] },
-  { path: 'audit', component: AuditTrailComponent, canActivate: [authGuard] },
-  { path: 'field-types', component: FieldTypesComponent, canActivate: [authGuard] },
-  { path: 'shadow-rules', component: ShadowRulesComponent, canActivate: [authGuard] },
-  { path: 'rule-rollouts', component: RolloutsComponent, canActivate: [authGuard] },
-  { path: 'api-keys', component: ApiKeysComponent, canActivate: [authGuard] },
+  {
+    path: '',
+    component: DashboardComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.dashboard }
+  },
+  {
+    path: 'dashboard',
+    component: DashboardComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.dashboard }
+  },
+  {
+    path: 'rules',
+    component: RuleListComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.rules }
+  },
+  {
+    path: 'rules/create',
+    component: RuleCreateComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.ruleCreate }
+  },
+  {
+    path: 'rules/:id/history',
+    component: RuleHistoryComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.rules }
+  },
+  {
+    path: 'rules/:id/revisions/:revision',
+    component: RuleDetailComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.rules }
+  },
+  {
+    path: 'rules/:id',
+    component: RuleDetailComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.rules }
+  },
+  {
+    path: 'labels',
+    component: LabelsComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.labels }
+  },
+  {
+    path: 'outcomes',
+    component: OutcomesComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.outcomes }
+  },
+  {
+    path: 'tested-events',
+    component: TestedEventsComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.testedEvents }
+  },
+  {
+    path: 'user-lists',
+    component: UserListsComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.userLists }
+  },
+  {
+    path: 'label_analytics',
+    component: LabelAnalyticsComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.labelAnalytics }
+  },
+  {
+    path: 'rule-quality',
+    component: RuleQualityComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.ruleQuality }
+  },
+  {
+    path: 'settings',
+    component: SettingsComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.settings }
+  },
+  {
+    path: 'management/users',
+    component: UserManagementComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.users }
+  },
+  {
+    path: 'role_management',
+    component: RoleManagementComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.roles }
+  },
+  {
+    path: 'role_management/:id/permissions',
+    component: RolePermissionsComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.roles }
+  },
+  {
+    path: 'audit',
+    component: AuditTrailComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.audit }
+  },
+  {
+    path: 'field-types',
+    component: FieldTypesComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.fieldTypes }
+  },
+  {
+    path: 'shadow-rules',
+    component: ShadowRulesComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.shadowRules }
+  },
+  {
+    path: 'rule-rollouts',
+    component: RolloutsComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.rollouts }
+  },
+  {
+    path: 'api-keys',
+    component: ApiKeysComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.apiKeys }
+  },
+  { path: 'access-denied', component: AccessDeniedComponent, canActivate: [authGuard] },
   { path: '**', redirectTo: '/login' }
 ];

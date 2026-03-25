@@ -4,6 +4,7 @@ import { Router, RouterModule } from '@angular/router';
 import { Change, diffLines } from 'diff';
 import { SidebarComponent } from '../components/sidebar.component';
 import { AuthService } from '../services/auth.service';
+import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import {
   RolloutConfigResponse,
   RolloutRuleItem,
@@ -40,6 +41,7 @@ export class RolloutsComponent implements OnInit {
 
   actionSuccess: string | null = null;
   actionError: string | null = null;
+  canModifyRules: boolean = false;
   canPromoteRules: boolean = false;
 
   constructor(
@@ -54,11 +56,13 @@ export class RolloutsComponent implements OnInit {
   }
 
   loadPermissions(): void {
-    this.authService.hasPermission('promote_rules').subscribe({
-      next: (hasPermission) => {
-        this.canPromoteRules = hasPermission;
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        this.canModifyRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyRule);
+        this.canPromoteRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.promoteRules);
       },
       error: () => {
+        this.canModifyRules = false;
         this.canPromoteRules = false;
       }
     });
@@ -195,6 +199,10 @@ export class RolloutsComponent implements OnInit {
   }
 
   editRollout(rule: RolloutRuleItem): void {
+    if (!this.canModifyRules) {
+      return;
+    }
+
     this.router.navigate(['/rules', rule.r_id], {
       state: {
         rolloutEditMode: true,
@@ -206,6 +214,10 @@ export class RolloutsComponent implements OnInit {
   }
 
   removeFromRollout(rule: RolloutRuleItem): void {
+    if (!this.canPromoteRules) {
+      return;
+    }
+
     this.openRemoveDialog(rule);
   }
 
@@ -214,5 +226,9 @@ export class RolloutsComponent implements OnInit {
       rule,
       stats: this.rolloutStats.rules.find(s => s.r_id === rule.r_id) ?? null,
     }));
+  }
+
+  showReadOnlyNotice(): boolean {
+    return !this.canModifyRules && !this.canPromoteRules;
   }
 }
