@@ -38,9 +38,9 @@ if $amount > 10000:
     return 'HOLD'
 ```
 
-3. Open **Outcomes** and confirm `HOLD` exists.
+3. Open **Outcomes** and add `HOLD` if it is not there yet.
 
-Tip: `HOLD` is seeded by `init-db`, but confirming it avoids confusion during first runs.
+Fresh installs start with an empty outcomes catalog, so creating the first outcome is part of the setup.
 
 ## Minute 5-7: Send a live event to the evaluator
 

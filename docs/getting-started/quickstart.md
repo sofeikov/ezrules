@@ -88,7 +88,7 @@ Checkpoint:
 ## Step 4: Ensure Outcome Exists
 
 1. Open **Outcomes**
-2. Ensure `HOLD` exists
+2. Add `HOLD` if it does not exist yet
 3. Save any changes
 
 ---
@@ -120,11 +120,12 @@ Checkpoint:
 ## Step 6: Add Labels and Verify Analytics
 
 1. Open **Labels**
-2. Confirm `FRAUD`, `NORMAL`, `CHARGEBACK` labels exist
-3. Open **Analytics**
-4. Check total labeled count and trend charts
-5. Open **Settings → General**, add curated outcome→label pairs to track
-6. Open **Rule Quality** and confirm pair metrics load for curated pairs
+2. Create the labels you want to use operationally (for example `FRAUD`, `NORMAL`, `CHARGEBACK`)
+3. Mark events or upload a small CSV from the Labels page
+4. Open **Analytics**
+5. Check total labeled count and trend charts
+6. Open **Settings → General**, add curated outcome→label pairs to track
+7. Open **Rule Quality** and confirm pair metrics load for curated pairs
 
 You can also upload a small `event_id,label_name` CSV in **Labels** and recheck the charts.
 

@@ -135,7 +135,9 @@ EZRULES_APP_BASE_URL=http://localhost:4200
 EOF
 
 # Initialise DB and create an admin user
-# init-db creates the database if missing, applies Alembic migrations, and seeds defaults
+# init-db creates the database if missing, applies Alembic migrations,
+# and bootstraps the default org, roles, permissions, and user lists.
+# Outcomes and labels are managed explicitly through the UI or API.
 uv run ezrules init-db
 uv run ezrules add-user --user-email admin@example.com --password admin --admin
 
@@ -281,8 +283,7 @@ Use the **Rule Quality** page to evaluate underperforming rules from labeled eve
 
 Default lookback for Rule Quality can be configured in **Settings → General** and is stored as a runtime setting.
 Curated rule-quality pairs are also managed in **Settings → General** and drive which pairs appear in reports.
-`uv run ezrules reset-dev` now seeds a demo-ready curated pair set: `RELEASE -> CHARGEBACK`, `HOLD -> CHARGEBACK`, and `CANCEL -> FRAUD`.
-It also writes a root-level `test_labels.csv` from the seeded labeled events so the Labels upload flow has a ready-made file after each reset.
+`uv run ezrules reset-dev` seeds the demo label/outcome catalogs, activates a curated pair set (`RELEASE -> CHARGEBACK`, `HOLD -> CHARGEBACK`, `CANCEL -> FRAUD`), and writes a root-level `test_labels.csv` from the generated labeled events.
 
 ### Bombardment with Fraud Labels
 
@@ -311,7 +312,9 @@ uv run ezrules generate-random-data --n-events 200 --label-ratio 0.4 --export-cs
 uv run ezrules export-test-csv --n-events 50 --unlabeled-only --output-file test_upload.csv
 ```
 
-### Built-in Labels
+Label assignment and CSV export only use labels that already exist in the database. `reset-dev` seeds the demo label catalog first; standalone `generate-random-data` skips labeling if you have not created any labels yet.
+
+### Common Label Set
 
 - **FRAUD**: Suspicious or confirmed fraudulent transactions
 - **CHARGEBACK**: Disputed transactions resulting in chargebacks

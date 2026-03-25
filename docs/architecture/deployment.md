@@ -116,7 +116,8 @@ uv run ezrules init-db
 uv run ezrules add-user --user-email admin@example.com --password admin --admin
 ```
 
-`init-db` performs database creation (if needed), Alembic migration to head, and default data seeding.
+`init-db` performs database creation (if needed), Alembic migration to head, and bootstrap of the default org, permissions, roles, and user lists.
+It leaves outcomes and labels empty until you create them through the UI or API.
 
 Requires `settings.env` with `EZRULES_DB_ENDPOINT` and `EZRULES_APP_SECRET`.
 
