@@ -36,7 +36,7 @@ from ezrules.models.backend_core import (
     User,
 )
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.database import Base, db_session
+from ezrules.models.database import Base
 from ezrules.settings import app_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -49,15 +49,147 @@ DEFAULT_RESET_DEV_OUTCOMES = ("CANCEL", "HOLD", "RELEASE")
 DEFAULT_RESET_DEV_LABELS = ("FRAUD", "CHARGEBACK", "NORMAL")
 
 
-def _get_or_create_default_organisation(db_session):
-    """Return the default organisation, creating it when needed."""
-    organisation = db_session.query(Organisation).filter_by(name="base").first()
-    if organisation is None:
-        organisation = Organisation(name="base")
-        db_session.add(organisation)
-        db_session.commit()
-        db_session.refresh(organisation)
-    return organisation
+def _create_cli_session():
+    db_endpoint = app_settings.DB_ENDPOINT
+    engine = create_engine(db_endpoint)
+    session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
+    Base.query = session.query_property()
+    return db_endpoint, engine, session
+
+
+def _close_cli_session(engine, session) -> None:
+    session.remove()
+    engine.dispose()
+
+
+def _normalize_organisation_name(org_name: str) -> str:
+    normalized = org_name.strip()
+    if not normalized:
+        raise click.BadParameter("Organisation name cannot be empty")
+    return normalized
+
+
+def _normalize_user_email(user_email: str) -> str:
+    normalized = user_email.strip()
+    if not normalized:
+        raise click.BadParameter("User email cannot be empty")
+    return normalized
+
+
+def _get_organisation_by_name(session, *, org_name: str) -> Organisation | None:
+    normalized_name = _normalize_organisation_name(org_name)
+    return session.query(Organisation).filter(Organisation.name == normalized_name).first()
+
+
+def _create_organisation(session, *, org_name: str) -> Organisation:
+    organization = Organisation(name=_normalize_organisation_name(org_name))
+    session.add(organization)
+    session.commit()
+    session.refresh(organization)
+    return organization
+
+
+def _get_or_create_organisation(session, *, org_name: str) -> tuple[Organisation, bool]:
+    organization = _get_organisation_by_name(session, org_name=org_name)
+    if organization is not None:
+        return organization, False
+    return _create_organisation(session, org_name=org_name), True
+
+
+def _list_organisation_names(session) -> list[str]:
+    return [str(org.name) for org in session.query(Organisation).order_by(Organisation.name).all()]
+
+
+def _resolve_organisation(session, *, org_name: str | None = None) -> Organisation:
+    if org_name is not None:
+        organization = _get_organisation_by_name(session, org_name=org_name)
+        if organization is None:
+            raise click.ClickException(
+                f"Organisation '{_normalize_organisation_name(org_name)}' does not exist. "
+                "Run `uv run ezrules bootstrap-org --name <org-name> ...` first."
+            )
+        return organization
+
+    organisations = session.query(Organisation).order_by(Organisation.name).all()
+    if len(organisations) == 1:
+        return organisations[0]
+    if not organisations:
+        raise click.ClickException(
+            "No organisation exists. Run `uv run ezrules bootstrap-org --name <org-name> ...` first."
+        )
+
+    available_orgs = ", ".join(_list_organisation_names(session))
+    raise click.ClickException(
+        f"Multiple organisations exist. Pass --org-name to select one. Available organisations: {available_orgs}"
+    )
+
+
+def _hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def _create_user(session, *, user_email: str, password: str, org_id: int) -> User:
+    normalized_email = _normalize_user_email(user_email)
+    existing_user = session.query(User).filter(User.email == normalized_email).first()
+    if existing_user is not None:
+        if int(existing_user.o_id) == org_id:
+            raise click.ClickException(f"User '{normalized_email}' already exists in the selected organisation.")
+
+        existing_org = session.query(Organisation).filter(Organisation.o_id == int(existing_user.o_id)).first()
+        existing_org_name = str(existing_org.name) if existing_org is not None else f"o_id={int(existing_user.o_id)}"
+        raise click.ClickException(f"User '{normalized_email}' already exists in organisation '{existing_org_name}'.")
+
+    user = User(
+        email=normalized_email,
+        password=_hash_password(password),
+        active=True,
+        fs_uniquifier=normalized_email,
+        o_id=org_id,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+def _get_or_create_user(session, *, user_email: str, password: str, org_id: int) -> tuple[User, bool]:
+    normalized_email = _normalize_user_email(user_email)
+    existing_user = session.query(User).filter(User.email == normalized_email).first()
+    if existing_user is not None:
+        if int(existing_user.o_id) != org_id:
+            existing_org = session.query(Organisation).filter(Organisation.o_id == int(existing_user.o_id)).first()
+            existing_org_name = (
+                str(existing_org.name) if existing_org is not None else f"o_id={int(existing_user.o_id)}"
+            )
+            raise click.ClickException(
+                f"User '{normalized_email}' already exists in organisation '{existing_org_name}'."
+            )
+
+        if not existing_user.active:
+            existing_user.active = True
+            session.commit()
+        return existing_user, False
+
+    return _create_user(session, user_email=normalized_email, password=password, org_id=org_id), True
+
+
+def _ensure_admin_role(session, *, user: User) -> bool:
+    admin_role = _ensure_default_roles(session, o_id=int(user.o_id))["admin"]
+    if admin_role in user.roles:
+        return False
+
+    user.roles.append(admin_role)
+    session.commit()
+    return True
+
+
+def _bootstrap_organisation(session, *, org_name: str) -> tuple[Organisation, bool]:
+    organization, created = _get_or_create_organisation(session, org_name=org_name)
+    _ensure_default_roles(session, o_id=int(organization.o_id))
+
+    user_list_manager = PersistentUserListManager(db_session=session, o_id=int(organization.o_id))
+    user_list_manager._ensure_default_lists()
+    return organization, created
 
 
 def _get_or_create_role(
@@ -206,57 +338,78 @@ def cli():
 
 
 @cli.command()
-@click.option("--user-email")
-@click.option("--password")
+@click.option("--user-email", required=True)
+@click.option("--password", required=True)
+@click.option(
+    "--org-name",
+    help="Target organisation name. If omitted and exactly one organisation exists, that organisation is used.",
+)
 @click.option("--admin", is_flag=True, help="Grant admin role with all permissions to the user")
-def add_user(user_email, password, admin):
-    db_endpoint = app_settings.DB_ENDPOINT
-    engine = create_engine(db_endpoint)
-    db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-    Base.query = db_session.query_property()
+def add_user(user_email, password, org_name, admin):
+    db_endpoint, engine, session = _create_cli_session()
 
-    user = None
     try:
-        organisation = _get_or_create_default_organisation(db_session)
-        hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-        user = User(
-            email=user_email,
-            password=hashed_password,
-            active=True,
-            fs_uniquifier=user_email,
-            o_id=int(organisation.o_id),
+        organization = _resolve_organisation(session, org_name=org_name)
+        user = _create_user(session, user_email=user_email, password=password, org_id=int(organization.o_id))
+        logger.info("Added %s to organisation '%s' at %s", user.email, organization.name, db_endpoint)
+
+        if admin:
+            if _ensure_admin_role(session, user=user):
+                logger.info("Assigned admin role to %s", user.email)
+            else:
+                logger.info("Admin role already present for %s", user.email)
+    finally:
+        _close_cli_session(engine, session)
+
+
+@cli.command()
+@click.option("--name", "org_name", required=True, help="Organisation name to create or bootstrap")
+@click.option("--admin-email", required=True, help="Email for the initial admin user")
+@click.option("--admin-password", required=True, help="Password for the initial admin user")
+def bootstrap_org(org_name, admin_email, admin_password):
+    """Create an organisation, seed defaults, and ensure an initial admin user exists."""
+    db_endpoint, engine, session = _create_cli_session()
+
+    try:
+        organization, organization_created = _bootstrap_organisation(session, org_name=org_name)
+        user, user_created = _get_or_create_user(
+            session,
+            user_email=admin_email,
+            password=admin_password,
+            org_id=int(organization.o_id),
         )
-        db_session.add(user)
-        db_session.commit()
-        logger.info(f"Done adding {user_email} to {db_endpoint}")
-    except Exception as e:
-        db_session.rollback()
-        logger.error(e)
-        logger.info("User already exists")
-        # Try to get existing user
-        user = db_session.query(User).filter_by(email=user_email).first()
-        _get_or_create_default_organisation(db_session)
+        admin_assigned = _ensure_admin_role(session, user=user)
 
-        # Grant admin permissions if --admin flag is set
-    if admin and user:
-        logger.info("Granting admin permissions...")
-
-        admin_role = _ensure_default_roles(db_session, o_id=int(user.o_id))["admin"]
-
-        # Assign admin role to user
-        if admin_role not in user.roles:
-            user.roles.append(admin_role)
-            db_session.commit()
-            logger.info(f"Assigned admin role to {user_email}")
+        if organization_created:
+            logger.info("Created organisation '%s' at %s", organization.name, db_endpoint)
         else:
-            logger.info(f"User {user_email} already has admin role")
+            logger.info("Organisation '%s' already exists", organization.name)
 
-        logger.info(f"User {user_email} now has full admin permissions")
+        if user_created:
+            logger.info("Created admin user %s", user.email)
+        else:
+            logger.info(
+                "Admin user %s already exists in organisation '%s'; password left unchanged",
+                user.email,
+                organization.name,
+            )
+
+        if admin_assigned:
+            logger.info("Ensured admin role for %s", user.email)
+        else:
+            logger.info("%s already has admin role", user.email)
+    finally:
+        _close_cli_session(engine, session)
 
 
 @cli.command()
 @click.option("--auto-delete", is_flag=True, help="Automatically delete existing database without prompting")
-def init_db(auto_delete):
+@click.option(
+    "--with-default-org",
+    is_flag=True,
+    help="Also create the legacy default 'base' organisation with default roles and user lists.",
+)
+def init_db(auto_delete, with_default_org):
     db_endpoint = app_settings.DB_ENDPOINT
     logger.info(f"Initializing the DB at {db_endpoint}")
 
@@ -308,32 +461,21 @@ def init_db(auto_delete):
     try:
         _upgrade_database_schema(db_endpoint)
 
-        engine = create_engine(db_endpoint)
-        db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-        Base.query = db_session.query_property()
+        _, engine, session = _create_cli_session()
+        try:
+            logger.info("Initializing default permissions...")
+            PermissionManager.db_session = session
+            PermissionManager.init_default_actions()
+            logger.info("Default permissions initialized")
 
-        # Create default organisation
-        logger.info("Creating default organisation...")
-        existing_org = _get_or_create_default_organisation(db_session)
-        logger.info("Default organisation ready: %s", existing_org.name)
+            if with_default_org:
+                logger.info("Creating legacy default organisation...")
+                organization, _ = _bootstrap_organisation(session, org_name="base")
+                logger.info("Legacy default organisation ready: %s", organization.name)
 
-        # Initialize default permissions
-        logger.info("Initializing default permissions...")
-        PermissionManager.db_session = db_session
-        PermissionManager.init_default_actions()
-        logger.info("Default permissions initialized")
-
-        logger.info("Seeding default roles...")
-        _ensure_default_roles(db_session, o_id=int(existing_org.o_id))
-        logger.info("Default roles seeded")
-
-        # Seed default user lists (MiddleAsiaCountries, NACountries, LatamCountries)
-        logger.info("Seeding default user lists...")
-        user_list_manager = PersistentUserListManager(db_session=db_session, o_id=int(existing_org.o_id))
-        user_list_manager._ensure_default_lists()
-        logger.info("Default user lists seeded")
-
-        logger.info(f"Done initializing the DB at {db_endpoint}")
+            logger.info(f"Done initializing the DB at {db_endpoint}")
+        finally:
+            _close_cli_session(engine, session)
 
     except Exception as e:
         logger.error(f"Failed to initialize database schema: {e}")
@@ -341,17 +483,34 @@ def init_db(auto_delete):
 
 
 @cli.command()
-def init_permissions():
-    db_endpoint = app_settings.DB_ENDPOINT
-    logger.info(f"Initializing permissions at {db_endpoint}")
-    engine = create_engine(db_endpoint)
-    db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-    Base.query = db_session.query_property()
+@click.option(
+    "--org-name",
+    help="Seed default roles for a specific organisation. If omitted, all existing organisations are updated.",
+)
+def init_permissions(org_name):
+    db_endpoint, engine, session = _create_cli_session()
+    logger.info("Initializing permissions at %s", db_endpoint)
 
-    organisation = _get_or_create_default_organisation(db_session)
-    _ensure_default_roles(db_session, o_id=int(organisation.o_id))
+    try:
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
 
-    logger.info("Permissions initialized successfully")
+        if org_name:
+            organisations = [_resolve_organisation(session, org_name=org_name)]
+        else:
+            organisations = session.query(Organisation).order_by(Organisation.name).all()
+
+        if not organisations:
+            logger.info("No organisations found; initialized the global action catalogue only")
+            return
+
+        for organization in organisations:
+            _ensure_default_roles(session, o_id=int(organization.o_id))
+            logger.info("Default roles ready for organisation '%s'", organization.name)
+
+        logger.info("Permissions initialized successfully")
+    finally:
+        _close_cli_session(engine, session)
 
 
 @cli.command()
@@ -381,118 +540,126 @@ def api(port, reload):
 @click.option("--n-events", default=200)
 @click.option("--label-ratio", default=0.3, help="Ratio of events to label (0.0-1.0)")
 @click.option("--export-csv", help="Export labeled events to CSV file for testing uploads")
-def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export_csv: str):
+@click.option(
+    "--org-name",
+    help="Target organisation name. If omitted and exactly one organisation exists, that organisation is used.",
+)
+def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export_csv: str, org_name: str | None):
     if n_rules < 0 or n_events < 0:
         raise click.BadParameter("n-rules and n-events must be zero or greater")
     if not 0 <= label_ratio <= 1:
         raise click.BadParameter("label-ratio must be between 0.0 and 1.0")
 
-    organisation = _get_or_create_default_organisation(db_session)
-    org_id = int(organisation.o_id)
-    rng = Random()
-    user_list_manager = PersistentUserListManager(db_session=db_session, o_id=org_id)
-    set_user_list_manager(user_list_manager)
-    set_organization_id(org_id)
-    seed_demo_user_lists(user_list_manager)
+    _, engine, session = _create_cli_session()
 
-    fsrm: RuleManager = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db": db_session, "o_id": org_id})
-    rule_engine_config_producer = RDBRuleEngineConfigProducer(db=db_session, o_id=org_id)
-    existing_rule_count = (
-        db_session.query(RuleModel)
-        .filter(
-            RuleModel.o_id == org_id,
-            RuleModel.rid.like("TestRule_%"),
-        )
-        .count()
-    )
-    generated_rules = build_demo_rules(n_rules=n_rules, start_index=existing_rule_count)
-    for rule in generated_rules:
-        db_session.add(RuleModel(rid=rule.rid, logic=rule.logic, description=rule.description, o_id=org_id))
-    if generated_rules:
-        db_session.commit()
-        logger.info(
-            "Generated %s fraud-demo rules with list-backed conditions and correlated thresholds.", len(generated_rules)
-        )
+    try:
+        organisation = _resolve_organisation(session, org_name=org_name)
+        org_id = int(organisation.o_id)
+        rng = Random()
+        user_list_manager = PersistentUserListManager(db_session=session, o_id=org_id)
+        set_user_list_manager(user_list_manager)
+        set_organization_id(org_id)
+        seed_demo_user_lists(user_list_manager)
 
-    rule_engine_config_producer.save_config(fsrm, changed_by="cli")
-    lre = LocalRuleExecutorSQL(db=db_session, o_id=org_id)
-
-    # Generate and evaluate events
-    existing_event_count = (
-        db_session.query(TestingRecordLog)
-        .filter(
-            TestingRecordLog.o_id == org_id,
-            TestingRecordLog.event_id.like("TestEvent_%"),
+        fsrm: RuleManager = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db": session, "o_id": org_id})
+        rule_engine_config_producer = RDBRuleEngineConfigProducer(db=session, o_id=org_id)
+        existing_rule_count = (
+            session.query(RuleModel)
+            .filter(
+                RuleModel.o_id == org_id,
+                RuleModel.rid.like("TestRule_%"),
+            )
+            .count()
         )
-        .count()
-    )
-    generated_events = build_demo_events(n_events=n_events, start_index=existing_event_count)
-    for index, generated_event in enumerate(generated_events, start=1):
-        event = Event(
-            event_id=generated_event.event_id,
-            event_timestamp=generated_event.event_timestamp,
-            event_data=generated_event.event_data,
-        )
-
-        # Evaluate the event against the rules and store the results
-        response = eval_and_store(lre, event, commit=False)
-        record_observations(db_session, generated_event.event_data, org_id, commit=False)
-        if index % DEMO_DATA_COMMIT_BATCH_SIZE == 0:
-            db_session.commit()
-        if index == n_events or index % 25 == 0:
+        generated_rules = build_demo_rules(n_rules=n_rules, start_index=existing_rule_count)
+        for rule in generated_rules:
+            session.add(RuleModel(rid=rule.rid, logic=rule.logic, description=rule.description, o_id=org_id))
+        if generated_rules:
+            session.commit()
             logger.info(
-                "Evaluated %s/%s demo events. Last outcome set: %s", index, n_events, response[0]["outcome_set"]
+                "Generated %s fraud-demo rules with list-backed conditions and correlated thresholds.",
+                len(generated_rules),
             )
-    if generated_events:
-        db_session.commit()
 
-    # Enhanced labeling logic
-    if label_ratio > 0 and generated_events:
-        logger.info(f"Labeling {label_ratio * 100:.1f}% of events with realistic patterns...")
+        rule_engine_config_producer.save_config(fsrm, changed_by="cli")
+        lre = LocalRuleExecutorSQL(db=session, o_id=org_id)
 
-        available_labels = {label.label: label for label in db_session.query(Label).filter(Label.o_id == org_id).all()}
-        if not available_labels:
-            logger.info("No labels found in database. Skipping demo label assignment and CSV export.")
+        existing_event_count = (
+            session.query(TestingRecordLog)
+            .filter(
+                TestingRecordLog.o_id == org_id,
+                TestingRecordLog.event_id.like("TestEvent_%"),
+            )
+            .count()
+        )
+        generated_events = build_demo_events(n_events=n_events, start_index=existing_event_count)
+        for index, generated_event in enumerate(generated_events, start=1):
+            event = Event(
+                event_id=generated_event.event_id,
+                event_timestamp=generated_event.event_timestamp,
+                event_data=generated_event.event_data,
+            )
 
-        if available_labels:
-            logger.info(f"Available labels: {list(available_labels.keys())}")
-
-            generated_event_ids = [generated_event.event_id for generated_event in generated_events]
-            all_events = (
-                db_session.query(TestingRecordLog)
-                .filter(
-                    TestingRecordLog.o_id == org_id,
-                    TestingRecordLog.event_id.in_(generated_event_ids),
+            response = eval_and_store(lre, event, commit=False)
+            record_observations(session, generated_event.event_data, org_id, commit=False)
+            if index % DEMO_DATA_COMMIT_BATCH_SIZE == 0:
+                session.commit()
+            if index == n_events or index % 25 == 0:
+                logger.info(
+                    "Evaluated %s/%s demo events. Last outcome set: %s",
+                    index,
+                    n_events,
+                    response[0]["outcome_set"],
                 )
-                .all()
-            )
+        if generated_events:
+            session.commit()
 
-            # Determine how many events to label
-            n_to_label = int(len(all_events) * label_ratio)
-            if n_to_label <= 0:
-                events_to_label = []
-            elif n_to_label >= len(all_events):
-                events_to_label = all_events
-            else:
-                events_to_label = rng.sample(all_events, k=n_to_label)
+        if label_ratio > 0 and generated_events:
+            logger.info(f"Labeling {label_ratio * 100:.1f}% of events with realistic patterns...")
 
-            labeled_events = []
+            available_labels = {label.label: label for label in session.query(Label).filter(Label.o_id == org_id).all()}
+            if not available_labels:
+                logger.info("No labels found in database. Skipping demo label assignment and CSV export.")
 
-            for event_record in events_to_label:
-                event_data = event_record.event
-                label_name = _determine_realistic_label(event_data, list(available_labels.keys()))
+            if available_labels:
+                logger.info(f"Available labels: {list(available_labels.keys())}")
 
-                if label_name and label_name in available_labels:
-                    event_record.el_id = available_labels[label_name].el_id
-                    labeled_events.append((event_record.event_id, label_name))
-                    logger.info(f"Marked {event_record.event_id} as {label_name}")
+                generated_event_ids = [generated_event.event_id for generated_event in generated_events]
+                all_events = (
+                    session.query(TestingRecordLog)
+                    .filter(
+                        TestingRecordLog.o_id == org_id,
+                        TestingRecordLog.event_id.in_(generated_event_ids),
+                    )
+                    .all()
+                )
 
-            db_session.commit()
-            logger.info(f"Successfully labeled {len(labeled_events)} events")
+                n_to_label = int(len(all_events) * label_ratio)
+                if n_to_label <= 0:
+                    events_to_label = []
+                elif n_to_label >= len(all_events):
+                    events_to_label = all_events
+                else:
+                    events_to_label = rng.sample(all_events, k=n_to_label)
 
-            # Export to CSV if requested
-            if export_csv and labeled_events:
-                _export_labels_to_csv(labeled_events, export_csv)
+                labeled_events = []
+
+                for event_record in events_to_label:
+                    event_data = event_record.event
+                    label_name = _determine_realistic_label(event_data, list(available_labels.keys()))
+
+                    if label_name and label_name in available_labels:
+                        event_record.el_id = available_labels[label_name].el_id
+                        labeled_events.append((event_record.event_id, label_name))
+                        logger.info(f"Marked {event_record.event_id} as {label_name}")
+
+                session.commit()
+                logger.info(f"Successfully labeled {len(labeled_events)} events")
+
+                if export_csv and labeled_events:
+                    _export_labels_to_csv(labeled_events, export_csv)
+    finally:
+        _close_cli_session(engine, session)
 
 
 def _determine_realistic_label(event_data: dict, available_labels) -> str | None:
@@ -607,13 +774,19 @@ def _export_labels_to_csv(labeled_events: list, filename: str):
         logger.error(f"Failed to export CSV: {e}")
 
 
-def _invoke_reset_dev_generation(ctx, *, n_rules: int, n_events: int) -> None:
+def _invoke_reset_dev_generation(ctx, *, n_rules: int, n_events: int, org_name: str | None = None) -> None:
+    kwargs = {
+        "n_rules": n_rules,
+        "n_events": n_events,
+        "label_ratio": 0.3,
+        "export_csv": str(DEFAULT_RESET_DEV_LABELS_CSV_PATH),
+    }
+    if org_name is not None:
+        kwargs["org_name"] = org_name
+
     ctx.invoke(
         generate_random_data,
-        n_rules=n_rules,
-        n_events=n_events,
-        label_ratio=0.3,
-        export_csv=str(DEFAULT_RESET_DEV_LABELS_CSV_PATH),
+        **kwargs,
     )
 
 
@@ -621,52 +794,59 @@ def _invoke_reset_dev_generation(ctx, *, n_rules: int, n_events: int) -> None:
 @click.option("--output-file", default="test_labels.csv", help="Output CSV filename")
 @click.option("--n-events", default=50, help="Number of events to include in CSV")
 @click.option("--unlabeled-only", is_flag=True, help="Only include events that don't have labels yet")
-def export_test_csv(output_file: str, n_events: int, unlabeled_only: bool):
+@click.option(
+    "--org-name",
+    help="Target organisation name. If omitted and exactly one organisation exists, that organisation is used.",
+)
+def export_test_csv(output_file: str, n_events: int, unlabeled_only: bool, org_name: str | None):
     """Export existing events to CSV for testing label uploads"""
     logger.info("Exporting events to CSV for testing...")
-    organisation = _get_or_create_default_organisation(db_session)
-    org_id = int(organisation.o_id)
+    _, engine, session = _create_cli_session()
 
-    # Get available labels for realistic assignment
-    available_labels = [label.label for label in db_session.query(Label).filter(Label.o_id == org_id).all()]
-    if not available_labels:
-        logger.warning("No labels found in database. Create labels in the UI or API before exporting a label CSV.")
-        return
+    try:
+        organisation = _resolve_organisation(session, org_name=org_name)
+        org_id = int(organisation.o_id)
 
-    # Query events based on filter
-    query = db_session.query(TestingRecordLog).filter(TestingRecordLog.o_id == org_id)
-    if unlabeled_only:
-        query = query.filter(TestingRecordLog.el_id.is_(None))
+        available_labels = [label.label for label in session.query(Label).filter(Label.o_id == org_id).all()]
+        if not available_labels:
+            logger.warning("No labels found in database. Create labels in the UI or API before exporting a label CSV.")
+            return
 
-    events = query.limit(n_events).all()
+        query = session.query(TestingRecordLog).filter(TestingRecordLog.o_id == org_id)
+        if unlabeled_only:
+            query = query.filter(TestingRecordLog.el_id.is_(None))
 
-    if not events:
-        logger.warning("No events found matching criteria.")
-        return
+        events = query.limit(n_events).all()
 
-    # Generate test CSV with realistic labels
-    test_labels = []
-    for event in events:
-        event_data = event.event
-        label_name = _determine_realistic_label(event_data, available_labels)
-        if label_name:
-            test_labels.append((event.event_id, label_name))
+        if not events:
+            logger.warning("No events found matching criteria.")
+            return
 
-    if test_labels:
-        _export_labels_to_csv(test_labels, output_file)
-        logger.info(f"Generated test CSV with {len(test_labels)} events")
-        logger.info("Use this file to test the CSV upload functionality in the web interface")
-    else:
-        logger.warning("No valid labels could be generated")
+        test_labels = []
+        for event in events:
+            event_data = event.event
+            label_name = _determine_realistic_label(event_data, available_labels)
+            if label_name:
+                test_labels.append((event.event_id, label_name))
+
+        if test_labels:
+            _export_labels_to_csv(test_labels, output_file)
+            logger.info(f"Generated test CSV with {len(test_labels)} events")
+            logger.info("Use this file to test the CSV upload functionality in the web interface")
+        else:
+            logger.warning("No valid labels could be generated")
+    finally:
+        _close_cli_session(engine, session)
 
 
 @cli.command()
 @click.option("--user-email", default="admin@test_org.com", help="Admin email (default: admin@test_org.com)")
 @click.option("--password", default="12345678", help="Admin password (default: 12345678)")
+@click.option("--org-name", default="test_org", help="Organisation name to bootstrap (default: test_org)")
 @click.option("--n-rules", default=10, help="Number of rules to generate (default: 10)")
 @click.option("--n-events", default=1000, help="Number of events to generate (default: 1000)")
 @click.pass_context
-def reset_dev(ctx, user_email, password, n_rules, n_events):
+def reset_dev(ctx, user_email, password, org_name, n_rules, n_events):
     """Reset the dev database: init-db --auto-delete + add admin user + generate fake data.
 
     One command to get a fresh development environment ready to use.
@@ -677,34 +857,44 @@ def reset_dev(ctx, user_email, password, n_rules, n_events):
     logger.info("Step 1/3: Initializing database...")
     ctx.invoke(init_db, auto_delete=True)
 
-    # Step 2: add admin user
-    logger.info(f"Step 2/3: Creating admin user {user_email}...")
-    ctx.invoke(add_user, user_email=user_email, password=password, admin=True)
+    # Step 2: bootstrap dev organisation and admin user
+    logger.info("Step 2/3: Bootstrapping organisation '%s' with admin user %s...", org_name, user_email)
+    ctx.invoke(bootstrap_org, org_name=org_name, admin_email=user_email, admin_password=password)
 
-    org_id = int(_get_or_create_default_organisation(db_session).o_id)
-    _seed_reset_dev_catalogs(db_session, o_id=org_id)
+    _, engine, session = _create_cli_session()
+    try:
+        organisation = _resolve_organisation(session, org_name=org_name)
+        org_id = int(organisation.o_id)
+        _seed_reset_dev_catalogs(session, o_id=org_id)
 
-    # Step 3: generate fake data
-    logger.info(f"Step 3/3: Generating fake data ({n_rules} rules, {n_events} events)...")
-    _invoke_reset_dev_generation(ctx, n_rules=n_rules, n_events=n_events)
-    _ensure_default_rule_quality_pairs(
-        db_session,
-        o_id=org_id,
-        created_by="cli.reset_dev",
-    )
+        # Step 3: generate fake data
+        logger.info(f"Step 3/3: Generating fake data ({n_rules} rules, {n_events} events)...")
+        _invoke_reset_dev_generation(ctx, org_name=org_name, n_rules=n_rules, n_events=n_events)
+        _ensure_default_rule_quality_pairs(
+            session,
+            o_id=org_id,
+            created_by="cli.reset_dev",
+        )
+    finally:
+        _close_cli_session(engine, session)
 
     logger.info("=== Development environment ready ===")
     logger.info("Generated label-upload CSV at: %s", DEFAULT_RESET_DEV_LABELS_CSV_PATH)
+    logger.info("Organisation: %s", org_name)
     logger.info(f"Login with: {user_email} / {password}")
 
 
 @cli.command()
 def delete_test_data():
-    db_session.query(TestingRecordLog).filter(TestingRecordLog.event_id.ilike("TestEvent_%")).delete(
-        synchronize_session=False
-    )
-    db_session.query(RuleModel).filter(RuleModel.rid.ilike("TestRule_%")).delete(synchronize_session=False)
-    db_session.commit()
+    _, engine, session = _create_cli_session()
+    try:
+        session.query(TestingRecordLog).filter(TestingRecordLog.event_id.ilike("TestEvent_%")).delete(
+            synchronize_session=False
+        )
+        session.query(RuleModel).filter(RuleModel.rid.ilike("TestRule_%")).delete(synchronize_session=False)
+        session.commit()
+    finally:
+        _close_cli_session(engine, session)
 
 
 if __name__ == "__main__":

@@ -95,23 +95,28 @@ uv run ezrules init-db --auto-delete
 verify_db "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('user', 'role', 'organisation');" "3" "Essential tables created"
 
 # Test 2: Add user
-print_status "Test 2: Add user"
+print_status "Test 2: Bootstrap organisation"
+test_org_name="cli_test_org"
 test_email="test@example.com"
 test_password="testpass123"
 
-uv run ezrules add-user --user-email "$test_email" --password "$test_password"
+uv run ezrules bootstrap-org --name "$test_org_name" --admin-email "$test_email" --admin-password "$test_password"
+
+# Verify organisation exists
+verify_db "SELECT name FROM organisation WHERE name = '$test_org_name';" "$test_org_name" "Organisation $test_org_name created"
 
 # Verify user exists in database
 verify_db "SELECT email FROM \"user\" WHERE email = '$test_email';" "$test_email" "User $test_email created"
 verify_db_contains "SELECT password FROM \"user\" WHERE email = '$test_email';" '$2b$' "Password is properly hashed (bcrypt)"
 verify_db "SELECT active FROM \"user\" WHERE email = '$test_email';" "t" "User is active"
+verify_db_contains "SELECT name FROM \"role\" r JOIN roles_users ru ON ru.role_id = r.id JOIN \"user\" u ON u.id = ru.user_id WHERE u.email = '$test_email';" "admin" "Bootstrap user received admin role"
 
 # Test 3: Initialize permissions
 print_status "Test 3: Initialize permissions"
-uv run ezrules init-permissions
+uv run ezrules init-permissions --org-name "$test_org_name"
 
 # Verify roles and permissions exist
-verify_db "SELECT COUNT(*) FROM \"role\" WHERE name IN ('admin', 'readonly', 'rule_editor');" "3" "Default roles created"
+verify_db "SELECT COUNT(*) FROM \"role\" WHERE o_id = (SELECT o_id FROM organisation WHERE name = '$test_org_name') AND name IN ('admin', 'readonly', 'rule_editor');" "3" "Default roles created"
 # Check if we have at least 1 permission (using a more flexible approach)
 actions_count=$(psql "$TEST_DB_ENDPOINT" -t -c "SELECT COUNT(*) FROM actions WHERE name IS NOT NULL;" | xargs)
 if [[ $actions_count -gt 0 ]]; then
@@ -120,19 +125,26 @@ else
     print_error "✗ No permissions found - FAILED"
 fi
 
-# Test 4: Add duplicate user (should handle gracefully)
-print_status "Test 4: Add duplicate user"
-uv run ezrules add-user --user-email "$test_email" --password "newpass" 2>/dev/null || true
+# Test 4: Add second user to explicit organisation
+print_status "Test 4: Add user to explicit organisation"
+member_email="member@example.com"
+uv run ezrules add-user --org-name "$test_org_name" --user-email "$member_email" --password "memberpass123"
+
+verify_db "SELECT email FROM \"user\" WHERE email = '$member_email';" "$member_email" "User $member_email created in explicit organisation"
+
+# Test 5: Add duplicate user (should handle gracefully)
+print_status "Test 5: Add duplicate user"
+uv run ezrules add-user --org-name "$test_org_name" --user-email "$member_email" --password "newpass" 2>/dev/null || true
 
 # Verify only one user exists
-verify_db "SELECT COUNT(*) FROM \"user\" WHERE email = '$test_email';" "1" "Duplicate user not created"
+verify_db "SELECT COUNT(*) FROM \"user\" WHERE email = '$member_email';" "1" "Duplicate user not created"
 
-# Test 5: Generate random data
-print_status "Test 5: Generate random data"
+# Test 6: Generate random data
+print_status "Test 6: Generate random data"
 initial_rules=$(count_rows "rules" "before data generation")
 initial_events=$(count_rows "testing_record_log" "before data generation")
 
-uv run ezrules generate-random-data --n-rules 5 --n-events 10 --label-ratio 0.5
+uv run ezrules generate-random-data --org-name "$test_org_name" --n-rules 5 --n-events 10 --label-ratio 0.5
 
 # Verify data was generated
 final_rules=$(count_rows "rules" "after data generation")
@@ -160,10 +172,10 @@ else
     print_warning "⚠ No events were labeled (this might be expected)"
 fi
 
-# Test 6: Export test CSV
-print_status "Test 6: Export test CSV"
+# Test 7: Export test CSV
+print_status "Test 7: Export test CSV"
 test_csv_file="test_export.csv"
-uv run ezrules export-test-csv --output-file "$test_csv_file" --n-events 5
+uv run ezrules export-test-csv --org-name "$test_org_name" --output-file "$test_csv_file" --n-events 5
 
 if [[ -f "$test_csv_file" ]]; then
     csv_lines=$(wc -l < "$test_csv_file")
@@ -182,10 +194,6 @@ else
     print_error "✗ CSV export failed - file not created"
 fi
 
-# Test 7: Verify organisation exists
-print_status "Test 7: Verify organisation"
-verify_db "SELECT name FROM organisation WHERE name = 'base';" "base" "Base organisation created"
-
 # Test 8: Delete test data
 print_status "Test 8: Delete test data"
 uv run ezrules delete-test-data
@@ -198,7 +206,8 @@ verify_db "SELECT COUNT(*) FROM rules WHERE rid LIKE 'TestRule_%';" "0" "Test ru
 print_status "=== CLI TEST SUMMARY ==="
 print_status "All major CLI commands tested successfully:"
 print_status "  ✓ init-db: Database initialization"
-print_status "  ✓ add-user: User creation with password hashing"
+print_status "  ✓ bootstrap-org: Organisation bootstrap with admin user"
+print_status "  ✓ add-user: User creation in explicit organisations"
 print_status "  ✓ init-permissions: Role and permission setup"
 print_status "  ✓ generate-random-data: Data generation and labeling"
 print_status "  ✓ export-test-csv: CSV export functionality"

@@ -48,7 +48,7 @@ Re-running that command recreates the demo database from scratch so older persis
 **Production** (empty database, credentials from `.env`):
 
 ```bash
-cp .env.example .env   # fill in APP_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
+cp .env.example .env   # fill in APP_SECRET, ORG_NAME, ADMIN_EMAIL, ADMIN_PASSWORD
 docker compose -f docker-compose.prod.yml up --build
 ```
 
@@ -113,11 +113,12 @@ uv sync
 
 ```bash
 uv run ezrules init-db
-uv run ezrules add-user --user-email admin@example.com --password admin --admin
+uv run ezrules bootstrap-org --name your-org --admin-email admin@example.com --admin-password admin
 ```
 
-`init-db` performs database creation (if needed), Alembic migration to head, and bootstrap of the default org, permissions, roles, and user lists.
-It leaves outcomes and labels empty until you create them through the UI or API.
+`init-db` performs database creation (if needed), Alembic migration to head, and initialization of the global action catalogue.
+`bootstrap-org` creates the organisation, seeds default roles and user lists, and ensures the initial admin user exists.
+Outcomes and labels remain empty until you create them through the UI or API.
 
 Requires `settings.env` with `EZRULES_DB_ENDPOINT` and `EZRULES_APP_SECRET`.
 

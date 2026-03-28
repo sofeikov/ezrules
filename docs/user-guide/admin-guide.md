@@ -29,8 +29,7 @@ Use [Deployment Guide](../architecture/deployment.md) for local deployment flow 
 
 ```bash
 uv run ezrules init-db
-uv run ezrules init-permissions
-uv run ezrules add-user --user-email admin@example.com --password admin --admin
+uv run ezrules bootstrap-org --name your-org --admin-email admin@example.com --admin-password admin
 ```
 
 ### Verify
@@ -45,7 +44,7 @@ uv run ezrules add-user --user-email admin@example.com --password admin --admin
 ### Rollback / Recovery
 
 - If initialization was run with wrong DB settings, fix `EZRULES_DB_ENDPOINT` and rerun setup commands
-- If admin login fails, recreate user with `add-user`
+- If admin login fails, rerun `bootstrap-org` for the same organisation or create another admin with `add-user --org-name`
 
 ---
 

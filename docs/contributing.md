@@ -32,7 +32,7 @@ git remote add upstream https://github.com/sofeikov/ezrules.git
 ```bash
 uv sync
 uv run ezrules init-db --auto-delete
-uv run ezrules init-permissions
+uv run ezrules bootstrap-org --name test_org --admin-email admin@test_org.com --admin-password 12345678
 ```
 
 When validating migrations directly (without re-initializing the full DB), apply the current head:

@@ -88,7 +88,7 @@ Full stack with an empty database. Credentials come from a `.env` file you contr
 ```bash
 git clone https://github.com/sofeikov/ezrules.git
 cd ezrules
-cp .env.example .env          # edit with your own secret and admin credentials
+cp .env.example .env          # edit with your own secret, org name, and admin credentials
 docker compose -f docker-compose.prod.yml up --build
 ```
 
@@ -134,12 +134,16 @@ EZRULES_FROM_EMAIL=no-reply@ezrules.local
 EZRULES_APP_BASE_URL=http://localhost:4200
 EOF
 
-# Initialise DB and create an admin user
+# Initialise DB and bootstrap the first organisation/admin
 # init-db creates the database if missing, applies Alembic migrations,
-# and bootstraps the default org, roles, permissions, and user lists.
-# Outcomes and labels are managed explicitly through the UI or API.
+# and initializes the global permission action catalogue.
+# bootstrap-org creates the organisation, seeds default roles and user lists,
+# and ensures the first admin user exists.
 uv run ezrules init-db
-uv run ezrules add-user --user-email admin@example.com --password admin --admin
+uv run ezrules bootstrap-org --name your-org --admin-email admin@example.com --admin-password admin
+
+# Add additional users to an existing organisation
+uv run ezrules add-user --org-name your-org --user-email analyst@example.com --password analyst123
 
 # For existing databases, apply new migrations after pulling updates
 uv run alembic upgrade head
@@ -157,10 +161,11 @@ Open Mailpit at http://localhost:8025 to inspect invitation/password-reset email
 To generate fraud-oriented demo data for development:
 
 ```bash
-uv run ezrules generate-random-data --n-rules 10 --n-events 100
+uv run ezrules generate-random-data --org-name your-org --n-rules 10 --n-events 100
 ```
 
-`init-db` creates a default organisation automatically. Manager requests and API-key evaluation derive org context from the authenticated user or API key rather than a global environment variable.
+`init-db` no longer creates a default organisation automatically. Create organisations explicitly with `bootstrap-org`.
+Manager requests and API-key evaluation derive org context from the authenticated user or API key rather than a global environment variable.
 
 ## 🔐 Enterprise Security
 
