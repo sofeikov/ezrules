@@ -96,10 +96,6 @@ def _get_or_create_organisation(session, *, org_name: str) -> tuple[Organisation
     return _create_organisation(session, org_name=org_name), True
 
 
-def _list_organisation_names(session) -> list[str]:
-    return [str(org.name) for org in session.query(Organisation).order_by(Organisation.name).all()]
-
-
 def _resolve_organisation(session, *, org_name: str | None = None) -> Organisation:
     if org_name is not None:
         organization = _get_organisation_by_name(session, org_name=org_name)
@@ -118,7 +114,7 @@ def _resolve_organisation(session, *, org_name: str | None = None) -> Organisati
             "No organisation exists. Run `uv run ezrules bootstrap-org --name <org-name> ...` first."
         )
 
-    available_orgs = ", ".join(_list_organisation_names(session))
+    available_orgs = ", ".join(str(org.name) for org in organisations)
     raise click.ClickException(
         f"Multiple organisations exist. Pass --org-name to select one. Available organisations: {available_orgs}"
     )
@@ -132,11 +128,12 @@ def _create_user(session, *, user_email: str, password: str, org_id: int) -> Use
     normalized_email = _normalize_user_email(user_email)
     existing_user = session.query(User).filter(User.email == normalized_email).first()
     if existing_user is not None:
-        if int(existing_user.o_id) == org_id:
+        existing_user_org_id = int(existing_user.o_id)
+        if existing_user_org_id == org_id:
             raise click.ClickException(f"User '{normalized_email}' already exists in the selected organisation.")
 
-        existing_org = session.query(Organisation).filter(Organisation.o_id == int(existing_user.o_id)).first()
-        existing_org_name = str(existing_org.name) if existing_org is not None else f"o_id={int(existing_user.o_id)}"
+        existing_org = session.query(Organisation).filter(Organisation.o_id == existing_user_org_id).first()
+        existing_org_name = str(existing_org.name) if existing_org is not None else f"o_id={existing_user_org_id}"
         raise click.ClickException(f"User '{normalized_email}' already exists in organisation '{existing_org_name}'.")
 
     user = User(
@@ -156,11 +153,10 @@ def _get_or_create_user(session, *, user_email: str, password: str, org_id: int)
     normalized_email = _normalize_user_email(user_email)
     existing_user = session.query(User).filter(User.email == normalized_email).first()
     if existing_user is not None:
-        if int(existing_user.o_id) != org_id:
-            existing_org = session.query(Organisation).filter(Organisation.o_id == int(existing_user.o_id)).first()
-            existing_org_name = (
-                str(existing_org.name) if existing_org is not None else f"o_id={int(existing_user.o_id)}"
-            )
+        existing_user_org_id = int(existing_user.o_id)
+        if existing_user_org_id != org_id:
+            existing_org = session.query(Organisation).filter(Organisation.o_id == existing_user_org_id).first()
+            existing_org_name = str(existing_org.name) if existing_org is not None else f"o_id={existing_user_org_id}"
             raise click.ClickException(
                 f"User '{normalized_email}' already exists in organisation '{existing_org_name}'."
             )
@@ -174,7 +170,8 @@ def _get_or_create_user(session, *, user_email: str, password: str, org_id: int)
 
 
 def _ensure_admin_role(session, *, user: User) -> bool:
-    admin_role = _ensure_default_roles(session, o_id=int(user.o_id))["admin"]
+    user_org_id = int(user.o_id)
+    admin_role = _ensure_default_roles(session, o_id=user_org_id)["admin"]
     if admin_role in user.roles:
         return False
 
@@ -185,9 +182,10 @@ def _ensure_admin_role(session, *, user: User) -> bool:
 
 def _bootstrap_organisation(session, *, org_name: str) -> tuple[Organisation, bool]:
     organization, created = _get_or_create_organisation(session, org_name=org_name)
-    _ensure_default_roles(session, o_id=int(organization.o_id))
+    organization_id = int(organization.o_id)
+    _ensure_default_roles(session, o_id=organization_id)
 
-    user_list_manager = PersistentUserListManager(db_session=session, o_id=int(organization.o_id))
+    user_list_manager = PersistentUserListManager(db_session=session, o_id=organization_id)
     user_list_manager._ensure_default_lists()
     return organization, created
 
@@ -350,7 +348,8 @@ def add_user(user_email, password, org_name, admin):
 
     try:
         organization = _resolve_organisation(session, org_name=org_name)
-        user = _create_user(session, user_email=user_email, password=password, org_id=int(organization.o_id))
+        organization_id = int(organization.o_id)
+        user = _create_user(session, user_email=user_email, password=password, org_id=organization_id)
         logger.info("Added %s to organisation '%s' at %s", user.email, organization.name, db_endpoint)
 
         if admin:
@@ -372,11 +371,12 @@ def bootstrap_org(org_name, admin_email, admin_password):
 
     try:
         organization, organization_created = _bootstrap_organisation(session, org_name=org_name)
+        organization_id = int(organization.o_id)
         user, user_created = _get_or_create_user(
             session,
             user_email=admin_email,
             password=admin_password,
-            org_id=int(organization.o_id),
+            org_id=organization_id,
         )
         admin_assigned = _ensure_admin_role(session, user=user)
 
@@ -404,12 +404,7 @@ def bootstrap_org(org_name, admin_email, admin_password):
 
 @cli.command()
 @click.option("--auto-delete", is_flag=True, help="Automatically delete existing database without prompting")
-@click.option(
-    "--with-default-org",
-    is_flag=True,
-    help="Also create the legacy default 'base' organisation with default roles and user lists.",
-)
-def init_db(auto_delete, with_default_org):
+def init_db(auto_delete):
     db_endpoint = app_settings.DB_ENDPOINT
     logger.info(f"Initializing the DB at {db_endpoint}")
 
@@ -468,11 +463,6 @@ def init_db(auto_delete, with_default_org):
             PermissionManager.init_default_actions()
             logger.info("Default permissions initialized")
 
-            if with_default_org:
-                logger.info("Creating legacy default organisation...")
-                organization, _ = _bootstrap_organisation(session, org_name="base")
-                logger.info("Legacy default organisation ready: %s", organization.name)
-
             logger.info(f"Done initializing the DB at {db_endpoint}")
         finally:
             _close_cli_session(engine, session)
@@ -505,7 +495,8 @@ def init_permissions(org_name):
             return
 
         for organization in organisations:
-            _ensure_default_roles(session, o_id=int(organization.o_id))
+            organization_id = int(organization.o_id)
+            _ensure_default_roles(session, o_id=organization_id)
             logger.info("Default roles ready for organisation '%s'", organization.name)
 
         logger.info("Permissions initialized successfully")
