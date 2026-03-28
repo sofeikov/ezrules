@@ -32,7 +32,9 @@ Run the service:
 
 --8<-- "snippets/start-api.md"
 
-Fresh database bootstrap creates a default organisation automatically. Manager requests and API-key evaluation derive org context from the authenticated user or API key, not from an environment variable.
+Fresh database bootstrap does not create an organisation automatically. Create organisations explicitly with
+`uv run ezrules bootstrap-org --name <org-name> --admin-email <email> --admin-password <password>`.
+Manager requests and API-key evaluation derive org context from the authenticated user or API key, not from an environment variable.
 
 ---
 

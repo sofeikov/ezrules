@@ -48,6 +48,7 @@ Edit `.env` with your own values:
 
 ```bash
 EZRULES_APP_SECRET=<generate with: python -c "import secrets; print(secrets.token_hex(32))">
+EZRULES_ORG_NAME=your-org
 EZRULES_ADMIN_EMAIL=admin@yourorg.com
 EZRULES_ADMIN_PASSWORD=<strong password>
 ```
@@ -102,14 +103,15 @@ EZRULES_FROM_EMAIL=no-reply@ezrules.local
 EZRULES_APP_BASE_URL=http://localhost:4200
 ```
 
-### 4) Initialize database and create first user
+### 4) Initialize database and bootstrap the first organisation
 
 ```bash
 uv run ezrules init-db
-uv run ezrules add-user --user-email admin@example.com --password admin --admin
+uv run ezrules bootstrap-org --name your-org --admin-email admin@example.com --admin-password admin
 ```
 
-`init-db` creates the target database (if missing), applies Alembic migrations, creates the default organisation, and bootstraps permissions, roles, and user lists.
+`init-db` creates the target database (if missing), applies Alembic migrations, and initializes the global permission action catalogue.
+`bootstrap-org` creates the organisation, seeds default roles and user lists, and creates the first admin user.
 It does not create any outcomes or labels; add those through the UI or API for each environment.
 After pulling future schema changes, run `uv run alembic upgrade head` on existing databases.
 

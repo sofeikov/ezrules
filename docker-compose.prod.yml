@@ -39,15 +39,15 @@ services:
       - "1025:1025" # SMTP
       - "8025:8025" # Web UI
 
-  # Runs once on first boot to initialise the DB and create the admin user.
+  # Runs once on first boot to initialise the DB and bootstrap the first org/admin.
   # Safe to re-run: init-db keeps an existing DB, Alembic applies pending
-  # migrations, and add-user skips duplicate users.
+  # migrations, and bootstrap-org reuses the existing org/admin while ensuring defaults exist.
   init:
     build: .
     command: >
       sh -c "echo N | uv run ezrules init-db &&
              uv run alembic upgrade head &&
-             uv run ezrules add-user --user-email ${EZRULES_ADMIN_EMAIL} --password ${EZRULES_ADMIN_PASSWORD} --admin"
+             uv run ezrules bootstrap-org --name ${EZRULES_ORG_NAME:-base} --admin-email ${EZRULES_ADMIN_EMAIL} --admin-password ${EZRULES_ADMIN_PASSWORD}"
     depends_on:
       postgres:
         condition: service_healthy

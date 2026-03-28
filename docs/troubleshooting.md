@@ -42,7 +42,13 @@ lsof -i :8888
 1. Create an admin user:
 
    ```bash
-   uv run ezrules add-user --user-email admin@example.com --password admin --admin
+   uv run ezrules bootstrap-org --name your-org --admin-email admin@example.com --admin-password admin
+   ```
+
+   Or, if the organisation already exists:
+
+   ```bash
+   uv run ezrules add-user --org-name your-org --user-email admin@example.com --password admin --admin
    ```
 
 2. Restart API service
