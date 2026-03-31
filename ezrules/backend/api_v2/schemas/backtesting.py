@@ -12,14 +12,18 @@ class BacktestTriggerResponse(BaseModel):
     success: bool
     task_id: str = Field(default="", description="Celery task ID for tracking")
     message: str
+    queue_status: str | None = None
     error: str | None = None
 
 
 class BacktestResultItem(BaseModel):
     task_id: str
     created_at: datetime | None = None
+    completed_at: datetime | None = None
     stored_logic: str | None = None
     proposed_logic: str | None = None
+    status: str | None = None
+    queue_status: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -52,6 +56,9 @@ class BacktestQualitySummary(BaseModel):
 
 class BacktestTaskResult(BaseModel):
     status: str
+    queue_status: str | None = None
+    created_at: datetime | None = None
+    completed_at: datetime | None = None
     stored_result: dict[str, int] | None = None
     proposed_result: dict[str, int] | None = None
     stored_result_rate: dict[str, float] | None = None

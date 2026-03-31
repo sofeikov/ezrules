@@ -75,6 +75,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   // Backtesting properties
   backtestResults: BacktestResultItem[] = [];
   backtestTaskResults: Map<string, BacktestTaskResult> = new Map();
+  private backtestActionStates: Map<string, 'cancel' | 'retry'> = new Map();
   expandedBacktests: Set<string> = new Set();
   backtesting: boolean = false;
   backtestError: string | null = null;
@@ -526,7 +527,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     this.backtestingService.getTaskResult(taskId).subscribe({
       next: (result) => {
         this.setBacktestTaskResult(taskId, result);
-        if (result.status === 'PENDING') {
+        if (this.isBacktestActive(taskId)) {
           this.startPolling(taskId);
         } else {
           this.stopPolling(taskId);
@@ -542,7 +543,6 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   toggleBacktestResult(taskId: string): void {
     if (this.expandedBacktests.has(taskId)) {
       this.expandedBacktests.delete(taskId);
-      this.stopPolling(taskId);
     } else {
       this.expandedBacktests.add(taskId);
       if (!this.backtestTaskResults.has(taskId)) {
@@ -559,6 +559,26 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     return this.backtestTaskResults.get(taskId);
   }
 
+  getBacktestQueueStatus(taskId: string, item?: BacktestResultItem): string {
+    const result = this.backtestTaskResults.get(taskId);
+    const queueStatus = result?.queue_status || item?.queue_status;
+    if (queueStatus) {
+      return queueStatus;
+    }
+
+    const legacyStatus = result?.status || item?.status;
+    switch (legacyStatus) {
+      case 'SUCCESS':
+        return 'done';
+      case 'FAILURE':
+        return 'failed';
+      case 'CANCELLED':
+        return 'cancelled';
+      default:
+        return 'pending';
+    }
+  }
+
   computeBacktestDiff(stored: string | null, proposed: string | null): Change[] {
     const key = `${stored}|||${proposed}`;
     if (!this.backtestDiffs.has(key)) {
@@ -567,10 +587,40 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     return this.backtestDiffs.get(key)!;
   }
 
-  getBacktestStatus(taskId: string): string {
+  getBacktestStatus(taskId: string, item?: BacktestResultItem): string {
     const result = this.backtestTaskResults.get(taskId);
-    if (!result) return 'PENDING';
-    return result.status;
+    if (result?.status) {
+      return result.status;
+    }
+    return item?.status || 'PENDING';
+  }
+
+  getBacktestStatusLabel(taskId: string, item?: BacktestResultItem): string {
+    switch (this.getBacktestQueueStatus(taskId, item)) {
+      case 'pending':
+        return 'Queued';
+      case 'running':
+        return 'Running';
+      case 'done':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Failed';
+    }
+  }
+
+  canCancelBacktest(taskId: string, item?: BacktestResultItem): boolean {
+    const queueStatus = this.getBacktestQueueStatus(taskId, item);
+    return queueStatus === 'pending' || queueStatus === 'running';
+  }
+
+  canRetryBacktest(taskId: string, item?: BacktestResultItem): boolean {
+    return this.getBacktestQueueStatus(taskId, item) === 'failed';
+  }
+
+  isBacktestActionPending(taskId: string, action: 'cancel' | 'retry'): boolean {
+    return this.backtestActionStates.get(taskId) === action;
   }
 
   getOutcomeKeys(taskResult: BacktestTaskResult): string[] {
@@ -638,13 +688,56 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     return metrics.find(metric => metric.outcome === outcome && metric.label === label);
   }
 
+  cancelBacktest(taskId: string, event?: Event): void {
+    event?.stopPropagation();
+    if (!this.rule || this.isBacktestActionPending(taskId, 'cancel')) {
+      return;
+    }
+
+    this.backtestError = null;
+    this.setBacktestActionState(taskId, 'cancel');
+    this.backtestingService.cancelBacktest(taskId).subscribe({
+      next: () => {
+        this.setBacktestActionState(taskId, null);
+        this.stopPolling(taskId);
+        this.loadBacktestResults(this.rule!.r_id);
+      },
+      error: (error) => {
+        this.setBacktestActionState(taskId, null);
+        this.backtestError = error.error?.detail || 'Failed to cancel backtest. Please try again.';
+        console.error('Error cancelling backtest:', error);
+      }
+    });
+  }
+
+  retryBacktest(taskId: string, event?: Event): void {
+    event?.stopPropagation();
+    if (!this.rule || this.isBacktestActionPending(taskId, 'retry')) {
+      return;
+    }
+
+    this.backtestError = null;
+    this.setBacktestActionState(taskId, 'retry');
+    this.backtestingService.retryBacktest(taskId).subscribe({
+      next: () => {
+        this.setBacktestActionState(taskId, null);
+        this.loadBacktestResults(this.rule!.r_id);
+      },
+      error: (error) => {
+        this.setBacktestActionState(taskId, null);
+        this.backtestError = error.error?.detail || 'Failed to retry backtest. Please try again.';
+        console.error('Error retrying backtest:', error);
+      }
+    });
+  }
+
   private startPolling(taskId: string): void {
     if (this.pollingIntervals.has(taskId)) return;
     const interval = setInterval(() => {
       this.backtestingService.getTaskResult(taskId).subscribe({
         next: (result) => {
           this.setBacktestTaskResult(taskId, result);
-          if (result.status !== 'PENDING') {
+          if (!this.isBacktestActive(taskId)) {
             this.stopPolling(taskId);
           }
         },
@@ -674,6 +767,21 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     const nextResults = new Map(this.backtestTaskResults);
     nextResults.delete(taskId);
     this.backtestTaskResults = nextResults;
+  }
+
+  private isBacktestActive(taskId: string): boolean {
+    const queueStatus = this.getBacktestQueueStatus(taskId);
+    return queueStatus === 'pending' || queueStatus === 'running';
+  }
+
+  private setBacktestActionState(taskId: string, action: 'cancel' | 'retry' | null): void {
+    const nextStates = new Map(this.backtestActionStates);
+    if (action) {
+      nextStates.set(taskId, action);
+    } else {
+      nextStates.delete(taskId);
+    }
+    this.backtestActionStates = nextStates;
   }
 
   showReadOnlyNotice(): boolean {

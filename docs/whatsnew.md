@@ -2,6 +2,7 @@
 
 ## v1.2.4
 
+* **Persistent backtest jobs and controls**: Backtest history rows now persist queue status, completion timestamps, and full result metrics, and the Rule Detail page can cancel queued/running jobs and retry failed jobs without losing the original snapshot.
 * **Explicit organisation bootstrap CLI**: `uv run ezrules init-db` now initializes the schema and global action catalogue without auto-creating a default tenant, and the new `uv run ezrules bootstrap-org --name ... --admin-email ... --admin-password ...` command creates an organisation, seeds default roles/user lists, and ensures the first admin user exists.
 * **Org-aware CLI targeting**: `add-user`, `generate-random-data`, and `export-test-csv` now accept `--org-name`, and fall back to implicit selection only when exactly one organisation exists.
 * **Reset-dev now bootstraps a named dev org**: `uv run ezrules reset-dev` now creates an explicit development organisation before seeding demo data, rather than relying on the legacy implicit `base` organisation.

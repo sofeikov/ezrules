@@ -7,14 +7,18 @@ export interface BacktestTriggerResponse {
   success: boolean;
   task_id: string;
   message: string;
+  queue_status?: string | null;
   error?: string;
 }
 
 export interface BacktestResultItem {
   task_id: string;
   created_at: string | null;
+  completed_at?: string | null;
   stored_logic: string | null;
   proposed_logic: string | null;
+  status?: string | null;
+  queue_status?: string | null;
 }
 
 export interface BacktestResultsResponse {
@@ -45,6 +49,9 @@ export interface BacktestQualitySummary {
 
 export interface BacktestTaskResult {
   status: string;
+  queue_status?: string | null;
+  created_at?: string | null;
+  completed_at?: string | null;
   stored_result?: Record<string, number>;
   proposed_result?: Record<string, number>;
   stored_result_rate?: Record<string, number>;
@@ -91,5 +98,13 @@ export class BacktestingService {
     return this.http.get<BacktestTaskResult>(`${this.apiUrl}/task/${taskId}`, {
       params: this.freshParams()
     });
+  }
+
+  cancelBacktest(taskId: string): Observable<BacktestTriggerResponse> {
+    return this.http.delete<BacktestTriggerResponse>(`${this.apiUrl}/${taskId}`);
+  }
+
+  retryBacktest(taskId: string): Observable<BacktestTriggerResponse> {
+    return this.http.post<BacktestTriggerResponse>(`${this.apiUrl}/${taskId}/retry`, {});
   }
 }

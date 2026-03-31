@@ -33,7 +33,7 @@ export class BacktestingPage {
 
   async expandResult(index: number) {
     const item = this.backtestItems.nth(index);
-    const header = item.locator('button').first();
+    const header = item.getByTestId('backtest-toggle-button');
     await header.click();
   }
 
@@ -56,5 +56,21 @@ export class BacktestingPage {
 
   async getOutcomeTable(): Promise<Locator> {
     return this.page.locator('[data-testid="backtest-outcome-table"]').first();
+  }
+
+  getCancelButton(index: number): Locator {
+    return this.backtestItems.nth(index).getByTestId('backtest-cancel-button');
+  }
+
+  getRetryButton(index: number): Locator {
+    return this.backtestItems.nth(index).getByTestId('backtest-retry-button');
+  }
+
+  async cancelResult(index: number) {
+    await this.getCancelButton(index).click();
+  }
+
+  async retryResult(index: number) {
+    await this.getRetryButton(index).click();
   }
 }

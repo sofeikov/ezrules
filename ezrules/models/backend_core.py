@@ -434,6 +434,9 @@ class RuleBackTestingResult(Base):
     task_id = Column(String, nullable=False)
     stored_logic = Column(String, nullable=True)
     proposed_logic = Column(String, nullable=True)
+    result_metrics = Column(JSON, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    status = Column(String(20), nullable=False, default="pending")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     rule: Mapped["Rule"] = relationship(back_populates="backtesting_results")

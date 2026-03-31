@@ -17,6 +17,23 @@ from ezrules.core.type_casting import (
 )
 from ezrules.models.backend_core import TestingRecordLog
 
+BACKTEST_QUEUE_PENDING = "pending"
+BACKTEST_QUEUE_RUNNING = "running"
+BACKTEST_QUEUE_DONE = "done"
+BACKTEST_QUEUE_FAILED = "failed"
+BACKTEST_QUEUE_CANCELLED = "cancelled"
+
+ACTIVE_BACKTEST_QUEUE_STATUSES = {
+    BACKTEST_QUEUE_PENDING,
+    BACKTEST_QUEUE_RUNNING,
+}
+
+TERMINAL_BACKTEST_QUEUE_STATUSES = {
+    BACKTEST_QUEUE_DONE,
+    BACKTEST_QUEUE_FAILED,
+    BACKTEST_QUEUE_CANCELLED,
+}
+
 
 def _safe_round(value: float | None) -> float | None:
     return round(value, 4) if value is not None else None

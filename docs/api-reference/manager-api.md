@@ -250,10 +250,14 @@ Field type config note:
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | `POST` | `/api/v2/backtesting` | Bearer + permission | Trigger async backtest for a rule in the caller's org |
+| `DELETE` | `/api/v2/backtesting/{task_id}` | Bearer + permission | Cancel a queued or running backtest task and persist it as `cancelled` |
+| `POST` | `/api/v2/backtesting/{task_id}/retry` | Bearer + permission | Retry a failed/cancelled backtest using the stored logic snapshot |
 | `GET` | `/api/v2/backtesting/task/{task_id}` | Bearer + permission | Task status/result, including outcome counts/rates, `eligible_records`, `skipped_records`, warnings, plus label counts and quality metrics for labeled history |
 | `GET` | `/api/v2/backtesting/{rule_id}` | Bearer + permission | Backtest history for a rule visible to the caller's org |
 
 Backtest task result note:
+- `GET /api/v2/backtesting/task/{task_id}` now returns both the legacy terminal `status` (`PENDING`, `SUCCESS`, `FAILURE`, `CANCELLED`) and a persisted `queue_status` (`pending`, `running`, `done`, `failed`, `cancelled`) so UI clients can distinguish queued work from active execution.
+- Backtest history rows now persist `queue_status`, `completed_at`, and the full result payload in `result_metrics`, so completed jobs remain inspectable even after Celery result-backend entries age out.
 - `GET /api/v2/backtesting/task/{task_id}` returns raw outcome counts/rates over the eligible comparison subset used by both stored and proposed logic.
 - Results now include `eligible_records`, `skipped_records`, and `warnings` when historical records were excluded because a referenced field was missing/null or live normalization rules would have rejected the event.
 - When labeled historical events exist, it also returns `labeled_records`, `label_counts`, and stored/proposed outcome→label quality summaries and pair metrics (`precision`, `recall`, `f1`, `true_positive`, `false_positive`, `false_negative`).
