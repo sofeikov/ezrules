@@ -113,7 +113,7 @@ def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int, back
                     backtest_id,
                     status=BACKTEST_QUEUE_FAILED,
                     result_metrics=payload,
-                    completed_at=datetime.utcnow(),
+                    completed_at=datetime.now(UTC),
                     skip_if_cancelled=True,
                 )
             return payload
@@ -138,7 +138,7 @@ def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int, back
                     backtest_id,
                     status=BACKTEST_QUEUE_FAILED,
                     result_metrics=payload,
-                    completed_at=datetime.utcnow(),
+                    completed_at=datetime.now(UTC),
                     skip_if_cancelled=True,
                 )
             return payload
@@ -152,7 +152,7 @@ def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int, back
                     backtest_id,
                     status=BACKTEST_QUEUE_FAILED,
                     result_metrics=payload,
-                    completed_at=datetime.utcnow(),
+                    completed_at=datetime.now(UTC),
                     skip_if_cancelled=True,
                 )
             return payload
@@ -171,7 +171,7 @@ def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int, back
                     backtest_id,
                     status=BACKTEST_QUEUE_FAILED,
                     result_metrics=payload,
-                    completed_at=datetime.utcnow(),
+                    completed_at=datetime.now(UTC),
                     skip_if_cancelled=True,
                 )
             return payload
@@ -198,7 +198,7 @@ def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int, back
             backtest_id,
             status=BACKTEST_QUEUE_FAILED if "error" in payload else BACKTEST_QUEUE_DONE,
             result_metrics=payload,
-            completed_at=datetime.utcnow(),
+            completed_at=datetime.now(UTC),
             task_id=str(self.request.id) if getattr(self.request, "id", None) else None,
             skip_if_cancelled=True,
         )
@@ -214,7 +214,7 @@ def generate_rule_quality_report(report_id: int) -> dict[str, str]:
 
     try:
         report.status = "RUNNING"
-        report.started_at = datetime.utcnow()
+        report.started_at = datetime.now(UTC)
         report.error = None
         db_session.commit()
 
@@ -242,7 +242,7 @@ def generate_rule_quality_report(report_id: int) -> dict[str, str]:
 
         report.result = payload
         report.status = "SUCCESS"
-        report.completed_at = datetime.utcnow()
+        report.completed_at = datetime.now(UTC)
         report.error = None
         db_session.commit()
         return {"status": "SUCCESS"}
@@ -252,6 +252,6 @@ def generate_rule_quality_report(report_id: int) -> dict[str, str]:
         if report is not None:
             report.status = "FAILURE"
             report.error = str(e)
-            report.completed_at = datetime.utcnow()
+            report.completed_at = datetime.now(UTC)
             db_session.commit()
         return {"error": f"Rule quality report {report_id} failed: {e!s}"}

@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import uuid4
 
@@ -115,7 +115,7 @@ def _persist_record_from_async_result(task_record: RuleBackTestingResult, db: An
     if eager_result is not None:
         task_record.status = BACKTEST_QUEUE_DONE
         task_record.result_metrics = eager_result
-        task_record.completed_at = task_record.completed_at or datetime.utcnow()
+        task_record.completed_at = task_record.completed_at or datetime.now(UTC)
         db.commit()
         db.refresh(task_record)
         return task_record
@@ -147,7 +147,7 @@ def _persist_record_from_async_result(task_record: RuleBackTestingResult, db: An
     if payload is not None:
         task_record.result_metrics = payload
     if next_status in {BACKTEST_QUEUE_DONE, BACKTEST_QUEUE_FAILED, BACKTEST_QUEUE_CANCELLED}:
-        task_record.completed_at = task_record.completed_at or datetime.utcnow()
+        task_record.completed_at = task_record.completed_at or datetime.now(UTC)
     db.commit()
     db.refresh(task_record)
     return task_record
@@ -207,7 +207,7 @@ def trigger_backtest(
     except Exception as e:
         bt_result.status = BACKTEST_QUEUE_FAILED
         bt_result.result_metrics = {"error": f"Failed to queue backtest: {e!s}"}
-        bt_result.completed_at = datetime.utcnow()
+        bt_result.completed_at = datetime.now(UTC)
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -297,7 +297,7 @@ def cancel_backtest(
     celery_app.control.revoke(task_id, terminate=True)
     task_record.status = BACKTEST_QUEUE_CANCELLED
     task_record.result_metrics = {"error": "Backtest cancelled by operator"}
-    task_record.completed_at = datetime.utcnow()
+    task_record.completed_at = datetime.now(UTC)
     db.commit()
 
     return BacktestTriggerResponse(
@@ -366,7 +366,7 @@ def retry_backtest(
     except Exception as e:
         retry_record.status = BACKTEST_QUEUE_FAILED
         retry_record.result_metrics = {"error": f"Failed to queue backtest retry: {e!s}"}
-        retry_record.completed_at = datetime.utcnow()
+        retry_record.completed_at = datetime.now(UTC)
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -616,7 +616,8 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   }
 
   canRetryBacktest(taskId: string, item?: BacktestResultItem): boolean {
-    return this.getBacktestQueueStatus(taskId, item) === 'failed';
+    const queueStatus = this.getBacktestQueueStatus(taskId, item);
+    return queueStatus === 'failed' || queueStatus === 'cancelled';
   }
 
   isBacktestActionPending(taskId: string, action: 'cancel' | 'retry'): boolean {

@@ -102,6 +102,7 @@ test.describe('Backtesting Controls', () => {
     await backtestingPage.cancelResult(0);
     await backtestingPage.waitForResultStatus(0, 'Cancelled');
     await expect(backtestingPage.getCancelButton(0)).toHaveCount(0);
+    await expect(backtestingPage.getRetryButton(0)).toBeVisible();
   });
 
   test('shows retry control for failed jobs and refreshes the list after retry', async ({ page }) => {
@@ -203,4 +204,4 @@ test.describe('Backtesting Controls', () => {
     await expect(backtestingPage.backtestItems).toHaveCount(2);
     await backtestingPage.waitForResultStatus(0, 'Completed');
   });
-}
+});
