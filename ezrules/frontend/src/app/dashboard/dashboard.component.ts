@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, AfterViewInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Chart, registerables } from 'chart.js';
 import { ChartDataset, DashboardService, RuleActivityItem } from '../services/dashboard.service';
@@ -10,7 +11,7 @@ Chart.register(...registerables);
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterLink, SidebarComponent],
   templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -125,8 +126,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  onAggregationChange(event: Event): void {
-    this.selectedAggregation = (event.target as HTMLSelectElement).value;
+  onAggregationChange(): void {
     this.loadCharts();
   }
 

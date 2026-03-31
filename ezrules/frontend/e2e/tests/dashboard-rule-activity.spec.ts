@@ -29,19 +29,27 @@ test.describe('Dashboard Rule Activity', () => {
     const response = await responsePromise;
 
     expect(response.ok()).toBeTruthy();
+    await expect(dashboardPage.mostFiringState.first()).toBeVisible();
+    await expect(dashboardPage.leastFiringState.first()).toBeVisible();
+    const leastLinkCount = await dashboardPage.leastFiringLinks.count();
+    const mostLinkCount = await dashboardPage.mostFiringLinks.count();
 
-    if (await dashboardPage.leastFiringLinks.count()) {
+    if (leastLinkCount) {
       await expect(dashboardPage.leastFiringLinks.first()).toHaveAttribute('href', /\/rules\/\d+$/);
-      return;
     }
 
-    if (await dashboardPage.mostFiringLinks.count()) {
+    if (mostLinkCount) {
       await expect(dashboardPage.mostFiringLinks.first()).toHaveAttribute('href', /\/rules\/\d+$/);
     }
+
+    expect(leastLinkCount + mostLinkCount).toBeGreaterThan(0);
   });
 
   test('should refetch rule activity when the time range changes', async () => {
+    const initialResponsePromise = dashboardPage.waitForRuleActivityResponse('6h');
     await dashboardPage.goto();
+    const initialResponse = await initialResponsePromise;
+    expect(initialResponse.ok()).toBeTruthy();
     await expect(dashboardPage.timeRangeSelect).toHaveValue('6h');
 
     const responsePromise = dashboardPage.waitForRuleActivityResponse('1h');

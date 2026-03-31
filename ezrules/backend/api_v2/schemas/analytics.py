@@ -35,7 +35,7 @@ class TimeSeriesResponse(BaseModel):
 
     labels: list[str] = Field(..., description="Time labels for x-axis")
     data: list[int] = Field(..., description="Values for y-axis")
-    aggregation: str = Field(..., description="Aggregation period used")
+    aggregation: AggregationPeriod = Field(..., description="Aggregation period used")
 
 
 class ChartDataset(BaseModel):
@@ -54,7 +54,7 @@ class MultiSeriesResponse(BaseModel):
 
     labels: list[str] = Field(..., description="Time labels for x-axis")
     datasets: list[ChartDataset] = Field(..., description="Multiple datasets")
-    aggregation: str = Field(..., description="Aggregation period used")
+    aggregation: AggregationPeriod = Field(..., description="Aggregation period used")
 
 
 class RuleFireActivityItem(BaseModel):
@@ -69,7 +69,7 @@ class RuleFireActivityItem(BaseModel):
 class RuleActivityResponse(BaseModel):
     """Response for most/least firing active rules in a time window."""
 
-    aggregation: str = Field(..., description="Aggregation period used")
+    aggregation: AggregationPeriod = Field(..., description="Aggregation period used")
     limit: int = Field(..., description="Maximum number of rules returned per ranking")
     most_firing: list[RuleFireActivityItem] = Field(..., description="Highest firing active rules")
     least_firing: list[RuleFireActivityItem] = Field(..., description="Lowest firing active rules")

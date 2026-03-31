@@ -21,8 +21,8 @@
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
           <div *ngIf="!loading">
-            <div class="text-5xl font-bold text-blue-600">{{ activeRulesCount }}</div>
-            <div class="text-lg text-gray-500 mt-1">Active Rules</div>
+            <div data-testid="active-rules-value" class="text-5xl font-bold text-blue-600">{{ activeRulesCount }}</div>
+            <div data-testid="active-rules-label" class="text-lg text-gray-500 mt-1">Active Rules</div>
           </div>
         </div>
       </div>
@@ -34,8 +34,8 @@
           <select
             data-testid="dashboard-time-range"
             class="border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            [value]="selectedAggregation"
-            (change)="onAggregationChange($event)"
+            [(ngModel)]="selectedAggregation"
+            (ngModelChange)="onAggregationChange()"
           >
             <option *ngFor="let agg of aggregations" [value]="agg.value">{{ agg.label }}</option>
           </select>
@@ -90,7 +90,7 @@
         <div data-testid="least-firing-rules-card" class="bg-white rounded-lg shadow border border-gray-200">
           <div class="p-6 border-b border-gray-200">
             <h2 class="text-lg font-semibold text-gray-900">Least Firing Rules</h2>
-            <p class="text-sm text-gray-500 mt-1">Active rules with the fewest stored hits, including zero-fire rules.</p>
+            <p class="text-sm text-gray-500 mt-1">Fewest stored hits among active rules, including zero-fire rules.</p>
           </div>
 
           <div class="p-6">
