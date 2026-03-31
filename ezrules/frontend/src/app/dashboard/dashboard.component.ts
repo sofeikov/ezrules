@@ -1,7 +1,8 @@
 import { Component, OnInit, OnDestroy, AfterViewInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { Chart, registerables } from 'chart.js';
-import { DashboardService, ChartDataset } from '../services/dashboard.service';
+import { ChartDataset, DashboardService, RuleActivityItem } from '../services/dashboard.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
 Chart.register(...registerables);
@@ -9,7 +10,7 @@ Chart.register(...registerables);
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, SidebarComponent],
+  imports: [CommonModule, RouterLink, SidebarComponent],
   templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -24,9 +25,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   outcomeDatasets: ChartDataset[] = [];
   outcomeTimeLabels: string[] = [];
+  mostFiringRules: RuleActivityItem[] = [];
+  leastFiringRules: RuleActivityItem[] = [];
 
   private charts: Map<string, Chart> = new Map();
   private canvasReady = false;
+  private readonly ruleActivityLimit = 5;
 
   readonly aggregations = [
     { value: '1h', label: 'Last 1 Hour' },
@@ -71,7 +75,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   loadCharts(): void {
     this.chartsLoading = true;
     let completed = 0;
-    const total = 2;
+    const total = 3;
 
     const checkDone = () => {
       completed++;
@@ -104,6 +108,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       error: () => {
         this.error = 'Failed to load outcomes distribution data.';
+        checkDone();
+      }
+    });
+
+    this.dashboardService.getRuleActivity(this.selectedAggregation, this.ruleActivityLimit).subscribe({
+      next: (response) => {
+        this.mostFiringRules = response.most_firing;
+        this.leastFiringRules = response.least_firing;
+        checkDone();
+      },
+      error: () => {
+        this.error = 'Failed to load rule activity data.';
         checkDone();
       }
     });

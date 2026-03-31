@@ -25,6 +25,8 @@ from ezrules.backend.api_v2.schemas.analytics import (
     LabelsSummaryResponse,
     MultiSeriesResponse,
     PieChartData,
+    RuleActivityResponse,
+    RuleFireActivityItem,
     RuleQualityReportRequest,
     RuleQualityReportTaskResponse,
     RuleQualityResponse,
@@ -39,7 +41,8 @@ from ezrules.backend.rule_quality import (
 from ezrules.backend.runtime_settings import get_rule_quality_lookback_days
 from ezrules.backend.tasks import generate_rule_quality_report
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Label, RuleQualityReport, TestingRecordLog, TestingResultsLog, User
+from ezrules.models.backend_core import Label, RuleQualityReport, RuleStatus, TestingRecordLog, TestingResultsLog, User
+from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/analytics", tags=["Analytics"])
@@ -67,6 +70,19 @@ def format_bucket_label(bucket: Any, config: dict[str, Any]) -> str:
     else:
         dt = datetime.datetime.fromtimestamp(bucket)
         return dt.strftime(config["label_format"])
+
+
+def build_rule_activity_items(rows: list[Any]) -> list[RuleFireActivityItem]:
+    """Normalize SQL rows into rule-activity response items."""
+    return [
+        RuleFireActivityItem(
+            r_id=int(row.r_id),
+            rid=str(row.rid),
+            description=str(row.description),
+            fire_count=int(row.fire_count),
+        )
+        for row in rows
+    ]
 
 
 # =============================================================================
@@ -185,6 +201,64 @@ def get_outcomes_distribution(
         )
 
     return MultiSeriesResponse(labels=labels, datasets=datasets, aggregation=aggregation)
+
+
+# =============================================================================
+# RULE ACTIVITY
+# =============================================================================
+
+
+@router.get("/rule-activity", response_model=RuleActivityResponse)
+def get_rule_activity(
+    aggregation: str = Query(default="6h", description="Aggregation period"),
+    limit: int = Query(default=5, ge=1, le=50, description="Maximum rules returned per ranking"),
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> RuleActivityResponse:
+    """
+    Return most/least firing active rules for the selected time window.
+
+    Fire counts are derived from stored non-null rule outcomes in testing_results_log.
+    """
+    config = validate_aggregation(aggregation)
+    start_time = datetime.datetime.now() - config["delta"]
+
+    fire_counts = (
+        db.query(
+            TestingResultsLog.r_id.label("r_id"),
+            sqlalchemy.func.count(TestingResultsLog.tr_id).label("fire_count"),
+        )
+        .join(TestingRecordLog, TestingRecordLog.tl_id == TestingResultsLog.tl_id)
+        .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.o_id == current_org_id)
+        .group_by(TestingResultsLog.r_id)
+        .subquery()
+    )
+
+    fire_count_expr = sqlalchemy.func.coalesce(fire_counts.c.fire_count, 0)
+    base_query = (
+        db.query(
+            RuleModel.r_id.label("r_id"),
+            RuleModel.rid.label("rid"),
+            RuleModel.description.label("description"),
+            fire_count_expr.label("fire_count"),
+        )
+        .outerjoin(fire_counts, fire_counts.c.r_id == RuleModel.r_id)
+        .filter(RuleModel.o_id == current_org_id)
+        .filter(RuleModel.status == RuleStatus.ACTIVE)
+    )
+
+    most_firing_rows = base_query.order_by(fire_count_expr.desc(), RuleModel.rid.asc()).limit(limit).all()
+    least_firing_rows = base_query.order_by(fire_count_expr.asc(), RuleModel.rid.asc()).limit(limit).all()
+
+    return RuleActivityResponse(
+        aggregation=aggregation,
+        limit=limit,
+        most_firing=build_rule_activity_items(most_firing_rows),
+        least_firing=build_rule_activity_items(least_firing_rows),
+    )
 
 
 # =============================================================================

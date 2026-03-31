@@ -6,6 +6,7 @@ You should be able to answer four questions quickly:
 
 - Are events flowing as expected?
 - Which concrete transactions were just processed, and which rules fired for each one?
+- Which active rules are currently noisy, and which active rules are silent?
 - Which outcomes are firing most often?
 - Do labels confirm or contradict current rule behavior?
 
@@ -17,6 +18,7 @@ Open **Dashboard** in the sidebar and verify:
 
 - Active rules count is non-zero when rules are deployed
 - Transaction volume chart has data in the selected window
+- Most-firing and least-firing rule cards look plausible for the selected window
 - Outcome charts move as you submit test or live events
 
 Use aggregation windows: `1h`, `6h`, `12h`, `24h`, `30d`.
@@ -24,6 +26,7 @@ Use aggregation windows: `1h`, `6h`, `12h`, `24h`, `30d`.
 Healthy signal:
 
 - transaction volume is non-zero when your integration is sending events
+- least-firing rules include active zero-hit rules instead of dropping them from the ranking
 - outcome lines change after rule updates or test submissions
 
 ---
@@ -103,6 +106,7 @@ Healthy signal:
 - `GET /api/v2/tested-events?limit=50`
 - `GET /api/v2/analytics/transaction-volume?aggregation=6h`
 - `GET /api/v2/analytics/outcomes-distribution?aggregation=24h`
+- `GET /api/v2/analytics/rule-activity?aggregation=6h&limit=5`
 - `GET /api/v2/analytics/labels-summary`
 - `GET /api/v2/analytics/labels-distribution?aggregation=6h`
 - `GET /api/v2/analytics/rule-quality?min_support=5&lookback_days=30`

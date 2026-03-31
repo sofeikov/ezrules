@@ -1,5 +1,9 @@
 # What's New
 
+## v1.2.5
+
+* **Dashboard rule-activity rankings**: The Dashboard now shows ranked **Most Firing Rules** and **Least Firing Rules** for the selected time window, uses stored non-null rule outcomes only, includes active zero-hit rules in the least-firing list, and links each ranked row straight to the matching rule detail page.
+
 ## v1.2.4
 
 * **Explicit organisation bootstrap CLI**: `uv run ezrules init-db` now initializes the schema and global action catalogue without auto-creating a default tenant, and the new `uv run ezrules bootstrap-org --name ... --admin-email ... --admin-password ...` command creates an organisation, seeds default roles/user lists, and ensures the first admin user exists.

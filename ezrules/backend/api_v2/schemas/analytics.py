@@ -57,6 +57,24 @@ class MultiSeriesResponse(BaseModel):
     aggregation: str = Field(..., description="Aggregation period used")
 
 
+class RuleFireActivityItem(BaseModel):
+    """Summary row for dashboard rule-fire rankings."""
+
+    r_id: int = Field(..., description="Rule database ID")
+    rid: str = Field(..., description="Rule external ID")
+    description: str = Field(..., description="Rule description")
+    fire_count: int = Field(..., description="Stored non-null outcome count for the selected window")
+
+
+class RuleActivityResponse(BaseModel):
+    """Response for most/least firing active rules in a time window."""
+
+    aggregation: str = Field(..., description="Aggregation period used")
+    limit: int = Field(..., description="Maximum number of rules returned per ranking")
+    most_firing: list[RuleFireActivityItem] = Field(..., description="Highest firing active rules")
+    least_firing: list[RuleFireActivityItem] = Field(..., description="Lowest firing active rules")
+
+
 class PieChartData(BaseModel):
     """Pie chart data for label distribution."""
 
