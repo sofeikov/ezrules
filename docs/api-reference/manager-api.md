@@ -150,6 +150,7 @@ Rule lifecycle fields on rule responses:
 |---|---|---|---|
 | `GET` | `/api/v2/analytics/transaction-volume` | Bearer + permission | Time-series event volume |
 | `GET` | `/api/v2/analytics/outcomes-distribution` | Bearer + permission | Outcome trends |
+| `GET` | `/api/v2/analytics/rule-activity` | Bearer + `VIEW_RULES` | Most/least firing active rules for the caller's org; counts stored non-null outcomes and includes zero-hit active rules in the least-firing ranking |
 | `GET` | `/api/v2/analytics/labels-summary` | Bearer + permission | Total labeled summary for the caller's org |
 | `GET` | `/api/v2/analytics/labels-distribution` | Bearer + permission | Label trends for the caller's org |
 | `GET` | `/api/v2/analytics/labeled-transaction-volume` | Bearer + permission | Time-series labeled event volume for the caller's org |
@@ -163,6 +164,10 @@ Rule quality query params:
 - `force_refresh` on report requests: `false` returns existing snapshot only, `true` enqueues a new snapshot
 - `freeze_at` is returned in responses to indicate snapshot timestamp
 - Reports include only active curated pairs configured under Settings.
+
+Rule activity query params:
+- `aggregation` (default `6h`; valid values `1h`, `6h`, `12h`, `24h`, `30d`)
+- `limit` (default `5`; maximum rules returned per ranking)
 
 ### Settings
 

@@ -21,8 +21,8 @@
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
           <div *ngIf="!loading">
-            <div class="text-5xl font-bold text-blue-600">{{ activeRulesCount }}</div>
-            <div class="text-lg text-gray-500 mt-1">Active Rules</div>
+            <div data-testid="active-rules-value" class="text-5xl font-bold text-blue-600">{{ activeRulesCount }}</div>
+            <div data-testid="active-rules-label" class="text-lg text-gray-500 mt-1">Active Rules</div>
           </div>
         </div>
       </div>
@@ -32,14 +32,107 @@
         <div class="flex items-center gap-2">
           <label class="text-sm text-gray-600">Time Range:</label>
           <select
+            data-testid="dashboard-time-range"
             class="border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            [value]="selectedAggregation"
-            (change)="onAggregationChange($event)"
+            [(ngModel)]="selectedAggregation"
+            (ngModelChange)="onAggregationChange()"
           >
             <option *ngFor="let agg of aggregations" [value]="agg.value">{{ agg.label }}</option>
           </select>
         </div>
       </div>
+
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+        <div data-testid="most-firing-rules-card" class="bg-white rounded-lg shadow border border-gray-200">
+          <div class="p-6 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Most Firing Rules</h2>
+            <p class="text-sm text-gray-500 mt-1">Highest active-rule hit counts in the selected window.</p>
+          </div>
+
+          <div class="p-6">
+            <div *ngIf="chartsLoading" class="flex justify-center py-12">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+
+            <div
+              *ngIf="!chartsLoading && mostFiringRules.length === 0"
+              data-testid="most-firing-rules-empty"
+              class="text-center py-12 text-gray-500"
+            >
+              No active rules available for this window.
+            </div>
+
+            <ol
+              *ngIf="!chartsLoading && mostFiringRules.length > 0"
+              data-testid="most-firing-rules"
+              class="space-y-3"
+            >
+              <li *ngFor="let rule of mostFiringRules">
+                <a
+                  [routerLink]="['/rules', rule.r_id]"
+                  class="flex items-start justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 transition-colors hover:border-blue-300 hover:bg-blue-50"
+                  data-testid="most-firing-rule-link"
+                >
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold text-blue-700 truncate hover:underline">{{ rule.rid }}</p>
+                    <p class="text-sm text-gray-600">{{ rule.description }}</p>
+                  </div>
+                  <div class="shrink-0 text-right">
+                    <p class="text-2xl font-bold text-blue-600">{{ rule.fire_count }}</p>
+                    <p class="text-xs uppercase tracking-wide text-gray-500">fires</p>
+                  </div>
+                </a>
+              </li>
+            </ol>
+          </div>
+        </div>
+
+        <div data-testid="least-firing-rules-card" class="bg-white rounded-lg shadow border border-gray-200">
+          <div class="p-6 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Least Firing Rules</h2>
+            <p class="text-sm text-gray-500 mt-1">Fewest stored hits among active rules, including zero-fire rules.</p>
+          </div>
+
+          <div class="p-6">
+            <div *ngIf="chartsLoading" class="flex justify-center py-12">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+
+            <div
+              *ngIf="!chartsLoading && leastFiringRules.length === 0"
+              data-testid="least-firing-rules-empty"
+              class="text-center py-12 text-gray-500"
+            >
+              No active rules available for this window.
+            </div>
+
+            <ol
+              *ngIf="!chartsLoading && leastFiringRules.length > 0"
+              data-testid="least-firing-rules"
+              class="space-y-3"
+            >
+              <li *ngFor="let rule of leastFiringRules">
+                <a
+                  [routerLink]="['/rules', rule.r_id]"
+                  class="flex items-start justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 transition-colors hover:border-amber-300 hover:bg-amber-50"
+                  data-testid="least-firing-rule-link"
+                >
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold text-blue-700 truncate hover:underline">{{ rule.rid }}</p>
+                    <p class="text-sm text-gray-600">{{ rule.description }}</p>
+                  </div>
+                  <div class="shrink-0 text-right">
+                    <p class="text-2xl font-bold text-amber-600">{{ rule.fire_count }}</p>
+                    <p class="text-xs uppercase tracking-wide text-gray-500">fires</p>
+                  </div>
+                </a>
+              </li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <p class="mb-8 text-sm text-gray-500">Fire counts reflect stored non-null rule outcomes.</p>
 
       <!-- Transaction Volume Section -->
       <div class="bg-white rounded-lg shadow border border-gray-200 mb-8">

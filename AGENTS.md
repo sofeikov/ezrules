@@ -9,11 +9,11 @@ Use this as the single source of truth for backend test runs.
 ## Preconditions
 - PostgreSQL must be reachable on `localhost:5432`.
 - Default local stack (`docker-compose.yml`) uses `postgres:root`.
-- Test DB name should be `tests`.
+- For local agent runs, do **not** use the shared `tests` database when other agents may be active. Follow the existing private E2E naming convention instead, for example `tests_e2e_54043`.
 
 ## Full backend suite command
 ```bash
-EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/tests \
+EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/tests_e2e_54043 \
 EZRULES_TESTING=true \
 EZRULES_APP_SECRET=test-secret \
 EZRULES_ORG_ID=1 \
@@ -21,7 +21,8 @@ uv run pytest --cov=ezrules.backend --cov=ezrules.core --cov-report=term-missing
 ```
 
 ## Notes
-- `conftest.py` creates/drops the `tests` database and applies Alembic migrations (`upgrade head`) before tests.
+- `conftest.py` creates/drops the database named in `EZRULES_DB_ENDPOINT` and applies Alembic migrations (`upgrade head`) before tests.
+- When running the full suite locally, always use a private DB name for the backend test run and a different private DB name for any dev/E2E stack. Never reuse shared names like `tests` or `ezrules`.
 - If another Postgres container is bound to `5432` with different credentials, override `EZRULES_DB_ENDPOINT` accordingly.
 - If uv cache permission errors occur in restricted environments, prefix with `UV_CACHE_DIR=/tmp/uv-cache`.
 - CI parity sequence is: `uv sync --dev` -> `uv run alembic upgrade head` -> pytest command above.
@@ -46,6 +47,7 @@ All common operations are available as VS Code launch configs; use these instead
 - **API v2 (FastAPI)**: starts API on port 8888 with reload
 - **Tests**: runs full pytest suite with coverage (test DB)
 - **Celery Worker**, **Generate Fake Data**, **Playwright: Debug** are also available
+- For local full-suite agent runs, override the shared launch-config DB endpoints with private `*_e2e_<suffix>` database names before starting anything.
 
 # Architecture Overview
 ezrules is a transaction monitoring engine with business rule capabilities.
@@ -82,9 +84,11 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 13. When tests are approved, run ALL tests, not selective subsets.
 14. When the user requests the full test suite, also validate the demo Docker path by testing `docker compose -f docker-compose.demo.yml up --build` and confirming the demo stack starts successfully; tear it down afterward.
 15. When tests require starting local services manually, run the API/backend and Angular frontend on random available high ports instead of standard ports like `8888` and `4200` to reduce the chance of blocking commonly used defaults.
-16. After tests are done, kill any API/backend and Angular dev servers you started manually, regardless of which ports were used.
-17. After all tests pass, reset the dev environment (prefer VS Code launch config **Reset Dev Environment**, or run `EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules EZRULES_TESTING=true uv run ezrules reset-dev`).
-18. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
+16. When running the full test suite locally, always use private database names for this worktree/agent instead of shared names like `tests` or `ezrules`. This applies to backend pytest, CLI test helpers, reset-dev, and any Playwright/dev-stack runs.
+17. Prefer the existing private E2E naming convention, for example `tests_e2e_<suffix>` and `ezrules_e2e_<suffix>`.
+18. After tests are done, kill any API/backend and Angular dev servers you started manually, regardless of which ports were used.
+19. After all tests pass, reset the dev environment using the same private dev DB you used for the run, not the shared `ezrules` DB.
+20. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
 
 # Writing New Documentation
 1. Canonical documentation map: [DOCUMENTATION_MAP.md](DOCUMENTATION_MAP.md)
