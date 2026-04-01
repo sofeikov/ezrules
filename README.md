@@ -23,7 +23,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Rule Lifecycle Controls**: Rules now support `draft`, `active`, and `archived` states with explicit promotion and approver tracking (`effective_from`, `approved_by`, `approved_at`)
 - **Permission-Aware UI**: Navigation, route access, and mutating controls are filtered against the current user's effective permissions; direct links now land on an explicit access-denied page, and view-only users see read-only states instead of clickable controls that fail with `403`
 - **Revision Rollback**: Restore logic and description from a historical rule revision into a new draft version directly from the history timeline, without deleting any audit history
-- **Backtesting**: Test rule changes against historical data before deployment, with outcome counts plus label-aware precision/recall/F1 when labeled history exists; backtests use a common eligible subset when proposed logic references newly introduced fields and report skipped historical records explicitly
+- **Backtesting**: Test rule changes against historical data before deployment, with outcome counts plus label-aware precision/recall/F1 when labeled history exists; backtests use a common eligible subset when proposed logic references newly introduced fields, persist result payloads and queue status in history, and support cancel/retry controls for queued or failed jobs
 - **CLI Tools**: Command-line interface for database management and realistic test data generation
 
 ## 🏗️ Architecture

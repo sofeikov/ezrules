@@ -1,5 +1,8 @@
 # What's New
 
+## v1.2.6
+
+* **Persistent backtest jobs and controls**: Backtest history rows now persist queue status, completion timestamps, and full result metrics, and the Rule Detail page can cancel queued/running jobs and retry failed jobs without losing the original snapshot.
 ## v1.2.5
 
 * **Dashboard rule-activity rankings**: The Dashboard now shows ranked **Most Firing Rules** and **Least Firing Rules** for the selected time window, uses stored non-null rule outcomes only, includes active zero-hit rules in the least-firing list, and links each ranked row straight to the matching rule detail page.

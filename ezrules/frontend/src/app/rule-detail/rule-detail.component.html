@@ -377,28 +377,54 @@
             <div class="space-y-3">
               <div *ngFor="let bt of backtestResults; let i = index" class="border border-gray-200 rounded-lg" [attr.data-testid]="'backtest-item-' + i">
                 <!-- Accordion Header -->
-                <button
-                  (click)="toggleBacktestResult(bt.task_id)"
-                  class="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-                >
-                  <div class="flex items-center space-x-3">
+                <div class="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+                  <button
+                    type="button"
+                    (click)="toggleBacktestResult(bt.task_id)"
+                    class="min-w-0 flex flex-1 items-center space-x-3 text-left"
+                    data-testid="backtest-toggle-button"
+                  >
                     <svg class="w-4 h-4 text-gray-500 transition-transform" [ngClass]="{'rotate-90': isBacktestExpanded(bt.task_id)}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
                     <span class="text-sm text-gray-700">{{ formatDate(bt.created_at) }}</span>
+                  </button>
+                  <div class="flex items-center gap-2">
+                    <button
+                      *ngIf="canCancelBacktest(bt.task_id, bt)"
+                      type="button"
+                      (click)="cancelBacktest(bt.task_id, $event)"
+                      class="px-3 py-1 text-xs font-medium rounded-lg border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                      [disabled]="isBacktestActionPending(bt.task_id, 'cancel')"
+                      data-testid="backtest-cancel-button"
+                    >
+                      {{ isBacktestActionPending(bt.task_id, 'cancel') ? 'Cancelling...' : 'Cancel' }}
+                    </button>
+                    <button
+                      *ngIf="canRetryBacktest(bt.task_id, bt)"
+                      type="button"
+                      (click)="retryBacktest(bt.task_id, $event)"
+                      class="px-3 py-1 text-xs font-medium rounded-lg border border-red-300 text-red-800 bg-red-50 hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                      [disabled]="isBacktestActionPending(bt.task_id, 'retry')"
+                      data-testid="backtest-retry-button"
+                    >
+                      {{ isBacktestActionPending(bt.task_id, 'retry') ? 'Retrying...' : 'Retry' }}
+                    </button>
+                    <span
+                      class="px-2 py-1 rounded-full text-xs font-medium"
+                      [attr.data-testid]="'backtest-status-' + i"
+                      [ngClass]="{
+                        'bg-green-100 text-green-800': getBacktestQueueStatus(bt.task_id, bt) === 'done',
+                        'bg-yellow-100 text-yellow-800': getBacktestQueueStatus(bt.task_id, bt) === 'pending',
+                        'bg-blue-100 text-blue-800': getBacktestQueueStatus(bt.task_id, bt) === 'running',
+                        'bg-red-100 text-red-800': getBacktestQueueStatus(bt.task_id, bt) === 'failed',
+                        'bg-gray-100 text-gray-800': getBacktestQueueStatus(bt.task_id, bt) === 'cancelled'
+                      }"
+                    >
+                      {{ getBacktestStatusLabel(bt.task_id, bt) }}
+                    </span>
                   </div>
-                  <span
-                    class="px-2 py-1 rounded-full text-xs font-medium"
-                    [attr.data-testid]="'backtest-status-' + i"
-                    [ngClass]="{
-                      'bg-green-100 text-green-800': getBacktestStatus(bt.task_id) === 'SUCCESS',
-                      'bg-yellow-100 text-yellow-800': getBacktestStatus(bt.task_id) === 'PENDING',
-                      'bg-red-100 text-red-800': getBacktestStatus(bt.task_id) === 'FAILURE'
-                    }"
-                  >
-                    {{ getBacktestStatus(bt.task_id) === 'SUCCESS' ? 'Completed' : getBacktestStatus(bt.task_id) === 'PENDING' ? 'In Progress' : 'Failed' }}
-                  </span>
-                </button>
+                </div>
 
                 <!-- Accordion Content -->
                 <div *ngIf="isBacktestExpanded(bt.task_id)" class="border-t border-gray-200 px-4 py-4" data-testid="backtest-expanded-content">
@@ -407,15 +433,22 @@
                     <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
                   </div>
 
-                  <!-- PENDING state -->
-                  <div *ngIf="getTaskResult(bt.task_id)?.status === 'PENDING'" class="text-center py-4">
+                  <!-- Active state -->
+                  <div *ngIf="getTaskResult(bt.task_id) && (getBacktestQueueStatus(bt.task_id, bt) === 'pending' || getBacktestQueueStatus(bt.task_id, bt) === 'running')" class="text-center py-4">
                     <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-500 mx-auto mb-2"></div>
-                    <p class="text-sm text-gray-600">Backtest is running...</p>
+                    <p class="text-sm text-gray-600">
+                      {{ getBacktestQueueStatus(bt.task_id, bt) === 'pending' ? 'Backtest is queued...' : 'Backtest is running...' }}
+                    </p>
                   </div>
 
                   <!-- FAILURE state -->
                   <div *ngIf="getTaskResult(bt.task_id)?.status === 'FAILURE'" class="p-3 bg-red-50 border border-red-200 rounded-lg">
                     <p class="text-sm text-red-800">{{ getTaskResult(bt.task_id)?.error || 'Backtest failed' }}</p>
+                  </div>
+
+                  <!-- CANCELLED state -->
+                  <div *ngIf="getTaskResult(bt.task_id)?.status === 'CANCELLED'" class="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <p class="text-sm text-gray-800">{{ getTaskResult(bt.task_id)?.error || 'Backtest cancelled' }}</p>
                   </div>
 
                   <!-- SUCCESS state -->
