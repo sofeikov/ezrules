@@ -153,9 +153,9 @@ def _persist_record_from_async_result(task_record: RuleBackTestingResult, db: An
     return task_record
 
 
-def _enqueue_backtest(rule_id: int, new_rule_logic: str, org_id: int, backtest_id: int, task_id: str) -> None:
+def _enqueue_backtest(rule_id: int, new_rule_logic: str, org_id: int, task_id: str) -> None:
     task = backtest_rule_change.apply_async(
-        args=[rule_id, new_rule_logic, org_id, backtest_id],
+        args=[rule_id, new_rule_logic, org_id],
         task_id=task_id,
     )
     if celery_app.conf.task_always_eager and task.id and isinstance(task.result, dict):
@@ -203,7 +203,7 @@ def trigger_backtest(
     db.refresh(bt_result)
 
     try:
-        _enqueue_backtest(request.r_id, request.new_rule_logic, current_org_id, int(bt_result.bt_id), task_id)
+        _enqueue_backtest(request.r_id, request.new_rule_logic, current_org_id, task_id)
     except Exception as e:
         bt_result.status = BACKTEST_QUEUE_FAILED
         bt_result.result_metrics = {"error": f"Failed to queue backtest: {e!s}"}
@@ -360,7 +360,6 @@ def retry_backtest(
             int(retry_record.r_id),
             str(retry_record.proposed_logic or ""),
             current_org_id,
-            int(retry_record.bt_id),
             retry_task_id,
         )
     except Exception as e:

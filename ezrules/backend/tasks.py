@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from celery import Celery
 
@@ -27,17 +27,22 @@ from ezrules.settings import app_settings
 app = Celery("tasks", backend=f"db+{app_settings.DB_ENDPOINT}", broker=app_settings.CELERY_BROKER_URL)
 
 
+def _get_backtest_record(task_id: str | None) -> RuleBackTestingResult | None:
+    if not task_id:
+        return None
+    return db_session.query(RuleBackTestingResult).filter(RuleBackTestingResult.task_id == task_id).first()
+
+
 def _persist_backtest_state(
-    backtest_id: int,
+    task_id: str,
     *,
     status: str,
     result_metrics: dict[str, Any] | None = None,
     completed_at: datetime | None = None,
-    task_id: str | None = None,
     skip_if_cancelled: bool = False,
 ) -> None:
     try:
-        record = db_session.get(RuleBackTestingResult, backtest_id)
+        record = _get_backtest_record(task_id)
         if record is None:
             return
         if skip_if_cancelled and record.status == BACKTEST_QUEUE_CANCELLED:
@@ -46,8 +51,6 @@ def _persist_backtest_state(
         record.status = status
         record.result_metrics = result_metrics
         record.completed_at = completed_at
-        if task_id:
-            record.task_id = task_id
         db_session.commit()
     except Exception:
         db_session.rollback()
@@ -59,58 +62,58 @@ def _load_backtest_snapshot(
     r_id: int,
     new_rule_logic: str,
     org_id: int,
-    backtest_id: int | None,
     task_id: str | None,
 ) -> tuple[RuleModel | None, str | None, str, dict[str, Any] | None]:
-    if backtest_id is None:
+    record = _get_backtest_record(task_id)
+    if record is None:
         rule_obj = db_session.query(RuleModel).filter(RuleModel.r_id == r_id, RuleModel.o_id == org_id).first()
         if rule_obj is None:
             return None, None, new_rule_logic, None
-        return rule_obj, rule_obj.logic, new_rule_logic, None
-
-    record = db_session.get(RuleBackTestingResult, backtest_id)
-    if record is None:
-        return None, None, new_rule_logic, {"error": f"Backtest record {backtest_id} not found"}
+        return rule_obj, cast(str | None, rule_obj.logic), new_rule_logic, None
     if record.status == BACKTEST_QUEUE_CANCELLED:
         return (
-            record.rule,
-            record.stored_logic,
-            record.proposed_logic or new_rule_logic,
+            cast(RuleModel | None, record.rule),
+            cast(str | None, record.stored_logic),
+            cast(str, record.proposed_logic or new_rule_logic),
             {"error": "Backtest was cancelled before execution began"},
         )
 
-    rule_obj = record.rule
+    rule_obj = cast(RuleModel | None, record.rule)
     if rule_obj is None:
-        return None, None, record.proposed_logic or new_rule_logic, None
+        return None, None, cast(str, record.proposed_logic or new_rule_logic), None
 
     _persist_backtest_state(
-        backtest_id,
+        str(task_id),
         status=BACKTEST_QUEUE_RUNNING,
         result_metrics=None,
         completed_at=None,
-        task_id=str(task_id) if task_id else None,
     )
-    return rule_obj, record.stored_logic or rule_obj.logic, record.proposed_logic or new_rule_logic, None
+    return (
+        rule_obj,
+        cast(str | None, record.stored_logic or rule_obj.logic),
+        cast(str, record.proposed_logic or new_rule_logic),
+        None,
+    )
 
 
 @app.task(bind=True)
-def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int, backtest_id: int | None = None):
+def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int):
+    task_id = str(self.request.id) if getattr(self.request, "id", None) else None
     try:
         rule_obj, stored_logic, proposed_logic, early_payload = _load_backtest_snapshot(
             r_id=r_id,
             new_rule_logic=new_rule_logic,
             org_id=org_id,
-            backtest_id=backtest_id,
-            task_id=str(self.request.id) if getattr(self.request, "id", None) else None,
+            task_id=task_id,
         )
         if early_payload is not None:
             return early_payload
 
         if rule_obj is None:
             payload = {"error": f"Rule with id {r_id} not found"}
-            if backtest_id is not None:
+            if task_id is not None:
                 _persist_backtest_state(
-                    backtest_id,
+                    task_id,
                     status=BACKTEST_QUEUE_FAILED,
                     result_metrics=payload,
                     completed_at=datetime.now(UTC),
@@ -133,9 +136,9 @@ def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int, back
             )
         except Exception as e:
             payload = {"error": f"Failed to compile stored rule: {e!s}"}
-            if backtest_id is not None:
+            if task_id is not None:
                 _persist_backtest_state(
-                    backtest_id,
+                    task_id,
                     status=BACKTEST_QUEUE_FAILED,
                     result_metrics=payload,
                     completed_at=datetime.now(UTC),
@@ -147,9 +150,9 @@ def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int, back
             proposed_rule = Rule(rid="", logic=proposed_logic, list_values_provider=list_provider)
         except Exception as e:
             payload = {"error": f"Failed to compile proposed rule logic: {e!s}"}
-            if backtest_id is not None:
+            if task_id is not None:
                 _persist_backtest_state(
-                    backtest_id,
+                    task_id,
                     status=BACKTEST_QUEUE_FAILED,
                     result_metrics=payload,
                     completed_at=datetime.now(UTC),
@@ -166,9 +169,9 @@ def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int, back
             )
         except Exception as e:
             payload = {"error": f"Failed to query test records: {e!s}"}
-            if backtest_id is not None:
+            if task_id is not None:
                 _persist_backtest_state(
-                    backtest_id,
+                    task_id,
                     status=BACKTEST_QUEUE_FAILED,
                     result_metrics=payload,
                     completed_at=datetime.now(UTC),
@@ -193,13 +196,12 @@ def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int, back
         db_session.rollback()
         payload = {"error": f"Backtest task failed: {e!s}"}
 
-    if backtest_id is not None:
+    if task_id is not None:
         _persist_backtest_state(
-            backtest_id,
+            task_id,
             status=BACKTEST_QUEUE_FAILED if "error" in payload else BACKTEST_QUEUE_DONE,
             result_metrics=payload,
             completed_at=datetime.now(UTC),
-            task_id=str(self.request.id) if getattr(self.request, "id", None) else None,
             skip_if_cancelled=True,
         )
 
