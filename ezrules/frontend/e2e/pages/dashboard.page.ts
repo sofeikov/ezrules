@@ -18,8 +18,8 @@ export class DashboardPage {
   constructor(page: Page) {
     this.page = page;
     this.heading = page.locator('h1');
-    this.activeRulesValue = page.locator('.text-5xl.font-bold.text-blue-600');
-    this.activeRulesLabel = page.locator('text=Active Rules');
+    this.activeRulesValue = page.getByTestId('active-rules-value');
+    this.activeRulesLabel = page.getByTestId('active-rules-label');
     this.transactionVolumeHeading = page.locator('h2:has-text("Transaction Volume")');
     this.outcomesHeading = page.locator('h2:has-text("Rule Outcomes Over Time")');
     this.timeRangeSelect = page.locator('select');

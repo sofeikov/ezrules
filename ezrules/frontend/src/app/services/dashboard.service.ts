@@ -21,6 +21,20 @@ export interface MultiSeriesResponse {
   datasets: ChartDataset[];
 }
 
+export interface RuleActivityItem {
+  r_id: number;
+  rid: string;
+  description: string;
+  fire_count: number;
+}
+
+export interface RuleActivityResponse {
+  aggregation: string;
+  limit: number;
+  most_firing: RuleActivityItem[];
+  least_firing: RuleActivityItem[];
+}
+
 interface TimeSeriesResponseV2 {
   labels: string[];
   data: number[];
@@ -43,7 +57,10 @@ interface MultiSeriesResponseV2 {
 }
 
 interface RulesListResponseV2 {
-  rules: { r_id: number }[];
+  rules: {
+    r_id: number;
+    status: string;
+  }[];
   evaluator_endpoint: string;
 }
 
@@ -58,7 +75,7 @@ export class DashboardService {
 
   getActiveRulesCount(): Observable<number> {
     return this.http.get<RulesListResponseV2>(this.rulesUrl).pipe(
-      map(response => response.rules.length)
+      map(response => response.rules.filter(rule => rule.status === 'active').length)
     );
   }
 
@@ -87,5 +104,11 @@ export class DashboardService {
         }))
       }))
     );
+  }
+
+  getRuleActivity(aggregation: string, limit: number = 5): Observable<RuleActivityResponse> {
+    return this.http.get<RuleActivityResponse>(`${this.analyticsUrl}/rule-activity`, {
+      params: { aggregation, limit }
+    });
   }
 }

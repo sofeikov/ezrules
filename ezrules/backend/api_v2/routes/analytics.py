@@ -21,10 +21,13 @@ from ezrules.backend.api_v2.auth.dependencies import (
 from ezrules.backend.api_v2.schemas.analytics import (
     CHART_COLORS,
     PIE_COLORS,
+    AggregationPeriod,
     ChartDataset,
     LabelsSummaryResponse,
     MultiSeriesResponse,
     PieChartData,
+    RuleActivityResponse,
+    RuleFireActivityItem,
     RuleQualityReportRequest,
     RuleQualityReportTaskResponse,
     RuleQualityResponse,
@@ -39,7 +42,8 @@ from ezrules.backend.rule_quality import (
 from ezrules.backend.runtime_settings import get_rule_quality_lookback_days
 from ezrules.backend.tasks import generate_rule_quality_report
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Label, RuleQualityReport, TestingRecordLog, TestingResultsLog, User
+from ezrules.models.backend_core import Label, RuleQualityReport, RuleStatus, TestingRecordLog, TestingResultsLog, User
+from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/analytics", tags=["Analytics"])
@@ -50,14 +54,27 @@ router = APIRouter(prefix="/api/v2/analytics", tags=["Analytics"])
 # =============================================================================
 
 
-def validate_aggregation(aggregation: str) -> dict[str, Any]:
-    """Validate and return aggregation config."""
-    if aggregation not in AGGREGATION_CONFIG:
+def validate_aggregation(aggregation: str | AggregationPeriod) -> tuple[AggregationPeriod, dict[str, Any]]:
+    """Validate and normalize an aggregation value."""
+    try:
+        period = aggregation if isinstance(aggregation, AggregationPeriod) else AggregationPeriod(aggregation)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid aggregation. Valid options: {list(AGGREGATION_CONFIG.keys())}",
-        )
-    return AGGREGATION_CONFIG[aggregation]
+        ) from exc
+    return period, AGGREGATION_CONFIG[period.value]
+
+
+def get_current_time_bounds(delta: datetime.timedelta | None = None) -> tuple[datetime.datetime, datetime.datetime]:
+    """Return a naive datetime window that tolerates local-vs-UTC stored timestamps."""
+    local_now = datetime.datetime.now()
+    utc_now = datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
+    window_start = min(local_now, utc_now)
+    window_end = max(local_now, utc_now)
+    if delta is not None:
+        window_start -= delta
+    return window_start, window_end
 
 
 def format_bucket_label(bucket: Any, config: dict[str, Any]) -> str:
@@ -69,6 +86,19 @@ def format_bucket_label(bucket: Any, config: dict[str, Any]) -> str:
         return dt.strftime(config["label_format"])
 
 
+def build_rule_activity_items(rows: list[Any]) -> list[RuleFireActivityItem]:
+    """Normalize SQL rows into rule-activity response items."""
+    return [
+        RuleFireActivityItem(
+            r_id=int(row.r_id),
+            rid=str(row.rid),
+            description=str(row.description),
+            fire_count=int(row.fire_count),
+        )
+        for row in rows
+    ]
+
+
 # =============================================================================
 # TRANSACTION VOLUME
 # =============================================================================
@@ -76,7 +106,7 @@ def format_bucket_label(bucket: Any, config: dict[str, Any]) -> str:
 
 @router.get("/transaction-volume", response_model=TimeSeriesResponse)
 def get_transaction_volume(
-    aggregation: str = Query(default="1h", description="Aggregation period"),
+    aggregation: str = Query(default=AggregationPeriod.ONE_HOUR.value, description="Aggregation period"),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
     current_org_id: int = Depends(get_current_org_id),
@@ -87,14 +117,15 @@ def get_transaction_volume(
 
     Returns time-series data showing the number of transactions in each time bucket.
     """
-    config = validate_aggregation(aggregation)
-    start_time = datetime.datetime.now() - config["delta"]
+    aggregation_period, config = validate_aggregation(aggregation)
+    start_time, end_time = get_current_time_bounds(config["delta"])
 
     bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
 
     transactions = (
         db.query(bucket_expr.label("bucket"), sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
         .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.created_at <= end_time)
         .filter(TestingRecordLog.o_id == current_org_id)
         .group_by("bucket")
         .order_by("bucket")
@@ -108,7 +139,7 @@ def get_transaction_volume(
         labels.append(format_bucket_label(bucket, config))
         data.append(count)
 
-    return TimeSeriesResponse(labels=labels, data=data, aggregation=aggregation)
+    return TimeSeriesResponse(labels=labels, data=data, aggregation=aggregation_period)
 
 
 # =============================================================================
@@ -118,7 +149,7 @@ def get_transaction_volume(
 
 @router.get("/outcomes-distribution", response_model=MultiSeriesResponse)
 def get_outcomes_distribution(
-    aggregation: str = Query(default="1h", description="Aggregation period"),
+    aggregation: str = Query(default=AggregationPeriod.ONE_HOUR.value, description="Aggregation period"),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_OUTCOMES)),
     current_org_id: int = Depends(get_current_org_id),
@@ -129,8 +160,8 @@ def get_outcomes_distribution(
 
     Returns multi-series time-series data showing count of each outcome type.
     """
-    config = validate_aggregation(aggregation)
-    start_time = datetime.datetime.now() - config["delta"]
+    aggregation_period, config = validate_aggregation(aggregation)
+    start_time, end_time = get_current_time_bounds(config["delta"])
 
     bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
 
@@ -142,6 +173,7 @@ def get_outcomes_distribution(
         )
         .join(TestingRecordLog, TestingRecordLog.tl_id == TestingResultsLog.tl_id)
         .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.created_at <= end_time)
         .filter(TestingRecordLog.o_id == current_org_id)
         .group_by("bucket", TestingResultsLog.rule_result)
         .order_by("bucket")
@@ -184,7 +216,67 @@ def get_outcomes_distribution(
             )
         )
 
-    return MultiSeriesResponse(labels=labels, datasets=datasets, aggregation=aggregation)
+    return MultiSeriesResponse(labels=labels, datasets=datasets, aggregation=aggregation_period)
+
+
+# =============================================================================
+# RULE ACTIVITY
+# =============================================================================
+
+
+@router.get("/rule-activity", response_model=RuleActivityResponse)
+def get_rule_activity(
+    aggregation: str = Query(default=AggregationPeriod.SIX_HOURS.value, description="Aggregation period"),
+    limit: int = Query(default=5, ge=1, le=50, description="Maximum rules returned per ranking"),
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> RuleActivityResponse:
+    """
+    Return most/least firing active rules for the selected time window.
+
+    Fire counts are derived from stored non-null rule outcomes in testing_results_log.
+    """
+    aggregation_period, config = validate_aggregation(aggregation)
+    start_time, end_time = get_current_time_bounds(config["delta"])
+
+    fire_counts = (
+        db.query(
+            TestingResultsLog.r_id.label("r_id"),
+            sqlalchemy.func.count(TestingResultsLog.tr_id).label("fire_count"),
+        )
+        .join(TestingRecordLog, TestingRecordLog.tl_id == TestingResultsLog.tl_id)
+        .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.created_at <= end_time)
+        .filter(TestingRecordLog.o_id == current_org_id)
+        .filter(TestingResultsLog.rule_result.isnot(None))
+        .group_by(TestingResultsLog.r_id)
+        .subquery()
+    )
+
+    fire_count_expr = sqlalchemy.func.coalesce(fire_counts.c.fire_count, 0)
+    base_query = (
+        db.query(
+            RuleModel.r_id.label("r_id"),
+            RuleModel.rid.label("rid"),
+            RuleModel.description.label("description"),
+            fire_count_expr.label("fire_count"),
+        )
+        .outerjoin(fire_counts, fire_counts.c.r_id == RuleModel.r_id)
+        .filter(RuleModel.o_id == current_org_id)
+        .filter(RuleModel.status == RuleStatus.ACTIVE)
+    )
+
+    most_firing_rows = base_query.order_by(fire_count_expr.desc(), RuleModel.rid.asc()).limit(limit).all()
+    least_firing_rows = base_query.order_by(fire_count_expr.asc(), RuleModel.rid.asc()).limit(limit).all()
+
+    return RuleActivityResponse(
+        aggregation=aggregation_period,
+        limit=limit,
+        most_firing=build_rule_activity_items(most_firing_rows),
+        least_firing=build_rule_activity_items(least_firing_rows),
+    )
 
 
 # =============================================================================
@@ -194,7 +286,7 @@ def get_outcomes_distribution(
 
 @router.get("/labels-distribution", response_model=MultiSeriesResponse)
 def get_labels_distribution(
-    aggregation: str = Query(default="1h", description="Aggregation period"),
+    aggregation: str = Query(default=AggregationPeriod.ONE_HOUR.value, description="Aggregation period"),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
     current_org_id: int = Depends(get_current_org_id),
@@ -205,8 +297,8 @@ def get_labels_distribution(
 
     Returns multi-series time-series data showing count of each label type.
     """
-    config = validate_aggregation(aggregation)
-    start_time = datetime.datetime.now() - config["delta"]
+    aggregation_period, config = validate_aggregation(aggregation)
+    start_time, end_time = get_current_time_bounds(config["delta"])
 
     bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
 
@@ -218,6 +310,7 @@ def get_labels_distribution(
         )
         .join(TestingRecordLog, TestingRecordLog.el_id == Label.el_id)
         .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.created_at <= end_time)
         .filter(TestingRecordLog.o_id == current_org_id)
         .filter(Label.o_id == current_org_id)
         .filter(TestingRecordLog.el_id.isnot(None))
@@ -262,7 +355,7 @@ def get_labels_distribution(
             )
         )
 
-    return MultiSeriesResponse(labels=labels, datasets=datasets, aggregation=aggregation)
+    return MultiSeriesResponse(labels=labels, datasets=datasets, aggregation=aggregation_period)
 
 
 # =============================================================================
@@ -272,7 +365,7 @@ def get_labels_distribution(
 
 @router.get("/labeled-transaction-volume", response_model=TimeSeriesResponse)
 def get_labeled_transaction_volume(
-    aggregation: str = Query(default="1h", description="Aggregation period"),
+    aggregation: str = Query(default=AggregationPeriod.ONE_HOUR.value, description="Aggregation period"),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
     current_org_id: int = Depends(get_current_org_id),
@@ -283,14 +376,15 @@ def get_labeled_transaction_volume(
 
     Returns time-series data showing the number of labeled transactions in each time bucket.
     """
-    config = validate_aggregation(aggregation)
-    start_time = datetime.datetime.now() - config["delta"]
+    aggregation_period, config = validate_aggregation(aggregation)
+    start_time, end_time = get_current_time_bounds(config["delta"])
 
     bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
 
     transactions = (
         db.query(bucket_expr.label("bucket"), sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
         .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.created_at <= end_time)
         .filter(TestingRecordLog.o_id == current_org_id)
         .filter(TestingRecordLog.el_id.isnot(None))
         .group_by("bucket")
@@ -305,7 +399,7 @@ def get_labeled_transaction_volume(
         labels.append(format_bucket_label(bucket, config))
         data.append(count)
 
-    return TimeSeriesResponse(labels=labels, data=data, aggregation=aggregation)
+    return TimeSeriesResponse(labels=labels, data=data, aggregation=aggregation_period)
 
 
 # =============================================================================
@@ -423,7 +517,7 @@ def get_rule_quality(
     applied_lookback_days = (
         lookback_days if lookback_days is not None else get_rule_quality_lookback_days(db, current_org_id)
     )
-    freeze_at = datetime.datetime.utcnow()
+    _window_start, freeze_at = get_current_time_bounds()
     max_tl_id = get_rule_quality_snapshot_max_tl_id(
         db,
         freeze_at=freeze_at,
@@ -458,7 +552,7 @@ def request_rule_quality_report(
     )
     active_pairs = get_active_rule_quality_pairs(db, o_id=current_org_id)
     pair_set_hash = compute_rule_quality_pairs_hash(active_pairs)
-    now = datetime.datetime.utcnow()
+    _window_start, now = get_current_time_bounds()
 
     if not request_data.force_refresh:
         cached_report = (
