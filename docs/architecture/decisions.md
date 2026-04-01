@@ -12,9 +12,9 @@ Use it as the canonical decision log until formal ADR files are introduced.
 
 ## ADR-002: Internal-Use Evaluator Endpoint
 
-- **Decision**: keep `POST /api/v2/evaluate` available without built-in user authentication.
-- **Why**: service-to-service evaluation path with low friction for internal pipelines.
-- **Tradeoff**: requires network/gateway enforcement outside application auth.
+- **Decision**: keep `POST /api/v2/evaluate` inside the unified API service and require either an API key or a Bearer token.
+- **Why**: supports service-to-service evaluation without a separate evaluator service while preserving organisation scoping.
+- **Tradeoff**: callers must provision and manage credentials for every request.
 - **Related docs**: [Evaluator API](../api-reference/evaluator-api.md), [Architecture Overview](overview.md).
 
 ## ADR-003: PostgreSQL as Source of Truth

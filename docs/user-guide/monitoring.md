@@ -62,8 +62,8 @@ Healthy signal:
 Open **Analytics** in the sidebar and verify:
 
 - Total labeled events
-- Label distribution
 - Label trends over time
+- Aggregation window changes update the charts you are reviewing
 
 If charts are empty, feed labels through:
 

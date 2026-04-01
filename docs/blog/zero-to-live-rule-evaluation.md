@@ -44,10 +44,11 @@ Fresh installs start with an empty outcomes catalog, so creating the first outco
 
 ## Minute 5-7: Send a live event to the evaluator
 
-Call the evaluator endpoint:
+Authenticate first (for example via `POST /api/v2/auth/login`) and then call the evaluator endpoint:
 
 ```bash
 curl -X POST http://localhost:8888/api/v2/evaluate \
+  -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "txn_live_001",

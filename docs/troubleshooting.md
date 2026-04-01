@@ -181,7 +181,7 @@ docker compose ps
 
 - Another PostgreSQL container is already bound to `localhost:5432`
 - Credentials in `EZRULES_DB_ENDPOINT` do not match the running DB
-- Test DB name differs from expected (`tests`)
+- Test DB name differs from the private database you intended to use (`tests_e2e_<suffix>`)
 
 **Diagnose**
 
@@ -196,9 +196,10 @@ echo "$EZRULES_DB_ENDPOINT"
 2. Run tests with explicit env vars:
 
    ```bash
-   EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/tests \
+   EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/tests_e2e_local \
    EZRULES_TESTING=true \
    EZRULES_APP_SECRET=test-secret \
+   EZRULES_ORG_ID=1 \
    uv run pytest --cov=ezrules.backend --cov=ezrules.core --cov-report=term-missing --cov-report=xml tests
    ```
 

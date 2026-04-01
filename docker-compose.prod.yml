@@ -2,7 +2,7 @@
 # Intended for real usage. Credentials are loaded from a .env file.
 #
 # Setup:
-#   cp .env.example .env   # then edit .env with your own values
+#   cp .env.example .env   # then edit .env with EZRULES_APP_SECRET, EZRULES_ORG_NAME, EZRULES_ADMIN_EMAIL, and EZRULES_ADMIN_PASSWORD
 #   docker compose -f docker-compose.prod.yml up --build
 #
 # Access:

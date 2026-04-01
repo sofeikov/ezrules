@@ -103,7 +103,7 @@ Shadow evaluation errors are silenced — production response is never affected.
 | Decision | Why | Tradeoff |
 |---|---|---|
 | Unified API service for management + evaluation | Simplifies local/dev topology and operations | One service handles mixed workloads |
-| Evaluate endpoint without built-in user auth | Supports internal service-to-service usage | Must enforce network-level controls externally |
+| Evaluate endpoint with API key or Bearer auth | Supports service-to-service usage while preserving org scoping | Callers must provision credentials for every request |
 | Rule execution in-process | Low integration overhead and direct access to model context | Poorly written rules can impact latency |
 | PostgreSQL as source of truth | Strong relational model and auditability | Requires schema/index care at larger scale |
 | Optional Celery for backtesting | Keeps heavy reprocessing async | Adds Redis/worker operational dependency |

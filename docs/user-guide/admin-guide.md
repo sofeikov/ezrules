@@ -121,12 +121,14 @@ Use audit endpoints during incident review or compliance checks:
 - `GET /api/v2/audit/users`
 - `GET /api/v2/audit/roles`
 - `GET /api/v2/audit/field-types`
+- `GET /api/v2/audit/api-keys`
 
 Operational tips:
 
 - Capture `changed_by` values and timestamps when preparing incident timelines
 - Watch for `rolled_back` rule actions when reconstructing emergency change timelines
 - Field type changes affect rule evaluation behavior; review `GET /api/v2/audit/field-types` when investigating unexpected rule outcomes
+- Review `GET /api/v2/audit/api-keys` when tracing API key creation or revocation during an incident
 
 ### Rule rollback in incident response
 

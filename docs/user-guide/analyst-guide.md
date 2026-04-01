@@ -202,6 +202,7 @@ Use these API examples only when labeling/testing is integrated into another sys
 
 ```bash
 curl -X POST http://localhost:8888/api/v2/evaluate \
+  -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "txn_001",

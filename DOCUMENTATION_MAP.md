@@ -53,5 +53,5 @@ This file is the quick reference for where documentation lives and what code is 
 3. Ensure documented UI paths match `ezrules/frontend/src/app/app.routes.ts`.
 
 ## Snippets
-- Reusable snippets live in `docs/snippets/*.txt`.
+- Reusable snippets live in `docs/snippets/*.md`.
 - Keep include references aligned with snippet file names.

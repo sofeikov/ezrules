@@ -249,6 +249,7 @@ Field type config note:
 | `GET` | `/api/v2/audit/users` | Bearer + permission | User-account history for the caller's org (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/roles` | Bearer + permission | Role/permission history for the caller's org (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/field-types` | Bearer + permission | Field type config history (`limit`, `offset`, `field_name` filter) |
+| `GET` | `/api/v2/audit/api-keys` | Bearer + permission | API key create/revoke history for the caller's org (`limit`, `offset`, filters) |
 
 ### Backtesting
 

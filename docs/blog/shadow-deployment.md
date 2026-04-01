@@ -20,7 +20,7 @@ There is no traffic splitting, no separate service to deploy, no routing configu
 
 ```mermaid
 flowchart LR
-    A[Incoming event] --> B[POST /evaluate]
+    A[Incoming event] --> B[POST /api/v2/evaluate]
     B --> C[Production rules]
     B --> D[Shadow rules]
     C --> E[Response to caller]

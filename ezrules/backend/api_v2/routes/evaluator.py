@@ -2,8 +2,8 @@
 FastAPI routes for event evaluation.
 
 These endpoints provide the rule evaluation engine, merged into the
-main API service. No authentication required — designed for
-service-to-service / internal use.
+main API service. Requests must authenticate with either an API key
+or a Bearer token.
 """
 
 import hashlib

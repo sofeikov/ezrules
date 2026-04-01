@@ -61,7 +61,7 @@ ul.task-list li input[type="checkbox"] {
 <p>From the caller’s perspective, nothing has changed. From your perspective, you’re accumulating a real distribution of how the candidate rule would have answered every question the production system received, starting from the moment you deployed it.</p>
 <p>There is no traffic splitting, no separate service to deploy, no routing configuration. You hit the Deploy to Shadow button (or the API equivalent), and from that point forward every event is evaluated against the shadow config in parallel with production.</p>
 <pre class="mermaid"><code>flowchart LR
-    A[Incoming event] --&gt; B[POST /evaluate]
+    A[Incoming event] --&gt; B[POST /api/v2/evaluate]
     B --&gt; C[Production rules]
     B --&gt; D[Shadow rules]
     C --&gt; E[Response to caller]

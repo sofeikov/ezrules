@@ -4,12 +4,12 @@ This page is organized for fast local setup first, then production hardening.
 
 ## Fast Path (Local Development)
 
-Set these three variables first:
+Set these two variables first:
 
 - `EZRULES_DB_ENDPOINT`
 - `EZRULES_APP_SECRET`
 
-If you use the Rules page "Evaluate" shortcut, set this too:
+If external clients or automation read the evaluator URL from `GET /api/v2/rules`, set this too:
 
 - `EZRULES_EVALUATOR_ENDPOINT`
 
@@ -44,8 +44,9 @@ Manager requests and API-key evaluation derive org context from the authenticate
 |---|---|---|---|---|
 | `EZRULES_DB_ENDPOINT` | Yes | None | `postgresql://user:pass@host:5432/db` | Primary database connection |
 | `EZRULES_APP_SECRET` | Yes | None | strong random string | JWT/signing and security features |
-| `EZRULES_EVALUATOR_ENDPOINT` | No | `localhost:9999` | `http://localhost:8888/api/v2` | Base URL used by Rules page "Evaluate" shortcut |
+| `EZRULES_EVALUATOR_ENDPOINT` | No | `localhost:9999` | `http://localhost:8888/api/v2` | Evaluator base URL advertised in `GET /api/v2/rules` responses |
 | `EZRULES_TESTING` | No | `false` | `true` in tests | Testing mode |
+| `EZRULES_MAX_BODY_SIZE_KB` | No | `1024` | `2048` | Reject requests whose declared body size exceeds this limit |
 | `EZRULES_CELERY_BROKER_URL` | No | `redis://localhost:6379` | `redis://host:6379/0` | Celery broker for backtesting |
 | `EZRULES_SMTP_HOST` | No | None | `smtp.example.com` | SMTP host for invitation/password reset emails |
 | `EZRULES_SMTP_PORT` | No | `587` | `587` | SMTP port |
