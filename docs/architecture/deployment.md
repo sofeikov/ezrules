@@ -1,6 +1,6 @@
 # Deployment Guide (Local Runbook)
 
-This runbook covers local deployment. Three modes are supported.
+This runbook covers local deployment. Two local deployment modes are supported.
 
 For system boundaries and design rationale, use [Architecture Overview](overview.md).
 For environment variable details, use [Configuration](../getting-started/configuration.md).
@@ -11,7 +11,7 @@ For environment variable details, use [Configuration](../getting-started/configu
 
 In scope:
 
-- single-host local setup, all three deployment modes
+- single-host local setup, both deployment modes
 - API service startup and verification
 - backtesting worker readiness
 
@@ -48,7 +48,7 @@ Re-running that command recreates the demo database from scratch so older persis
 **Production** (empty database, credentials from `.env`):
 
 ```bash
-cp .env.example .env   # fill in APP_SECRET, ORG_NAME, ADMIN_EMAIL, ADMIN_PASSWORD
+cp .env.example .env   # fill in EZRULES_APP_SECRET, EZRULES_ORG_NAME, EZRULES_ADMIN_EMAIL, EZRULES_ADMIN_PASSWORD
 docker compose -f docker-compose.prod.yml up --build
 ```
 
@@ -61,7 +61,7 @@ curl http://localhost:8888/ping        # → {"status":"ok"}
 # open http://localhost:4200 in a browser
 ```
 
-Stop (keep data):
+Stop containers:
 
 ```bash
 docker compose -f docker-compose.demo.yml down
@@ -69,10 +69,15 @@ docker compose -f docker-compose.demo.yml down
 docker compose -f docker-compose.prod.yml down
 ```
 
+For the production stack, that keeps the Docker volume data intact.
+For the demo stack, the next `up --build` run reseeds the database from scratch.
+
 Stop and delete all data:
 
 ```bash
 docker compose -f docker-compose.demo.yml down -v
+# or
+docker compose -f docker-compose.prod.yml down -v
 ```
 
 ---
@@ -186,5 +191,9 @@ docker compose down
 docker compose up -d
 uv run ezrules api --port 8888
 uv run poe check
+EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/tests_e2e_local \
+EZRULES_TESTING=true \
+EZRULES_APP_SECRET=test-secret \
+EZRULES_ORG_ID=1 \
 uv run pytest --cov=ezrules.backend --cov=ezrules.core --cov-report=term-missing --cov-report=xml tests
 ```

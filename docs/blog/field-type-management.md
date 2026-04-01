@@ -15,7 +15,7 @@ ezrules v0.12 handles this at the engine level.
 
 ## How it works
 
-Every event that passes through `/evaluate` is observed. For each field in the payload, we record the JSON type Python saw — `int`, `float`, `str`, `bool` — and how many times we've seen that combination. The same happens in the Test Rule panel, so observations build up during development without needing live traffic.
+Every event that passes through `/api/v2/evaluate` is observed. For each field in the payload, we record the JSON type Python saw — `int`, `float`, `str`, `bool` — and how many times we've seen that combination. The same happens in the Test Rule panel, so observations build up during development without needing live traffic.
 
 The observations show up under **Settings → Field Types**:
 

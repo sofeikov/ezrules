@@ -52,7 +52,6 @@ txn_003,CHARGEBACK
 Open **Analytics** (sidebar label) to view:
 
 - Total labeled events
-- Label distribution summary
 - Label trends over time
 - Aggregation windows (`1h`, `6h`, `12h`, `24h`, `30d`)
 
