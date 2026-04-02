@@ -35,8 +35,19 @@ export interface RulesResponse {
 }
 
 export interface VerifyRuleResponse {
+  valid: boolean;
   params: string[];
+  referenced_lists: string[];
   warnings: string[];
+  errors: RuleVerifyError[];
+}
+
+export interface RuleVerifyError {
+  message: string;
+  line: number | null;
+  column: number | null;
+  end_line: number | null;
+  end_column: number | null;
 }
 
 export interface TestRuleResponse {

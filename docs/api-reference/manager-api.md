@@ -103,6 +103,13 @@ Rule lifecycle fields on rule responses:
 - Deleting a rule preserves its history so `GET /api/v2/audit/rules/{rule_id}` remains available after deletion.
 - Rules with an active shadow deployment or rollout cannot be edited, archived, deleted, directly promoted, or rolled back until the candidate deployment is removed or promoted.
 
+`POST /api/v2/rules/verify` response fields:
+- `valid`: `true` when the rule compiles successfully; `false` when syntax or referenced-list validation fails.
+- `params`: extracted `$field` references used for JSON prefill and unseen-field warnings.
+- `warnings`: advisory messages for referenced fields that have not yet been observed in traffic or rule-test payloads.
+- `referenced_lists`: detected `@user_list` names, even when validation fails.
+- `errors`: structured validation failures with `message`, `line`, `column`, `end_line`, and `end_column`.
+
 ### Shadow
 
 | Method | Path | Auth | Notes |

@@ -269,20 +269,12 @@ test.describe('Rule Detail Page', () => {
       expect(isFocused || value.includes('\t')).toBeTruthy();
     });
 
-    test('should handle TAB key in logic textarea', async () => {
+    test('should render syntax-highlighted logic in read-only mode', async () => {
       await ruleDetailPage.goto(testRuleId);
       await ruleDetailPage.waitForRuleToLoad();
 
-      // Note: logic textarea is readonly, but should still handle Tab if it weren't
-      // This test verifies the handleTextareaTab function is applied
-      await ruleDetailPage.logicTextarea.click();
-
-      // Press Tab key
-      await ruleDetailPage.logicTextarea.press('Tab');
-
-      // Since it's readonly, focus might move, but the handler should be present
-      // We're just verifying no errors occur
-      await expect(ruleDetailPage.logicTextarea).toBeDefined();
+      await expect(ruleDetailPage.logicViewer).toBeVisible();
+      await expect(ruleDetailPage.logicViewer.locator('.cm-rule-field-token')).toContainText('$amount');
     });
   });
 
