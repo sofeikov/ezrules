@@ -1,5 +1,10 @@
 # What's New
 
+## v1.3.1
+
+* **Configurable active-rule auto-promotion**: Organisations can now enable `auto_promote_active_rule_updates` under **Settings → General** so edits to already active rules stay live immediately instead of always falling back to a draft.
+* **Permission boundary preserved for live edits**: Even with active-rule auto-promotion enabled, saving an active rule in place still requires `PROMOTE_RULES` in addition to `MODIFY_RULE`, so draft editing and live deployment remain separate capabilities.
+
 ## 1.3.0
 
 * **CodeMirror rule editor**: The rule create/edit flows now use a proper syntax-highlighted editor instead of a plain textarea, with line numbers, Python-aware highlighting, and dedicated styling for ezrules `$field` and `@userList` notation.

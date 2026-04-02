@@ -66,6 +66,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   saving: boolean = false;
   saveError: string | null = null;
   saveSuccess: boolean = false;
+  saveSuccessMessage: string = 'Rule saved successfully!';
 
   // Shadow deployment properties
   shadowEntry: ShadowRuleItem | null = null;
@@ -367,6 +368,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       this.rolloutTrafficPercent = this.rolloutEntry?.traffic_percent ?? 10;
       this.saveError = null;
       this.saveSuccess = false;
+      this.saveSuccessMessage = 'Rule saved successfully!';
       this.rolloutDeployError = null;
       this.rolloutDeploySuccess = false;
       this.fillInExampleParams(this.editedLogic);
@@ -378,6 +380,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     this.isEditMode = false;
     this.saveError = null;
     this.saveSuccess = false;
+    this.saveSuccessMessage = 'Rule saved successfully!';
     if (this.rule) {
       this.editedDescription = this.rule.description;
       this.editedLogic = this.rule.logic;
@@ -393,6 +396,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     this.saving = true;
     this.saveError = null;
     this.saveSuccess = false;
+    this.saveSuccessMessage = 'Rule saved successfully!';
 
     const updateData: UpdateRuleRequest = {
       description: this.editedDescription,
@@ -405,6 +409,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
         if (response.success && response.rule) {
           this.rule = response.rule;
           this.saveSuccess = true;
+          this.saveSuccessMessage = response.message || 'Rule saved successfully!';
           this.isEditMode = false;
           // Update test JSON with new parameters
           this.fillInExampleParams();
@@ -414,7 +419,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.saving = false;
-        this.saveError = error.error?.error || 'Failed to save rule. Please try again.';
+        this.saveError = error.error?.detail || error.error?.error || 'Failed to save rule. Please try again.';
         console.error('Error saving rule:', error);
       }
     });
