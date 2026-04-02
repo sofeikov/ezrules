@@ -1,5 +1,10 @@
 # What's New
 
+## v1.2.7
+
+* **Configurable active-rule auto-promotion**: Organisations can now enable `auto_promote_active_rule_updates` under **Settings → General** so edits to already active rules stay live immediately instead of always falling back to a draft.
+* **Permission boundary preserved for live edits**: Even with active-rule auto-promotion enabled, saving an active rule in place still requires `PROMOTE_RULES` in addition to `MODIFY_RULE`, so draft editing and live deployment remain separate capabilities.
+
 ## v1.2.6
 
 * **Persistent backtest jobs and controls**: Backtest history rows now persist queue status, completion timestamps, and full result metrics, and the Rule Detail page can cancel queued/running jobs and retry failed jobs without losing the original snapshot.

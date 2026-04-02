@@ -158,6 +158,8 @@ Shadow deployment gives you live-traffic validation without any production impac
 
 If you want to move beyond observe-only validation, use [Rule Rollouts](rule-rollouts.md) to serve the candidate logic to a controlled percentage of live traffic while the current production version remains the control.
 
+By default, editing an active rule saves a new `draft` version and removes that rule from live production until you promote it again. If your organisation enables **Settings → General → Auto-promote edits to active rules**, users who also have `PROMOTE_RULES` can save an edit to an active rule and keep it live immediately.
+
 ---
 
 ## Review History and Roll Back Safely

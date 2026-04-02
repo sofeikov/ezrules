@@ -8,6 +8,12 @@ from pydantic import BaseModel, Field
 class RuntimeSettingsResponse(BaseModel):
     """Current runtime settings used by configurable backend features."""
 
+    auto_promote_active_rule_updates: bool = Field(
+        ..., description="Whether edits to active rules are auto-promoted in place"
+    )
+    default_auto_promote_active_rule_updates: bool = Field(
+        ..., description="Fallback default for active-rule auto-promotion"
+    )
     rule_quality_lookback_days: int = Field(..., ge=1, description="Default lookback (days) for rule-quality analytics")
     default_rule_quality_lookback_days: int = Field(
         ..., ge=1, description="Fallback env-based default lookback in days"
@@ -17,6 +23,7 @@ class RuntimeSettingsResponse(BaseModel):
 class RuntimeSettingsUpdateRequest(BaseModel):
     """Request payload for runtime settings updates."""
 
+    auto_promote_active_rule_updates: bool | None = Field(default=None)
     rule_quality_lookback_days: int = Field(..., ge=1, le=3650)
 
 

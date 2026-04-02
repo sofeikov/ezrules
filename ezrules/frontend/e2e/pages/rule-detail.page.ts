@@ -61,11 +61,11 @@ export class RuleDetailPage {
 
     // Edit mode locators
     this.editButton = page.locator('button:has-text("Edit Rule")');
-    this.saveButton = page.locator('button:has-text("Save to Production")');
+    this.saveButton = page.locator('[data-testid="rule-save-button"]');
     this.cancelButton = page.locator('button:has-text("Cancel")');
     this.descriptionTextarea = page.locator('label:has-text("Description") + textarea');
     this.editableLogicTextarea = page.locator('label:has-text("Logic") + textarea:not([readonly])');
-    this.saveSuccessMessage = page.locator('text=Rule saved successfully');
+    this.saveSuccessMessage = page.locator('[data-testid="rule-save-success"]');
     this.saveErrorMessage = page.locator('.bg-red-50:has-text("Failed")').or(page.locator('.bg-red-50:has-text("Invalid")'));
   }
 

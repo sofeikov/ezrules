@@ -18,6 +18,8 @@ import {
   templateUrl: './settings.component.html'
 })
 export class SettingsComponent implements OnInit {
+  autoPromoteActiveRuleUpdates: boolean = false;
+  defaultAutoPromoteActiveRuleUpdates: boolean = false;
   loading: boolean = true;
   saving: boolean = false;
   hierarchySaving: boolean = false;
@@ -70,6 +72,8 @@ export class SettingsComponent implements OnInit {
       pairs: this.runtimeSettingsService.getRuleQualityPairs(),
     }).subscribe({
       next: ({ settings, hierarchy, options, pairs }) => {
+        this.autoPromoteActiveRuleUpdates = settings.autoPromoteActiveRuleUpdates;
+        this.defaultAutoPromoteActiveRuleUpdates = settings.defaultAutoPromoteActiveRuleUpdates;
         this.ruleQualityLookbackDays = settings.ruleQualityLookbackDays;
         this.defaultRuleQualityLookbackDays = settings.defaultRuleQualityLookbackDays;
         this.hierarchyOutcomes = hierarchy;
@@ -106,8 +110,13 @@ export class SettingsComponent implements OnInit {
     }
 
     this.saving = true;
-    this.runtimeSettingsService.updateRuntimeSettings(Math.floor(this.ruleQualityLookbackDays)).subscribe({
+    this.runtimeSettingsService.updateRuntimeSettings(
+      Math.floor(this.ruleQualityLookbackDays),
+      this.autoPromoteActiveRuleUpdates
+    ).subscribe({
       next: (settings) => {
+        this.autoPromoteActiveRuleUpdates = settings.autoPromoteActiveRuleUpdates;
+        this.defaultAutoPromoteActiveRuleUpdates = settings.defaultAutoPromoteActiveRuleUpdates;
         this.ruleQualityLookbackDays = settings.ruleQualityLookbackDays;
         this.defaultRuleQualityLookbackDays = settings.defaultRuleQualityLookbackDays;
         this.success = 'Settings saved successfully.';

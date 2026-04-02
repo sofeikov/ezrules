@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import uuid4
 
@@ -28,7 +28,7 @@ from ezrules.backend.backtesting import (
     BACKTEST_QUEUE_RUNNING,
 )
 from ezrules.backend.tasks import app as celery_app
-from ezrules.backend.tasks import backtest_rule_change
+from ezrules.backend.tasks import backtest_rule_change, execute_backtest_rule_change
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import Rule
 from ezrules.core.user_lists import PersistentUserListManager
@@ -38,6 +38,7 @@ from ezrules.models.backend_core import RuleBackTestingResult, User
 router = APIRouter(prefix="/api/v2/backtesting", tags=["Backtesting"])
 _MAX_EAGER_BACKTEST_RESULTS = 128
 _EAGER_BACKTEST_RESULTS: OrderedDict[str, dict[str, Any]] = OrderedDict()
+_SYNC_BACKTEST_FALLBACK_DELAY = timedelta(seconds=2)
 
 
 def _queue_status_to_response_status(queue_status: str) -> str:
@@ -153,6 +154,35 @@ def _persist_record_from_async_result(task_record: RuleBackTestingResult, db: An
     return task_record
 
 
+def _should_run_sync_backtest_fallback(task_record: RuleBackTestingResult) -> bool:
+    created_at = _record_datetime(task_record.created_at)
+    if created_at is None:
+        return False
+    if _record_result_metrics(task_record) is not None:
+        return False
+    if _record_queue_status(task_record) != BACKTEST_QUEUE_PENDING:
+        return False
+    return datetime.now(UTC) - created_at.astimezone(UTC) >= _SYNC_BACKTEST_FALLBACK_DELAY
+
+
+def _run_sync_backtest_fallback(task_record: RuleBackTestingResult, db: Any) -> RuleBackTestingResult:
+    if not _should_run_sync_backtest_fallback(task_record):
+        return task_record
+
+    rule = cast(RuleModel | None, task_record.rule)
+    if rule is None:
+        return task_record
+
+    execute_backtest_rule_change(
+        int(task_record.r_id),
+        cast(str, task_record.proposed_logic or rule.logic),
+        int(rule.o_id),
+        task_id=str(task_record.task_id),
+    )
+    db.refresh(task_record)
+    return task_record
+
+
 def _enqueue_backtest(rule_id: int, new_rule_logic: str, org_id: int, task_id: str) -> None:
     task = backtest_rule_change.apply_async(
         args=[rule_id, new_rule_logic, org_id],
@@ -250,6 +280,7 @@ def get_task_result(
         or _record_queue_status(task_record) in ACTIVE_BACKTEST_QUEUE_STATUSES
     ):
         task_record = _persist_record_from_async_result(task_record, db)
+        task_record = _run_sync_backtest_fallback(task_record, db)
 
     return _build_task_result_response(
         queue_status=_record_queue_status(task_record),
@@ -403,6 +434,13 @@ def get_backtest_results(
         .all()
     )
 
+    refreshed_results: list[RuleBackTestingResult] = []
+    for result in results:
+        if _record_result_metrics(result) is None or _record_queue_status(result) in ACTIVE_BACKTEST_QUEUE_STATUSES:
+            result = _persist_record_from_async_result(result, db)
+            result = _run_sync_backtest_fallback(result, db)
+        refreshed_results.append(result)
+
     items = [
         BacktestResultItem(
             task_id=str(r.task_id),
@@ -413,7 +451,7 @@ def get_backtest_results(
             status=_queue_status_to_response_status(_record_queue_status(r)),
             queue_status=_record_queue_status(r),
         )
-        for r in results
+        for r in refreshed_results
     ]
 
     return BacktestResultsResponse(results=items)

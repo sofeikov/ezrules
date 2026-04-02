@@ -35,13 +35,15 @@ The same metadata is snapshotted into `rules_history`, so lifecycle transitions 
 The lifecycle is enforced by API behavior:
 
 - `POST /api/v2/rules` creates a `draft` rule
-- `PUT /api/v2/rules/{id}` saves edits as `draft` and clears previous approval metadata
+- `PUT /api/v2/rules/{id}` saves edits as `draft` and clears previous approval metadata by default
 - `POST /api/v2/rules/{id}/rollback` restores a historical revision's logic and description into a brand new `draft`
 - `POST /api/v2/rules/{id}/promote` moves `draft` to `active` and records approver + approval timestamp
 - `POST /api/v2/rules/{id}/archive` moves a rule to `archived`
 - `DELETE /api/v2/rules/{id}` deletes the rule (requires `DELETE_RULE`)
 
 Production evaluation config now includes only `active` rules.
+
+An org can opt into `auto_promote_active_rule_updates` through the runtime settings API or **Settings → General**. When that setting is enabled, editing an already active rule keeps it active and rewrites the production config immediately, but the caller still needs `PROMOTE_RULES` in addition to `MODIFY_RULE`.
 
 ```mermaid
 flowchart LR

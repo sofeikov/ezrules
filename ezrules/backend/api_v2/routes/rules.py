@@ -37,6 +37,7 @@ from ezrules.backend.api_v2.schemas.rules import (
     RuleVerifyResponse,
 )
 from ezrules.backend.api_v2.schemas.shadow import ShadowDeployRequest, ShadowDeployResponse
+from ezrules.backend.runtime_settings import get_auto_promote_active_rule_updates
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import MissingFieldLookupError, Rule, RuleFactory
@@ -57,7 +58,7 @@ from ezrules.core.rule_updater import (
 )
 from ezrules.core.type_casting import CastError, RequiredFieldError, normalize_event
 from ezrules.core.user_lists import PersistentUserListManager
-from ezrules.models.backend_core import FieldObservation, RuleHistory, RuleStatus, User
+from ezrules.models.backend_core import Action, FieldObservation, RoleActions, RuleHistory, RuleStatus, User
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.settings import app_settings
 
@@ -112,6 +113,25 @@ def build_rule_warnings(db: Any, org_id: int, referenced_fields: list[str]) -> l
 def is_active(rule: RuleModel) -> bool:
     """Return True when a rule is currently active."""
     return rule.status == RuleStatus.ACTIVE
+
+
+def user_has_permission(db: Any, user: User, action: PermissionAction) -> bool:
+    """Return True when the current user has the requested permission."""
+    db_action = db.query(Action).filter_by(name=action.value).first()
+    if db_action is None:
+        return False
+
+    for role in user.roles:
+        role_action = (
+            db.query(RoleActions)
+            .filter_by(role_id=role.id, action_id=db_action.id)
+            .filter(RoleActions.resource_id.is_(None))
+            .first()
+        )
+        if role_action is not None:
+            return True
+
+    return False
 
 
 def get_status(status_value: RuleStatus | str) -> RuleStatus:
@@ -463,6 +483,14 @@ def update_rule(
             error="Archived rules cannot be modified",
         )
 
+    was_active = is_active(rule)
+    auto_promote_active_updates = was_active and get_auto_promote_active_rule_updates(db, current_org_id)
+    if auto_promote_active_updates and not user_has_permission(db, user, PermissionAction.PROMOTE_RULES):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="PROMOTE_RULES permission is required to update active rules when auto-promotion is enabled",
+        )
+
     # Apply updates (only if provided)
     new_description = rule_data.description if rule_data.description is not None else rule.description
     new_logic = rule_data.logic if rule_data.logic is not None else rule.logic
@@ -482,26 +510,31 @@ def update_rule(
             error=f"Invalid rule logic: {e!s}",
         )
 
+    promoted_at = datetime.now(UTC) if auto_promote_active_updates else None
+    next_status = RuleStatus.ACTIVE if auto_promote_active_updates else RuleStatus.DRAFT
+
     # Snapshot current state before mutation
     save_rule_history(
         db,
         rule,
         changed_by=str(user.email),
         action="updated",
-        to_status=RuleStatus.DRAFT,
+        to_status=next_status,
+        effective_from_override=promoted_at,
+        approved_by_override=int(user.id) if auto_promote_active_updates else None,
+        approved_at_override=promoted_at,
     )
-    was_active = is_active(rule)
 
     # Apply the mutation and save (version bump handled by rule manager)
     rule.description = new_description
     rule.logic = new_logic
-    rule.status = RuleStatus.DRAFT
-    rule.effective_from = None
-    rule.approved_by = None
-    rule.approved_at = None
+    rule.status = next_status
+    rule.effective_from = promoted_at
+    rule.approved_by = user.id if auto_promote_active_updates else None
+    rule.approved_at = promoted_at
     rule_manager.save_rule(rule)
 
-    # Editing an active rule creates a draft and removes it from production config.
+    # Editing an active rule either updates production in place or removes the rule until it is re-promoted.
     if was_active:
         config_producer.save_config(rule_manager, changed_by=str(user.email))
 
@@ -517,7 +550,11 @@ def update_rule(
 
     return RuleMutationResponse(
         success=True,
-        message="Rule updated in draft status. Promote to activate.",
+        message=(
+            "Rule updated and kept active."
+            if auto_promote_active_updates
+            else "Rule updated in draft status. Promote to activate."
+        ),
         rule=rule_to_response(rule, revisions),
     )
 

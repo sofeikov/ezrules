@@ -76,12 +76,12 @@
       </div>
 
       <!-- Save Success Message -->
-      <div *ngIf="saveSuccess && !loading" class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+      <div *ngIf="saveSuccess && !loading" class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6" data-testid="rule-save-success">
         <div class="flex items-center">
           <svg class="w-5 h-5 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <p class="text-sm font-medium text-green-800">Rule saved successfully!</p>
+          <p class="text-sm font-medium text-green-800">{{ saveSuccessMessage }}</p>
         </div>
       </div>
 
@@ -209,9 +209,10 @@
                 <button
                   (click)="saveRule()"
                   [disabled]="saving"
+                  data-testid="rule-save-button"
                   class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  <span *ngIf="!saving">Save to Production</span>
+                  <span *ngIf="!saving">Save Changes</span>
                   <span *ngIf="saving" class="flex items-center">
                     <svg class="animate-spin h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

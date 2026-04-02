@@ -25,7 +25,10 @@ from ezrules.backend.api_v2.schemas.settings import (
     RuntimeSettingsUpdateRequest,
 )
 from ezrules.backend.runtime_settings import (
+    AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
+    get_auto_promote_active_rule_updates,
     get_rule_quality_lookback_days,
+    set_auto_promote_active_rule_updates,
     set_rule_quality_lookback_days,
 )
 from ezrules.core.audit_helpers import save_outcome_history
@@ -74,6 +77,8 @@ def get_runtime_settings(
 ) -> RuntimeSettingsResponse:
     """Return current runtime settings that can be tuned without redeploying."""
     return RuntimeSettingsResponse(
+        auto_promote_active_rule_updates=get_auto_promote_active_rule_updates(db, current_org_id),
+        default_auto_promote_active_rule_updates=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
         rule_quality_lookback_days=get_rule_quality_lookback_days(db, current_org_id),
         default_rule_quality_lookback_days=app_settings.RULE_QUALITY_LOOKBACK_DAYS,
     )
@@ -89,9 +94,13 @@ def update_runtime_settings(
 ) -> RuntimeSettingsResponse:
     """Update runtime settings values."""
     set_rule_quality_lookback_days(db, request_data.rule_quality_lookback_days, current_org_id)
+    if request_data.auto_promote_active_rule_updates is not None:
+        set_auto_promote_active_rule_updates(db, request_data.auto_promote_active_rule_updates, current_org_id)
     db.commit()
 
     return RuntimeSettingsResponse(
+        auto_promote_active_rule_updates=get_auto_promote_active_rule_updates(db, current_org_id),
+        default_auto_promote_active_rule_updates=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
         rule_quality_lookback_days=get_rule_quality_lookback_days(db, current_org_id),
         default_rule_quality_lookback_days=app_settings.RULE_QUALITY_LOOKBACK_DAYS,
     )

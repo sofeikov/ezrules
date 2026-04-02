@@ -1,6 +1,7 @@
 import { Page, Locator } from '@playwright/test';
 
 export class SettingsPage {
+  readonly autoPromoteActiveRuleUpdatesCheckbox: Locator;
   readonly page: Page;
   readonly heading: Locator;
   readonly lookbackDaysInput: Locator;
@@ -15,6 +16,7 @@ export class SettingsPage {
   constructor(page: Page) {
     this.page = page;
     this.heading = page.locator('h1');
+    this.autoPromoteActiveRuleUpdatesCheckbox = page.locator('#settings-autoPromoteActiveRuleUpdates');
     this.lookbackDaysInput = page.locator('#settings-ruleQualityLookbackDays');
     this.saveButton = page.locator('#settings-saveRuntimeSettings');
     this.outcomeHierarchySaveButton = page.locator('#settings-saveOutcomeHierarchy');
@@ -31,6 +33,7 @@ export class SettingsPage {
 
   async waitForPageToLoad() {
     await this.heading.waitFor({ state: 'visible' });
+    await this.autoPromoteActiveRuleUpdatesCheckbox.waitFor({ state: 'visible' });
     await this.lookbackDaysInput.waitFor({ state: 'visible' });
     await this.outcomeHierarchySaveButton.waitFor({ state: 'visible' });
     await this.pairsTable.waitFor({ state: 'visible' });
@@ -43,6 +46,17 @@ export class SettingsPage {
 
   async setLookbackDays(value: number) {
     await this.lookbackDaysInput.fill(String(value));
+  }
+
+  async isAutoPromoteActiveRuleUpdatesEnabled(): Promise<boolean> {
+    return this.autoPromoteActiveRuleUpdatesCheckbox.isChecked();
+  }
+
+  async setAutoPromoteActiveRuleUpdates(value: boolean) {
+    const currentValue = await this.autoPromoteActiveRuleUpdatesCheckbox.isChecked();
+    if (currentValue !== value) {
+      await this.autoPromoteActiveRuleUpdatesCheckbox.click();
+    }
   }
 
   async save() {
