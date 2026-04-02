@@ -30,9 +30,10 @@ For permission checking, use require_permission():
 
 import hashlib
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import joinedload, sessionmaker
 
@@ -57,6 +58,15 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # When you click it and enter credentials, Swagger POSTs to this URL.
 # auto_error=False allows unauthenticated requests (for optional auth mode)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v2/auth/login", auto_error=False)
+
+
+@dataclass(slots=True)
+class EvaluatorRequestState:
+    """Per-request evaluator auth and org-context state."""
+
+    org_id: int | None = None
+    auth_error: HTTPException | None = None
+    org_context_bound: bool = False
 
 
 # =============================================================================
@@ -96,6 +106,15 @@ def bind_request_org_context(db: Any, org_id: int) -> int:
     set_organization_id(org_id)
     set_user_list_manager(PersistentUserListManager(db_session=db, o_id=org_id))
     return org_id
+
+
+def get_evaluator_request_state(request: Request) -> EvaluatorRequestState:
+    """Return the evaluator request state, creating it on first access."""
+    state = getattr(request.state, "evaluator_request_state", None)
+    if state is None:
+        state = EvaluatorRequestState()
+        request.state.evaluator_request_state = state
+    return state
 
 
 def get_org_id_for_api_key(api_key: str, db: Any) -> int | None:
@@ -389,6 +408,7 @@ def require_permission(
 
 
 def get_evaluator_auth(
+    request: Request,
     api_key: str | None = Header(default=None, alias="X-API-Key"),
     token: str | None = Depends(oauth2_scheme),
     db: Any = Depends(get_db),
@@ -399,37 +419,53 @@ def get_evaluator_auth(
     Accepts either an X-API-Key header or a Bearer JWT access token.
     Raises 401 if neither is provided or if the provided credentials are invalid.
     """
+    request_state = get_evaluator_request_state(request)
+    if request_state.org_id is not None:
+        return request_state.org_id
+    if request_state.auth_error is not None:
+        raise request_state.auth_error
+
     if api_key is not None:
         org_id = get_org_id_for_api_key(api_key, db)
         if org_id is not None:
+            request_state.org_id = org_id
             return org_id
-        raise HTTPException(
+        request_state.auth_error = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or revoked API key",
         )
+        raise request_state.auth_error
 
     if token is not None:
         org_id = get_org_id_for_access_token(token, db)
         if org_id is not None:
+            request_state.org_id = org_id
             return org_id
-        raise HTTPException(
+        request_state.auth_error = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+        raise request_state.auth_error
 
-    raise HTTPException(
+    request_state.auth_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Authentication required",
     )
+    raise request_state.auth_error
 
 
 async def get_current_evaluator_org_id(
+    request: Request,
     org_id: int = Depends(get_evaluator_auth),
     db: Any = Depends(get_db),
 ) -> int:
     """Bind evaluator org context in the async request task before sync execution hops."""
-    return bind_request_org_context(db, org_id)
+    request_state = get_evaluator_request_state(request)
+    if not request_state.org_context_bound:
+        bind_request_org_context(db, org_id)
+        request_state.org_context_bound = True
+    return org_id
 
 
 def require_any_permission(*actions: PermissionAction) -> Callable[..., None]:

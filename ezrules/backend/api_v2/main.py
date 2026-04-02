@@ -93,7 +93,8 @@ async def cleanup_scoped_db_session(request: StarletteRequest, call_next):
     """Release request-local context and any checked-out scoped DB session."""
     context_db = db_session if app_settings.TESTING else SessionLocal()
     try:
-        _prime_request_context_from_headers(request, context_db)
+        if request.url.path != "/api/v2/evaluate":
+            _prime_request_context_from_headers(request, context_db)
         return await call_next(request)
     finally:
         reset_context()
