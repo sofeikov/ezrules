@@ -1,5 +1,11 @@
 # What's New
 
+## 1.3.0
+
+* **CodeMirror rule editor**: The rule create/edit flows now use a proper syntax-highlighted editor instead of a plain textarea, with line numbers, Python-aware highlighting, and dedicated styling for ezrules `$field` and `@userList` notation.
+* **Structured rule diagnostics**: `POST /api/v2/rules/verify` now returns explicit validation metadata (`valid`, `errors`, and referenced user lists), and the Angular UI surfaces syntax and missing-list issues inline with line/column context while you type.
+* **Rule authoring hints**: The editor now offers autocomplete for observed fields and known user lists, plus live detected-reference chips so rule writers can see which `$fields` and `@lists` the current source resolves to before testing or saving.
+
 ## v1.2.6
 
 * **Persistent backtest jobs and controls**: Backtest history rows now persist queue status, completion timestamps, and full result metrics, and the Rule Detail page can cancel queued/running jobs and retry failed jobs without losing the original snapshot.

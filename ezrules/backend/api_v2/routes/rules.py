@@ -6,6 +6,7 @@ All endpoints require authentication and appropriate permissions.
 """
 
 import json
+import re
 from datetime import UTC, datetime
 from json import JSONDecodeError
 from typing import Any
@@ -33,6 +34,7 @@ from ezrules.backend.api_v2.schemas.rules import (
     RuleTestRequest,
     RuleTestResponse,
     RuleUpdate,
+    RuleVerifyError,
     RuleVerifyRequest,
     RuleVerifyResponse,
 )
@@ -40,6 +42,7 @@ from ezrules.backend.api_v2.schemas.shadow import ShadowDeployRequest, ShadowDep
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import MissingFieldLookupError, Rule, RuleFactory
+from ezrules.core.rule_helpers import UserListReferenceExtractor
 from ezrules.core.rule_updater import (
     ROLLOUT_CONFIG_LABEL,
     SHADOW_CONFIG_LABEL,
@@ -107,6 +110,53 @@ def build_rule_warnings(db: Any, org_id: int, referenced_fields: list[str]) -> l
         )
         for field_name in unseen_fields
     ]
+
+
+def unique_preserving_order(items: list[str]) -> list[str]:
+    """Return the first occurrence of each item while preserving source order."""
+    return list(dict.fromkeys(items))
+
+
+def extract_referenced_lists(rule_source: str) -> list[str]:
+    """Extract @ListName references from rule source without compiling it."""
+    return unique_preserving_order(UserListReferenceExtractor().extract(rule_source))
+
+
+def find_reference_bounds(rule_source: str, reference: str) -> tuple[int, int, int, int] | None:
+    """Return 1-based line/column bounds for the first matching reference."""
+    for line_number, line_text in enumerate(rule_source.splitlines(), start=1):
+        start = line_text.find(reference)
+        if start == -1:
+            continue
+        column = start + 1
+        end_column = column + len(reference)
+        return (line_number, column, line_number, end_column)
+    return None
+
+
+def build_verify_error(
+    message: str,
+    line: int | None = None,
+    column: int | None = None,
+    end_line: int | None = None,
+    end_column: int | None = None,
+) -> RuleVerifyError:
+    return RuleVerifyError(
+        message=message,
+        line=line,
+        column=column,
+        end_line=end_line,
+        end_column=end_column,
+    )
+
+
+def normalize_rule_source_line(line: int | None) -> int | None:
+    """Map syntax errors from the wrapped helper function back to user source lines."""
+    if line is None:
+        return None
+    if line <= 1:
+        return 1
+    return line - 1
 
 
 def is_active(rule: RuleModel) -> bool:
@@ -770,6 +820,7 @@ def verify_rule(
 
     This does NOT save the rule - it's just for validation.
     """
+    referenced_lists = extract_referenced_lists(request.rule_source)
     try:
         rule = Rule(
             rid="",
@@ -777,10 +828,59 @@ def verify_rule(
             list_values_provider=get_list_provider(db, current_org_id),
         )
         params = sorted(rule.get_rule_params(), key=str)
-        return RuleVerifyResponse(params=params, warnings=build_rule_warnings(db, current_org_id, params))
-    except Exception:
-        # Return empty params if rule can't be compiled
-        return RuleVerifyResponse(params=[], warnings=[])
+        return RuleVerifyResponse(
+            valid=True,
+            params=params,
+            referenced_lists=referenced_lists,
+            warnings=build_rule_warnings(db, current_org_id, params),
+            errors=[],
+        )
+    except SyntaxError as exc:
+        message = exc.msg or "Rule source is invalid"
+        return RuleVerifyResponse(
+            valid=False,
+            params=[],
+            referenced_lists=referenced_lists,
+            warnings=[],
+            errors=[
+                build_verify_error(
+                    message=message,
+                    line=normalize_rule_source_line(exc.lineno),
+                    column=exc.offset,
+                    end_line=normalize_rule_source_line(exc.end_lineno),
+                    end_column=exc.end_offset,
+                )
+            ],
+        )
+    except KeyError as exc:
+        message = str(exc.args[0]) if exc.args else "Rule source is invalid"
+        missing_list_match = re.search(r"List '([^']+)' not found", message)
+        location = None
+        if missing_list_match:
+            location = find_reference_bounds(request.rule_source, f"@{missing_list_match.group(1)}")
+        return RuleVerifyResponse(
+            valid=False,
+            params=[],
+            referenced_lists=referenced_lists,
+            warnings=[],
+            errors=[
+                build_verify_error(
+                    message=message,
+                    line=location[0] if location else None,
+                    column=location[1] if location else None,
+                    end_line=location[2] if location else None,
+                    end_column=location[3] if location else None,
+                )
+            ],
+        )
+    except Exception as exc:
+        return RuleVerifyResponse(
+            valid=False,
+            params=[],
+            referenced_lists=referenced_lists,
+            warnings=[],
+            errors=[build_verify_error(message=str(exc) or "Rule source is invalid")],
+        )
 
 
 # =============================================================================

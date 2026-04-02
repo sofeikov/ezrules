@@ -141,11 +141,26 @@ class RuleHistoryResponse(BaseModel):
     history: list[RuleHistoryEntry]
 
 
+class RuleVerifyError(BaseModel):
+    """Structured validation error returned while verifying rule logic."""
+
+    message: str = Field(..., description="Human-readable validation failure")
+    line: int | None = Field(default=None, description="1-based line number where the error starts")
+    column: int | None = Field(default=None, description="1-based column number where the error starts")
+    end_line: int | None = Field(default=None, description="1-based line number where the error ends")
+    end_column: int | None = Field(default=None, description="1-based column number where the error ends")
+
+
 class RuleVerifyResponse(BaseModel):
     """Response for rule verification."""
 
+    valid: bool = Field(default=True, description="Whether the rule compiled successfully")
     params: list[str] = Field(default_factory=list, description="Parameters extracted from the rule")
+    referenced_lists: list[str] = Field(
+        default_factory=list, description="User list references extracted from the rule"
+    )
     warnings: list[str] = Field(default_factory=list, description="Advisory warnings about referenced fields")
+    errors: list[RuleVerifyError] = Field(default_factory=list, description="Structured validation failures")
 
 
 class RuleTestResponse(BaseModel):

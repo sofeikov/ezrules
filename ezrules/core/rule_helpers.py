@@ -19,6 +19,27 @@ class RuleParamExtractor(ast.NodeVisitor):
         return node
 
 
+class TriggerReferenceExtractor:
+    def __init__(self, trigger_char: str):
+        search_for_word = pp.Combine(pp.Literal(trigger_char) + pp.Word(pp.alphas + "_", pp.alphanums + "_"))
+        line_parser = search_for_word
+        line_parser.ignore(pp.QuotedString('"'))
+        line_parser.ignore(pp.QuotedString("'"))
+        self._parser = line_parser
+
+    def extract(self, code: str) -> list[str]:
+        references: list[str] = []
+
+        def collect_reference(tokens):
+            references.append(tokens[0][1:])
+            return tokens[0]
+
+        parser = self._parser.copy()
+        parser.setParseAction(collect_reference)
+        parser.transform_string(code)
+        return references
+
+
 class DollarNotationConverter:
     TRIGGER_CHAR = "$"
 
@@ -46,3 +67,13 @@ class AtNotationConverter(DollarNotationConverter):
 
     def replace_with_matched_text(self, tokens):
         return json.dumps(self.list_values_provider.get_entries(tokens[0][1:]))
+
+
+class FieldReferenceExtractor(TriggerReferenceExtractor):
+    def __init__(self):
+        super().__init__("$")
+
+
+class UserListReferenceExtractor(TriggerReferenceExtractor):
+    def __init__(self):
+        super().__init__("@")
