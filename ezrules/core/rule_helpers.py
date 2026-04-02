@@ -69,6 +69,7 @@ class AtNotationConverter(DollarNotationConverter):
     def replace_with_matched_text(self, tokens):
         return json.dumps(self.list_values_provider.get_entries(tokens[0][1:]))
 
+
 class UserListReferenceExtractor(TriggerReferenceExtractor):
     def __init__(self):
         super().__init__("@")
