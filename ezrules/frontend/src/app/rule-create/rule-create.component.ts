@@ -1,30 +1,42 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { of, Subscription } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { CreateRuleRequest, RuleService } from '../services/rule.service';
+import { RuleLogicEditorComponent, RuleEditorDiagnostic } from '../components/rule-logic-editor.component';
 import { RuleTestDataService } from '../services/rule-test-data.service';
+import {
+  RuleEditorAssistService,
+  RuleEditorFieldSuggestion,
+  RuleEditorListSuggestion,
+} from '../services/rule-editor-assist.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
   selector: 'app-rule-create',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, SidebarComponent],
+  imports: [CommonModule, RouterModule, FormsModule, SidebarComponent, RuleLogicEditorComponent],
   templateUrl: './rule-create.component.html'
 })
-export class RuleCreateComponent implements OnDestroy {
+export class RuleCreateComponent implements OnInit, OnDestroy {
   rid: string = '';
   description: string = '';
   logic: string = '';
   testJson: string = '';
   testResult: any = null;
   testError: string | null = null;
+  verifyErrors: RuleEditorDiagnostic[] = [];
   verifyWarnings: string[] = [];
+  verifiedParams: string[] = [];
+  referencedLists: string[] = [];
+  fieldSuggestions: RuleEditorFieldSuggestion[] = [];
+  listSuggestions: RuleEditorListSuggestion[] = [];
   testing: boolean = false;
   saving: boolean = false;
   saveError: string | null = null;
+  private assistSubscription: Subscription | null = null;
   private verifyDebounceHandle: ReturnType<typeof setTimeout> | null = null;
   private verifyRequestSequence: number = 0;
   private verifySubscription: Subscription | null = null;
@@ -32,10 +44,19 @@ export class RuleCreateComponent implements OnDestroy {
   constructor(
     private router: Router,
     private ruleService: RuleService,
-    private ruleTestDataService: RuleTestDataService
+    private ruleTestDataService: RuleTestDataService,
+    private ruleEditorAssistService: RuleEditorAssistService
   ) { }
 
+  ngOnInit(): void {
+    this.assistSubscription = this.ruleEditorAssistService.getAssistData().subscribe((assistData) => {
+      this.fieldSuggestions = assistData.fields;
+      this.listSuggestions = assistData.lists;
+    });
+  }
+
   ngOnDestroy(): void {
+    this.assistSubscription?.unsubscribe();
     this.cancelPendingVerify();
   }
 
@@ -47,13 +68,29 @@ export class RuleCreateComponent implements OnDestroy {
       const end = textarea.selectionEnd;
       const value = textarea.value;
 
-      textarea.value = value.substring(0, start) + '\t' + value.substring(end);
+      const nextValue = value.substring(0, start) + '\t' + value.substring(end);
+      textarea.value = nextValue;
       textarea.selectionStart = textarea.selectionEnd = start + 1;
+
+      if (textarea.placeholder === 'Enter rule logic') {
+        this.logic = nextValue;
+        this.handleLogicChange();
+      }
     }
   }
 
   handleLogicChange(): void {
     this.queueFillInExampleParams(this.logic);
+  }
+
+  handleLogicEditorChange(value: string): void {
+    this.logic = value;
+    this.handleLogicChange();
+  }
+
+  handleLogicProxyInput(event: Event): void {
+    this.logic = (event.target as HTMLTextAreaElement).value;
+    this.handleLogicChange();
   }
 
   fillInExampleParams(): void {
@@ -73,7 +110,10 @@ export class RuleCreateComponent implements OnDestroy {
     if (!ruleSource.trim()) {
       if (requestId === this.verifyRequestSequence) {
         this.testJson = '';
+        this.verifyErrors = [];
         this.verifyWarnings = [];
+        this.verifiedParams = [];
+        this.referencedLists = [];
       }
       return;
     }
@@ -84,7 +124,19 @@ export class RuleCreateComponent implements OnDestroy {
           return of<string | null>(null);
         }
 
+        this.verifyErrors = (response.errors ?? []).map((error) => ({
+          message: error.message,
+          line: error.line,
+          column: error.column,
+          endLine: error.end_line,
+          endColumn: error.end_column,
+        }));
         this.verifyWarnings = response.warnings ?? [];
+        this.verifiedParams = response.params ?? [];
+        this.referencedLists = response.referenced_lists ?? [];
+        if (!response.valid || this.verifyErrors.length > 0) {
+          return of<string | null>(null);
+        }
         if (!response.params.length && /\$[A-Za-z_]/.test(ruleSource)) {
           return of<string | null>(null);
         }
@@ -106,7 +158,10 @@ export class RuleCreateComponent implements OnDestroy {
           return;
         }
 
+        this.verifyErrors = [{ message: 'Failed to validate rule right now.', line: null, column: null, endLine: null, endColumn: null }];
         this.verifyWarnings = [];
+        this.verifiedParams = [];
+        this.referencedLists = [];
         console.error('Error verifying rule:', error);
       }
     });

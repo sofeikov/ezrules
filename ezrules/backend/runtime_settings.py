@@ -9,6 +9,8 @@ from typing import Any
 from ezrules.models.backend_core import RuntimeSetting
 from ezrules.settings import app_settings
 
+AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY = "auto_promote_active_rule_updates"
+AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT = False
 RULE_QUALITY_LOOKBACK_DAYS_KEY = "rule_quality_lookback_days"
 
 _RUNTIME_VALUE_TYPE_INT = "int"
@@ -28,6 +30,11 @@ class RuntimeSettingSpec:
 
 
 _RUNTIME_SETTING_SPECS: dict[str, RuntimeSettingSpec] = {
+    AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY: RuntimeSettingSpec(
+        key=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY,
+        value_type=_RUNTIME_VALUE_TYPE_BOOL,
+        default=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
+    ),
     RULE_QUALITY_LOOKBACK_DAYS_KEY: RuntimeSettingSpec(
         key=RULE_QUALITY_LOOKBACK_DAYS_KEY,
         value_type=_RUNTIME_VALUE_TYPE_INT,
@@ -145,5 +152,13 @@ def get_rule_quality_lookback_days(db: Any, org_id: int) -> int:
     return int(get_runtime_setting(db, RULE_QUALITY_LOOKBACK_DAYS_KEY, org_id))
 
 
+def get_auto_promote_active_rule_updates(db: Any, org_id: int) -> bool:
+    return bool(get_runtime_setting(db, AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY, org_id))
+
+
 def set_rule_quality_lookback_days(db: Any, value: int, org_id: int) -> None:
     set_runtime_setting(db, RULE_QUALITY_LOOKBACK_DAYS_KEY, value, org_id)
+
+
+def set_auto_promote_active_rule_updates(db: Any, value: bool, org_id: int) -> None:
+    set_runtime_setting(db, AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY, value, org_id)

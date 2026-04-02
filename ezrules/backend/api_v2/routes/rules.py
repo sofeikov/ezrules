@@ -6,6 +6,7 @@ All endpoints require authentication and appropriate permissions.
 """
 
 import json
+import re
 from datetime import UTC, datetime
 from json import JSONDecodeError
 from typing import Any
@@ -33,13 +34,16 @@ from ezrules.backend.api_v2.schemas.rules import (
     RuleTestRequest,
     RuleTestResponse,
     RuleUpdate,
+    RuleVerifyError,
     RuleVerifyRequest,
     RuleVerifyResponse,
 )
 from ezrules.backend.api_v2.schemas.shadow import ShadowDeployRequest, ShadowDeployResponse
+from ezrules.backend.runtime_settings import get_auto_promote_active_rule_updates
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import MissingFieldLookupError, Rule, RuleFactory
+from ezrules.core.rule_helpers import UserListReferenceExtractor
 from ezrules.core.rule_updater import (
     ROLLOUT_CONFIG_LABEL,
     SHADOW_CONFIG_LABEL,
@@ -57,7 +61,7 @@ from ezrules.core.rule_updater import (
 )
 from ezrules.core.type_casting import CastError, RequiredFieldError, normalize_event
 from ezrules.core.user_lists import PersistentUserListManager
-from ezrules.models.backend_core import FieldObservation, RuleHistory, RuleStatus, User
+from ezrules.models.backend_core import Action, FieldObservation, RoleActions, RuleHistory, RuleStatus, User
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.settings import app_settings
 
@@ -109,9 +113,75 @@ def build_rule_warnings(db: Any, org_id: int, referenced_fields: list[str]) -> l
     ]
 
 
+def unique_preserving_order(items: list[str]) -> list[str]:
+    """Return the first occurrence of each item while preserving source order."""
+    return list(dict.fromkeys(items))
+
+
+def extract_referenced_lists(rule_source: str) -> list[str]:
+    """Extract @ListName references from rule source without compiling it."""
+    return unique_preserving_order(UserListReferenceExtractor().extract(rule_source))
+
+
+def find_reference_bounds(rule_source: str, reference: str) -> tuple[int, int, int, int] | None:
+    """Return 1-based line/column bounds for the first matching reference."""
+    for line_number, line_text in enumerate(rule_source.splitlines(), start=1):
+        start = line_text.find(reference)
+        if start == -1:
+            continue
+        column = start + 1
+        end_column = column + len(reference)
+        return (line_number, column, line_number, end_column)
+    return None
+
+
+def build_verify_error(
+    message: str,
+    line: int | None = None,
+    column: int | None = None,
+    end_line: int | None = None,
+    end_column: int | None = None,
+) -> RuleVerifyError:
+    return RuleVerifyError(
+        message=message,
+        line=line,
+        column=column,
+        end_line=end_line,
+        end_column=end_column,
+    )
+
+
+def normalize_rule_source_line(line: int | None) -> int | None:
+    """Map syntax errors from the wrapped helper function back to user source lines."""
+    if line is None:
+        return None
+    if line <= 1:
+        return 1
+    return line - 1
+
+
 def is_active(rule: RuleModel) -> bool:
     """Return True when a rule is currently active."""
     return rule.status == RuleStatus.ACTIVE
+
+
+def user_has_permission(db: Any, user: User, action: PermissionAction) -> bool:
+    """Return True when the current user has the requested permission."""
+    db_action = db.query(Action).filter_by(name=action.value).first()
+    if db_action is None:
+        return False
+
+    for role in user.roles:
+        role_action = (
+            db.query(RoleActions)
+            .filter_by(role_id=role.id, action_id=db_action.id)
+            .filter(RoleActions.resource_id.is_(None))
+            .first()
+        )
+        if role_action is not None:
+            return True
+
+    return False
 
 
 def get_status(status_value: RuleStatus | str) -> RuleStatus:
@@ -463,6 +533,14 @@ def update_rule(
             error="Archived rules cannot be modified",
         )
 
+    was_active = is_active(rule)
+    auto_promote_active_updates = was_active and get_auto_promote_active_rule_updates(db, current_org_id)
+    if auto_promote_active_updates and not user_has_permission(db, user, PermissionAction.PROMOTE_RULES):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="PROMOTE_RULES permission is required to update active rules when auto-promotion is enabled",
+        )
+
     # Apply updates (only if provided)
     new_description = rule_data.description if rule_data.description is not None else rule.description
     new_logic = rule_data.logic if rule_data.logic is not None else rule.logic
@@ -482,26 +560,31 @@ def update_rule(
             error=f"Invalid rule logic: {e!s}",
         )
 
+    promoted_at = datetime.now(UTC) if auto_promote_active_updates else None
+    next_status = RuleStatus.ACTIVE if auto_promote_active_updates else RuleStatus.DRAFT
+
     # Snapshot current state before mutation
     save_rule_history(
         db,
         rule,
         changed_by=str(user.email),
         action="updated",
-        to_status=RuleStatus.DRAFT,
+        to_status=next_status,
+        effective_from_override=promoted_at,
+        approved_by_override=int(user.id) if auto_promote_active_updates else None,
+        approved_at_override=promoted_at,
     )
-    was_active = is_active(rule)
 
     # Apply the mutation and save (version bump handled by rule manager)
     rule.description = new_description
     rule.logic = new_logic
-    rule.status = RuleStatus.DRAFT
-    rule.effective_from = None
-    rule.approved_by = None
-    rule.approved_at = None
+    rule.status = next_status
+    rule.effective_from = promoted_at
+    rule.approved_by = user.id if auto_promote_active_updates else None
+    rule.approved_at = promoted_at
     rule_manager.save_rule(rule)
 
-    # Editing an active rule creates a draft and removes it from production config.
+    # Editing an active rule either updates production in place or removes the rule until it is re-promoted.
     if was_active:
         config_producer.save_config(rule_manager, changed_by=str(user.email))
 
@@ -517,7 +600,11 @@ def update_rule(
 
     return RuleMutationResponse(
         success=True,
-        message="Rule updated in draft status. Promote to activate.",
+        message=(
+            "Rule updated and kept active."
+            if auto_promote_active_updates
+            else "Rule updated in draft status. Promote to activate."
+        ),
         rule=rule_to_response(rule, revisions),
     )
 
@@ -770,6 +857,7 @@ def verify_rule(
 
     This does NOT save the rule - it's just for validation.
     """
+    referenced_lists = extract_referenced_lists(request.rule_source)
     try:
         rule = Rule(
             rid="",
@@ -777,10 +865,59 @@ def verify_rule(
             list_values_provider=get_list_provider(db, current_org_id),
         )
         params = sorted(rule.get_rule_params(), key=str)
-        return RuleVerifyResponse(params=params, warnings=build_rule_warnings(db, current_org_id, params))
-    except Exception:
-        # Return empty params if rule can't be compiled
-        return RuleVerifyResponse(params=[], warnings=[])
+        return RuleVerifyResponse(
+            valid=True,
+            params=params,
+            referenced_lists=referenced_lists,
+            warnings=build_rule_warnings(db, current_org_id, params),
+            errors=[],
+        )
+    except SyntaxError as exc:
+        message = exc.msg or "Rule source is invalid"
+        return RuleVerifyResponse(
+            valid=False,
+            params=[],
+            referenced_lists=referenced_lists,
+            warnings=[],
+            errors=[
+                build_verify_error(
+                    message=message,
+                    line=normalize_rule_source_line(exc.lineno),
+                    column=exc.offset,
+                    end_line=normalize_rule_source_line(exc.end_lineno),
+                    end_column=exc.end_offset,
+                )
+            ],
+        )
+    except KeyError as exc:
+        message = str(exc.args[0]) if exc.args else "Rule source is invalid"
+        missing_list_match = re.search(r"List '([^']+)' not found", message)
+        location = None
+        if missing_list_match:
+            location = find_reference_bounds(request.rule_source, f"@{missing_list_match.group(1)}")
+        return RuleVerifyResponse(
+            valid=False,
+            params=[],
+            referenced_lists=referenced_lists,
+            warnings=[],
+            errors=[
+                build_verify_error(
+                    message=message,
+                    line=location[0] if location else None,
+                    column=location[1] if location else None,
+                    end_line=location[2] if location else None,
+                    end_column=location[3] if location else None,
+                )
+            ],
+        )
+    except Exception as exc:
+        return RuleVerifyResponse(
+            valid=False,
+            params=[],
+            referenced_lists=referenced_lists,
+            warnings=[],
+            errors=[build_verify_error(message=str(exc) or "Rule source is invalid")],
+        )
 
 
 # =============================================================================

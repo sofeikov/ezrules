@@ -5,6 +5,8 @@ import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 export interface RuntimeSettings {
+  autoPromoteActiveRuleUpdates: boolean;
+  defaultAutoPromoteActiveRuleUpdates: boolean;
   ruleQualityLookbackDays: number;
   defaultRuleQualityLookbackDays: number;
 }
@@ -31,6 +33,8 @@ export interface OutcomeHierarchyItem {
 }
 
 interface RuntimeSettingsV2 {
+  auto_promote_active_rule_updates: boolean;
+  default_auto_promote_active_rule_updates: boolean;
   rule_quality_lookback_days: number;
   default_rule_quality_lookback_days: number;
 }
@@ -77,17 +81,22 @@ export class RuntimeSettingsService {
   getRuntimeSettings(): Observable<RuntimeSettings> {
     return this.http.get<RuntimeSettingsV2>(this.settingsUrl).pipe(
       map(response => ({
+        autoPromoteActiveRuleUpdates: response.auto_promote_active_rule_updates,
+        defaultAutoPromoteActiveRuleUpdates: response.default_auto_promote_active_rule_updates,
         ruleQualityLookbackDays: response.rule_quality_lookback_days,
         defaultRuleQualityLookbackDays: response.default_rule_quality_lookback_days
       }))
     );
   }
 
-  updateRuntimeSettings(ruleQualityLookbackDays: number): Observable<RuntimeSettings> {
+  updateRuntimeSettings(ruleQualityLookbackDays: number, autoPromoteActiveRuleUpdates: boolean): Observable<RuntimeSettings> {
     return this.http.put<RuntimeSettingsV2>(this.settingsUrl, {
+      auto_promote_active_rule_updates: autoPromoteActiveRuleUpdates,
       rule_quality_lookback_days: ruleQualityLookbackDays
     }).pipe(
       map(response => ({
+        autoPromoteActiveRuleUpdates: response.auto_promote_active_rule_updates,
+        defaultAutoPromoteActiveRuleUpdates: response.default_auto_promote_active_rule_updates,
         ruleQualityLookbackDays: response.rule_quality_lookback_days,
         defaultRuleQualityLookbackDays: response.default_rule_quality_lookback_days
       }))

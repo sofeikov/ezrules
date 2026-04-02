@@ -12,7 +12,7 @@ export class RuleDetailPage {
   readonly errorMessage: Locator;
   readonly ruleIdField: Locator;
   readonly descriptionField: Locator;
-  readonly logicTextarea: Locator;
+  readonly logicViewer: Locator;
   readonly createdDateField: Locator;
   readonly testJsonTextarea: Locator;
   readonly testRuleButton: Locator;
@@ -44,7 +44,7 @@ export class RuleDetailPage {
     this.errorMessage = page.locator('text=/Failed to load rule/i');
     this.ruleIdField = page.locator('label:has-text("Rule ID") + div');
     this.descriptionField = page.locator('label:has-text("Description") + div');
-    this.logicTextarea = page.locator('textarea[readonly]').first();
+    this.logicViewer = page.getByTestId('rule-logic-readonly');
     this.createdDateField = page.locator('label:has-text("Created") + div');
     this.testJsonTextarea = page.locator('textarea:not([readonly])');
     this.testRuleButton = page.locator('button:has-text("Test Rule")');
@@ -61,11 +61,11 @@ export class RuleDetailPage {
 
     // Edit mode locators
     this.editButton = page.locator('button:has-text("Edit Rule")');
-    this.saveButton = page.locator('button:has-text("Save to Production")');
+    this.saveButton = page.locator('[data-testid="rule-save-button"]');
     this.cancelButton = page.locator('button:has-text("Cancel")');
     this.descriptionTextarea = page.locator('label:has-text("Description") + textarea');
     this.editableLogicTextarea = page.locator('label:has-text("Logic") + textarea:not([readonly])');
-    this.saveSuccessMessage = page.locator('text=Rule saved successfully');
+    this.saveSuccessMessage = page.locator('[data-testid="rule-save-success"]');
     this.saveErrorMessage = page.locator('.bg-red-50:has-text("Failed")').or(page.locator('.bg-red-50:has-text("Invalid")'));
   }
 
@@ -104,7 +104,10 @@ export class RuleDetailPage {
    */
   async getLogic(): Promise<string> {
     await this.waitForRuleToLoad();
-    return (await this.logicTextarea.inputValue()) || '';
+    const lines = await this.logicViewer.locator('.cm-line').evaluateAll((elements) =>
+      elements.map((element) => element.textContent ?? '')
+    );
+    return lines.join('\n');
   }
 
   /**

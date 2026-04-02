@@ -24,13 +24,19 @@ import {
 } from '../services/backtesting.service';
 import { AuthService } from '../services/auth.service';
 import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
+import { RuleLogicEditorComponent, RuleEditorDiagnostic } from '../components/rule-logic-editor.component';
 import { RuleTestDataService } from '../services/rule-test-data.service';
+import {
+  RuleEditorAssistService,
+  RuleEditorFieldSuggestion,
+  RuleEditorListSuggestion,
+} from '../services/rule-editor-assist.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
   selector: 'app-rule-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, SidebarComponent],
+  imports: [CommonModule, RouterModule, FormsModule, SidebarComponent, RuleLogicEditorComponent],
   templateUrl: './rule-detail.component.html'
 })
 export class RuleDetailComponent implements OnInit, OnDestroy {
@@ -41,7 +47,12 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   private autoFilledTestJson: string = '';
   testResult: any = null;
   testError: string | null = null;
+  verifyErrors: RuleEditorDiagnostic[] = [];
   verifyWarnings: string[] = [];
+  verifiedParams: string[] = [];
+  referencedLists: string[] = [];
+  fieldSuggestions: RuleEditorFieldSuggestion[] = [];
+  listSuggestions: RuleEditorListSuggestion[] = [];
   testing: boolean = false;
 
   // Revision view properties
@@ -55,6 +66,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   saving: boolean = false;
   saveError: string | null = null;
   saveSuccess: boolean = false;
+  saveSuccessMessage: string = 'Rule saved successfully!';
 
   // Shadow deployment properties
   shadowEntry: ShadowRuleItem | null = null;
@@ -81,6 +93,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   backtestError: string | null = null;
   backtestDiffs: Map<string, Change[]> = new Map();
   private pollingIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
+  private assistSubscription: Subscription | null = null;
   private verifyDebounceHandle: ReturnType<typeof setTimeout> | null = null;
   private verifyRequestSequence: number = 0;
   private verifySubscription: Subscription | null = null;
@@ -91,10 +104,15 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     private ruleService: RuleService,
     private backtestingService: BacktestingService,
     private ruleTestDataService: RuleTestDataService,
+    private ruleEditorAssistService: RuleEditorAssistService,
     private authService: AuthService
   ) { }
 
   ngOnInit(): void {
+    this.assistSubscription = this.ruleEditorAssistService.getAssistData().subscribe((assistData) => {
+      this.fieldSuggestions = assistData.fields;
+      this.listSuggestions = assistData.lists;
+    });
     this.loadPermissions();
     const ruleId = this.route.snapshot.paramMap.get('id');
     const revision = this.route.snapshot.paramMap.get('revision');
@@ -122,6 +140,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.assistSubscription?.unsubscribe();
     this.cancelPendingVerify();
     this.pollingIntervals.forEach(interval => clearInterval(interval));
     this.pollingIntervals.clear();
@@ -198,7 +217,10 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   private runFillInExampleParams(ruleSource: string, requestId: number): void {
     if (!ruleSource.trim()) {
       if (requestId === this.verifyRequestSequence) {
+        this.verifyErrors = [];
         this.verifyWarnings = [];
+        this.verifiedParams = [];
+        this.referencedLists = [];
       }
       return;
     }
@@ -209,7 +231,19 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
           return of<string | null>(null);
         }
 
+        this.verifyErrors = (response.errors ?? []).map((error) => ({
+          message: error.message,
+          line: error.line,
+          column: error.column,
+          endLine: error.end_line,
+          endColumn: error.end_column,
+        }));
         this.verifyWarnings = response.warnings ?? [];
+        this.verifiedParams = response.params ?? [];
+        this.referencedLists = response.referenced_lists ?? [];
+        if (!response.valid || this.verifyErrors.length > 0) {
+          return of<string | null>(null);
+        }
         if (!response.params.length && /\$[A-Za-z_]/.test(ruleSource)) {
           return of<string | null>(null);
         }
@@ -233,7 +267,10 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
           return;
         }
 
+        this.verifyErrors = [{ message: 'Failed to validate rule right now.', line: null, column: null, endLine: null, endColumn: null }];
         this.verifyWarnings = [];
+        this.verifiedParams = [];
+        this.referencedLists = [];
         console.error('Error verifying rule:', error);
       }
     });
@@ -244,6 +281,16 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       return;
     }
     this.queueFillInExampleParams(this.editedLogic);
+  }
+
+  handleEditedLogicEditorChange(value: string): void {
+    this.editedLogic = value;
+    this.handleEditedLogicChange();
+  }
+
+  handleEditedLogicProxyInput(event: Event): void {
+    this.editedLogic = (event.target as HTMLTextAreaElement).value;
+    this.handleEditedLogicChange();
   }
 
   private cancelPendingVerify(): number {
@@ -292,10 +339,16 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       const value = textarea.value;
 
       // Insert tab character
-      textarea.value = value.substring(0, start) + '\t' + value.substring(end);
+      const nextValue = value.substring(0, start) + '\t' + value.substring(end);
+      textarea.value = nextValue;
 
       // Move cursor after the tab
       textarea.selectionStart = textarea.selectionEnd = start + 1;
+
+      if (!textarea.readOnly && textarea.placeholder === 'Enter rule logic') {
+        this.editedLogic = nextValue;
+        this.handleEditedLogicChange();
+      }
     }
   }
 
@@ -315,6 +368,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       this.rolloutTrafficPercent = this.rolloutEntry?.traffic_percent ?? 10;
       this.saveError = null;
       this.saveSuccess = false;
+      this.saveSuccessMessage = 'Rule saved successfully!';
       this.rolloutDeployError = null;
       this.rolloutDeploySuccess = false;
       this.fillInExampleParams(this.editedLogic);
@@ -326,6 +380,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     this.isEditMode = false;
     this.saveError = null;
     this.saveSuccess = false;
+    this.saveSuccessMessage = 'Rule saved successfully!';
     if (this.rule) {
       this.editedDescription = this.rule.description;
       this.editedLogic = this.rule.logic;
@@ -341,6 +396,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     this.saving = true;
     this.saveError = null;
     this.saveSuccess = false;
+    this.saveSuccessMessage = 'Rule saved successfully!';
 
     const updateData: UpdateRuleRequest = {
       description: this.editedDescription,
@@ -353,6 +409,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
         if (response.success && response.rule) {
           this.rule = response.rule;
           this.saveSuccess = true;
+          this.saveSuccessMessage = response.message || 'Rule saved successfully!';
           this.isEditMode = false;
           // Update test JSON with new parameters
           this.fillInExampleParams();
@@ -362,7 +419,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.saving = false;
-        this.saveError = error.error?.error || 'Failed to save rule. Please try again.';
+        this.saveError = error.error?.detail || error.error?.error || 'Failed to save rule. Please try again.';
         console.error('Error saving rule:', error);
       }
     });

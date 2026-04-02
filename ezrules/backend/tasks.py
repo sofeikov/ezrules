@@ -70,6 +70,20 @@ def _load_backtest_snapshot(
         if rule_obj is None:
             return None, None, new_rule_logic, None
         return rule_obj, cast(str | None, rule_obj.logic), new_rule_logic, None
+
+    existing_payload = record.result_metrics if isinstance(record.result_metrics, dict) else None
+    if existing_payload is not None and record.status in {
+        BACKTEST_QUEUE_DONE,
+        BACKTEST_QUEUE_FAILED,
+        BACKTEST_QUEUE_CANCELLED,
+    }:
+        return (
+            cast(RuleModel | None, record.rule),
+            cast(str | None, record.stored_logic),
+            cast(str, record.proposed_logic or new_rule_logic),
+            existing_payload,
+        )
+
     if record.status == BACKTEST_QUEUE_CANCELLED:
         return (
             cast(RuleModel | None, record.rule),
@@ -96,9 +110,13 @@ def _load_backtest_snapshot(
     )
 
 
-@app.task(bind=True)
-def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int):
-    task_id = str(self.request.id) if getattr(self.request, "id", None) else None
+def execute_backtest_rule_change(
+    r_id: int,
+    new_rule_logic: str,
+    org_id: int,
+    *,
+    task_id: str | None = None,
+) -> dict[str, Any]:
     try:
         rule_obj, stored_logic, proposed_logic, early_payload = _load_backtest_snapshot(
             r_id=r_id,
@@ -206,6 +224,17 @@ def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int):
         )
 
     return payload
+
+
+@app.task(bind=True)
+def backtest_rule_change(self, r_id: int, new_rule_logic: str, org_id: int):
+    task_id = str(self.request.id) if getattr(self.request, "id", None) else None
+    return execute_backtest_rule_change(
+        r_id,
+        new_rule_logic,
+        org_id,
+        task_id=task_id,
+    )
 
 
 @app.task

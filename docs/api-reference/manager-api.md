@@ -97,11 +97,20 @@ Rule lifecycle fields on rule responses:
 - `status`: `draft`, `active`, or `archived`
 - `effective_from`: activation timestamp for active versions
 - `approved_by` / `approved_at`: approver audit metadata for promotions
-- `POST /api/v2/rules` creates draft rules; `PUT /api/v2/rules/{id}` saves edits as draft and requires promotion to reactivate.
+- `POST /api/v2/rules` creates draft rules.
+- `PUT /api/v2/rules/{id}` saves edits as draft by default and requires promotion to reactivate.
+- If runtime setting `auto_promote_active_rule_updates` is enabled for the caller's org, editing an already active rule keeps it active and updates production immediately, but the caller still needs `PROMOTE_RULES`.
 - `POST /api/v2/rules/{id}/rollback` restores the selected historical revision's logic and description into a brand new draft version, preserving the full revision chain.
 - Rule audit entries (`GET /api/v2/audit/rules*`) now include `action` (`updated`, `promoted`, `deactivated`, `rolled_back`, `deleted`) and `to_status` to show lifecycle transitions such as `draft -> active`.
 - Deleting a rule preserves its history so `GET /api/v2/audit/rules/{rule_id}` remains available after deletion.
 - Rules with an active shadow deployment or rollout cannot be edited, archived, deleted, directly promoted, or rolled back until the candidate deployment is removed or promoted.
+
+`POST /api/v2/rules/verify` response fields:
+- `valid`: `true` when the rule compiles successfully; `false` when syntax or referenced-list validation fails.
+- `params`: extracted `$field` references used for JSON prefill and unseen-field warnings.
+- `warnings`: advisory messages for referenced fields that have not yet been observed in traffic or rule-test payloads.
+- `referenced_lists`: detected `@user_list` names, even when validation fails.
+- `errors`: structured validation failures with `message`, `line`, `column`, `end_line`, and `end_column`.
 
 ### Shadow
 
@@ -174,7 +183,7 @@ Rule activity query params:
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | `GET` | `/api/v2/settings/runtime` | Bearer + `VIEW_ROLES` | Read runtime settings |
-| `PUT` | `/api/v2/settings/runtime` | Bearer + `MANAGE_PERMISSIONS` | Update runtime settings (e.g., rule quality lookback days) |
+| `PUT` | `/api/v2/settings/runtime` | Bearer + `MANAGE_PERMISSIONS` | Update runtime settings (e.g., rule quality lookback days, active-rule auto-promotion) |
 | `GET` | `/api/v2/settings/outcome-hierarchy` | Bearer + `VIEW_ROLES` | Read ordered outcome severity hierarchy |
 | `PUT` | `/api/v2/settings/outcome-hierarchy` | Bearer + `MANAGE_PERMISSIONS` | Replace ordered outcome severity hierarchy |
 | `GET` | `/api/v2/settings/rule-quality-pairs` | Bearer + `VIEW_ROLES` | List configured curated outcome→label pairs |
@@ -186,6 +195,11 @@ Rule activity query params:
 Outcome hierarchy notes:
 - Outcome hierarchy is ordered from highest severity to lowest severity.
 - `POST /api/v2/evaluate` uses this hierarchy to compute the single `resolved_outcome` stored for each event.
+
+Runtime settings notes:
+- `GET /api/v2/settings/runtime` returns both stored values and fallback defaults for `rule_quality_lookback_days` and `auto_promote_active_rule_updates`.
+- `auto_promote_active_rule_updates` defaults to `false`.
+- When `auto_promote_active_rule_updates=true`, saving edits to an active rule requires both `MODIFY_RULE` and `PROMOTE_RULES`.
 
 ### Users and Roles
 

@@ -551,6 +551,8 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
         set_user_list_manager(user_list_manager)
         set_organization_id(org_id)
         seed_demo_user_lists(user_list_manager)
+        if label_ratio > 0 or export_csv:
+            _seed_reset_dev_catalogs(session, o_id=org_id)
 
         fsrm: RuleManager = RuleManagerFactory.get_rule_manager("RDBRuleManager", **{"db": session, "o_id": org_id})
         rule_engine_config_producer = RDBRuleEngineConfigProducer(db=session, o_id=org_id)
