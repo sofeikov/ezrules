@@ -187,14 +187,7 @@
                   [listSuggestions]="listSuggestions"
                   placeholderText="Enter rule logic"
                 ></app-rule-logic-editor>
-                <div *ngIf="!isEditMode" class="relative">
-                  <textarea
-                    [value]="rule.logic"
-                    (keydown)="handleTextareaTab($event)"
-                    readonly
-                    class="absolute inset-0 z-10 h-full w-full resize-none rounded-lg opacity-0"
-                    rows="10"
-                  ></textarea>
+                <div *ngIf="!isEditMode" data-testid="rule-logic-readonly">
                   <app-rule-logic-editor
                     [value]="rule.logic"
                     [readOnly]="true"

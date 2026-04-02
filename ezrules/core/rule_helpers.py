@@ -51,6 +51,7 @@ class DollarNotationConverter:
 
         line_parser = search_for_word
         line_parser.ignore(pp.QuotedString('"'))
+        line_parser.ignore(pp.QuotedString("'"))
         line_parser.setParseAction(self.replace_with_matched_text)
         self._parser = line_parser
 
@@ -67,12 +68,6 @@ class AtNotationConverter(DollarNotationConverter):
 
     def replace_with_matched_text(self, tokens):
         return json.dumps(self.list_values_provider.get_entries(tokens[0][1:]))
-
-
-class FieldReferenceExtractor(TriggerReferenceExtractor):
-    def __init__(self):
-        super().__init__("$")
-
 
 class UserListReferenceExtractor(TriggerReferenceExtractor):
     def __init__(self):

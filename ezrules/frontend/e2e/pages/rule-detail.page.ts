@@ -12,7 +12,7 @@ export class RuleDetailPage {
   readonly errorMessage: Locator;
   readonly ruleIdField: Locator;
   readonly descriptionField: Locator;
-  readonly logicTextarea: Locator;
+  readonly logicViewer: Locator;
   readonly createdDateField: Locator;
   readonly testJsonTextarea: Locator;
   readonly testRuleButton: Locator;
@@ -44,7 +44,7 @@ export class RuleDetailPage {
     this.errorMessage = page.locator('text=/Failed to load rule/i');
     this.ruleIdField = page.locator('label:has-text("Rule ID") + div');
     this.descriptionField = page.locator('label:has-text("Description") + div');
-    this.logicTextarea = page.locator('textarea[readonly]').first();
+    this.logicViewer = page.getByTestId('rule-logic-readonly');
     this.createdDateField = page.locator('label:has-text("Created") + div');
     this.testJsonTextarea = page.locator('textarea:not([readonly])');
     this.testRuleButton = page.locator('button:has-text("Test Rule")');
@@ -104,7 +104,10 @@ export class RuleDetailPage {
    */
   async getLogic(): Promise<string> {
     await this.waitForRuleToLoad();
-    return (await this.logicTextarea.inputValue()) || '';
+    const lines = await this.logicViewer.locator('.cm-line').evaluateAll((elements) =>
+      elements.map((element) => element.textContent ?? '')
+    );
+    return lines.join('\n');
   }
 
   /**

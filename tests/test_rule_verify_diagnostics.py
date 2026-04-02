@@ -1,63 +1,74 @@
+from ezrules.models.backend_core import UserList, UserListEntry
 from tests.test_rules_verify_warnings import _build_rules_client
 
 
 class TestRuleVerifyDiagnostics:
     def test_verify_rule_returns_structured_syntax_errors(self, session):
         client = _build_rules_client(session)
-        token = client.test_data["token"]  # type: ignore[attr-defined]
+        try:
+            token = client.test_data["token"]  # type: ignore[attr-defined]
 
-        response = client.post(
-            "/api/v2/rules/verify",
-            headers={"Authorization": f"Bearer {token}"},
-            json={"rule_source": "return ("},
-        )
+            response = client.post(
+                "/api/v2/rules/verify",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"rule_source": "return ("},
+            )
 
-        client.close()
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["valid"] is False
-        assert data["params"] == []
-        assert data["errors"]
-        assert data["errors"][0]["line"] == 1
-        assert data["errors"][0]["column"] is not None
+            assert response.status_code == 200
+            data = response.json()
+            assert data["valid"] is False
+            assert data["params"] == []
+            assert data["errors"]
+            assert data["errors"][0]["line"] == 1
+            assert data["errors"][0]["column"] is not None
+        finally:
+            client.close()
 
     def test_verify_rule_returns_unknown_list_location(self, session):
         client = _build_rules_client(session)
-        token = client.test_data["token"]  # type: ignore[attr-defined]
+        try:
+            token = client.test_data["token"]  # type: ignore[attr-defined]
 
-        response = client.post(
-            "/api/v2/rules/verify",
-            headers={"Authorization": f"Bearer {token}"},
-            json={"rule_source": 'return "GB" in @DefinitelyMissingList'},
-        )
+            response = client.post(
+                "/api/v2/rules/verify",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"rule_source": 'return "GB" in @DefinitelyMissingList'},
+            )
 
-        client.close()
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["valid"] is False
-        assert data["referenced_lists"] == ["DefinitelyMissingList"]
-        assert data["errors"]
-        assert "DefinitelyMissingList" in data["errors"][0]["message"]
-        assert data["errors"][0]["line"] == 1
-        assert data["errors"][0]["column"] is not None
+            assert response.status_code == 200
+            data = response.json()
+            assert data["valid"] is False
+            assert data["referenced_lists"] == ["DefinitelyMissingList"]
+            assert data["errors"]
+            assert "DefinitelyMissingList" in data["errors"][0]["message"]
+            assert data["errors"][0]["line"] == 1
+            assert data["errors"][0]["column"] is not None
+        finally:
+            client.close()
 
     def test_verify_rule_returns_referenced_lists_when_valid(self, session):
         client = _build_rules_client(session)
-        token = client.test_data["token"]  # type: ignore[attr-defined]
+        try:
+            token = client.test_data["token"]  # type: ignore[attr-defined]
+            org = client.test_data["org"]  # type: ignore[attr-defined]
 
-        response = client.post(
-            "/api/v2/rules/verify",
-            headers={"Authorization": f"Bearer {token}"},
-            json={"rule_source": 'return "US" in @NACountries and $amount > 0'},
-        )
+            user_list = UserList(list_name="VerifyCountries", o_id=int(org.o_id))
+            session.add(user_list)
+            session.flush()
+            session.add(UserListEntry(entry_value="US", ul_id=int(user_list.ul_id)))
+            session.commit()
 
-        client.close()
+            response = client.post(
+                "/api/v2/rules/verify",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"rule_source": 'return "US" in @VerifyCountries and $amount > 0'},
+            )
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["valid"] is True
-        assert data["referenced_lists"] == ["NACountries"]
-        assert data["errors"] == []
-        assert data["params"] == ["amount"]
+            assert response.status_code == 200
+            data = response.json()
+            assert data["valid"] is True
+            assert data["referenced_lists"] == ["VerifyCountries"]
+            assert data["errors"] == []
+            assert data["params"] == ["amount"]
+        finally:
+            client.close()
