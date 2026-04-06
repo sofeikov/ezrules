@@ -22,6 +22,7 @@ class RuleCreate(BaseModel):
     rid: str = Field(..., min_length=1, description="Unique rule identifier (e.g., 'rule_001')")
     description: str = Field(..., min_length=1, description="Human-readable description of what the rule does")
     logic: str = Field(..., min_length=1, description="Rule logic expression")
+    evaluation_lane: str = Field(default="main", description="Evaluation lane: main or allowlist")
 
     model_config = {
         "json_schema_extra": {
@@ -42,6 +43,7 @@ class RuleUpdate(BaseModel):
 
     description: str | None = Field(None, description="New description for the rule")
     logic: str | None = Field(None, description="New rule logic expression")
+    evaluation_lane: str | None = Field(None, description="Evaluation lane: main or allowlist")
 
 
 class RuleVerifyRequest(BaseModel):
@@ -82,6 +84,7 @@ class RuleResponse(BaseModel):
     rid: str = Field(..., description="Rule identifier")
     description: str
     logic: str
+    evaluation_lane: str = Field(..., description="Evaluation lane for this rule")
     status: RuleStatus = Field(..., description="Rule lifecycle status")
     effective_from: datetime | None = Field(None, description="When the currently active version became effective")
     approved_by: int | None = Field(None, description="User ID that approved promotion to active")
@@ -100,6 +103,7 @@ class RuleListItem(BaseModel):
     rid: str
     description: str
     logic: str
+    evaluation_lane: str = Field(..., description="Evaluation lane for this rule")
     status: RuleStatus = Field(..., description="Rule lifecycle status")
     effective_from: datetime | None = Field(None, description="When the currently active version became effective")
     approved_by: int | None = Field(None, description="User ID that approved promotion to active")
@@ -125,6 +129,7 @@ class RuleHistoryEntry(BaseModel):
     revision_number: int
     logic: str
     description: str
+    evaluation_lane: str = Field(..., description="Evaluation lane for this revision")
     status: RuleStatus = Field(..., description="Rule lifecycle status in this revision")
     effective_from: datetime | None = Field(None, description="When this revision became effective")
     approved_by: int | None = Field(None, description="User ID that approved this revision")

@@ -25,9 +25,12 @@ from ezrules.backend.api_v2.schemas.settings import (
     RuntimeSettingsUpdateRequest,
 )
 from ezrules.backend.runtime_settings import (
+    ALLOWLIST_MATCH_OUTCOME_DEFAULT,
     AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
+    get_allowlist_match_outcome,
     get_auto_promote_active_rule_updates,
     get_rule_quality_lookback_days,
+    set_allowlist_match_outcome,
     set_auto_promote_active_rule_updates,
     set_rule_quality_lookback_days,
 )
@@ -81,6 +84,8 @@ def get_runtime_settings(
         default_auto_promote_active_rule_updates=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
         rule_quality_lookback_days=get_rule_quality_lookback_days(db, current_org_id),
         default_rule_quality_lookback_days=app_settings.RULE_QUALITY_LOOKBACK_DAYS,
+        allowlist_match_outcome=get_allowlist_match_outcome(db, current_org_id),
+        default_allowlist_match_outcome=ALLOWLIST_MATCH_OUTCOME_DEFAULT,
     )
 
 
@@ -96,6 +101,8 @@ def update_runtime_settings(
     set_rule_quality_lookback_days(db, request_data.rule_quality_lookback_days, current_org_id)
     if request_data.auto_promote_active_rule_updates is not None:
         set_auto_promote_active_rule_updates(db, request_data.auto_promote_active_rule_updates, current_org_id)
+    if request_data.allowlist_match_outcome is not None:
+        set_allowlist_match_outcome(db, request_data.allowlist_match_outcome, current_org_id)
     db.commit()
 
     return RuntimeSettingsResponse(
@@ -103,6 +110,8 @@ def update_runtime_settings(
         default_auto_promote_active_rule_updates=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
         rule_quality_lookback_days=get_rule_quality_lookback_days(db, current_org_id),
         default_rule_quality_lookback_days=app_settings.RULE_QUALITY_LOOKBACK_DAYS,
+        allowlist_match_outcome=get_allowlist_match_outcome(db, current_org_id),
+        default_allowlist_match_outcome=ALLOWLIST_MATCH_OUTCOME_DEFAULT,
     )
 
 

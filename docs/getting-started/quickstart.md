@@ -76,7 +76,8 @@ if $amount > 10000:
     return 'HOLD'
 ```
 
-4. Save
+4. Leave **Rule Lane** set to **Main rules**
+5. Save
 
 Checkpoint:
 
@@ -135,6 +136,7 @@ You can also upload a small `event_id,label_name` CSV in **Labels** and recheck 
 
 - [Analyst Guide](../user-guide/analyst-guide.md)
 - [Creating Rules](../user-guide/creating-rules.md)
+- [Allowlist Rules](../user-guide/allowlist-rules.md)
 - [Rule Rollouts](../user-guide/rule-rollouts.md)
 - [Monitoring & Analytics](../user-guide/monitoring.md)
 - [Integration Quickstart](integration-quickstart.md)

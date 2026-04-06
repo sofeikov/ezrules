@@ -1,5 +1,11 @@
 # What's New
 
+## v1.3.2
+
+* **Allowlist rule lane**: Rules can now be marked as `allowlist` in the create/edit UI and API. When any active allowlist rule matches, ezrules short-circuits the main rule set and returns the configured allowlist outcome immediately.
+* **Allowlist visibility in the UI**: Rule list and detail views now display an `ALLOWLIST` / `Allowlist` badge so these rules are visually distinct from the main rule set.
+* **Allowlist guardrails**: Allowlist rules must return the configured allowlist outcome (runtime setting `allowlist_match_outcome`, default `RELEASE`), and they cannot be deployed to shadow or rollout flows.
+
 ## v1.3.1
 
 * **Configurable active-rule auto-promotion**: Organisations can now enable `auto_promote_active_rule_updates` under **Settings → General** so edits to already active rules stay live immediately instead of always falling back to a draft.

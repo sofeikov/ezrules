@@ -21,6 +21,7 @@ from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.rule import MissingFieldLookupError, RuleFactory
 from ezrules.core.rule_updater import (
+    ALLOWLIST_CONFIG_LABEL,
     DEPLOYMENT_MODE_SHADOW,
     DEPLOYMENT_MODE_SPLIT,
     DEPLOYMENT_VARIANT_CANDIDATE,
@@ -38,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 _lre: LocalRuleExecutorSQL | None = None
 _shadow_lre: LocalRuleExecutorSQL | None = None
+_allowlist_lre: LocalRuleExecutorSQL | None = None
 
 
 def _get_rule_executor(
@@ -58,6 +60,16 @@ def _get_shadow_executor(
     if app_settings.TESTING and _shadow_lre is not None:
         return _shadow_lre
     return LocalRuleExecutorSQL(db=db, o_id=current_org_id, label="shadow")
+
+
+def _get_allowlist_executor(
+    current_org_id: int = Depends(get_current_evaluator_org_id),
+    db=Depends(get_db),  # noqa: B008
+) -> LocalRuleExecutorSQL:
+    """Return the test-injected allowlist executor or a request-scoped executor."""
+    if app_settings.TESTING and _allowlist_lre is not None:
+        return _allowlist_lre
+    return LocalRuleExecutorSQL(db=db, o_id=current_org_id, label=ALLOWLIST_CONFIG_LABEL)
 
 
 def _get_assignment_key(event: Event) -> str:
@@ -85,6 +97,7 @@ def evaluate(
     request_data: EvaluateRequest,
     lre: LocalRuleExecutorSQL = Depends(_get_rule_executor),
     shadow_lre: LocalRuleExecutorSQL = Depends(_get_shadow_executor),
+    allowlist_lre: LocalRuleExecutorSQL = Depends(_get_allowlist_executor),
     db: Any = Depends(get_db),
     _: int = Depends(get_current_evaluator_org_id),
 ) -> EvaluateResponse:
@@ -110,6 +123,18 @@ def evaluate(
         event_data=event_data,
     )
     try:
+        allowlist_result = allowlist_lre.evaluate_rules(event.event_data)
+        if allowlist_result.get("rule_results"):
+            result = _build_response_from_all_results(dict(allowlist_result.get("all_rule_results", {})))
+            result, _ = data_utils.eval_and_store(lre, event, response=result)
+            record_observations(db, request_data.event_data, lre.o_id)
+            return EvaluateResponse(
+                outcome_counters=result["outcome_counters"],
+                outcome_set=result["outcome_set"],
+                resolved_outcome=result.get("resolved_outcome"),
+                rule_results={str(k): str(v) for k, v in result["rule_results"].items()},
+            )
+
         production_result = lre.evaluate_rules(event.event_data)
     except MissingFieldLookupError as exc:
         raise HTTPException(

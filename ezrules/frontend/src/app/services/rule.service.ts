@@ -4,12 +4,14 @@ import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export type RuleStatus = 'draft' | 'active' | 'archived';
+export type RuleEvaluationLane = 'main' | 'allowlist';
 
 export interface Rule {
   r_id: number;
   rid: string;
   description: string;
   logic: string;
+  evaluation_lane: RuleEvaluationLane;
   status: RuleStatus;
   effective_from: string | null;
   approved_by: number | null;
@@ -64,6 +66,7 @@ export interface RuleHistoryEntry {
   revision_number: number;
   logic: string;
   description: string;
+  evaluation_lane: RuleEvaluationLane;
   status: RuleStatus;
   effective_from: string | null;
   approved_by: number | null;
@@ -81,6 +84,7 @@ export interface RuleHistoryResponse {
 export interface UpdateRuleRequest {
   description: string;
   logic: string;
+  evaluation_lane?: RuleEvaluationLane;
 }
 
 export interface UpdateRuleResponse {
@@ -94,6 +98,7 @@ export interface CreateRuleRequest {
   rid: string;
   description: string;
   logic: string;
+  evaluation_lane?: RuleEvaluationLane;
 }
 
 export interface CreateRuleResponse {

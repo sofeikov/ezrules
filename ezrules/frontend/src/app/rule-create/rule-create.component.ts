@@ -21,9 +21,18 @@ import { SidebarComponent } from '../components/sidebar.component';
   templateUrl: './rule-create.component.html'
 })
 export class RuleCreateComponent implements OnInit, OnDestroy {
+  readonly laneOptions = [
+    { value: 'main', label: 'Main rules' },
+    { value: 'allowlist', label: 'Allowlist rules' },
+  ] as const;
+  readonly laneDescriptions: Record<'main' | 'allowlist', string> = {
+    main: 'Main rules run during standard evaluation and participate in the normal outcome resolution flow.',
+    allowlist: 'Allowlist rules short-circuit evaluation when they match. They must return the configured bypass outcome.',
+  };
   rid: string = '';
   description: string = '';
   logic: string = '';
+  evaluationLane: 'main' | 'allowlist' = 'main';
   testJson: string = '';
   testResult: any = null;
   testError: string | null = null;
@@ -203,7 +212,8 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
     const createData: CreateRuleRequest = {
       rid: this.rid,
       description: this.description,
-      logic: this.logic
+      logic: this.logic,
+      evaluation_lane: this.evaluationLane,
     };
 
     this.ruleService.createRule(createData).subscribe({
@@ -225,5 +235,9 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
 
   goBack(): void {
     this.router.navigate(['/rules']);
+  }
+
+  selectedLaneDescription(): string {
+    return this.laneDescriptions[this.evaluationLane];
   }
 }
