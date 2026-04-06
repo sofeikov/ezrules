@@ -128,7 +128,6 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       this.loadRevision(parseInt(ruleId, 10), this.revisionNumber);
     } else if (ruleId) {
       this.loadRule(parseInt(ruleId, 10));
-      this.loadBacktestResults(parseInt(ruleId, 10));
 
       // If navigated from the shadow page, enter edit mode pre-seeded with shadow logic
       const nav = history.state;
@@ -178,12 +177,16 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     this.ruleService.getRule(ruleId).subscribe({
       next: (rule) => {
         this.rule = rule;
+        this.backtestResults = [];
         this.loading = false;
         this.fillInExampleParams();
         this.loadShadowEntry(rule.r_id);
         this.loadRolloutEntry(rule.r_id);
+        this.loadBacktestResults(rule.r_id);
       },
       error: (error) => {
+        this.rule = null;
+        this.backtestResults = [];
         this.error = 'Failed to load rule. Please try again.';
         this.loading = false;
         console.error('Error loading rule:', error);
@@ -198,10 +201,13 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     this.ruleService.getRuleRevision(ruleId, revisionNumber).subscribe({
       next: (revision: RuleRevisionDetail) => {
         this.rule = revision;
+        this.backtestResults = [];
         this.loading = false;
         this.fillInExampleParams();
       },
       error: (error) => {
+        this.rule = null;
+        this.backtestResults = [];
         this.error = 'Failed to load rule revision. Please try again.';
         this.loading = false;
         console.error('Error loading rule revision:', error);
