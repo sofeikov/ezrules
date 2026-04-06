@@ -1,6 +1,6 @@
 # What's New
 
-## v1.3.2
+## v1.4.0
 
 * **Allowlist rule lane**: Rules can now be marked as `allowlist` in the create/edit UI and API. When any active allowlist rule matches, ezrules short-circuits the main rule set and returns the configured allowlist outcome immediately.
 * **Allowlist visibility in the UI**: Rule list and detail views now display an `ALLOWLIST` / `Allowlist` badge so these rules are visually distinct from the main rule set.
