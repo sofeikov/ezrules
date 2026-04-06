@@ -23,10 +23,13 @@ RuleRevision = namedtuple("RuleRevision", ["revision_number", "created"])
 
 SHADOW_CONFIG_LABEL = "shadow"
 ROLLOUT_CONFIG_LABEL = "rollout"
+ALLOWLIST_CONFIG_LABEL = "allowlist"
 DEPLOYMENT_MODE_SHADOW = "shadow"
 DEPLOYMENT_MODE_SPLIT = "split"
 DEPLOYMENT_VARIANT_CONTROL = "control"
 DEPLOYMENT_VARIANT_CANDIDATE = "candidate"
+RULE_EVALUATION_LANE_MAIN = "main"
+RULE_EVALUATION_LANE_ALLOWLIST = "allowlist"
 
 
 def save_rule_history(
@@ -46,6 +49,7 @@ def save_rule_history(
         rid=rule.rid,
         logic=rule.logic,
         description=rule.description,
+        evaluation_lane=str(rule.evaluation_lane or RULE_EVALUATION_LANE_MAIN),
         action=action,
         status=rule.status,
         to_status=to_status,
@@ -171,29 +175,68 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
         self.db = db
         self.o_id = o_id
 
-    def save_config(self, rule_manager: RuleManager, changed_by: str | None = None) -> None:
-        stored_rules = cast(list[RuleModel], rule_manager.load_all_rules())
-        all_rules = [rule for rule in stored_rules if rule.status == RuleStatus.ACTIVE]
-        list_provider = PersistentUserListManager(self.db, self.o_id)
-        all_rules = [RuleFactory.from_json(r.__dict__, list_values_provider=list_provider) for r in all_rules]
-        rules_json = [RuleConverter.to_json(r) for r in all_rules]
-        try:
-            config_obj = (
-                self.db.query(RuleEngineConfig)
-                .where(
-                    RuleEngineConfig.label == "production",
-                    RuleEngineConfig.o_id == self.o_id,
-                )
-                .with_for_update()
-                .one()
+    def build_rules_json_for_lane(
+        self,
+        stored_rules: list["RuleModel"],
+        lane: str,
+        list_provider: PersistentUserListManager,
+    ) -> list[dict[str, Any]]:
+        active_rules = [
+            rule
+            for rule in stored_rules
+            if rule.status == RuleStatus.ACTIVE and str(rule.evaluation_lane or RULE_EVALUATION_LANE_MAIN) == lane
+        ]
+        compiled_rules = [RuleFactory.from_json(r.__dict__, list_values_provider=list_provider) for r in active_rules]
+        return [RuleConverter.to_json(r) for r in compiled_rules]
+
+    def _save_rules_for_label(
+        self,
+        label: str,
+        rules_json: list[dict[str, Any]],
+        changed_by: str | None = None,
+        *,
+        create_when_empty: bool = True,
+    ) -> None:
+        config_obj = (
+            self.db.query(RuleEngineConfig)
+            .where(
+                RuleEngineConfig.label == label,
+                RuleEngineConfig.o_id == self.o_id,
             )
-            # Snapshot before mutation
+            .with_for_update()
+            .first()
+        )
+
+        if not rules_json and not create_when_empty:
+            if config_obj is not None:
+                save_config_history(self.db, config_obj, changed_by=changed_by)
+                self.db.delete(config_obj)
+            return
+
+        try:
+            if config_obj is None:
+                raise NoResultFound
             save_config_history(self.db, config_obj, changed_by=changed_by)
             config_obj.config = rules_json
             config_obj.version += 1
         except NoResultFound:
-            new_config = RuleEngineConfig(label="production", config=rules_json, o_id=self.o_id)
-            self.db.add(new_config)
+            self.db.add(RuleEngineConfig(label=label, config=rules_json, o_id=self.o_id))
+
+    def save_config(self, rule_manager: RuleManager, changed_by: str | None = None) -> None:
+        stored_rules = cast(list[RuleModel], rule_manager.load_all_rules())
+        list_provider = PersistentUserListManager(self.db, self.o_id)
+
+        self._save_rules_for_label(
+            "production",
+            self.build_rules_json_for_lane(stored_rules, RULE_EVALUATION_LANE_MAIN, list_provider),
+            changed_by=changed_by,
+        )
+        self._save_rules_for_label(
+            ALLOWLIST_CONFIG_LABEL,
+            self.build_rules_json_for_lane(stored_rules, RULE_EVALUATION_LANE_ALLOWLIST, list_provider),
+            changed_by=changed_by,
+            create_when_empty=False,
+        )
         self.db.commit()
 
 

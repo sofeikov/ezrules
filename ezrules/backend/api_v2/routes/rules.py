@@ -39,13 +39,16 @@ from ezrules.backend.api_v2.schemas.rules import (
     RuleVerifyResponse,
 )
 from ezrules.backend.api_v2.schemas.shadow import ShadowDeployRequest, ShadowDeployResponse
-from ezrules.backend.runtime_settings import get_auto_promote_active_rule_updates
+from ezrules.backend.runtime_settings import get_allowlist_match_outcome, get_auto_promote_active_rule_updates
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import MissingFieldLookupError, Rule, RuleFactory
+from ezrules.core.rule_checkers import AllowedOutcomeReturnVisitor
 from ezrules.core.rule_helpers import UserListReferenceExtractor
 from ezrules.core.rule_updater import (
     ROLLOUT_CONFIG_LABEL,
+    RULE_EVALUATION_LANE_ALLOWLIST,
+    RULE_EVALUATION_LANE_MAIN,
     SHADOW_CONFIG_LABEL,
     RDBRuleEngineConfigProducer,
     RDBRuleManager,
@@ -200,6 +203,7 @@ def rule_to_response(rule: RuleModel, revisions: list[RuleRevisionSummary] | Non
         rid=str(rule.rid),
         description=str(rule.description),
         logic=str(rule.logic),
+        evaluation_lane=str(getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN),
         status=get_status(rule.status),
         effective_from=rule.effective_from if rule.effective_from is not None else None,  # type: ignore[arg-type]
         approved_by=int(rule.approved_by) if rule.approved_by is not None else None,
@@ -217,6 +221,29 @@ def ensure_no_active_candidate_deployment(db: Any, org_id: int, rule_id: int) ->
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f"Rule has an active {deployment_label} deployment. Remove or promote it before changing the base rule.",
     )
+
+
+def normalize_evaluation_lane(value: str | None) -> str:
+    lane = str(value or RULE_EVALUATION_LANE_MAIN).strip().lower()
+    if lane not in {RULE_EVALUATION_LANE_MAIN, RULE_EVALUATION_LANE_ALLOWLIST}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="evaluation_lane must be either 'main' or 'allowlist'",
+        )
+    return lane
+
+
+def validate_allowlist_rule(rule: Rule, allowlist_outcome: str) -> str | None:
+    visitor = AllowedOutcomeReturnVisitor()
+    visitor.visit(rule._rule_ast)
+    if not visitor.values:
+        return f"Allowlist rules must contain at least one return '{allowlist_outcome}' statement."
+
+    invalid_values = [value for value in visitor.values if value != allowlist_outcome]
+    if invalid_values:
+        rendered_values = ", ".join(sorted({repr(value) for value in invalid_values}))
+        return f"Allowlist rules must return only '{allowlist_outcome}'. Found {rendered_values}."
+    return None
 
 
 # =============================================================================
@@ -256,6 +283,9 @@ def list_rules(
             rid=str(rule.rid),
             description=str(rule.description),
             logic=str(rule.logic),
+            evaluation_lane=str(
+                getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN
+            ),
             status=get_status(rule.status),
             effective_from=rule.effective_from if rule.effective_from is not None else None,  # type: ignore[arg-type]
             approved_by=int(rule.approved_by) if rule.approved_by is not None else None,
@@ -351,6 +381,7 @@ def get_rule_revision(
         rid=str(rule.rid),
         description=str(rule.description),
         logic=str(rule.logic),
+        evaluation_lane=str(getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN),
         status=get_status(rule.status),
         effective_from=rule.effective_from if hasattr(rule, "effective_from") else None,  # type: ignore[arg-type]
         approved_by=int(rule.approved_by) if getattr(rule, "approved_by", None) is not None else None,
@@ -413,6 +444,9 @@ def get_rule_history(
                 revision_number=rev.revision_number,
                 logic=str(rule.logic),
                 description=str(rule.description),
+                evaluation_lane=str(
+                    getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN
+                ),
                 status=get_status(rule.status),
                 effective_from=rule.effective_from if hasattr(rule, "effective_from") else None,  # type: ignore[arg-type]
                 approved_by=int(rule.approved_by) if getattr(rule, "approved_by", None) is not None else None,
@@ -427,6 +461,9 @@ def get_rule_history(
             revision_number=int(latest_version.version),  # type: ignore[attr-defined]
             logic=str(latest_version.logic),
             description=str(latest_version.description),
+            evaluation_lane=str(
+                getattr(latest_version, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN
+            ),
             status=get_status(latest_version.status),
             effective_from=latest_version.effective_from if latest_version.effective_from is not None else None,  # type: ignore[arg-type]
             approved_by=int(latest_version.approved_by) if latest_version.approved_by is not None else None,
@@ -462,6 +499,9 @@ def create_rule(
     The rule logic will be validated before saving. If validation fails,
     a 400 error is returned with details about what's wrong.
     """
+    evaluation_lane = normalize_evaluation_lane(rule_data.evaluation_lane)
+    allowlist_outcome = get_allowlist_match_outcome(db, current_org_id)
+
     # Validate the rule logic by trying to compile it
     try:
         rule_config = {
@@ -469,7 +509,7 @@ def create_rule(
             "logic": rule_data.logic,
             "description": rule_data.description,
         }
-        RuleFactory.from_json(rule_config, list_values_provider=get_list_provider(db, current_org_id))
+        compiled_rule = RuleFactory.from_json(rule_config, list_values_provider=get_list_provider(db, current_org_id))
     except Exception as e:
         return RuleMutationResponse(
             success=False,
@@ -477,12 +517,22 @@ def create_rule(
             error=f"Invalid rule logic: {e!s}",
         )
 
+    if evaluation_lane == RULE_EVALUATION_LANE_ALLOWLIST:
+        validation_error = validate_allowlist_rule(compiled_rule, allowlist_outcome)
+        if validation_error is not None:
+            return RuleMutationResponse(
+                success=False,
+                message="Rule validation failed",
+                error=validation_error,
+            )
+
     # Create and persist the new rule
     rule_manager = get_rule_manager(db, current_org_id)
     new_rule = RuleModel(
         rid=rule_data.rid,
         logic=rule_data.logic,
         description=rule_data.description,
+        evaluation_lane=evaluation_lane,
         status=RuleStatus.DRAFT,
         effective_from=None,
         approved_by=None,
@@ -544,6 +594,12 @@ def update_rule(
     # Apply updates (only if provided)
     new_description = rule_data.description if rule_data.description is not None else rule.description
     new_logic = rule_data.logic if rule_data.logic is not None else rule.logic
+    new_evaluation_lane = normalize_evaluation_lane(
+        rule_data.evaluation_lane
+        if rule_data.evaluation_lane is not None
+        else str(getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN)
+    )
+    allowlist_outcome = get_allowlist_match_outcome(db, current_org_id)
 
     # Validate the rule logic by trying to compile it
     try:
@@ -552,13 +608,22 @@ def update_rule(
             "logic": new_logic,
             "description": new_description,
         }
-        RuleFactory.from_json(rule_config, list_values_provider=get_list_provider(db, current_org_id))
+        compiled_rule = RuleFactory.from_json(rule_config, list_values_provider=get_list_provider(db, current_org_id))
     except Exception as e:
         return RuleMutationResponse(
             success=False,
             message="Rule validation failed",
             error=f"Invalid rule logic: {e!s}",
         )
+
+    if new_evaluation_lane == RULE_EVALUATION_LANE_ALLOWLIST:
+        validation_error = validate_allowlist_rule(compiled_rule, allowlist_outcome)
+        if validation_error is not None:
+            return RuleMutationResponse(
+                success=False,
+                message="Rule validation failed",
+                error=validation_error,
+            )
 
     promoted_at = datetime.now(UTC) if auto_promote_active_updates else None
     next_status = RuleStatus.ACTIVE if auto_promote_active_updates else RuleStatus.DRAFT
@@ -578,6 +643,7 @@ def update_rule(
     # Apply the mutation and save (version bump handled by rule manager)
     rule.description = new_description
     rule.logic = new_logic
+    rule.evaluation_lane = new_evaluation_lane
     rule.status = next_status
     rule.effective_from = promoted_at
     rule.approved_by = user.id if auto_promote_active_updates else None
@@ -811,6 +877,9 @@ def rollback_rule(
     )
     rule.logic = str(target_revision.logic)
     rule.description = str(target_revision.description)
+    rule.evaluation_lane = str(
+        getattr(target_revision, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN
+    )
     rule.status = RuleStatus.DRAFT
     rule.effective_from = None
     rule.approved_by = None
@@ -1034,6 +1103,10 @@ def deploy_to_shadow(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
     if rule.status == RuleStatus.ARCHIVED:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archived rules cannot be deployed")
+    if str(getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN) == (
+        RULE_EVALUATION_LANE_ALLOWLIST
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Allowlist rules cannot be deployed")
 
     try:
         deploy_rule_to_shadow(
@@ -1116,6 +1189,13 @@ def deploy_to_rollout(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
     if rule.status != RuleStatus.ACTIVE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only active rules can be rolled out")
+    if str(getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN) == (
+        RULE_EVALUATION_LANE_ALLOWLIST
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Allowlist rules cannot be rolled out",
+        )
 
     try:
         deploy_rule_to_rollout(

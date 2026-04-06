@@ -95,6 +95,7 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 
 Rule lifecycle fields on rule responses:
 - `status`: `draft`, `active`, or `archived`
+- `evaluation_lane`: `main` or `allowlist`
 - `effective_from`: activation timestamp for active versions
 - `approved_by` / `approved_at`: approver audit metadata for promotions
 - `POST /api/v2/rules` creates draft rules.
@@ -104,6 +105,7 @@ Rule lifecycle fields on rule responses:
 - Rule audit entries (`GET /api/v2/audit/rules*`) now include `action` (`updated`, `promoted`, `deactivated`, `rolled_back`, `deleted`) and `to_status` to show lifecycle transitions such as `draft -> active`.
 - Deleting a rule preserves its history so `GET /api/v2/audit/rules/{rule_id}` remains available after deletion.
 - Rules with an active shadow deployment or rollout cannot be edited, archived, deleted, directly promoted, or rolled back until the candidate deployment is removed or promoted.
+- Allowlist rules are first-class production rules. They cannot be deployed to shadow or rollout.
 
 `POST /api/v2/rules/verify` response fields:
 - `valid`: `true` when the rule compiles successfully; `false` when syntax or referenced-list validation fails.
@@ -197,8 +199,9 @@ Outcome hierarchy notes:
 - `POST /api/v2/evaluate` uses this hierarchy to compute the single `resolved_outcome` stored for each event.
 
 Runtime settings notes:
-- `GET /api/v2/settings/runtime` returns both stored values and fallback defaults for `rule_quality_lookback_days` and `auto_promote_active_rule_updates`.
+- `GET /api/v2/settings/runtime` returns both stored values and fallback defaults for `rule_quality_lookback_days`, `auto_promote_active_rule_updates`, and `allowlist_match_outcome`.
 - `auto_promote_active_rule_updates` defaults to `false`.
+- `allowlist_match_outcome` defaults to `RELEASE`.
 - When `auto_promote_active_rule_updates=true`, saving edits to an active rule requires both `MODIFY_RULE` and `PROMOTE_RULES`.
 
 ### Users and Roles

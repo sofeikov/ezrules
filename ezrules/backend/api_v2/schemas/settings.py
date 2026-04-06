@@ -18,6 +18,8 @@ class RuntimeSettingsResponse(BaseModel):
     default_rule_quality_lookback_days: int = Field(
         ..., ge=1, description="Fallback env-based default lookback in days"
     )
+    allowlist_match_outcome: str = Field(..., description="Outcome returned when any allowlist rule matches")
+    default_allowlist_match_outcome: str = Field(..., description="Fallback default allowlist outcome")
 
 
 class RuntimeSettingsUpdateRequest(BaseModel):
@@ -25,6 +27,7 @@ class RuntimeSettingsUpdateRequest(BaseModel):
 
     auto_promote_active_rule_updates: bool | None = Field(default=None)
     rule_quality_lookback_days: int = Field(..., ge=1, le=3650)
+    allowlist_match_outcome: str | None = Field(default=None, min_length=1, max_length=255)
 
 
 class OutcomeHierarchyItem(BaseModel):

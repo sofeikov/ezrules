@@ -6,19 +6,36 @@ Use this guide when you want to add or tune production rules safely.
 
 You will:
 
-1. write a rule that returns an allowed outcome
-2. test it with realistic payloads
-3. validate it before rollout
+1. choose the right rule lane
+2. write a rule that returns an allowed outcome
+3. test it with realistic payloads
+4. validate it before rollout
 
 ## Before You Start
 
 - You can access **Rules** and **Outcomes**
 - The outcome names you plan to return already exist (for example `HOLD`, `RELEASE`, `CANCEL`)
 - You have sample payloads that represent normal and suspicious behavior
+- If you plan to use the allowlist lane, you know the currently configured allowlist outcome (default `RELEASE`)
 
 ---
 
-## Step 1: Start With a Minimal Rule
+## Step 1: Choose the Right Rule Lane
+
+Every rule now belongs to one of two lanes:
+
+- **Main rules**: normal decisioning rules that participate in standard outcome resolution
+- **Allowlist rules**: rules that short-circuit the main rule set and immediately return the configured allowlist outcome when they match
+
+For most fraud/compliance logic, leave the lane as **Main rules**.
+
+Choose **Allowlist rules** only when the rule expresses an explicit trust decision and should stop the rest of the evaluation flow.
+
+See [Allowlist Rules](allowlist-rules.md) for the full rationale and constraints.
+
+---
+
+## Step 2: Start With a Minimal Rule
 
 Rules are Python-like snippets.
 If a condition is met, return an allowed outcome string.
@@ -32,6 +49,7 @@ Notes:
 
 - Use `$field_name` to read event fields (for example `$amount`, `$country`)
 - If no condition matches, return nothing
+- If the rule is in the allowlist lane, it must return the configured allowlist outcome
 
 Checkpoint:
 
@@ -40,7 +58,7 @@ Checkpoint:
 
 ---
 
-## Step 2: Test in the UI First
+## Step 3: Test in the UI First
 
 1. Open the rule in **Rules**
 2. Use the **Test Rule** panel
@@ -76,7 +94,7 @@ Checkpoint:
 
 ---
 
-## Step 3: Pick the Right Pattern
+## Step 4: Pick the Right Pattern
 
 ### Threshold pattern
 
@@ -95,6 +113,17 @@ Use when decisioning depends on maintained allow/block lists.
 if $user_id in @blocked_users:
     return 'CANCEL'
 ```
+
+### Allowlist pattern
+
+Use when a match should immediately produce the configured allowlist outcome and skip the normal rule set.
+
+```python
+if $merchant_id in @trusted_merchants:
+    return 'RELEASE'
+```
+
+This pattern only makes sense in the **Allowlist rules** lane.
 
 ### Multi-signal score pattern
 
@@ -124,18 +153,20 @@ if 2 <= $hour <= 5 and $amount > 1000:
 
 ---
 
-## Step 4: Avoid Common Mistakes
+## Step 5: Avoid Common Mistakes
 
 - Returning an outcome that is not configured in **Outcomes**
 - Using field names that do not exist in event payloads
 - Packing too many unrelated conditions into one rule
 - Running expensive lookups per event inside rule logic
+- Putting broad trust logic into the allowlist lane when it should still be monitored by the main rule set
+- Treating allowlist as a convenience `RELEASE` rule instead of a true short-circuiting policy
 
 Use lists (`@list_name`) and precomputed signals where possible.
 
 ---
 
-## Step 5: Pre-Deployment Validation
+## Step 6: Pre-Deployment Validation
 
 Before enabling major rule changes:
 
@@ -157,6 +188,8 @@ For higher-stakes changes, add a shadow validation step before promoting to prod
 Shadow deployment gives you live-traffic validation without any production impact. See [Shadow Deployment](shadow-deployment.md) for the full workflow.
 
 If you want to move beyond observe-only validation, use [Rule Rollouts](rule-rollouts.md) to serve the candidate logic to a controlled percentage of live traffic while the current production version remains the control.
+
+Allowlist rules are different: they are already production behavior. They cannot be sent through shadow or rollout candidate flows.
 
 By default, editing an active rule saves a new `draft` version and removes that rule from live production until you promote it again. If your organisation enables **Settings → General → Auto-promote edits to active rules**, users who also have `PROMOTE_RULES` can save an edit to an active rule and keep it live immediately.
 
@@ -206,6 +239,7 @@ For broader incident diagnostics, use [Troubleshooting](../troubleshooting.md).
 ## Next Steps
 
 - **[Field Type Management](field-types.md)** - ensure fields are compared with the right types
+- **[Allowlist Rules](allowlist-rules.md)** - when trusted traffic should short-circuit the normal rule set
 - **[Labels and Lists](labels-and-lists.md)** - tune decision quality with labels and reusable lists
 - **[Analyst Guide](analyst-guide.md)** - end-to-end analyst workflow
 - **[Monitoring & Analytics](monitoring.md)** - validate production behavior

@@ -9,6 +9,7 @@ import {
   RolloutDeployResponse,
   RolloutRuleItem,
   RuleDetail,
+  RuleEvaluationLane,
   RuleRevisionDetail,
   RuleService,
   ShadowDeployResponse,
@@ -40,6 +41,10 @@ import { SidebarComponent } from '../components/sidebar.component';
   templateUrl: './rule-detail.component.html'
 })
 export class RuleDetailComponent implements OnInit, OnDestroy {
+  readonly laneDescriptions: Record<RuleEvaluationLane, string> = {
+    main: 'Main rules run during standard evaluation and participate in the normal outcome resolution flow.',
+    allowlist: 'Allowlist rules short-circuit evaluation when they match. They must return the configured bypass outcome.',
+  };
   rule: RuleDetail | null = null;
   loading: boolean = true;
   error: string | null = null;
@@ -63,6 +68,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   isEditMode: boolean = false;
   editedDescription: string = '';
   editedLogic: string = '';
+  editedEvaluationLane: RuleEvaluationLane = 'main';
   saving: boolean = false;
   saveError: string | null = null;
   saveSuccess: boolean = false;
@@ -122,7 +128,6 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       this.loadRevision(parseInt(ruleId, 10), this.revisionNumber);
     } else if (ruleId) {
       this.loadRule(parseInt(ruleId, 10));
-      this.loadBacktestResults(parseInt(ruleId, 10));
 
       // If navigated from the shadow page, enter edit mode pre-seeded with shadow logic
       const nav = history.state;
@@ -130,10 +135,12 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
         this.isEditMode = true;
         this.editedLogic = nav.logic;
         this.editedDescription = nav.description;
+        this.editedEvaluationLane = 'main';
       } else if (nav?.rolloutEditMode) {
         this.isEditMode = true;
         this.editedLogic = nav.logic;
         this.editedDescription = nav.description;
+        this.editedEvaluationLane = 'main';
         this.rolloutTrafficPercent = nav.trafficPercent ?? 10;
       }
     }
@@ -170,12 +177,16 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     this.ruleService.getRule(ruleId).subscribe({
       next: (rule) => {
         this.rule = rule;
+        this.backtestResults = [];
         this.loading = false;
         this.fillInExampleParams();
         this.loadShadowEntry(rule.r_id);
         this.loadRolloutEntry(rule.r_id);
+        this.loadBacktestResults(rule.r_id);
       },
       error: (error) => {
+        this.rule = null;
+        this.backtestResults = [];
         this.error = 'Failed to load rule. Please try again.';
         this.loading = false;
         console.error('Error loading rule:', error);
@@ -190,10 +201,13 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     this.ruleService.getRuleRevision(ruleId, revisionNumber).subscribe({
       next: (revision: RuleRevisionDetail) => {
         this.rule = revision;
+        this.backtestResults = [];
         this.loading = false;
         this.fillInExampleParams();
       },
       error: (error) => {
+        this.rule = null;
+        this.backtestResults = [];
         this.error = 'Failed to load rule revision. Please try again.';
         this.loading = false;
         console.error('Error loading rule revision:', error);
@@ -365,6 +379,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       // Entering edit mode - copy current values
       this.editedDescription = this.rule.description;
       this.editedLogic = this.rule.logic;
+      this.editedEvaluationLane = this.rule.evaluation_lane;
       this.rolloutTrafficPercent = this.rolloutEntry?.traffic_percent ?? 10;
       this.saveError = null;
       this.saveSuccess = false;
@@ -384,6 +399,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     if (this.rule) {
       this.editedDescription = this.rule.description;
       this.editedLogic = this.rule.logic;
+      this.editedEvaluationLane = this.rule.evaluation_lane;
       this.rolloutTrafficPercent = this.rolloutEntry?.traffic_percent ?? 10;
       this.fillInExampleParams();
     }
@@ -400,7 +416,8 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
 
     const updateData: UpdateRuleRequest = {
       description: this.editedDescription,
-      logic: this.editedLogic
+      logic: this.editedLogic,
+      evaluation_lane: this.editedEvaluationLane,
     };
 
     this.ruleService.updateRule(this.rule.r_id, updateData).subscribe({
@@ -440,6 +457,9 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
 
   openDeployToShadowDialog(): void {
     if (!this.canModifyRules) {
+      return;
+    }
+    if (this.isAllowlistRule()) {
       return;
     }
 
@@ -492,6 +512,9 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   }
 
   openRolloutDialog(): void {
+    if (this.isAllowlistRule()) {
+      return;
+    }
     this.showRolloutDialog = true;
   }
 
@@ -844,5 +867,13 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
 
   showReadOnlyNotice(): boolean {
     return !this.isRevisionView && !this.canModifyRules && !this.canPromoteRules;
+  }
+
+  isAllowlistRule(): boolean {
+    return (this.isEditMode ? this.editedEvaluationLane : this.rule?.evaluation_lane) === 'allowlist';
+  }
+
+  selectedLaneDescription(): string {
+    return this.laneDescriptions[this.editedEvaluationLane];
   }
 }
