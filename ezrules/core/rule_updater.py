@@ -49,7 +49,7 @@ def save_rule_history(
         rid=rule.rid,
         logic=rule.logic,
         description=rule.description,
-        evaluation_lane=str(getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN),
+        evaluation_lane=str(rule.evaluation_lane or RULE_EVALUATION_LANE_MAIN),
         action=action,
         status=rule.status,
         to_status=to_status,
@@ -175,6 +175,20 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
         self.db = db
         self.o_id = o_id
 
+    def build_rules_json_for_lane(
+        self,
+        stored_rules: list["RuleModel"],
+        lane: str,
+        list_provider: PersistentUserListManager,
+    ) -> list[dict[str, Any]]:
+        active_rules = [
+            rule
+            for rule in stored_rules
+            if rule.status == RuleStatus.ACTIVE and str(rule.evaluation_lane or RULE_EVALUATION_LANE_MAIN) == lane
+        ]
+        compiled_rules = [RuleFactory.from_json(r.__dict__, list_values_provider=list_provider) for r in active_rules]
+        return [RuleConverter.to_json(r) for r in compiled_rules]
+
     def _save_rules_for_label(
         self,
         label: str,
@@ -212,23 +226,14 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
         stored_rules = cast(list[RuleModel], rule_manager.load_all_rules())
         list_provider = PersistentUserListManager(self.db, self.o_id)
 
-        def _rules_json_for_lane(lane: str) -> list[dict[str, Any]]:
-            active_rules = [
-                rule
-                for rule in stored_rules
-                if rule.status == RuleStatus.ACTIVE
-                and str(getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN)
-                == lane
-            ]
-            compiled_rules = [
-                RuleFactory.from_json(r.__dict__, list_values_provider=list_provider) for r in active_rules
-            ]
-            return [RuleConverter.to_json(r) for r in compiled_rules]
-
-        self._save_rules_for_label("production", _rules_json_for_lane(RULE_EVALUATION_LANE_MAIN), changed_by=changed_by)
+        self._save_rules_for_label(
+            "production",
+            self.build_rules_json_for_lane(stored_rules, RULE_EVALUATION_LANE_MAIN, list_provider),
+            changed_by=changed_by,
+        )
         self._save_rules_for_label(
             ALLOWLIST_CONFIG_LABEL,
-            _rules_json_for_lane(RULE_EVALUATION_LANE_ALLOWLIST),
+            self.build_rules_json_for_lane(stored_rules, RULE_EVALUATION_LANE_ALLOWLIST, list_provider),
             changed_by=changed_by,
             create_when_empty=False,
         )
