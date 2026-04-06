@@ -176,18 +176,32 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
         self.o_id = o_id
 
     def _save_rules_for_label(
-        self, label: str, rules_json: list[dict[str, Any]], changed_by: str | None = None
+        self,
+        label: str,
+        rules_json: list[dict[str, Any]],
+        changed_by: str | None = None,
+        *,
+        create_when_empty: bool = True,
     ) -> None:
-        try:
-            config_obj = (
-                self.db.query(RuleEngineConfig)
-                .where(
-                    RuleEngineConfig.label == label,
-                    RuleEngineConfig.o_id == self.o_id,
-                )
-                .with_for_update()
-                .one()
+        config_obj = (
+            self.db.query(RuleEngineConfig)
+            .where(
+                RuleEngineConfig.label == label,
+                RuleEngineConfig.o_id == self.o_id,
             )
+            .with_for_update()
+            .first()
+        )
+
+        if not rules_json and not create_when_empty:
+            if config_obj is not None:
+                save_config_history(self.db, config_obj, changed_by=changed_by)
+                self.db.delete(config_obj)
+            return
+
+        try:
+            if config_obj is None:
+                raise NoResultFound
             save_config_history(self.db, config_obj, changed_by=changed_by)
             config_obj.config = rules_json
             config_obj.version += 1
@@ -213,7 +227,10 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
 
         self._save_rules_for_label("production", _rules_json_for_lane(RULE_EVALUATION_LANE_MAIN), changed_by=changed_by)
         self._save_rules_for_label(
-            ALLOWLIST_CONFIG_LABEL, _rules_json_for_lane(RULE_EVALUATION_LANE_ALLOWLIST), changed_by=changed_by
+            ALLOWLIST_CONFIG_LABEL,
+            _rules_json_for_lane(RULE_EVALUATION_LANE_ALLOWLIST),
+            changed_by=changed_by,
+            create_when_empty=False,
         )
         self.db.commit()
 
