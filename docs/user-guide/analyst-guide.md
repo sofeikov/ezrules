@@ -24,6 +24,7 @@ Most analyst work in ezrules follows this loop:
 6. Backtest before promoting major rule changes.
 7. For higher-stakes changes, shadow deploy to validate on live traffic before promoting.
 8. If a new revision performs worse than expected, use **Rule History** to roll back to a known-good revision and create a replacement draft.
+9. If certain traffic should be treated as explicitly safe before normal checks, move that logic into the allowlist lane instead of relying on an ordinary `RELEASE` rule.
 
 This process is simple, but doing it consistently is what improves model quality over time.
 
@@ -182,11 +183,14 @@ if $user_id not in @trusted_users:
     return 'HOLD'  # Send for manual review
 ```
 
+If a trusted list should bypass the rest of the decisioning flow entirely, that is a better fit for an **Allowlist rule** than for an inverse main rule.
+
 ---
 
 ## Next Steps
 
 - **[Creating Rules](creating-rules.md)** - Rule syntax and patterns
+- **[Allowlist Rules](allowlist-rules.md)** - Use explicit safe-pass rules when trusted traffic should skip the main rule set
 - **[Shadow Deployment](shadow-deployment.md)** - Validate rule changes on live traffic before promoting
 - **[Rule Rollouts](rule-rollouts.md)** - Shift a candidate rule onto a stable percentage of live traffic
 - **[Labels and Lists](labels-and-lists.md)** - Labels, lists, and outcomes in one workflow

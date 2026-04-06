@@ -49,6 +49,16 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
 
 Evaluates an event against the current rule configuration, resolves any conflicting outcomes using the configured outcome hierarchy, and stores evaluation results in the database.
 
+#### Allowlist Short-Circuiting
+
+If one or more active allowlist rules match an event:
+
+- the allowlist result is returned immediately
+- the main rule set is skipped for the returned result
+- `rule_results` contains the matching allowlist rules only
+
+Allowlist rules must return the configured allowlist outcome. The current runtime setting is `allowlist_match_outcome`, which defaults to `RELEASE`.
+
 #### Request Fields
 
 | Field | Type | Required | Description |
@@ -92,6 +102,8 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
 ```
 
 `resolved_outcome` is the highest-severity outcome after applying the ordering configured under **Settings → Outcome Resolution**.
+
+When allowlist rules match, `resolved_outcome` is derived from the allowlist result and the main rules do not contribute to the returned evaluation.
 
 #### Field Normalization
 

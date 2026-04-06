@@ -54,6 +54,7 @@ High-level storage domains:
 - Rules/config history: `rules`, `rules_history`, `rule_engine_config`, `rule_engine_config_history`
 - Event evaluation: `testing_record_log`, `testing_results_log`
 - Event evaluation rows persist both per-rule outcomes and the resolved winning outcome for each event
+- Separate `RuleEngineConfig` labels are used for the main production rule set and the allowlist rule lane
 - Shadow evaluation: `shadow_results_log` (parallel results, never returned to callers)
 - Decision controls: `allowed_outcomes`, `event_labels`, user list tables
 - Access control: `user`, `role`, `roles_users`, `actions`, `role_actions`
@@ -67,11 +68,15 @@ High-level storage domains:
 
 1. Caller sends `POST /api/v2/evaluate`
 2. API validates payload
-3. Active rule configuration is loaded/executed
-4. Outcomes are aggregated (`rule_results`, `outcome_counters`, `outcome_set`)
-5. A single `resolved_outcome` is selected from the configured outcome hierarchy
-6. Evaluation data is stored in DB
-7. Response returned to caller
+3. Active allowlist configuration is loaded/executed first
+4. If allowlist rules match, the main rule set is skipped and the allowlist result is returned/stored
+5. Otherwise, the active main rule configuration is loaded/executed
+6. Outcomes are aggregated (`rule_results`, `outcome_counters`, `outcome_set`)
+7. A single `resolved_outcome` is selected from the configured outcome hierarchy
+8. Evaluation data is stored in DB
+9. Response returned to caller
+
+Allowlist rules exist for explicit trust decisions where a match should stop the normal decision flow entirely.
 
 ### 2) Shadow Evaluation Flow
 

@@ -75,20 +75,22 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 4. Any new imports must go to the top of the file (no inline imports in functions).
 5. Any new functionality must be covered with tests.
 6. **FOR ANGULAR FRONTEND CHANGES**: Any new pages/navigation must have Playwright e2e tests in `ezrules/frontend/e2e/tests/` plus corresponding page objects in `e2e/pages/*.page.ts`.
-7. If a new endpoint is implemented, restart the API server if needed.
-8. If one e2e test fails, stop and fix the root cause before waiting for all failures.
-9. For Playwright runs that include invite/reset flows, start API with `EZRULES_TESTING=false` and SMTP configured (for local stack: `EZRULES_SMTP_HOST=localhost`, `EZRULES_SMTP_PORT=1025`, `EZRULES_FROM_EMAIL=...`). `EZRULES_TESTING=true` skips SMTP sends and will break email-flow e2e tests.
-10. Database-related functionality must be tested on the live test DB rather than mocked.
-11. If functionality affects user experience/actions, update README and `docs/whatsnew.md`.
-12. If you are asked to bump the version, bump the version first, then create or update the matching topmost version section in `docs/whatsnew.md` and place the current change notes under that new version heading. Do not add new changes under an older version section.
-13. When tests are approved, run ALL tests, not selective subsets.
-14. When the user requests the full test suite, also validate the demo Docker path by testing `docker compose -f docker-compose.demo.yml up --build` and confirming the demo stack starts successfully; tear it down afterward.
-15. When tests require starting local services manually, run the API/backend and Angular frontend on random available high ports instead of standard ports like `8888` and `4200` to reduce the chance of blocking commonly used defaults.
-16. When running the full test suite locally, always use private database names for this worktree/agent instead of shared names like `tests` or `ezrules`. This applies to backend pytest, CLI test helpers, reset-dev, and any Playwright/dev-stack runs.
-17. Prefer the existing private E2E naming convention, for example `tests_e2e_<suffix>` and `ezrules_e2e_<suffix>`.
-18. After tests are done, kill any API/backend and Angular dev servers you started manually, regardless of which ports were used.
-19. After all tests pass, reset the dev environment using the same private dev DB you used for the run, not the shared `ezrules` DB.
-20. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
+7. **FOR USER-VISIBLE UI FEATURES OR WORKFLOWS**: Record a short browser demonstration against a live local stack that proves the feature works end to end. Use a private dev DB, run the backend/frontend on random high ports, save the recording artifact under `artifacts/` in the worktree, and keep the proof focused on the implemented behavior.
+8. When the browser recording is generated as `.webm`, convert it to a shareable `.mp4` using H.264 + `yuv420p` + `faststart` so it can be uploaded to services such as X/Twitter. Preferred command: `ffmpeg -y -i input.webm -c:v libx264 -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k output.mp4`. File must be named accorind to the feature it demos.
+9. If a new endpoint is implemented, restart the API server if needed.
+10. If one e2e test fails, stop and fix the root cause before waiting for all failures.
+11. For Playwright runs that include invite/reset flows, start API with `EZRULES_TESTING=false` and SMTP configured (for local stack: `EZRULES_SMTP_HOST=localhost`, `EZRULES_SMTP_PORT=1025`, `EZRULES_FROM_EMAIL=...`). `EZRULES_TESTING=true` skips SMTP sends and will break email-flow e2e tests.
+12. Database-related functionality must be tested on the live test DB rather than mocked.
+13. If functionality affects user experience/actions, update README and `docs/whatsnew.md`.
+14. If you are asked to bump the version, bump the version first before editing `docs/whatsnew.md`. Then create or update the matching topmost version section in `docs/whatsnew.md` and place the current change notes under that new version heading. Do not add new changes under an older version section, and do not place new notes into the previous release section while the version bump is still pending.
+15. When tests are approved, run ALL tests, not selective subsets.
+16. When the user requests the full test suite, also validate the demo Docker path by testing `docker compose -f docker-compose.demo.yml up --build` and confirming the demo stack starts successfully; tear it down afterward.
+17. When tests require starting local services manually, run the API/backend and Angular frontend on random available high ports instead of standard ports like `8888` and `4200` to reduce the chance of blocking commonly used defaults.
+18. When running the full test suite locally, always use private database names for this worktree/agent instead of shared names like `tests` or `ezrules`. This applies to backend pytest, CLI test helpers, reset-dev, and any Playwright/dev-stack runs.
+19. Prefer the existing private E2E naming convention, for example `tests_e2e_<suffix>` and `ezrules_e2e_<suffix>`.
+20. After tests are done, kill any API/backend and Angular dev servers you started manually, regardless of which ports were used.
+21. After all tests pass, reset the dev environment using the same private dev DB you used for the run, not the shared `ezrules` DB.
+22. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
 
 # Writing New Documentation
 1. Canonical documentation map: [DOCUMENTATION_MAP.md](DOCUMENTATION_MAP.md)
