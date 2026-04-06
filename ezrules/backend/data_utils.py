@@ -50,10 +50,7 @@ def store_eval_result(db_session, o_id: int, event: Event, response: dict, commi
         created_at=created_at_datetime,
     )
     db_session.add(tl)
-    if commit:
-        db_session.commit()
-    else:
-        db_session.flush()
+    db_session.flush()
 
     resolved_outcome = outcome_manager.resolve_outcome(response["outcome_counters"])
     tl.outcome_counters = response["outcome_counters"]

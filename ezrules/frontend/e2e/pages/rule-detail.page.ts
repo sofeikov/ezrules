@@ -104,10 +104,7 @@ export class RuleDetailPage {
    */
   async getLogic(): Promise<string> {
     await this.waitForRuleToLoad();
-    const lines = await this.logicViewer.locator('.cm-line').evaluateAll((elements) =>
-      elements.map((element) => element.textContent ?? '')
-    );
-    return lines.join('\n');
+    return ((await this.logicViewer.getByRole('textbox').innerText()) || '').trim();
   }
 
   /**
