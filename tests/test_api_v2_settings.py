@@ -14,10 +14,12 @@ from ezrules.models.backend_core import (
     Organisation,
     OutcomeHistory,
     Role,
+    RuleStatus,
     RuleQualityPair,
     RuntimeSetting,
     User,
 )
+from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.settings import app_settings
 
 
@@ -54,6 +56,7 @@ def settings_test_client(session):
     PermissionManager.init_default_actions()
     PermissionManager.grant_permission(role.id, PermissionAction.VIEW_ROLES)
     PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_PERMISSIONS)
+    PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_NEUTRAL_OUTCOME)
 
     token = create_access_token(
         user_id=int(user.id),
@@ -85,6 +88,9 @@ class TestRuntimeSettings:
         data = response.json()
         assert data["rule_quality_lookback_days"] == app_settings.RULE_QUALITY_LOOKBACK_DAYS
         assert data["default_rule_quality_lookback_days"] == app_settings.RULE_QUALITY_LOOKBACK_DAYS
+        assert data["neutral_outcome"] == "RELEASE"
+        assert data["default_neutral_outcome"] == "RELEASE"
+        assert data["invalid_allowlist_rules"] == []
 
     def test_update_runtime_settings(self, settings_test_client):
         token = settings_test_client.test_data["token"]
@@ -152,6 +158,95 @@ class TestRuntimeSettings:
             )
 
             assert response.status_code == 403
+
+    def test_update_runtime_settings_accepts_neutral_outcome_from_catalog(self, settings_test_client):
+        token = settings_test_client.test_data["token"]
+        session = settings_test_client.test_data["session"]
+        org = _get_org(session)
+        session.add_all(
+            [
+                AllowedOutcome(outcome_name="CANCEL", severity_rank=1, o_id=int(org.o_id)),
+                AllowedOutcome(outcome_name="HOLD", severity_rank=2, o_id=int(org.o_id)),
+                AllowedOutcome(outcome_name="RELEASE", severity_rank=3, o_id=int(org.o_id)),
+            ]
+        )
+        session.commit()
+
+        response = settings_test_client.put(
+            "/api/v2/settings/runtime",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"rule_quality_lookback_days": 21, "neutral_outcome": "hold"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["neutral_outcome"] == "HOLD"
+
+        stored = (
+            session.query(RuntimeSetting)
+            .filter(RuntimeSetting.key == "neutral_outcome", RuntimeSetting.o_id == int(org.o_id))
+            .one()
+        )
+        assert stored.value_type == "string"
+        assert stored.value == "HOLD"
+
+        history = (
+            session.query(OutcomeHistory)
+            .filter(
+                OutcomeHistory.o_id == int(org.o_id),
+                OutcomeHistory.action == "neutral_outcome_updated",
+            )
+            .order_by(OutcomeHistory.id.desc())
+            .first()
+        )
+        assert history is not None
+        assert history.outcome_name == "HOLD"
+        assert history.changed_by == "settings_admin@example.com"
+
+    def test_update_runtime_settings_rejects_unknown_neutral_outcome(self, settings_test_client):
+        token = settings_test_client.test_data["token"]
+        response = settings_test_client.put(
+            "/api/v2/settings/runtime",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"rule_quality_lookback_days": 21, "neutral_outcome": "UNKNOWN"},
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Neutral outcome must match an existing configured outcome"
+
+    def test_runtime_settings_flags_invalid_allowlist_rules_for_selected_neutral_outcome(self, settings_test_client):
+        token = settings_test_client.test_data["token"]
+        session = settings_test_client.test_data["session"]
+        org = _get_org(session)
+        session.add_all(
+            [
+                AllowedOutcome(outcome_name="CANCEL", severity_rank=1, o_id=int(org.o_id)),
+                AllowedOutcome(outcome_name="HOLD", severity_rank=2, o_id=int(org.o_id)),
+                AllowedOutcome(outcome_name="RELEASE", severity_rank=3, o_id=int(org.o_id)),
+                RuleModel(
+                    rid="ALLOWLIST_RELEASE_ONLY",
+                    description="Existing allowlist rule",
+                    logic='if $country == "GB":\n\treturn "RELEASE"',
+                    evaluation_lane="allowlist",
+                    status=RuleStatus.DRAFT,
+                    o_id=int(org.o_id),
+                ),
+            ]
+        )
+        session.commit()
+
+        response = settings_test_client.put(
+            "/api/v2/settings/runtime",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"rule_quality_lookback_days": 21, "neutral_outcome": "HOLD"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["neutral_outcome"] == "HOLD"
+        assert len(payload["invalid_allowlist_rules"]) == 1
+        assert payload["invalid_allowlist_rules"][0]["rid"] == "ALLOWLIST_RELEASE_ONLY"
+        assert "configured neutral outcome 'HOLD'" in payload["invalid_allowlist_rules"][0]["error"]
 
 
 class TestOutcomeHierarchySettings:

@@ -12,8 +12,8 @@ from ezrules.settings import app_settings
 AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY = "auto_promote_active_rule_updates"
 AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT = False
 RULE_QUALITY_LOOKBACK_DAYS_KEY = "rule_quality_lookback_days"
-ALLOWLIST_MATCH_OUTCOME_KEY = "allowlist_match_outcome"
-ALLOWLIST_MATCH_OUTCOME_DEFAULT = "RELEASE"
+NEUTRAL_OUTCOME_KEY = "neutral_outcome"
+NEUTRAL_OUTCOME_DEFAULT = "RELEASE"
 
 _RUNTIME_VALUE_TYPE_INT = "int"
 _RUNTIME_VALUE_TYPE_FLOAT = "float"
@@ -44,10 +44,10 @@ _RUNTIME_SETTING_SPECS: dict[str, RuntimeSettingSpec] = {
         min_value=1,
         max_value=3650,
     ),
-    ALLOWLIST_MATCH_OUTCOME_KEY: RuntimeSettingSpec(
-        key=ALLOWLIST_MATCH_OUTCOME_KEY,
+    NEUTRAL_OUTCOME_KEY: RuntimeSettingSpec(
+        key=NEUTRAL_OUTCOME_KEY,
         value_type=_RUNTIME_VALUE_TYPE_STRING,
-        default=ALLOWLIST_MATCH_OUTCOME_DEFAULT,
+        default=NEUTRAL_OUTCOME_DEFAULT,
     ),
 }
 
@@ -163,8 +163,8 @@ def get_auto_promote_active_rule_updates(db: Any, org_id: int) -> bool:
     return bool(get_runtime_setting(db, AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY, org_id))
 
 
-def get_allowlist_match_outcome(db: Any, org_id: int) -> str:
-    return str(get_runtime_setting(db, ALLOWLIST_MATCH_OUTCOME_KEY, org_id)).strip().upper()
+def get_neutral_outcome(db: Any, org_id: int) -> str:
+    return str(get_runtime_setting(db, NEUTRAL_OUTCOME_KEY, org_id)).strip().upper()
 
 
 def set_rule_quality_lookback_days(db: Any, value: int, org_id: int) -> None:
@@ -175,5 +175,5 @@ def set_auto_promote_active_rule_updates(db: Any, value: bool, org_id: int) -> N
     set_runtime_setting(db, AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY, value, org_id)
 
 
-def set_allowlist_match_outcome(db: Any, value: str, org_id: int) -> None:
-    set_runtime_setting(db, ALLOWLIST_MATCH_OUTCOME_KEY, value.strip().upper(), org_id)
+def set_neutral_outcome(db: Any, value: str, org_id: int) -> None:
+    set_runtime_setting(db, NEUTRAL_OUTCOME_KEY, value.strip().upper(), org_id)

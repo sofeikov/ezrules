@@ -6,6 +6,7 @@ import { AuthService } from '../services/auth.service';
 import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { SidebarComponent } from '../components/sidebar.component';
 import {
+  InvalidAllowlistRule,
   OutcomeHierarchyItem,
   RuleQualityPair,
   RuntimeSettingsService,
@@ -30,6 +31,9 @@ export class SettingsComponent implements OnInit {
 
   ruleQualityLookbackDays: number = 30;
   defaultRuleQualityLookbackDays: number = 30;
+  neutralOutcome: string = '';
+  defaultNeutralOutcome: string = '';
+  invalidAllowlistRules: InvalidAllowlistRule[] = [];
   availableOutcomes: string[] = [];
   availableLabels: string[] = [];
   hierarchyOutcomes: OutcomeHierarchyItem[] = [];
@@ -38,6 +42,7 @@ export class SettingsComponent implements OnInit {
   newPairLabel: string = '';
   hierarchyDirty: boolean = false;
   canManagePermissions: boolean = false;
+  canManageNeutralOutcome: boolean = false;
 
   constructor(
     private runtimeSettingsService: RuntimeSettingsService,
@@ -53,9 +58,14 @@ export class SettingsComponent implements OnInit {
     this.authService.getCurrentUser().subscribe({
       next: (user) => {
         this.canManagePermissions = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.managePermissions);
+        this.canManageNeutralOutcome = hasPermissionRequirement(
+          user.permissions,
+          ACTION_PERMISSION_REQUIREMENTS.manageNeutralOutcome,
+        );
       },
       error: () => {
         this.canManagePermissions = false;
+        this.canManageNeutralOutcome = false;
       }
     });
   }
@@ -76,6 +86,9 @@ export class SettingsComponent implements OnInit {
         this.defaultAutoPromoteActiveRuleUpdates = settings.defaultAutoPromoteActiveRuleUpdates;
         this.ruleQualityLookbackDays = settings.ruleQualityLookbackDays;
         this.defaultRuleQualityLookbackDays = settings.defaultRuleQualityLookbackDays;
+        this.neutralOutcome = settings.neutralOutcome;
+        this.defaultNeutralOutcome = settings.defaultNeutralOutcome;
+        this.invalidAllowlistRules = settings.invalidAllowlistRules;
         this.hierarchyOutcomes = hierarchy;
         this.availableOutcomes = options.outcomes;
         this.availableLabels = options.labels;
@@ -97,33 +110,42 @@ export class SettingsComponent implements OnInit {
   }
 
   save(): void {
-    if (!this.canManagePermissions) {
+    if (!this.canManagePermissions && !this.canManageNeutralOutcome) {
       return;
     }
 
     this.error = null;
     this.success = null;
 
-    if (!Number.isFinite(this.ruleQualityLookbackDays) || this.ruleQualityLookbackDays < 1) {
+    if (this.canManagePermissions && (!Number.isFinite(this.ruleQualityLookbackDays) || this.ruleQualityLookbackDays < 1)) {
       this.error = 'Lookback days must be at least 1.';
+      return;
+    }
+    if (this.canManageNeutralOutcome && this.availableOutcomes.length > 0 && !this.neutralOutcome) {
+      this.error = 'Select a neutral outcome before saving settings.';
       return;
     }
 
     this.saving = true;
-    this.runtimeSettingsService.updateRuntimeSettings(
-      Math.floor(this.ruleQualityLookbackDays),
-      this.autoPromoteActiveRuleUpdates
-    ).subscribe({
+    const updateRequest = {
+      autoPromoteActiveRuleUpdates: this.canManagePermissions ? this.autoPromoteActiveRuleUpdates : undefined,
+      ruleQualityLookbackDays: this.canManagePermissions ? Math.floor(this.ruleQualityLookbackDays) : undefined,
+      neutralOutcome: this.canManageNeutralOutcome ? this.neutralOutcome : undefined,
+    };
+    this.runtimeSettingsService.updateRuntimeSettings(updateRequest).subscribe({
       next: (settings) => {
         this.autoPromoteActiveRuleUpdates = settings.autoPromoteActiveRuleUpdates;
         this.defaultAutoPromoteActiveRuleUpdates = settings.defaultAutoPromoteActiveRuleUpdates;
         this.ruleQualityLookbackDays = settings.ruleQualityLookbackDays;
         this.defaultRuleQualityLookbackDays = settings.defaultRuleQualityLookbackDays;
+        this.neutralOutcome = settings.neutralOutcome;
+        this.defaultNeutralOutcome = settings.defaultNeutralOutcome;
+        this.invalidAllowlistRules = settings.invalidAllowlistRules;
         this.success = 'Settings saved successfully.';
         this.saving = false;
       },
-      error: () => {
-        this.error = 'Failed to save settings.';
+      error: (err) => {
+        this.error = err?.error?.detail || 'Failed to save settings.';
         this.saving = false;
       }
     });
@@ -250,6 +272,22 @@ export class SettingsComponent implements OnInit {
   }
 
   showReadOnlyNotice(): boolean {
-    return !this.canManagePermissions;
+    return !this.canManagePermissions && !this.canManageNeutralOutcome;
+  }
+
+  showNeutralOutcomeSelector(): boolean {
+    return this.availableOutcomes.length > 0;
+  }
+
+  neutralOutcomeLabel(): string {
+    return this.neutralOutcome || this.defaultNeutralOutcome || 'RELEASE';
+  }
+
+  neutralOutcomeMissingFromCatalog(): boolean {
+    return !!this.neutralOutcome && !this.availableOutcomes.includes(this.neutralOutcome);
+  }
+
+  canSaveNeutralOutcome(): boolean {
+    return this.canManageNeutralOutcome;
   }
 }

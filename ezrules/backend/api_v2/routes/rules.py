@@ -39,7 +39,7 @@ from ezrules.backend.api_v2.schemas.rules import (
     RuleVerifyResponse,
 )
 from ezrules.backend.api_v2.schemas.shadow import ShadowDeployRequest, ShadowDeployResponse
-from ezrules.backend.runtime_settings import get_allowlist_match_outcome, get_auto_promote_active_rule_updates
+from ezrules.backend.runtime_settings import get_auto_promote_active_rule_updates, get_neutral_outcome
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import MissingFieldLookupError, Rule, RuleFactory
@@ -242,7 +242,10 @@ def validate_allowlist_rule(rule: Rule, allowlist_outcome: str) -> str | None:
     invalid_values = [value for value in visitor.values if value != allowlist_outcome]
     if invalid_values:
         rendered_values = ", ".join(sorted({repr(value) for value in invalid_values}))
-        return f"Allowlist rules must return only '{allowlist_outcome}'. Found {rendered_values}."
+        return (
+            f"Allowlist rules must return only the configured neutral outcome '{allowlist_outcome}'. "
+            f"Found {rendered_values}."
+        )
     return None
 
 
@@ -500,7 +503,7 @@ def create_rule(
     a 400 error is returned with details about what's wrong.
     """
     evaluation_lane = normalize_evaluation_lane(rule_data.evaluation_lane)
-    allowlist_outcome = get_allowlist_match_outcome(db, current_org_id)
+    allowlist_outcome = get_neutral_outcome(db, current_org_id)
 
     # Validate the rule logic by trying to compile it
     try:
@@ -599,7 +602,7 @@ def update_rule(
         if rule_data.evaluation_lane is not None
         else str(getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN)
     )
-    allowlist_outcome = get_allowlist_match_outcome(db, current_org_id)
+    allowlist_outcome = get_neutral_outcome(db, current_org_id)
 
     # Validate the rule logic by trying to compile it
     try:

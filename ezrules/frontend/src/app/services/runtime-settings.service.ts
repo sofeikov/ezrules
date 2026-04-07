@@ -9,6 +9,16 @@ export interface RuntimeSettings {
   defaultAutoPromoteActiveRuleUpdates: boolean;
   ruleQualityLookbackDays: number;
   defaultRuleQualityLookbackDays: number;
+  neutralOutcome: string;
+  defaultNeutralOutcome: string;
+  invalidAllowlistRules: InvalidAllowlistRule[];
+}
+
+export interface InvalidAllowlistRule {
+  rId: number;
+  rid: string;
+  description: string;
+  error: string;
 }
 
 export interface RuleQualityPair {
@@ -32,11 +42,27 @@ export interface OutcomeHierarchyItem {
   severityRank: number;
 }
 
+export interface RuntimeSettingsUpdateRequest {
+  autoPromoteActiveRuleUpdates?: boolean;
+  ruleQualityLookbackDays?: number;
+  neutralOutcome?: string;
+}
+
 interface RuntimeSettingsV2 {
   auto_promote_active_rule_updates: boolean;
   default_auto_promote_active_rule_updates: boolean;
   rule_quality_lookback_days: number;
   default_rule_quality_lookback_days: number;
+  neutral_outcome: string;
+  default_neutral_outcome: string;
+  invalid_allowlist_rules: InvalidAllowlistRuleV2[];
+}
+
+interface InvalidAllowlistRuleV2 {
+  r_id: number;
+  rid: string;
+  description: string;
+  error: string;
 }
 
 interface RuleQualityPairV2 {
@@ -84,21 +110,28 @@ export class RuntimeSettingsService {
         autoPromoteActiveRuleUpdates: response.auto_promote_active_rule_updates,
         defaultAutoPromoteActiveRuleUpdates: response.default_auto_promote_active_rule_updates,
         ruleQualityLookbackDays: response.rule_quality_lookback_days,
-        defaultRuleQualityLookbackDays: response.default_rule_quality_lookback_days
+        defaultRuleQualityLookbackDays: response.default_rule_quality_lookback_days,
+        neutralOutcome: response.neutral_outcome,
+        defaultNeutralOutcome: response.default_neutral_outcome,
+        invalidAllowlistRules: response.invalid_allowlist_rules.map(rule => this.mapInvalidAllowlistRule(rule))
       }))
     );
   }
 
-  updateRuntimeSettings(ruleQualityLookbackDays: number, autoPromoteActiveRuleUpdates: boolean): Observable<RuntimeSettings> {
+  updateRuntimeSettings(request: RuntimeSettingsUpdateRequest): Observable<RuntimeSettings> {
     return this.http.put<RuntimeSettingsV2>(this.settingsUrl, {
-      auto_promote_active_rule_updates: autoPromoteActiveRuleUpdates,
-      rule_quality_lookback_days: ruleQualityLookbackDays
+      auto_promote_active_rule_updates: request.autoPromoteActiveRuleUpdates,
+      rule_quality_lookback_days: request.ruleQualityLookbackDays,
+      neutral_outcome: request.neutralOutcome,
     }).pipe(
       map(response => ({
         autoPromoteActiveRuleUpdates: response.auto_promote_active_rule_updates,
         defaultAutoPromoteActiveRuleUpdates: response.default_auto_promote_active_rule_updates,
         ruleQualityLookbackDays: response.rule_quality_lookback_days,
-        defaultRuleQualityLookbackDays: response.default_rule_quality_lookback_days
+        defaultRuleQualityLookbackDays: response.default_rule_quality_lookback_days,
+        neutralOutcome: response.neutral_outcome,
+        defaultNeutralOutcome: response.default_neutral_outcome,
+        invalidAllowlistRules: response.invalid_allowlist_rules.map(rule => this.mapInvalidAllowlistRule(rule))
       }))
     );
   }
@@ -170,6 +203,15 @@ export class RuntimeSettingsService {
       aoId: item.ao_id,
       outcomeName: item.outcome_name,
       severityRank: item.severity_rank
+    };
+  }
+
+  private mapInvalidAllowlistRule(rule: InvalidAllowlistRuleV2): InvalidAllowlistRule {
+    return {
+      rId: rule.r_id,
+      rid: rule.rid,
+      description: rule.description,
+      error: rule.error,
     };
   }
 }

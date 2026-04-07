@@ -19,6 +19,7 @@ from ezrules.models.backend_core import (
     Organisation,
     Role,
     RuleStatus,
+    RuntimeSetting,
     TestingRecordLog,
     TestingResultsLog,
     User,
@@ -124,7 +125,37 @@ class TestAllowlistRuleCrud:
         assert response.status_code == 201
         payload = response.json()
         assert payload["success"] is False
-        assert "Allowlist rules must return only 'RELEASE'" in payload["error"]
+        assert "Allowlist rules must return only the configured neutral outcome 'RELEASE'" in payload["error"]
+
+    def test_create_rule_uses_configured_neutral_outcome(self, allowlist_rules_client):
+        token = allowlist_rules_client.test_data["token"]
+        session = allowlist_rules_client.test_data["session"]
+        org = allowlist_rules_client.test_data["org"]
+        session.add(
+            RuntimeSetting(
+                key="neutral_outcome",
+                o_id=int(org.o_id),
+                value_type="string",
+                value="HOLD",
+            )
+        )
+        session.commit()
+
+        response = allowlist_rules_client.post(
+            "/api/v2/rules",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "rid": "ALLOWLIST_CREATE_HOLD",
+                "description": "Allowlist hold rule",
+                "logic": 'if $country == "GB":\n\treturn "HOLD"',
+                "evaluation_lane": "allowlist",
+            },
+        )
+
+        assert response.status_code == 201
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["rule"]["evaluation_lane"] == "allowlist"
 
 
 class TestAllowlistEvaluation:
