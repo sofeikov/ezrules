@@ -70,10 +70,10 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 
 # Writing New Code
 1. You may add new test files without asking. Do not modify existing test files unless explicitly allowed.
-2. **BEFORE RUNNING ANY TESTS**: Ask the user if they want tests to be run. Tests can take significant time. If you do run the tests, make sure you run production grade serving on the backend, otherwise playwright tests will overwhel mthe dev server
-3. Before reporting task completion, ensure `uv run poe check` completes successfully.
-4. Any new imports must go to the top of the file (no inline imports in functions).
-5. Any new functionality must be covered with tests.
+2. Before reporting task completion, ensure `uv run poe check` completes successfully.
+3. Any new imports must go to the top of the file (no inline imports in functions).
+4. Any new functionality must be covered with tests.
+5. When implementing new functionality, explicitly ask the user whether permissions and audit logging should be included in scope.
 6. **FOR ANGULAR FRONTEND CHANGES**: Any new pages/navigation must have Playwright e2e tests in `ezrules/frontend/e2e/tests/` plus corresponding page objects in `e2e/pages/*.page.ts`.
 7. **FOR USER-VISIBLE UI FEATURES OR WORKFLOWS**: Record a short browser demonstration against a live local stack that proves the feature works end to end. Use a private dev DB, run the backend/frontend on random high ports, save the recording artifact under `artifacts/` in the worktree, and keep the proof focused on the implemented behavior.
 8. When the browser recording is generated as `.webm`, convert it to a shareable `.mp4` using H.264 + `yuv420p` + `faststart` so it can be uploaded to services such as X/Twitter. Preferred command: `ffmpeg -y -i input.webm -c:v libx264 -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k output.mp4`. File must be named accorind to the feature it demos.

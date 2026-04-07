@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { SettingsPage } from '../pages/settings.page';
+import { getApiBaseUrl, getAuthToken } from '../support/config';
+
+const API_BASE = getApiBaseUrl();
 
 test.describe('Settings Page', () => {
   let settingsPage: SettingsPage;
@@ -33,6 +36,40 @@ test.describe('Settings Page', () => {
     await settingsPage.save();
 
     await expect(settingsPage.successMessage).toBeVisible();
+  });
+
+  test('should allow choosing a neutral outcome and surface it in allowlist helper text', async ({ page, request }) => {
+    const authHeaders = { Authorization: `Bearer ${getAuthToken()}` };
+    const currentSettingsResponse = await request.get(`${API_BASE}/api/v2/settings/runtime`, { headers: authHeaders });
+    expect(currentSettingsResponse.ok()).toBeTruthy();
+    const currentSettings = await currentSettingsResponse.json();
+    try {
+      await settingsPage.goto();
+      await settingsPage.waitForPageToLoad();
+
+      const originalNeutralOutcome = await settingsPage.getNeutralOutcome();
+      const nextNeutralOutcome = originalNeutralOutcome === 'HOLD' ? 'RELEASE' : 'HOLD';
+
+      await settingsPage.setNeutralOutcome(nextNeutralOutcome);
+      await settingsPage.save();
+      await expect(settingsPage.successMessage).toBeVisible();
+
+      await page.goto('/rules/create');
+      await page.locator('[data-testid="rule-lane-select"]').selectOption('allowlist');
+      await expect(page.locator('text=They must return').first()).toContainText(
+        `They must return ${nextNeutralOutcome}.`
+      );
+    } finally {
+      const restoreResponse = await request.put(`${API_BASE}/api/v2/settings/runtime`, {
+        headers: authHeaders,
+        data: {
+          rule_quality_lookback_days: currentSettings.rule_quality_lookback_days,
+          auto_promote_active_rule_updates: currentSettings.auto_promote_active_rule_updates,
+          neutral_outcome: currentSettings.neutral_outcome,
+        },
+      });
+      expect(restoreResponse.ok()).toBeTruthy();
+    }
   });
 
   test('should allow adding and deleting curated rule quality pairs', async ({ page }) => {

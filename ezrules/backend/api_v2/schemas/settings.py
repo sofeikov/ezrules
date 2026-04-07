@@ -18,16 +18,29 @@ class RuntimeSettingsResponse(BaseModel):
     default_rule_quality_lookback_days: int = Field(
         ..., ge=1, description="Fallback env-based default lookback in days"
     )
-    allowlist_match_outcome: str = Field(..., description="Outcome returned when any allowlist rule matches")
-    default_allowlist_match_outcome: str = Field(..., description="Fallback default allowlist outcome")
+    neutral_outcome: str = Field(..., description="Configured neutral outcome reused by allowlist and future policies")
+    default_neutral_outcome: str = Field(..., description="Fallback default neutral outcome")
+    invalid_allowlist_rules: list["InvalidAllowlistRule"] = Field(
+        default_factory=list,
+        description="Existing allowlist rules that do not comply with the configured neutral outcome",
+    )
 
 
 class RuntimeSettingsUpdateRequest(BaseModel):
     """Request payload for runtime settings updates."""
 
     auto_promote_active_rule_updates: bool | None = Field(default=None)
-    rule_quality_lookback_days: int = Field(..., ge=1, le=3650)
-    allowlist_match_outcome: str | None = Field(default=None, min_length=1, max_length=255)
+    rule_quality_lookback_days: int | None = Field(default=None, ge=1, le=3650)
+    neutral_outcome: str | None = Field(default=None, min_length=1, max_length=255)
+
+
+class InvalidAllowlistRule(BaseModel):
+    """Existing allowlist rule that no longer matches the configured neutral outcome."""
+
+    r_id: int = Field(..., description="Rule ID")
+    rid: str = Field(..., description="Rule external identifier")
+    description: str = Field(..., description="Rule description")
+    error: str = Field(..., description="Validation error explaining the mismatch")
 
 
 class OutcomeHierarchyItem(BaseModel):

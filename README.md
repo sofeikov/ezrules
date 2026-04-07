@@ -9,16 +9,16 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Rule Engine**: Flexible Python-based rule execution with custom logic support
 - **Management Interface**: Modern web UI for creating and managing rules
 - **Rule Authoring UX**: CodeMirror-powered rule editor with Python-aware highlighting, inline validation diagnostics, autocomplete for observed `$fields` and `@userLists`, and detected-reference chips while you write
-- **Enterprise Security**: Granular role-based access control with 32 permission types; API key authentication for service-to-service integration
+- **Enterprise Security**: Granular role-based access control with 33 permission types; API key authentication for service-to-service integration
 - **Org-Aware Admin APIs**: Manager access tokens now carry organisation context, and manager APIs resolve rules, users, roles, labels, settings, analytics, tested events, backtesting history, and audit reads against the authenticated user's org
 - **Transaction Labeling**: Comprehensive fraud analytics with API and bulk CSV upload capabilities
 - **Analytics Dashboard**: Real-time transaction volume charts, outcome trends, and ranked most/least firing active rules with configurable time ranges (1h, 6h, 12h, 24h, 30d)
 - **Scalable Architecture**: Unified API service with integrated rule evaluation
 - **Database Integration**: PostgreSQL backend with SQLAlchemy ORM and full audit history
-- **Audit Trail**: Change tracking for rules, user lists, outcomes, labels, and field type configurations, with per-change user attribution and explicit rule lifecycle actions (`promoted`, `deactivated`, `rolled_back`, `deleted`)
+- **Audit Trail**: Change tracking for rules, user lists, outcomes, labels, and field type configurations, with per-change user attribution and explicit rule lifecycle actions (`promoted`, `deactivated`, `rolled_back`, `deleted`) plus neutral-outcome setting changes
 - **Field Type Management**: Auto-discovers JSON field types from live traffic and test payloads; configurable type casting plus optional required/non-null field contracts are applied before rule evaluation so comparisons behave correctly and invalid live events fail fast
 - **Outcome Resolution Hierarchy**: Configure outcome severity order in Settings so conflicting rule hits resolve to one persisted winning outcome
-- **Allowlist Rule Lane**: Mark rules as `allowlist` so trusted or explicitly safe traffic can short-circuit the main rule set and immediately return the configured allowlist outcome (default `RELEASE`)
+- **Allowlist Rule Lane**: Mark rules as `allowlist` so trusted or explicitly safe traffic can short-circuit the main rule set and immediately return the configured neutral outcome (default `RELEASE`), chosen per organisation from the outcomes catalog
 - **Tested Events View**: Inspect the latest stored transactions, their final resolved outcomes, the raw event payload, every rule that fired for each event, see referenced payload fields highlighted inline inside the JSON with hover-based rule focus, jump straight from a trigger to the rule detail page, and refresh the list without reloading the whole app
 - **Shadow Deployment**: Deploy rules to a shadow environment that observes live traffic without affecting production outcomes; promote validated shadows to production in one step
 - **Rule Rollouts**: Shift a candidate rule onto a stable percentage of live traffic with deterministic bucketing, compare candidate vs control on the same events, and promote when the rollout looks good

@@ -16,6 +16,7 @@ class PermissionAction(Enum):
     MODIFY_OUTCOME = "modify_outcome"
     DELETE_OUTCOME = "delete_outcome"
     VIEW_OUTCOMES = "view_outcomes"
+    MANAGE_NEUTRAL_OUTCOME = "manage_neutral_outcome"
 
     # List Management
     CREATE_LIST = "create_list"
@@ -67,6 +68,7 @@ class PermissionAction(Enum):
             (cls.MODIFY_OUTCOME.value, "Modify existing outcomes", "outcome"),
             (cls.DELETE_OUTCOME.value, "Delete outcomes", "outcome"),
             (cls.VIEW_OUTCOMES.value, "View outcomes", "outcome"),
+            (cls.MANAGE_NEUTRAL_OUTCOME.value, "Manage the neutral outcome setting", "outcome"),
             (cls.CREATE_LIST.value, "Create new user lists", "list"),
             (cls.MODIFY_LIST.value, "Modify existing user lists", "list"),
             (cls.DELETE_LIST.value, "Delete user lists", "list"),
