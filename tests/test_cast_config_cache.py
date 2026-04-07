@@ -33,6 +33,17 @@ class FakeRedis:
         return next_value
 
 
+class FakeMonotonic:
+    def __init__(self) -> None:
+        self.value = 0.0
+
+    def __call__(self) -> float:
+        return self.value
+
+    def advance(self, seconds: float) -> None:
+        self.value += seconds
+
+
 @pytest.fixture(autouse=True)
 def reset_cast_config_state():
     cast_config_cache.reset_cast_config_cache()
@@ -101,6 +112,7 @@ def test_cast_config_cache_reuses_worker_memory_when_version_is_stable(monkeypat
         return configs
 
     monkeypatch.setattr(cast_config_cache, "_load_cast_configs_from_db", _fake_load)
+    monkeypatch.setattr(cache, "_read_durable_version", lambda db, o_id: "0")
 
     assert cache.load(object(), 42) == configs
     assert cache.load(object(), 42) == configs
@@ -113,6 +125,7 @@ def test_cast_config_cache_invalidation_refreshes_other_worker(monkeypatch: pyte
     worker_two = cast_config_cache.CastConfigCache(client_getter=lambda: fake_redis)
     load_calls: list[int] = []
     current_type = FieldType.INTEGER
+    durable_version = {"value": "1"}
 
     def _fake_load(db, o_id: int) -> list[FieldCastConfig]:
         del db
@@ -127,16 +140,95 @@ def test_cast_config_cache_invalidation_refreshes_other_worker(monkeypatch: pyte
         ]
 
     monkeypatch.setattr(cast_config_cache, "_load_cast_configs_from_db", _fake_load)
+    monkeypatch.setattr(worker_one, "_read_durable_version", lambda db, o_id: durable_version["value"])
+    monkeypatch.setattr(worker_two, "_read_durable_version", lambda db, o_id: durable_version["value"])
 
     assert worker_one.load(object(), 7)[0].field_type == FieldType.INTEGER
     assert worker_two.load(object(), 7)[0].field_type == FieldType.INTEGER
 
     current_type = FieldType.STRING
-    assert worker_one.invalidate(7) is True
+    durable_version["value"] = "2"
+    assert worker_one.publish(7, 2) is True
 
     refreshed_configs = worker_two.load(object(), 7)
     assert refreshed_configs[0].field_type == FieldType.STRING
     assert load_calls == [7, 7, 7]
+
+
+def test_cast_config_cache_recovers_from_redis_key_loss(monkeypatch: pytest.MonkeyPatch):
+    fake_redis = FakeRedis()
+    fake_clock = FakeMonotonic()
+    cache = cast_config_cache.CastConfigCache(client_getter=lambda: fake_redis)
+    load_calls: list[int] = []
+    durable_version = {"value": "1"}
+    current_type = {"value": FieldType.INTEGER}
+
+    def _fake_load(db, o_id: int) -> list[FieldCastConfig]:
+        del db
+        load_calls.append(o_id)
+        return [
+            FieldCastConfig(
+                field_name="amount",
+                field_type=current_type["value"],
+                datetime_format=None,
+                required=False,
+            )
+        ]
+
+    monkeypatch.setattr(cast_config_cache, "_load_cast_configs_from_db", _fake_load)
+    monkeypatch.setattr(cast_config_cache, "monotonic", fake_clock)
+    monkeypatch.setattr(cache, "_read_durable_version", lambda db, o_id: durable_version["value"])
+
+    assert cache.load(object(), 3)[0].field_type == FieldType.INTEGER
+
+    fake_redis._values.clear()
+    durable_version["value"] = "2"
+    current_type["value"] = FieldType.STRING
+
+    refreshed = cache.load(object(), 3)
+    assert refreshed[0].field_type == FieldType.STRING
+    assert fake_redis.get("ezrules:field_type_config_version:3") == "2"
+    assert load_calls == [3, 3]
+
+
+def test_cast_config_cache_refreshes_from_durable_version_after_ttl_when_redis_publish_was_missed(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    fake_redis = FakeRedis()
+    fake_clock = FakeMonotonic()
+    cache = cast_config_cache.CastConfigCache(client_getter=lambda: fake_redis)
+    load_calls: list[int] = []
+    durable_version = {"value": "1"}
+    current_type = {"value": FieldType.INTEGER}
+
+    def _fake_load(db, o_id: int) -> list[FieldCastConfig]:
+        del db
+        load_calls.append(o_id)
+        return [
+            FieldCastConfig(
+                field_name="amount",
+                field_type=current_type["value"],
+                datetime_format=None,
+                required=False,
+            )
+        ]
+
+    monkeypatch.setattr(cast_config_cache, "_load_cast_configs_from_db", _fake_load)
+    monkeypatch.setattr(cast_config_cache, "monotonic", fake_clock)
+    monkeypatch.setattr(cache, "_read_durable_version", lambda db, o_id: durable_version["value"])
+
+    assert cache.load(object(), 9)[0].field_type == FieldType.INTEGER
+
+    durable_version["value"] = "2"
+    current_type["value"] = FieldType.STRING
+    assert cache.load(object(), 9)[0].field_type == FieldType.INTEGER
+
+    fake_clock.advance(cast_config_cache._LOCAL_CACHE_MAX_AGE_SECONDS + 1)
+
+    refreshed = cache.load(object(), 9)
+    assert refreshed[0].field_type == FieldType.STRING
+    assert fake_redis.get("ezrules:field_type_config_version:9") == "2"
+    assert load_calls == [9, 9]
 
 
 def test_evaluate_reuses_cached_cast_configs_until_field_type_mutation(session, live_api_key, monkeypatch):
