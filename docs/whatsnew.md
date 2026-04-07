@@ -2,6 +2,7 @@
 
 ## v1.4.1
 
+* **Async shadow evaluation**: Live `/api/v2/evaluate` calls now enqueue shadow comparisons after the canonical event write and let a periodic Celery drain persist shadow results later, so shadow-enabled traffic no longer waits for best-effort shadow rule execution before the production response returns.
 * **Neutral outcome setting**: Settings now lets each organisation designate one existing outcome as the reusable `neutral_outcome`. Allowlist rule validation now depends on that selected neutral outcome instead of an implicit allowlist-only default.
 * **Visible allowlist guidance**: The rule create/edit flows now show the current neutral outcome explicitly in their allowlist helper text, so authors can immediately see which value allowlist rules must return.
 * **Invalid allowlist rule warnings**: Settings now revalidates existing allowlist rules against the selected neutral outcome and flags any rules that no longer comply.
