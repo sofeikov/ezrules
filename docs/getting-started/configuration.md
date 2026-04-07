@@ -26,6 +26,10 @@ EZRULES_SMTP_USER=mailer-user
 EZRULES_SMTP_PASSWORD=mailer-password
 EZRULES_FROM_EMAIL=no-reply@example.com
 EZRULES_RULE_QUALITY_LOOKBACK_DAYS=30
+EZRULES_SHADOW_EVALUATION_QUEUE_REDIS_URL=redis://localhost:6379/0
+EZRULES_SHADOW_EVALUATION_QUEUE_DRAIN_INTERVAL_SECONDS=5
+EZRULES_SHADOW_EVALUATION_QUEUE_DRAIN_BATCH_SIZE=100
+EZRULES_SHADOW_EVALUATION_QUEUE_MAX_BATCHES_PER_DRAIN=10
 ```
 
 Run the service:
@@ -48,6 +52,14 @@ Manager requests and API-key evaluation derive org context from the authenticate
 | `EZRULES_TESTING` | No | `false` | `true` in tests | Testing mode |
 | `EZRULES_MAX_BODY_SIZE_KB` | No | `1024` | `2048` | Reject requests whose declared body size exceeds this limit |
 | `EZRULES_CELERY_BROKER_URL` | No | `redis://localhost:6379` | `redis://host:6379/0` | Celery broker for backtesting |
+| `EZRULES_OBSERVATION_QUEUE_REDIS_URL` | No | `EZRULES_CELERY_BROKER_URL` | `redis://host:6379/1` | Optional dedicated Redis URL for async field-observation buffering |
+| `EZRULES_OBSERVATION_QUEUE_DRAIN_INTERVAL_SECONDS` | No | `5` | `5` | Celery beat interval for draining buffered field observations |
+| `EZRULES_OBSERVATION_QUEUE_DRAIN_BATCH_SIZE` | No | `1000` | `1000` | Max field-observation payloads drained per batch |
+| `EZRULES_OBSERVATION_QUEUE_MAX_BATCHES_PER_DRAIN` | No | `10` | `10` | Max field-observation batches drained per beat tick |
+| `EZRULES_SHADOW_EVALUATION_QUEUE_REDIS_URL` | No | `EZRULES_CELERY_BROKER_URL` | `redis://host:6379/2` | Optional dedicated Redis URL for async shadow-evaluation buffering |
+| `EZRULES_SHADOW_EVALUATION_QUEUE_DRAIN_INTERVAL_SECONDS` | No | `5` | `5` | Celery beat interval for draining buffered shadow evaluations |
+| `EZRULES_SHADOW_EVALUATION_QUEUE_DRAIN_BATCH_SIZE` | No | `100` | `100` | Max shadow-evaluation payloads drained per batch |
+| `EZRULES_SHADOW_EVALUATION_QUEUE_MAX_BATCHES_PER_DRAIN` | No | `10` | `10` | Max shadow-evaluation batches drained per beat tick |
 | `EZRULES_SMTP_HOST` | No | None | `smtp.example.com` | SMTP host for invitation/password reset emails |
 | `EZRULES_SMTP_PORT` | No | `587` | `587` | SMTP port |
 | `EZRULES_SMTP_USER` | No | None | `mailer-user` | SMTP username |
@@ -81,6 +93,10 @@ export EZRULES_SMTP_PASSWORD="mailer-password"
 export EZRULES_FROM_EMAIL="no-reply@example.com"
 export EZRULES_RULE_QUALITY_LOOKBACK_DAYS="30"
 export EZRULES_RULE_QUALITY_REPORT_SYNC_FALLBACK="true"
+export EZRULES_SHADOW_EVALUATION_QUEUE_REDIS_URL="redis://localhost:6379/0"
+export EZRULES_SHADOW_EVALUATION_QUEUE_DRAIN_INTERVAL_SECONDS="5"
+export EZRULES_SHADOW_EVALUATION_QUEUE_DRAIN_BATCH_SIZE="100"
+export EZRULES_SHADOW_EVALUATION_QUEUE_MAX_BATCHES_PER_DRAIN="10"
 ```
 
 ---
@@ -132,6 +148,12 @@ If you use backtesting:
 
 - ensure Redis is reachable via `EZRULES_CELERY_BROKER_URL`
 - ensure Celery workers are running
+
+If you use async field-observation buffering or async shadow evaluation:
+
+- leave `EZRULES_OBSERVATION_QUEUE_REDIS_URL` / `EZRULES_SHADOW_EVALUATION_QUEUE_REDIS_URL` unset to reuse the main broker, or point them at dedicated Redis instances
+- keep Celery beat running so queue drain tasks execute on schedule
+- tune the `*_DRAIN_INTERVAL_SECONDS`, `*_DRAIN_BATCH_SIZE`, and `*_MAX_BATCHES_PER_DRAIN` settings only if you need different throughput or lag tradeoffs
 
 ---
 
