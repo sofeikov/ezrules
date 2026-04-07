@@ -38,6 +38,7 @@ Open **Tested Events** in the sidebar and review the latest stored evaluations.
 Use it to answer:
 
 - Which event IDs were most recently stored
+- Which uploaded labels have already been applied to those events
 - What the raw event payload looked like
 - Which rules actually fired for a given transaction
 - What resolved outcome was persisted after severity resolution
@@ -45,6 +46,7 @@ Use it to answer:
 Tips:
 
 - Increase or decrease the **Show latest** selector to inspect a wider or narrower slice.
+- Use the **Uploaded Label** column to verify that CSV-applied labels landed on the expected events.
 - Expand a row to see the payload fields, every triggered rule, and the per-outcome counts for that event.
 - When no rule is hovered, fields referenced by any triggered rule stay highlighted.
 - Hover a specific triggered rule to narrow the payload highlight to just the fields that rule references.
