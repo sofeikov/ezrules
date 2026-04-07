@@ -10,6 +10,7 @@ from ezrules.backend.backtesting import (
     BACKTEST_QUEUE_RUNNING,
     compute_backtest_metrics,
 )
+from ezrules.backend.observation_queue import drain_observation_queue
 from ezrules.backend.rule_quality import (
     compute_rule_quality_metrics,
     get_active_rule_quality_pairs,
@@ -25,6 +26,12 @@ from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
 app = Celery("tasks", backend=f"db+{app_settings.DB_ENDPOINT}", broker=app_settings.CELERY_BROKER_URL)
+app.conf.beat_schedule = {
+    "drain-field-observation-queue": {
+        "task": "ezrules.backend.tasks.drain_field_observation_queue",
+        "schedule": timedelta(seconds=app_settings.OBSERVATION_QUEUE_DRAIN_INTERVAL_SECONDS),
+    }
+}
 
 
 def _get_backtest_record(task_id: str | None) -> RuleBackTestingResult | None:
@@ -286,3 +293,8 @@ def generate_rule_quality_report(report_id: int) -> dict[str, str]:
             report.completed_at = datetime.now(UTC)
             db_session.commit()
         return {"error": f"Rule quality report {report_id} failed: {e!s}"}
+
+
+@app.task(name="ezrules.backend.tasks.drain_field_observation_queue")
+def drain_field_observation_queue() -> dict[str, int]:
+    return drain_observation_queue()

@@ -133,7 +133,7 @@ If rule logic references a field that is absent from `event_data`, the request i
 }
 ```
 
-Field observations are also recorded on each successful call, contributing to the **Observed Fields** data visible in the UI.
+Field observations are also recorded on each successful call, contributing to the **Observed Fields** data visible in the UI. Live evaluation now buffers those observation writes through Redis and a periodic Celery drain, so observation listings are eventually consistent rather than immediate.
 
 #### Status Codes
 

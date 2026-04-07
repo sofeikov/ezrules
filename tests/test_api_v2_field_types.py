@@ -86,7 +86,7 @@ def sample_observation(session):
         session.add(org)
         session.commit()
 
-    obs = FieldObservation(field_name="country", observed_json_type="str", occurrence_count=5, o_id=org.o_id)
+    obs = FieldObservation(field_name="country", observed_json_type="str", o_id=org.o_id)
     session.add(obs)
     session.commit()
     return obs

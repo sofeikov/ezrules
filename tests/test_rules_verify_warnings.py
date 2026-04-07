@@ -71,7 +71,7 @@ class TestRuleVerifyWarnings:
         token = client.test_data["token"]  # type: ignore[attr-defined]
         org = client.test_data["org"]  # type: ignore[attr-defined]
 
-        session.add(FieldObservation(field_name="amount", observed_json_type="int", occurrence_count=3, o_id=org.o_id))
+        session.add(FieldObservation(field_name="amount", observed_json_type="int", o_id=org.o_id))
         session.commit()
 
         response = client.post(

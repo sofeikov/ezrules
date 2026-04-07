@@ -421,6 +421,8 @@ The Angular frontend includes comprehensive end-to-end tests using Playwright.
   Start API for e2e with `EZRULES_TESTING=false` (if `EZRULES_TESTING=true`, SMTP sends are skipped and email-flow tests fail).
 - Angular dev server running
 - Playwright browsers installed (first time only): `npx playwright install chromium`
+
+Live `/api/v2/evaluate` traffic now buffers field observations in Redis and relies on the Celery worker/beat loop to flush them into Postgres. The main evaluation response no longer waits on observation writes, so the **Observed Fields** view can lag by a few seconds behind fresh live traffic.
 ```bash
 # Example random high ports
 API_PORT=38888

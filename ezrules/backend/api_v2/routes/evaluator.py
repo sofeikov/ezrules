@@ -17,6 +17,7 @@ from ezrules.backend import data_utils
 from ezrules.backend.api_v2.auth.dependencies import get_current_evaluator_org_id, get_db
 from ezrules.backend.api_v2.schemas.evaluator import EvaluateRequest, EvaluateResponse
 from ezrules.backend.data_utils import Event
+from ezrules.backend.observation_queue import enqueue_observations
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.rule import MissingFieldLookupError, RuleFactory
@@ -92,6 +93,14 @@ def _build_response_from_all_results(all_rule_results: dict[Any, Any]) -> dict[s
     }
 
 
+def _persist_evaluate_observations(db: Any, event_data: dict, o_id: int) -> None:
+    if app_settings.TESTING:
+        record_observations(db, event_data, o_id)
+        return
+
+    enqueue_observations(event_data, o_id)
+
+
 @router.post("/evaluate", response_model=EvaluateResponse)
 def evaluate(
     request_data: EvaluateRequest,
@@ -127,7 +136,7 @@ def evaluate(
         if allowlist_result.get("rule_results"):
             result = _build_response_from_all_results(dict(allowlist_result.get("all_rule_results", {})))
             result, _ = data_utils.eval_and_store(lre, event, response=result)
-            record_observations(db, request_data.event_data, lre.o_id)
+            _persist_evaluate_observations(db, request_data.event_data, lre.o_id)
             return EvaluateResponse(
                 outcome_counters=result["outcome_counters"],
                 outcome_set=result["outcome_set"],
@@ -272,7 +281,7 @@ def evaluate(
                 lre.o_id,
             )
 
-    record_observations(db, request_data.event_data, lre.o_id)
+    _persist_evaluate_observations(db, request_data.event_data, lre.o_id)
 
     return EvaluateResponse(
         outcome_counters=result["outcome_counters"],

@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     PASSWORD_RESET_TOKEN_EXPIRY_HOURS: int = 1
     RULE_QUALITY_LOOKBACK_DAYS: int = 30
     RULE_QUALITY_REPORT_SYNC_FALLBACK: bool = True
+    OBSERVATION_QUEUE_REDIS_URL: str | None = None
+    OBSERVATION_QUEUE_KEY: str = "ezrules:field_observation_queue"
+    OBSERVATION_QUEUE_LOCK_KEY: str = "ezrules:field_observation_queue:lock"
+    OBSERVATION_QUEUE_DRAIN_BATCH_SIZE: int = 1000
+    OBSERVATION_QUEUE_MAX_BATCHES_PER_DRAIN: int = 10
+    OBSERVATION_QUEUE_LOCK_TIMEOUT_SECONDS: int = 30
+    OBSERVATION_QUEUE_DRAIN_INTERVAL_SECONDS: int = 5
 
 
 app_settings = Settings()  # type: ignore[missing-argument]

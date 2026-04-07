@@ -644,14 +644,12 @@ class FieldObservation(Base):
 
     field_name = Column(String, primary_key=True)
     observed_json_type = Column(String, primary_key=True)
-    last_seen = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
-    occurrence_count = Column(Integer, default=1, nullable=False)
 
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), primary_key=True)
     org: Mapped["Organisation"] = relationship()
 
     def __repr__(self) -> str:
-        return f"FieldObservation({self.field_name!r}, {self.observed_json_type!r}, count={self.occurrence_count}, o_id={self.o_id})"
+        return f"FieldObservation({self.field_name!r}, {self.observed_json_type!r}, o_id={self.o_id})"
 
 
 class UserSession(Base):

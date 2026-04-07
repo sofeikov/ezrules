@@ -16,8 +16,6 @@ export interface FieldTypeConfig {
 export interface FieldObservation {
   field_name: string;
   observed_json_type: string;
-  occurrence_count: number;
-  last_seen: string | null;
 }
 
 interface FieldTypeConfigListResponse {

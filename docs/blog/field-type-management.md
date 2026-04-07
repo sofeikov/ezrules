@@ -15,16 +15,16 @@ ezrules v0.12 handles this at the engine level.
 
 ## How it works
 
-Every event that passes through `/api/v2/evaluate` is observed. For each field in the payload, we record the JSON type Python saw — `int`, `float`, `str`, `bool` — and how many times we've seen that combination. The same happens in the Test Rule panel, so observations build up during development without needing live traffic.
+Every event that passes through `/api/v2/evaluate` is observed. For each field in the payload, we record the JSON type Python saw — `int`, `float`, `str`, `bool`. The same happens in the Test Rule panel, so observations build up during development without needing live traffic.
 
 The observations show up under **Settings → Field Types**:
 
 ```
-amount    int    1847 observations    last seen 2 minutes ago
-amount    str       3 observations    last seen 6 days ago
+amount    int
+amount    str
 ```
 
-Two rows for `amount` means it arrived with two different types. Three outlier `str` events is a data quality signal worth investigating, but you don't have to wait — configure `amount` as `float` and both variants are handled correctly from that point on.
+Two rows for `amount` means it arrived with two different types. That's a data quality signal worth investigating, but you don't have to wait — configure `amount` as `float` and both variants are handled correctly from that point on.
 
 From the same page, click **Configure** next to any observation, pick the type, save. For datetime fields you also provide a format string (`%Y-%m-%dT%H:%M:%S`), and the value will be parsed into a proper `datetime` object before rules run.
 

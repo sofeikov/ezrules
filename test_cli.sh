@@ -12,7 +12,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Test database configuration
-TEST_DB_ENDPOINT="postgresql://postgres:root@localhost:5432/tests"
+TEST_DB_ENDPOINT="${TEST_DB_ENDPOINT:-${EZRULES_DB_ENDPOINT:-postgresql://postgres:root@localhost:5432/tests}}"
 export EZRULES_DB_ENDPOINT="$TEST_DB_ENDPOINT"
 export EZRULES_TESTING="true"
 

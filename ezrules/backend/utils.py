@@ -1,7 +1,6 @@
-import datetime
 from typing import Any
 
-from sqlalchemy import tuple_
+from sqlalchemy.dialects.postgresql import insert
 
 from ezrules.core.type_casting import FieldCastConfig, FieldType
 from ezrules.models.backend_core import FieldObservation, FieldTypeConfig
@@ -16,44 +15,47 @@ def conditional_decorator(condition, decorator):
     return wrapper
 
 
+def build_observation_rows(event_data: dict, o_id: int) -> list[dict[str, Any]]:
+    observation_keys = {(o_id, field_name, type(value).__name__) for field_name, value in event_data.items()}
+    return [
+        {
+            "o_id": current_o_id,
+            "field_name": field_name,
+            "observed_json_type": observed_json_type,
+        }
+        for current_o_id, field_name, observed_json_type in observation_keys
+    ]
+
+
+def upsert_field_observations(db: Any, observation_rows: list[dict[str, Any]], *, commit: bool = True) -> None:
+    if not observation_rows:
+        return
+
+    statement = insert(FieldObservation).values(observation_rows)
+    statement = statement.on_conflict_do_nothing(
+        index_elements=[
+            FieldObservation.field_name,
+            FieldObservation.observed_json_type,
+            FieldObservation.o_id,
+        ]
+    )
+    db.execute(statement)
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+
+
 def record_observations(db: Any, event_data: dict, o_id: int, commit: bool = True) -> None:
-    """Upsert a FieldObservation row per (field, type) pair seen in event_data."""
+    """Insert one FieldObservation row per distinct (field, type) pair seen in event_data."""
     if not event_data:
         return
 
-    if not commit:
-        db.flush()
-
-    now = datetime.datetime.now(datetime.UTC)
-    field_pairs = [(field_name, type(value).__name__) for field_name, value in event_data.items()]
-    existing_rows = (
-        db.query(FieldObservation)
-        .filter(
-            FieldObservation.o_id == o_id,
-            tuple_(FieldObservation.field_name, FieldObservation.observed_json_type).in_(field_pairs),
-        )
-        .all()
+    upsert_field_observations(
+        db,
+        build_observation_rows(event_data, o_id),
+        commit=commit,
     )
-    existing_map = {(row.field_name, row.observed_json_type): row for row in existing_rows}
-
-    for field_name, value in event_data.items():
-        observed_type = type(value).__name__
-        existing = existing_map.get((field_name, observed_type))
-        if existing:
-            existing.last_seen = now
-            existing.occurrence_count = (existing.occurrence_count or 0) + 1
-        else:
-            observation = FieldObservation(
-                field_name=field_name,
-                observed_json_type=observed_type,
-                last_seen=now,
-                occurrence_count=1,
-                o_id=o_id,
-            )
-            db.add(observation)
-            existing_map[(field_name, observed_type)] = observation
-    if commit:
-        db.commit()
 
 
 def load_cast_configs(db: Any, o_id: int) -> list[FieldCastConfig]:
