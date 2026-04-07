@@ -185,7 +185,7 @@ Rule activity query params:
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | `GET` | `/api/v2/settings/runtime` | Bearer + `VIEW_ROLES` | Read runtime settings |
-| `PUT` | `/api/v2/settings/runtime` | Bearer + `MANAGE_PERMISSIONS` | Update runtime settings (e.g., rule quality lookback days, active-rule auto-promotion) |
+| `PUT` | `/api/v2/settings/runtime` | Bearer + field-specific permission | Update runtime settings. `MANAGE_PERMISSIONS` covers general runtime settings; `MANAGE_NEUTRAL_OUTCOME` is required when changing `neutral_outcome`. |
 | `GET` | `/api/v2/settings/outcome-hierarchy` | Bearer + `VIEW_ROLES` | Read ordered outcome severity hierarchy |
 | `PUT` | `/api/v2/settings/outcome-hierarchy` | Bearer + `MANAGE_PERMISSIONS` | Replace ordered outcome severity hierarchy |
 | `GET` | `/api/v2/settings/rule-quality-pairs` | Bearer + `VIEW_ROLES` | List configured curated outcome→label pairs |
@@ -199,9 +199,11 @@ Outcome hierarchy notes:
 - `POST /api/v2/evaluate` uses this hierarchy to compute the single `resolved_outcome` stored for each event.
 
 Runtime settings notes:
-- `GET /api/v2/settings/runtime` returns both stored values and fallback defaults for `rule_quality_lookback_days`, `auto_promote_active_rule_updates`, and `allowlist_match_outcome`.
+- `GET /api/v2/settings/runtime` returns both stored values and fallback defaults for `rule_quality_lookback_days`, `auto_promote_active_rule_updates`, and `neutral_outcome`.
 - `auto_promote_active_rule_updates` defaults to `false`.
-- `allowlist_match_outcome` defaults to `RELEASE`.
+- `neutral_outcome` defaults to `RELEASE` and must match an existing configured outcome.
+- Runtime settings responses also include `invalid_allowlist_rules`, a list of existing allowlist rules that no longer comply with the selected neutral outcome.
+- Neutral-outcome changes are recorded in outcome audit history with action `neutral_outcome_updated`.
 - When `auto_promote_active_rule_updates=true`, saving edits to an active rule requires both `MODIFY_RULE` and `PROMOTE_RULES`.
 
 ### Users and Roles

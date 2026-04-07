@@ -16,7 +16,7 @@ You will:
 - You can access **Rules** and **Outcomes**
 - The outcome names you plan to return already exist (for example `HOLD`, `RELEASE`, `CANCEL`)
 - You have sample payloads that represent normal and suspicious behavior
-- If you plan to use the allowlist lane, you know the currently configured allowlist outcome (default `RELEASE`)
+- If you plan to use the allowlist lane, you know the currently configured neutral outcome (default `RELEASE`)
 
 ---
 
@@ -25,7 +25,7 @@ You will:
 Every rule now belongs to one of two lanes:
 
 - **Main rules**: normal decisioning rules that participate in standard outcome resolution
-- **Allowlist rules**: rules that short-circuit the main rule set and immediately return the configured allowlist outcome when they match
+- **Allowlist rules**: rules that short-circuit the main rule set and immediately return the configured neutral outcome when they match
 
 For most fraud/compliance logic, leave the lane as **Main rules**.
 
@@ -49,7 +49,7 @@ Notes:
 
 - Use `$field_name` to read event fields (for example `$amount`, `$country`)
 - If no condition matches, return nothing
-- If the rule is in the allowlist lane, it must return the configured allowlist outcome
+- If the rule is in the allowlist lane, it must return the configured neutral outcome
 
 Checkpoint:
 
@@ -116,7 +116,7 @@ if $user_id in @blocked_users:
 
 ### Allowlist pattern
 
-Use when a match should immediately produce the configured allowlist outcome and skip the normal rule set.
+Use when a match should immediately produce the configured neutral outcome and skip the normal rule set.
 
 ```python
 if $merchant_id in @trusted_merchants:

@@ -41,18 +41,18 @@ If one or more allowlist rules match:
 
 This is why allowlist rules are useful. They are not just "rules that return a safe outcome". They are rules that can stop the normal decision flow entirely.
 
-## The Allowlist Outcome
+## The Neutral Outcome
 
-Allowlist rules must return the configured allowlist outcome.
+Allowlist rules must return the configured neutral outcome.
 
 Current implementation:
 
-- the runtime setting is `allowlist_match_outcome`
+- the runtime setting is `neutral_outcome`
 - the default value is `RELEASE`
+- admins choose it in **Settings** from the existing outcomes catalog
 - the setting is available through `GET /api/v2/settings/runtime` and `PUT /api/v2/settings/runtime`
-- it is not yet exposed as a dedicated selector in the Settings UI
 
-That means the rule editor and API validation both expect allowlist rules to return the currently configured allowlist outcome, not an arbitrary outcome.
+That means the rule editor and API validation both expect allowlist rules to return the currently configured neutral outcome, not an arbitrary outcome.
 
 ## When To Use Allowlist vs Main Rules
 
@@ -73,7 +73,7 @@ Use **Allowlist rules** when:
 1. Open **Rules**
 2. Click **New Rule**
 3. In **Rule Lane**, choose **Allowlist rules**
-4. Write logic that returns the configured allowlist outcome
+4. Write logic that returns the configured neutral outcome
 
 Example:
 
@@ -82,7 +82,7 @@ if $merchant_id in @trusted_merchants:
     return 'RELEASE'
 ```
 
-The editor validates allowlist rules more strictly than main rules. If the configured allowlist outcome is `RELEASE`, returning `HOLD` or `CANCEL` will fail validation.
+The editor validates allowlist rules more strictly than main rules. If the configured neutral outcome is `RELEASE`, returning `HOLD` or `CANCEL` will fail validation.
 
 ## Edit an Existing Rule Into the Allowlist Lane
 
@@ -91,7 +91,7 @@ You can also move a rule into the allowlist lane from the rule detail page:
 1. Open the rule
 2. Click **Edit Rule**
 3. Change **Rule Lane** to **Allowlist rules**
-4. Update logic if needed so it returns the configured allowlist outcome
+4. Update logic if needed so it returns the configured neutral outcome
 5. Save
 
 The rule detail and rules list views show an `Allowlist` / `ALLOWLIST` badge so these rules stand out from the main rule set.
@@ -110,7 +110,7 @@ Because of that, allowlist rules cannot be deployed to shadow or rollout.
 
 When an allowlist rule matches:
 
-- `resolved_outcome` is the configured allowlist outcome
+- `resolved_outcome` is the configured neutral outcome
 - `rule_results` includes the matching allowlist rules only
 - the current main rules do not appear in the returned result for that event
 

@@ -5,9 +5,11 @@ export class SettingsPage {
   readonly page: Page;
   readonly heading: Locator;
   readonly lookbackDaysInput: Locator;
+  readonly neutralOutcomeSelect: Locator;
   readonly saveButton: Locator;
   readonly outcomeHierarchySaveButton: Locator;
   readonly successMessage: Locator;
+  readonly invalidAllowlistRulesNotice: Locator;
   readonly pairOutcomeSelect: Locator;
   readonly pairLabelSelect: Locator;
   readonly addPairButton: Locator;
@@ -18,9 +20,11 @@ export class SettingsPage {
     this.heading = page.locator('h1');
     this.autoPromoteActiveRuleUpdatesCheckbox = page.locator('#settings-autoPromoteActiveRuleUpdates');
     this.lookbackDaysInput = page.locator('#settings-ruleQualityLookbackDays');
+    this.neutralOutcomeSelect = page.locator('#settings-neutralOutcome');
     this.saveButton = page.locator('#settings-saveRuntimeSettings');
     this.outcomeHierarchySaveButton = page.locator('#settings-saveOutcomeHierarchy');
     this.successMessage = page.locator('text=Settings saved successfully.');
+    this.invalidAllowlistRulesNotice = page.locator('#settings-invalidAllowlistRulesNotice');
     this.pairOutcomeSelect = page.locator('#settings-pairOutcome');
     this.pairLabelSelect = page.locator('#settings-pairLabel');
     this.addPairButton = page.locator('#settings-addPair');
@@ -35,6 +39,7 @@ export class SettingsPage {
     await this.heading.waitFor({ state: 'visible' });
     await this.autoPromoteActiveRuleUpdatesCheckbox.waitFor({ state: 'visible' });
     await this.lookbackDaysInput.waitFor({ state: 'visible' });
+    await this.neutralOutcomeSelect.waitFor({ state: 'visible' });
     await this.outcomeHierarchySaveButton.waitFor({ state: 'visible' });
     await this.pairsTable.waitFor({ state: 'visible' });
   }
@@ -46,6 +51,14 @@ export class SettingsPage {
 
   async setLookbackDays(value: number) {
     await this.lookbackDaysInput.fill(String(value));
+  }
+
+  async getNeutralOutcome(): Promise<string> {
+    return this.neutralOutcomeSelect.inputValue();
+  }
+
+  async setNeutralOutcome(value: string) {
+    await this.neutralOutcomeSelect.selectOption(value);
   }
 
   async isAutoPromoteActiveRuleUpdatesEnabled(): Promise<boolean> {

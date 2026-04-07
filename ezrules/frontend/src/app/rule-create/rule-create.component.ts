@@ -12,6 +12,7 @@ import {
   RuleEditorFieldSuggestion,
   RuleEditorListSuggestion,
 } from '../services/rule-editor-assist.service';
+import { RuntimeSettingsService } from '../services/runtime-settings.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -25,14 +26,12 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
     { value: 'main', label: 'Main rules' },
     { value: 'allowlist', label: 'Allowlist rules' },
   ] as const;
-  readonly laneDescriptions: Record<'main' | 'allowlist', string> = {
-    main: 'Main rules run during standard evaluation and participate in the normal outcome resolution flow.',
-    allowlist: 'Allowlist rules short-circuit evaluation when they match. They must return the configured bypass outcome.',
-  };
+  readonly mainLaneDescription = 'Main rules run during standard evaluation and participate in the normal outcome resolution flow.';
   rid: string = '';
   description: string = '';
   logic: string = '';
   evaluationLane: 'main' | 'allowlist' = 'main';
+  neutralOutcomeLabel: string = 'RELEASE';
   testJson: string = '';
   testResult: any = null;
   testError: string | null = null;
@@ -54,13 +53,22 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
     private router: Router,
     private ruleService: RuleService,
     private ruleTestDataService: RuleTestDataService,
-    private ruleEditorAssistService: RuleEditorAssistService
+    private ruleEditorAssistService: RuleEditorAssistService,
+    private runtimeSettingsService: RuntimeSettingsService,
   ) { }
 
   ngOnInit(): void {
     this.assistSubscription = this.ruleEditorAssistService.getAssistData().subscribe((assistData) => {
       this.fieldSuggestions = assistData.fields;
       this.listSuggestions = assistData.lists;
+    });
+    this.runtimeSettingsService.getRuntimeSettings().subscribe({
+      next: (settings) => {
+        this.neutralOutcomeLabel = settings.neutralOutcome || settings.defaultNeutralOutcome || 'RELEASE';
+      },
+      error: () => {
+        this.neutralOutcomeLabel = 'RELEASE';
+      }
     });
   }
 
@@ -238,6 +246,9 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
   }
 
   selectedLaneDescription(): string {
-    return this.laneDescriptions[this.evaluationLane];
+    if (this.evaluationLane === 'allowlist') {
+      return `Allowlist rules short-circuit evaluation when they match. They must return ${this.neutralOutcomeLabel}.`;
+    }
+    return this.mainLaneDescription;
   }
 }
