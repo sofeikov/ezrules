@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     OBSERVATION_QUEUE_MAX_BATCHES_PER_DRAIN: int = 10
     OBSERVATION_QUEUE_LOCK_TIMEOUT_SECONDS: int = 30
     OBSERVATION_QUEUE_DRAIN_INTERVAL_SECONDS: int = 5
+    SHADOW_EVALUATION_QUEUE_REDIS_URL: str | None = None
+    SHADOW_EVALUATION_QUEUE_KEY: str = "ezrules:shadow_evaluation_queue"
+    SHADOW_EVALUATION_QUEUE_LOCK_KEY: str = "ezrules:shadow_evaluation_queue:lock"
+    SHADOW_EVALUATION_QUEUE_DRAIN_BATCH_SIZE: int = 100
+    SHADOW_EVALUATION_QUEUE_MAX_BATCHES_PER_DRAIN: int = 10
+    SHADOW_EVALUATION_QUEUE_LOCK_TIMEOUT_SECONDS: int = 30
+    SHADOW_EVALUATION_QUEUE_DRAIN_INTERVAL_SECONDS: int = 5
 
 
 app_settings = Settings()  # type: ignore[missing-argument]

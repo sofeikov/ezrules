@@ -14,6 +14,7 @@ import bcrypt
 import pytest
 from fastapi.testclient import TestClient
 
+from ezrules.backend import shadow_evaluation_queue
 from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
 from ezrules.backend.api_v2.routes import evaluator as evaluator_module
@@ -27,6 +28,62 @@ from ezrules.core.rule_updater import (
 )
 from ezrules.models.backend_core import Organisation, Role, Rule as RuleModel
 from ezrules.models.backend_core import RuleEngineConfig, ShadowResultsLog, User
+
+
+class FakeRedisLock:
+    def __init__(self, state: dict[str, bool], name: str):
+        self._state = state
+        self._name = name
+        self._held = False
+
+    def acquire(self, blocking: bool = False) -> bool:
+        del blocking
+        if self._state.get(self._name, False):
+            return False
+        self._state[self._name] = True
+        self._held = True
+        return True
+
+    def release(self) -> None:
+        if self._held:
+            self._state[self._name] = False
+            self._held = False
+
+
+class FakeRedis:
+    def __init__(self) -> None:
+        self._lists: dict[str, list[str]] = {}
+        self._lock_state: dict[str, bool] = {}
+
+    def lpush(self, name: str, *values: str) -> int:
+        queue = self._lists.setdefault(name, [])
+        for value in values:
+            queue.insert(0, value)
+        return len(queue)
+
+    def rpush(self, name: str, *values: str) -> int:
+        queue = self._lists.setdefault(name, [])
+        queue.extend(values)
+        return len(queue)
+
+    def rpop(self, name: str, count: int | None = None) -> str | list[str] | None:
+        queue = self._lists.setdefault(name, [])
+        if not queue:
+            return None
+        if count is None:
+            return queue.pop()
+
+        popped: list[str] = []
+        for _ in range(min(count, len(queue))):
+            popped.append(queue.pop())
+        return popped
+
+    def lock(self, name: str, timeout: int | None = None, blocking: bool = False) -> FakeRedisLock:
+        del timeout, blocking
+        return FakeRedisLock(self._lock_state, name)
+
+    def queue_contents(self, name: str) -> list[str]:
+        return list(self._lists.get(name, []))
 
 
 @pytest.fixture(scope="function")
@@ -84,6 +141,13 @@ def shadow_test_client(session):
     with TestClient(app) as client:
         client.test_data = client_data  # type: ignore[attr-defined]
         yield client
+
+
+@pytest.fixture(scope="function")
+def fake_shadow_redis(monkeypatch: pytest.MonkeyPatch) -> FakeRedis:
+    client = FakeRedis()
+    monkeypatch.setattr(shadow_evaluation_queue, "get_shadow_evaluation_queue_client", lambda: client)
+    return client
 
 
 @pytest.fixture(scope="function")
@@ -477,8 +541,8 @@ class TestShadowConfigEndpoint:
 class TestShadowEvaluation:
     """Tests for shadow evaluation during POST /api/v2/evaluate."""
 
-    def test_shadow_results_stored_when_shadow_config_exists(self, session, live_api_key):
-        """Shadow results log entries should be created when a shadow config exists."""
+    def test_evaluate_returns_before_shadow_rows_are_persisted(self, session, live_api_key, fake_shadow_redis):
+        """Live evaluate should enqueue shadow work instead of persisting it inline."""
         org = session.query(Organisation).filter(Organisation.o_id == 1).first()
         if not org:
             org = Organisation(o_id=1, name="Test Org")
@@ -497,11 +561,9 @@ class TestShadowEvaluation:
         # Deploy same rule to shadow as well
         deploy_rule_to_shadow(db=session, o_id=org.o_id, rule_model=rule, changed_by="test")
 
-        # Wire up both executors to the test session
+        # Wire up the production executor to the test session
         lre = LocalRuleExecutorSQL(db=session, o_id=org.o_id, label="production")
-        shadow_lre = LocalRuleExecutorSQL(db=session, o_id=org.o_id, label="shadow")
         evaluator_module._lre = lre
-        evaluator_module._shadow_lre = shadow_lre
 
         with TestClient(app) as client:
             response = client.post(
@@ -515,13 +577,55 @@ class TestShadowEvaluation:
             )
 
         evaluator_module._lre = None
-        evaluator_module._shadow_lre = None
 
         assert response.status_code == 200
 
-        # Verify shadow results were stored
         shadow_logs = session.query(ShadowResultsLog).filter(ShadowResultsLog.r_id == rule.r_id).all()
-        assert len(shadow_logs) >= 1
+        assert shadow_logs == []
+        assert (
+            len(fake_shadow_redis.queue_contents(shadow_evaluation_queue.app_settings.SHADOW_EVALUATION_QUEUE_KEY)) == 1
+        )
+
+    def test_shadow_results_arrive_after_queue_drain(self, session, live_api_key, fake_shadow_redis):
+        """Queued shadow work should eventually populate the existing shadow tables."""
+        org = session.query(Organisation).filter(Organisation.o_id == 1).first()
+        if not org:
+            org = Organisation(o_id=1, name="Test Org")
+            session.add(org)
+            session.commit()
+
+        rule = RuleModel(logic="return 'HOLD'", description="Shadow eval rule", rid="SHADOW_EVAL:001", o_id=org.o_id)
+        session.add(rule)
+        session.commit()
+
+        rm = RDBRuleManager(db=session, o_id=org.o_id)
+        config_producer = RDBRuleEngineConfigProducer(db=session, o_id=org.o_id)
+        config_producer.save_config(rm)
+        deploy_rule_to_shadow(db=session, o_id=org.o_id, rule_model=rule, changed_by="test")
+
+        lre = LocalRuleExecutorSQL(db=session, o_id=org.o_id, label="production")
+        evaluator_module._lre = lre
+
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v2/evaluate",
+                json={
+                    "event_id": "shadow_eval_test_1",
+                    "event_timestamp": 1234567890,
+                    "event_data": {"amount": 100},
+                },
+                headers={"X-API-Key": live_api_key},
+            )
+
+        evaluator_module._lre = None
+
+        assert response.status_code == 200
+        drained = shadow_evaluation_queue.drain_shadow_evaluation_queue(batch_size=10, max_batches=1)
+        assert drained["drained_batches"] == 1
+        assert drained["drained_messages"] == 1
+
+        shadow_logs = session.query(ShadowResultsLog).filter(ShadowResultsLog.r_id == rule.r_id).all()
+        assert len(shadow_logs) == 1
         assert shadow_logs[-1].rule_result == "HOLD"
 
     def test_no_failure_when_shadow_config_absent(self, session, live_api_key):
@@ -546,9 +650,7 @@ class TestShadowEvaluation:
         config_producer.save_config(rm)
 
         lre = LocalRuleExecutorSQL(db=session, o_id=org.o_id, label="production")
-        shadow_lre = LocalRuleExecutorSQL(db=session, o_id=org.o_id, label="shadow")
         evaluator_module._lre = lre
-        evaluator_module._shadow_lre = shadow_lre
 
         with TestClient(app) as client:
             response = client.post(
@@ -562,6 +664,5 @@ class TestShadowEvaluation:
             )
 
         evaluator_module._lre = None
-        evaluator_module._shadow_lre = None
 
         assert response.status_code == 200

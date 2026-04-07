@@ -16,6 +16,7 @@ from ezrules.backend.rule_quality import (
     get_active_rule_quality_pairs,
     normalize_rule_quality_pairs,
 )
+from ezrules.backend.shadow_evaluation_queue import drain_shadow_evaluation_queue
 from ezrules.backend.utils import load_cast_configs
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
 from ezrules.core.rule import Rule, RuleFactory
@@ -30,7 +31,11 @@ app.conf.beat_schedule = {
     "drain-field-observation-queue": {
         "task": "ezrules.backend.tasks.drain_field_observation_queue",
         "schedule": timedelta(seconds=app_settings.OBSERVATION_QUEUE_DRAIN_INTERVAL_SECONDS),
-    }
+    },
+    "drain-shadow-evaluation-queue": {
+        "task": "ezrules.backend.tasks.drain_shadow_evaluation_queue_task",
+        "schedule": timedelta(seconds=app_settings.SHADOW_EVALUATION_QUEUE_DRAIN_INTERVAL_SECONDS),
+    },
 }
 
 
@@ -298,3 +303,8 @@ def generate_rule_quality_report(report_id: int) -> dict[str, str]:
 @app.task(name="ezrules.backend.tasks.drain_field_observation_queue")
 def drain_field_observation_queue() -> dict[str, int]:
     return drain_observation_queue()
+
+
+@app.task(name="ezrules.backend.tasks.drain_shadow_evaluation_queue_task")
+def drain_shadow_evaluation_queue_task() -> dict[str, int]:
+    return drain_shadow_evaluation_queue()

@@ -19,11 +19,11 @@ from ezrules.backend.api_v2.schemas.evaluator import EvaluateRequest, EvaluateRe
 from ezrules.backend.data_utils import Event
 from ezrules.backend.observation_queue import enqueue_observations
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
+from ezrules.backend.shadow_evaluation_queue import enqueue_shadow_evaluation
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.rule import MissingFieldLookupError, RuleFactory
 from ezrules.core.rule_updater import (
     ALLOWLIST_CONFIG_LABEL,
-    DEPLOYMENT_MODE_SHADOW,
     DEPLOYMENT_MODE_SPLIT,
     DEPLOYMENT_VARIANT_CANDIDATE,
     DEPLOYMENT_VARIANT_CONTROL,
@@ -32,7 +32,7 @@ from ezrules.core.rule_updater import (
 )
 from ezrules.core.type_casting import CastError, RequiredFieldError, normalize_event
 from ezrules.core.user_lists import PersistentUserListManager
-from ezrules.models.backend_core import RuleDeploymentResultsLog, ShadowResultsLog
+from ezrules.models.backend_core import RuleDeploymentResultsLog
 from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2", tags=["Evaluator"])
@@ -105,7 +105,6 @@ def _persist_evaluate_observations(db: Any, event_data: dict, o_id: int) -> None
 def evaluate(
     request_data: EvaluateRequest,
     lre: LocalRuleExecutorSQL = Depends(_get_rule_executor),
-    shadow_lre: LocalRuleExecutorSQL = Depends(_get_shadow_executor),
     allowlist_lre: LocalRuleExecutorSQL = Depends(_get_allowlist_executor),
     db: Any = Depends(get_db),
     _: int = Depends(get_current_evaluator_org_id),
@@ -115,7 +114,7 @@ def evaluate(
 
     Stores the event and its evaluation results in the database.
     Records field observations for type management.
-    Also performs a best-effort shadow evaluation if a shadow config exists.
+    Enqueues a best-effort shadow evaluation if a shadow config exists.
     """
     configs = load_cast_configs(db, lre.o_id)
     try:
@@ -241,45 +240,14 @@ def evaluate(
                     lre.o_id,
                 )
 
-    # Best-effort shadow evaluation — never fails the main request
-    try:
-        shadow_result = shadow_lre.evaluate_rules(event.event_data)
-        for r_id, rule_result in shadow_result.get("all_rule_results", {}).items():
-            shadow_log = ShadowResultsLog(tl_id=tl_id, r_id=int(r_id), rule_result=str(rule_result))
-            db.add(shadow_log)
-            db.add(
-                RuleDeploymentResultsLog(
-                    tl_id=tl_id,
-                    r_id=int(r_id),
-                    o_id=lre.o_id,
-                    mode=DEPLOYMENT_MODE_SHADOW,
-                    selected_variant=DEPLOYMENT_VARIANT_CONTROL,
-                    traffic_percent=None,
-                    bucket=None,
-                    control_result=str(production_result.get("all_rule_results", {}).get(int(r_id)))
-                    if production_result.get("all_rule_results", {}).get(int(r_id)) is not None
-                    else None,
-                    candidate_result=str(rule_result) if rule_result is not None else None,
-                    returned_result=str(production_result.get("all_rule_results", {}).get(int(r_id)))
-                    if production_result.get("all_rule_results", {}).get(int(r_id)) is not None
-                    else None,
-                )
-            )
-        db.commit()
-    except Exception:
-        logger.exception(
-            "Failed to persist shadow comparison logs for event_id=%s org_id=%s",
-            event.event_id,
-            lre.o_id,
-        )
-        try:
-            db.rollback()
-        except Exception:
-            logger.exception(
-                "Failed to rollback shadow comparison log transaction for event_id=%s org_id=%s",
-                event.event_id,
-                lre.o_id,
-            )
+    enqueue_shadow_evaluation(
+        db=db,
+        tl_id=int(tl_id),
+        o_id=int(lre.o_id),
+        event_id=str(event.event_id),
+        event_data=event.event_data,
+        production_all_rule_results=dict(production_result.get("all_rule_results", {})),
+    )
 
     _persist_evaluate_observations(db, request_data.event_data, lre.o_id)
 
