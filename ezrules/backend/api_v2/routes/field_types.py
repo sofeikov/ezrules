@@ -25,11 +25,17 @@ from ezrules.backend.api_v2.schemas.field_types import (
     FieldTypeConfigUpdate,
     FieldTypeMutationResponse,
 )
+from ezrules.backend.cast_config_cache import invalidate_cast_config_cache
 from ezrules.core.audit_helpers import save_field_type_history
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import FieldObservation, FieldTypeConfig, User
 
 router = APIRouter(prefix="/api/v2/field-types", tags=["Field Types"])
+
+
+def _commit_field_type_change(db: Any, current_org_id: int) -> None:
+    db.commit()
+    invalidate_cast_config_cache(current_org_id)
 
 
 # =============================================================================
@@ -100,7 +106,7 @@ def upsert_field_type_config(
             datetime_format=data.datetime_format,
             required=data.required,
         )
-        db.commit()
+        _commit_field_type_change(db, current_org_id)
         db.refresh(existing)
         return FieldTypeMutationResponse(
             success=True,
@@ -126,7 +132,7 @@ def upsert_field_type_config(
         datetime_format=data.datetime_format,
         required=data.required,
     )
-    db.commit()
+    _commit_field_type_change(db, current_org_id)
     db.refresh(new_config)
 
     return FieldTypeMutationResponse(
@@ -176,7 +182,7 @@ def update_field_type_config(
         datetime_format=data.datetime_format,
         required=data.required,
     )
-    db.commit()
+    _commit_field_type_change(db, current_org_id)
     db.refresh(config)
 
     return FieldTypeMutationResponse(
@@ -223,7 +229,7 @@ def delete_field_type_config(
         required=bool(config.required),
     )
     db.delete(config)
-    db.commit()
+    _commit_field_type_change(db, current_org_id)
 
     return FieldTypeMutationResponse(
         success=True,

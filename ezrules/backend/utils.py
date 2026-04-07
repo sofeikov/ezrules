@@ -2,8 +2,8 @@ from typing import Any
 
 from sqlalchemy.dialects.postgresql import insert
 
-from ezrules.core.type_casting import FieldCastConfig, FieldType
-from ezrules.models.backend_core import FieldObservation, FieldTypeConfig
+from ezrules.backend.cast_config_cache import load_cast_configs as load_cached_cast_configs
+from ezrules.models.backend_core import FieldObservation
 
 
 def conditional_decorator(condition, decorator):
@@ -58,15 +58,5 @@ def record_observations(db: Any, event_data: dict, o_id: int, commit: bool = Tru
     )
 
 
-def load_cast_configs(db: Any, o_id: int) -> list[FieldCastConfig]:
-    """Load FieldTypeConfig rows for an org and return as FieldCastConfig objects."""
-    rows = db.query(FieldTypeConfig).filter(FieldTypeConfig.o_id == o_id).all()
-    return [
-        FieldCastConfig(
-            field_name=row.field_name,
-            field_type=FieldType(row.configured_type),
-            datetime_format=row.datetime_format,
-            required=bool(row.required),
-        )
-        for row in rows
-    ]
+def load_cast_configs(db: Any, o_id: int):
+    return load_cached_cast_configs(db, o_id)
