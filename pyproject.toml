@@ -85,6 +85,10 @@ output-format = "concise"
 [tool.ty.rules]
 deprecated = "ignore"
 
+[tool.pytest.ini_options]
+addopts = "--tb=short --disable-warnings"
+console_output_style = "count"
+
 [tool.poe.tasks]
 check = [
     {cmd = "uv lock --locked"},

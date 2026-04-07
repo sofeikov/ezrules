@@ -54,4 +54,4 @@ jobs:
       run: uv run alembic upgrade head
 
     - name: Run tests
-      run: uv run pytest --cov=ezrules.backend --cov=ezrules.core --cov-report=term-missing --cov-report=xml tests
+      run: uv run pytest -q --cov=ezrules.backend --cov=ezrules.core --cov-report=xml tests

@@ -17,7 +17,7 @@ EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/tests_e2e_54043 \
 EZRULES_TESTING=true \
 EZRULES_APP_SECRET=test-secret \
 EZRULES_ORG_ID=1 \
-uv run pytest --cov=ezrules.backend --cov=ezrules.core --cov-report=term-missing --cov-report=xml tests
+uv run pytest -q --cov=ezrules.backend --cov=ezrules.core --cov-report=xml tests
 ```
 
 ## Notes
@@ -26,6 +26,8 @@ uv run pytest --cov=ezrules.backend --cov=ezrules.core --cov-report=term-missing
 - If another Postgres container is bound to `5432` with different credentials, override `EZRULES_DB_ENDPOINT` accordingly.
 - If uv cache permission errors occur in restricted environments, prefix with `UV_CACHE_DIR=/tmp/uv-cache`.
 - CI parity sequence is: `uv sync --dev` -> `uv run alembic upgrade head` -> pytest command above.
+- Prefer quiet test output by default: use backend pytest in quiet mode (`-q`) and keep coverage output in XML unless a failing run specifically needs the more verbose terminal report.
+- Prefer the default quiet Playwright run (`npm run test:e2e`) instead of the verbose reporter variant. Use the verbose mode only when debugging failures interactively.
 
 # Common Development Commands
 - **Install dependencies**: `uv sync`
