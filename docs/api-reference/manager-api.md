@@ -134,7 +134,7 @@ Rule lifecycle fields on rule responses:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/tested-events` | Bearer + `VIEW_RULES` | Recent stored event evaluations with raw payload and triggered rules (`?limit=50`). Add `include_referenced_fields=true` to include each rule's referenced top-level fields. |
+| `GET` | `/api/v2/tested-events` | Bearer + `VIEW_RULES` | Recent stored event evaluations with uploaded `label_name`, raw payload, and triggered rules (`?limit=50`). Add `include_referenced_fields=true` to include each rule's referenced top-level fields. |
 
 ### Outcomes
 

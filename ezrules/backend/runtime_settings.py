@@ -14,6 +14,8 @@ AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT = False
 RULE_QUALITY_LOOKBACK_DAYS_KEY = "rule_quality_lookback_days"
 NEUTRAL_OUTCOME_KEY = "neutral_outcome"
 NEUTRAL_OUTCOME_DEFAULT = "RELEASE"
+FIELD_TYPE_CONFIG_VERSION_KEY = "field_type_config_version"
+FIELD_TYPE_CONFIG_VERSION_DEFAULT = 0
 
 _RUNTIME_VALUE_TYPE_INT = "int"
 _RUNTIME_VALUE_TYPE_FLOAT = "float"
@@ -48,6 +50,12 @@ _RUNTIME_SETTING_SPECS: dict[str, RuntimeSettingSpec] = {
         key=NEUTRAL_OUTCOME_KEY,
         value_type=_RUNTIME_VALUE_TYPE_STRING,
         default=NEUTRAL_OUTCOME_DEFAULT,
+    ),
+    FIELD_TYPE_CONFIG_VERSION_KEY: RuntimeSettingSpec(
+        key=FIELD_TYPE_CONFIG_VERSION_KEY,
+        value_type=_RUNTIME_VALUE_TYPE_INT,
+        default=FIELD_TYPE_CONFIG_VERSION_DEFAULT,
+        min_value=0,
     ),
 }
 
@@ -177,3 +185,13 @@ def set_auto_promote_active_rule_updates(db: Any, value: bool, org_id: int) -> N
 
 def set_neutral_outcome(db: Any, value: str, org_id: int) -> None:
     set_runtime_setting(db, NEUTRAL_OUTCOME_KEY, value.strip().upper(), org_id)
+
+
+def get_field_type_config_version(db: Any, org_id: int) -> int:
+    return int(get_runtime_setting(db, FIELD_TYPE_CONFIG_VERSION_KEY, org_id))
+
+
+def bump_field_type_config_version(db: Any, org_id: int) -> int:
+    next_version = get_field_type_config_version(db, org_id) + 1
+    set_runtime_setting(db, FIELD_TYPE_CONFIG_VERSION_KEY, next_version, org_id)
+    return next_version

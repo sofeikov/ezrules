@@ -16,6 +16,7 @@ export interface TestedEvent {
   event_id: string;
   event_timestamp: number;
   resolved_outcome: string | null;
+  label_name: string | null;
   outcome_counters: Record<string, number>;
   event_data: Record<string, unknown>;
   triggered_rules: TriggeredRule[];

@@ -25,6 +25,7 @@ class TestedEventItem(BaseModel):
     event_id: str = Field(..., description="External event identifier")
     event_timestamp: int = Field(..., description="Original event timestamp as a Unix integer")
     resolved_outcome: str | None = Field(None, description="Winning outcome after severity resolution")
+    label_name: str | None = Field(None, description="Uploaded event label applied to the stored event")
     outcome_counters: dict[str, int] = Field(default_factory=dict, description="Counts of rule outcomes for the event")
     event_data: dict = Field(..., description="Original event payload")
     triggered_rules: list[TriggeredRuleItem] = Field(

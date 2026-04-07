@@ -81,8 +81,8 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 10. If one e2e test fails, stop and fix the root cause before waiting for all failures.
 11. For Playwright runs that include invite/reset flows, start API with `EZRULES_TESTING=false` and SMTP configured (for local stack: `EZRULES_SMTP_HOST=localhost`, `EZRULES_SMTP_PORT=1025`, `EZRULES_FROM_EMAIL=...`). `EZRULES_TESTING=true` skips SMTP sends and will break email-flow e2e tests.
 12. Database-related functionality must be tested on the live test DB rather than mocked.
-13. If functionality affects user experience/actions, update README and `docs/whatsnew.md`.
-14. If you are asked to bump the version, bump the version first before editing `docs/whatsnew.md`. Then create or update the matching topmost version section in `docs/whatsnew.md` and place the current change notes under that new version heading. Do not add new changes under an older version section, and do not place new notes into the previous release section while the version bump is still pending.
+13. If a task changes shipped code, API behavior, or user-visible behavior, bump the project version as part of the same change. Choose a **patch** bump by default. Choose a **minor** bump when the change introduces a new feature, new user-visible workflow, or new API surface that should read as a feature release.
+14. The version bump must happen **before** editing `docs/whatsnew.md`. Treat `pyproject.toml` as the canonical project version source unless the repo introduces a deeper override later. After bumping the version, create or update the matching topmost version section in `docs/whatsnew.md` and place the current change notes there. Never add new work under an already released older version section, and never update `docs/whatsnew.md` before the version bump is in place.
 15. When tests are approved, run ALL tests, not selective subsets.
 16. When the user requests the full test suite, also validate the demo Docker path by testing `docker compose -f docker-compose.demo.yml up --build` and confirming the demo stack starts successfully; tear it down afterward.
 17. When tests require starting local services manually, run the API/backend and Angular frontend on random available high ports instead of standard ports like `8888` and `4200` to reduce the chance of blocking commonly used defaults.
@@ -108,6 +108,6 @@ ezrules is a transaction monitoring engine with business rule capabilities.
    - `docs/getting-started/installation.md`
    - `docs/getting-started/configuration.md`
    - `docs/architecture/deployment.md`
-7. Update README and `docs/whatsnew.md` for user-facing changes
+7. For user-facing changes, update README and then update `docs/whatsnew.md` only after the version bump described above. Do not record new change notes under the current released version unless the task explicitly says to amend that release.
 8. Snippet includes live in `docs/snippets/*.txt`; keep include paths aligned
 9. Be factual; only write sections that can be backed by code
