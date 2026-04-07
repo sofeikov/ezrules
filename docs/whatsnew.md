@@ -1,9 +1,12 @@
 # What's New
 
+## v1.7.1
+
+* **Async shadow evaluation**: Live `/api/v2/evaluate` calls now enqueue shadow comparisons after the canonical event write and let a periodic Celery drain persist shadow results later, so shadow-enabled traffic no longer waits for best-effort shadow rule execution before the production response returns.
+
 ## v1.7.0
 
 * **Uploaded labels in Tested Events**: The Tested Events table now shows the uploaded label applied to each stored event, so analysts can scan CSV-labeled traffic without opening analytics or raw database records.
-* **Async shadow evaluation**: Live `/api/v2/evaluate` calls now enqueue shadow comparisons after the canonical event write and let a periodic Celery drain persist shadow results later, so shadow-enabled traffic no longer waits for best-effort shadow rule execution before the production response returns.
 
 ## v1.4.1
 
