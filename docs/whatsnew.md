@@ -1,5 +1,9 @@
 # What's New
 
+## v1.7.0
+
+* **Uploaded labels in Tested Events**: The Tested Events table now shows the uploaded label applied to each stored event, so analysts can scan CSV-labeled traffic without opening analytics or raw database records.
+
 ## v1.4.1
 
 * **Neutral outcome setting**: Settings now lets each organisation designate one existing outcome as the reusable `neutral_outcome`. Allowlist rule validation now depends on that selected neutral outcome instead of an implicit allowlist-only default.

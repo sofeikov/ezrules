@@ -16,7 +16,7 @@ from ezrules.backend.api_v2.auth.dependencies import (
 from ezrules.backend.api_v2.schemas.tested_events import TestedEventItem, TestedEventsResponse, TriggeredRuleItem
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import Rule as ParsedRule
-from ezrules.models.backend_core import Rule, TestingRecordLog, TestingResultsLog, User
+from ezrules.models.backend_core import Label, Rule, TestingRecordLog, TestingResultsLog, User
 
 router = APIRouter(prefix="/api/v2/tested-events", tags=["Tested Events"])
 
@@ -55,6 +55,14 @@ def list_tested_events(
     triggered_rules_by_tl: dict[int, list[TriggeredRuleItem]] = defaultdict(list)
     referenced_fields_by_rule_id: dict[int, list[str]] = {}
     record_ids = [int(record.tl_id) for record in records]
+    label_ids = {int(record.el_id) for record in records if record.el_id is not None}
+    label_names_by_id: dict[int, str] = {}
+
+    if label_ids:
+        label_rows = (
+            db.query(Label.el_id, Label.label).filter(Label.o_id == current_org_id, Label.el_id.in_(label_ids)).all()
+        )
+        label_names_by_id = {int(el_id): str(label_name) for el_id, label_name in label_rows}
 
     if record_ids:
         rule_rows = (
@@ -93,6 +101,7 @@ def list_tested_events(
             event_id=str(record.event_id),
             event_timestamp=int(record.event_timestamp),
             resolved_outcome=str(record.resolved_outcome) if record.resolved_outcome is not None else None,
+            label_name=label_names_by_id.get(int(record.el_id)) if record.el_id is not None else None,
             outcome_counters=dict(record.outcome_counters or {}),
             event_data=dict(record.event or {}),
             triggered_rules=triggered_rules_by_tl.get(int(record.tl_id), []),

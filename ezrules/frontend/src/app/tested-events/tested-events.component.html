@@ -104,6 +104,7 @@
                 <tr>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Time</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded Label</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Resolved Outcome</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Triggered Rules</th>
                   <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Details</th>
@@ -119,6 +120,18 @@
 
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {{ formatTimestamp(event.event_timestamp) }}
+                    </td>
+
+                    <td class="px-6 py-4 whitespace-nowrap" data-testid="tested-event-label">
+                      <span
+                        *ngIf="event.label_name; else unlabeledEvent"
+                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                      >
+                        {{ event.label_name }}
+                      </span>
+                      <ng-template #unlabeledEvent>
+                        <span class="text-sm text-gray-400">No label</span>
+                      </ng-template>
                     </td>
 
                     <td class="px-6 py-4 whitespace-nowrap">
@@ -165,7 +178,7 @@
                   </tr>
 
                   <tr *ngIf="isExpanded(event.tl_id)" data-testid="tested-event-details">
-                    <td colspan="5" class="px-6 py-5 bg-gray-50">
+                    <td colspan="6" class="px-6 py-5 bg-gray-50">
                       <div class="grid gap-6 lg:grid-cols-2">
                         <div>
                           <div class="mb-5">
