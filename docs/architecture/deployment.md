@@ -31,10 +31,10 @@ Everything runs inside Docker. No local Python or Node required.
 | Container | What it does |
 |---|---|
 | `postgres` | Database (`5432` not exposed to host by default) |
-| `redis` | Celery broker (`6379` not exposed to host by default) |
+| `redis` | Celery broker plus async observation/shadow queue backing store (`6379` not exposed to host by default) |
 | `init` | One-shot: creates DB schema, admin user, optional seed data |
 | `api` | FastAPI service on `localhost:8888` |
-| `worker` | Celery worker for backtesting |
+| `worker` | Celery worker/beat process for backtesting and async queue drains |
 | `frontend` | nginx serving the Angular SPA on `localhost:4200` |
 
 **Demo** (pre-seeded with sample rules and events):
@@ -172,7 +172,7 @@ docker compose down
 | `init` container exits non-zero | DB not ready or env var missing | Check `docker compose logs init` |
 | API fails to start | DB endpoint invalid or DB down | Check `settings.env`, then `docker compose ps` |
 | Port `8888` or `4200` conflict | Another process holds the port | `lsof -i :8888` to identify, then stop it |
-| Backtests stay `PENDING` | Worker or Redis unavailable | `docker compose ps` — confirm worker is `Up` |
+| Backtests stay `PENDING` or shadow stats stop updating | Worker or Redis unavailable | `docker compose ps` — confirm worker and redis are `Up` |
 | Frontend cannot log in | API not reachable or no admin user | Verify `/ping`, re-run `add-user` |
 
 ---
@@ -182,6 +182,13 @@ docker compose down
 - Backtesting enqueues Celery tasks via Redis
 - Worker must be running or tasks remain `PENDING` indefinitely
 - All three deployment modes include a running worker
+
+## Async Queue Notes
+
+- Live field observations and live shadow evaluation both rely on Redis-backed queues by default
+- Those queues reuse `EZRULES_CELERY_BROKER_URL` unless you explicitly set `EZRULES_OBSERVATION_QUEUE_REDIS_URL` or `EZRULES_SHADOW_EVALUATION_QUEUE_REDIS_URL`
+- The periodic drain cadence is controlled by the corresponding `*_DRAIN_INTERVAL_SECONDS`, `*_DRAIN_BATCH_SIZE`, and `*_MAX_BATCHES_PER_DRAIN` settings
+- If Celery beat is not running, shadow results and buffered field observations will lag even though `/api/v2/evaluate` still succeeds
 
 ---
 
