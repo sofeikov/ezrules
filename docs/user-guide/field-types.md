@@ -17,6 +17,9 @@ Field type management lets you declare the intended type for each field. ezrules
 3. **Validation + Casting** — at evaluation time, required fields are checked first. Then each configured non-null field value is cast before rule execution. Unconfigured fields pass through unchanged.
 4. **Audit** — every create, update, and delete of a field type configuration is recorded in the audit trail.
 
+!!! info "Live observations are eventually consistent"
+    Live `/api/v2/evaluate` traffic now buffers field observations to Redis and a periodic Celery drain writes them to Postgres in batches. New live observations can therefore take a few seconds to appear in **Observed Fields**. The **Test Rule** panel still records observations immediately.
+
 ---
 
 ## Supported Types
@@ -71,11 +74,9 @@ If a configuration already exists for that field name, it will be updated in pla
 |---|---|
 | Field Name | The JSON key from event payloads |
 | Observed Type | The Python type name (`int`, `float`, `str`, `bool`) |
-| Count | How many times this `(field, type)` combination has been observed |
-| Last Seen | Timestamp of the most recent observation |
 | Configured | Badge shown when a type configuration already exists for this field |
 
-A field may appear in multiple rows if it has been seen with different types (for example `amount: int×999` and `amount: str×1`). This indicates data quality issues upstream worth investigating.
+A field may appear in multiple rows if it has been seen with different types (for example `amount: int` and `amount: str`). This indicates data quality issues upstream worth investigating.
 
 !!! tip "Observations from Test Rule"
     Fields observed in the **Test Rule** panel on the Rules page are also recorded. This allows you to build up observations without requiring live traffic.
@@ -104,7 +105,7 @@ After deletion, the field reverts to `compare_as_is` behavior — values pass th
 
 Once a field is configured, normalization happens before rule execution:
 
-- `/api/v2/evaluate` — required fields are validated first, then values are cast before rules run. If a required field is missing/`null`, or if casting fails (for example a non-numeric string cast to `integer`), the request returns `HTTP 400` with a description of which field failed.
+- `/api/v2/evaluate` — required fields are validated first, then values are cast before rules run. If a required field is missing/`null`, or if casting fails (for example a non-numeric string cast to `integer`), the request returns `HTTP 400` with a description of which field failed. Field observations from live traffic are buffered asynchronously, so they may appear shortly after the request succeeds.
 - **Test Rule** panel — the same required-field validation and casting rules apply before the rule is tested. Errors are shown inline in the result panel.
 
 !!! warning "CastError on invalid values"

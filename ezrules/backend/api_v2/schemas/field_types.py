@@ -69,8 +69,6 @@ class FieldTypeMutationResponse(BaseModel):
 class FieldObservationResponse(BaseModel):
     field_name: str
     observed_json_type: str
-    occurrence_count: int
-    last_seen: datetime | None = None
 
     model_config = {"from_attributes": True}
 

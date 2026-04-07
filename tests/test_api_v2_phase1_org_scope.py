@@ -237,12 +237,8 @@ def test_field_types_and_observations_are_org_scoped(session):
         [
             FieldTypeConfig(field_name="org1_amount", configured_type="float", o_id=int(org.o_id)),
             FieldTypeConfig(field_name="org2_amount", configured_type="float", o_id=int(other_org.o_id)),
-            FieldObservation(
-                field_name="org1_country", observed_json_type="str", occurrence_count=2, o_id=int(org.o_id)
-            ),
-            FieldObservation(
-                field_name="org2_country", observed_json_type="str", occurrence_count=2, o_id=int(other_org.o_id)
-            ),
+            FieldObservation(field_name="org1_country", observed_json_type="str", o_id=int(org.o_id)),
+            FieldObservation(field_name="org2_country", observed_json_type="str", o_id=int(other_org.o_id)),
         ]
     )
     session.commit()

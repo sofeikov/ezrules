@@ -2,6 +2,7 @@
 
 ## v1.4.0
 
+* **Async field observation persistence**: Live `/api/v2/evaluate` calls now push field observations into Redis and let a periodic Celery drain batch them into Postgres, removing non-canonical observation writes from the critical response path. Observation listings are now eventually consistent for live traffic, while the **Test Rule** panel still records observations immediately.
 * **Allowlist rule lane**: Rules can now be marked as `allowlist` in the create/edit UI and API. When any active allowlist rule matches, ezrules short-circuits the main rule set and returns the configured allowlist outcome immediately.
 * **Allowlist visibility in the UI**: Rule list and detail views now display an `ALLOWLIST` / `Allowlist` badge so these rules are visually distinct from the main rule set.
 * **Allowlist guardrails**: Allowlist rules must return the configured allowlist outcome (runtime setting `allowlist_match_outcome`, default `RELEASE`), and they cannot be deployed to shadow or rollout flows.

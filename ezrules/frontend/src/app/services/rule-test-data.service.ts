@@ -7,7 +7,7 @@ type SampleValue = boolean | number | string;
 
 interface FieldTypeMetadata {
   configuredTypes: Map<string, FieldTypeConfig>;
-  observedTypes: Map<string, FieldObservation>;
+  observedTypes: Map<string, FieldObservation[]>;
 }
 
 const DEFAULT_DATETIME_SAMPLE = '2025-01-15T10:30:00Z';
@@ -111,13 +111,12 @@ function buildFieldTypeMetadata(
   observations: FieldObservation[]
 ): FieldTypeMetadata {
   const configuredTypes = new Map(configs.map((config) => [config.field_name, config]));
-  const observedTypes = new Map<string, FieldObservation>();
+  const observedTypes = new Map<string, FieldObservation[]>();
 
   observations.forEach((observation) => {
-    const current = observedTypes.get(observation.field_name);
-    if (!current || isHigherPriorityObservation(observation, current)) {
-      observedTypes.set(observation.field_name, observation);
-    }
+    const current = observedTypes.get(observation.field_name) ?? [];
+    current.push(observation);
+    observedTypes.set(observation.field_name, current);
   });
 
   return {
@@ -126,34 +125,41 @@ function buildFieldTypeMetadata(
   };
 }
 
-function isHigherPriorityObservation(candidate: FieldObservation, current: FieldObservation): boolean {
-  if (candidate.occurrence_count !== current.occurrence_count) {
-    return candidate.occurrence_count > current.occurrence_count;
-  }
-
-  return parseTimestamp(candidate.last_seen) > parseTimestamp(current.last_seen);
-}
-
-function parseTimestamp(value: string | null): number {
-  if (!value) {
-    return 0;
-  }
-
-  return Number.isNaN(Date.parse(value)) ? 0 : Date.parse(value);
-}
-
 function resolveFieldType(fieldName: string, metadata: FieldTypeMetadata): string {
   const configuredType = metadata.configuredTypes.get(fieldName)?.configured_type;
   if (configuredType && configuredType !== 'compare_as_is') {
     return configuredType;
   }
 
-  const observedType = metadata.observedTypes.get(fieldName)?.observed_json_type;
-  if (observedType && OBSERVED_TYPE_MAP[observedType]) {
-    return OBSERVED_TYPE_MAP[observedType];
+  const observedType = pickObservedType(fieldName, metadata.observedTypes.get(fieldName) ?? []);
+  if (observedType) {
+    return observedType;
   }
 
   return inferFieldTypeFromName(fieldName);
+}
+
+function pickObservedType(fieldName: string, observations: FieldObservation[]): string | null {
+  const observedTypes = observations
+    .map((observation) => OBSERVED_TYPE_MAP[observation.observed_json_type])
+    .filter((value): value is string => Boolean(value));
+
+  if (observedTypes.length === 0) {
+    return null;
+  }
+
+  const uniqueObservedTypes = [...new Set(observedTypes)];
+  if (uniqueObservedTypes.length === 1) {
+    return uniqueObservedTypes[0];
+  }
+
+  const inferredType = inferFieldTypeFromName(fieldName);
+  if (inferredType !== 'string') {
+    return inferredType;
+  }
+
+  const observedPriority = ['float', 'integer', 'boolean', 'string'];
+  return observedPriority.find((candidate) => uniqueObservedTypes.includes(candidate)) ?? uniqueObservedTypes[0];
 }
 
 function inferFieldTypeFromName(fieldName: string): string {

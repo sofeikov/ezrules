@@ -7,8 +7,6 @@ import { UserListService } from './user-list.service';
 export interface RuleEditorFieldSuggestion {
   name: string;
   observedJsonType: string;
-  occurrenceCount: number;
-  lastSeen: string | null;
 }
 
 export interface RuleEditorListSuggestion {
@@ -42,17 +40,15 @@ export class RuleEditorAssistService {
           fields: observations
             .slice()
             .sort((left, right) => {
-              const byCount = right.occurrence_count - left.occurrence_count;
-              if (byCount !== 0) {
-                return byCount;
+              const byField = left.field_name.localeCompare(right.field_name);
+              if (byField !== 0) {
+                return byField;
               }
-              return left.field_name.localeCompare(right.field_name);
+              return left.observed_json_type.localeCompare(right.observed_json_type);
             })
             .map((observation) => ({
               name: observation.field_name,
               observedJsonType: observation.observed_json_type,
-              occurrenceCount: observation.occurrence_count,
-              lastSeen: observation.last_seen,
             })),
           lists: lists
             .slice()

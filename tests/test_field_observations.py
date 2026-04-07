@@ -1,7 +1,7 @@
 """
 Integration tests for field observation collection via /evaluate.
 
-Verifies that FieldObservation rows are created/updated in the DB
+Verifies that distinct FieldObservation rows are recorded in the DB
 after each successful evaluation call.
 """
 
@@ -56,14 +56,12 @@ class TestFieldObservationCollection:
 
         assert amount_obs is not None
         assert amount_obs.observed_json_type == "int"
-        assert amount_obs.occurrence_count == 1
 
         assert country_obs is not None
         assert country_obs.observed_json_type == "str"
-        assert country_obs.occurrence_count == 1
 
-    def test_observation_count_increments_on_repeat_evaluate(self, session, live_api_key):
-        """Repeated /evaluate calls should increment occurrence_count."""
+    def test_repeat_evaluate_keeps_single_observation_row(self, session, live_api_key):
+        """Repeated /evaluate calls should not create duplicate observation rows."""
         org = _setup_rule(session, "OBS:002", 8002)
 
         with TestClient(app) as client:
@@ -80,16 +78,15 @@ class TestFieldObservationCollection:
 
         evaluator_router._lre = None
 
-        obs = (
+        rows = (
             session.query(FieldObservation)
             .filter(FieldObservation.field_name == "score", FieldObservation.o_id == org.o_id)
-            .first()
+            .all()
         )
-        assert obs is not None
-        assert obs.occurrence_count == 3
+        assert len(rows) == 1
 
     def test_observation_per_type_on_type_change(self, session, live_api_key):
-        """Each distinct type for a field gets its own row with its own count."""
+        """Each distinct type for a field gets its own observation row."""
         org = _setup_rule(session, "OBS:003", 8003)
 
         with TestClient(app) as client:
@@ -120,5 +117,4 @@ class TestFieldObservationCollection:
             .all()
         )
         assert len(rows) == 2
-        by_type = {r.observed_json_type: r.occurrence_count for r in rows}
-        assert by_type == {"int": 1, "str": 1}
+        assert {r.observed_json_type for r in rows} == {"int", "str"}
