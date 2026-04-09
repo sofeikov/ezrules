@@ -27,11 +27,14 @@ from ezrules.backend.api_v2.schemas.settings import (
 )
 from ezrules.backend.runtime_settings import (
     AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
+    MAIN_RULE_EXECUTION_MODE_DEFAULT,
     NEUTRAL_OUTCOME_DEFAULT,
     get_auto_promote_active_rule_updates,
+    get_main_rule_execution_mode,
     get_neutral_outcome,
     get_rule_quality_lookback_days,
     set_auto_promote_active_rule_updates,
+    set_main_rule_execution_mode,
     set_neutral_outcome,
     set_rule_quality_lookback_days,
 )
@@ -177,6 +180,8 @@ def get_runtime_settings(
     return RuntimeSettingsResponse(
         auto_promote_active_rule_updates=get_auto_promote_active_rule_updates(db, current_org_id),
         default_auto_promote_active_rule_updates=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
+        main_rule_execution_mode=get_main_rule_execution_mode(db, current_org_id),
+        default_main_rule_execution_mode=MAIN_RULE_EXECUTION_MODE_DEFAULT,
         rule_quality_lookback_days=get_rule_quality_lookback_days(db, current_org_id),
         default_rule_quality_lookback_days=app_settings.RULE_QUALITY_LOOKBACK_DAYS,
         neutral_outcome=get_neutral_outcome(db, current_org_id),
@@ -198,13 +203,16 @@ def update_runtime_settings(
     updates_requested = (
         request_data.rule_quality_lookback_days is not None
         or request_data.auto_promote_active_rule_updates is not None
+        or request_data.main_rule_execution_mode is not None
         or request_data.neutral_outcome is not None
     )
     if not updates_requested:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No runtime setting changes requested")
 
     if (
-        request_data.rule_quality_lookback_days is not None or request_data.auto_promote_active_rule_updates is not None
+        request_data.rule_quality_lookback_days is not None
+        or request_data.auto_promote_active_rule_updates is not None
+        or request_data.main_rule_execution_mode is not None
     ) and not _user_has_permission(db, user, PermissionAction.MANAGE_PERMISSIONS):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -215,6 +223,8 @@ def update_runtime_settings(
         set_rule_quality_lookback_days(db, request_data.rule_quality_lookback_days, current_org_id)
     if request_data.auto_promote_active_rule_updates is not None:
         set_auto_promote_active_rule_updates(db, request_data.auto_promote_active_rule_updates, current_org_id)
+    if request_data.main_rule_execution_mode is not None:
+        set_main_rule_execution_mode(db, request_data.main_rule_execution_mode, current_org_id)
     if request_data.neutral_outcome is not None:
         if not _user_has_permission(db, user, PermissionAction.MANAGE_NEUTRAL_OUTCOME):
             raise HTTPException(
@@ -239,6 +249,8 @@ def update_runtime_settings(
     return RuntimeSettingsResponse(
         auto_promote_active_rule_updates=get_auto_promote_active_rule_updates(db, current_org_id),
         default_auto_promote_active_rule_updates=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
+        main_rule_execution_mode=get_main_rule_execution_mode(db, current_org_id),
+        default_main_rule_execution_mode=MAIN_RULE_EXECUTION_MODE_DEFAULT,
         rule_quality_lookback_days=get_rule_quality_lookback_days(db, current_org_id),
         default_rule_quality_lookback_days=app_settings.RULE_QUALITY_LOOKBACK_DAYS,
         neutral_outcome=neutral_outcome,

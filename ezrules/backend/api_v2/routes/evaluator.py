@@ -19,9 +19,11 @@ from ezrules.backend.api_v2.schemas.evaluator import EvaluateRequest, EvaluateRe
 from ezrules.backend.data_utils import Event
 from ezrules.backend.observation_queue import enqueue_observations
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
+from ezrules.backend.runtime_settings import get_main_rule_execution_mode
 from ezrules.backend.shadow_evaluation_queue import enqueue_shadow_evaluation
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.rule import MissingFieldLookupError, RuleFactory
+from ezrules.core.rule_engine import RULE_EXECUTION_MODE_FIRST_MATCH
 from ezrules.core.rule_updater import (
     ALLOWLIST_CONFIG_LABEL,
     DEPLOYMENT_MODE_SPLIT,
@@ -50,7 +52,11 @@ def _get_rule_executor(
     """Return the test-injected executor or a request-scoped production executor."""
     if app_settings.TESTING and _lre is not None:
         return _lre
-    return LocalRuleExecutorSQL(db=db, o_id=current_org_id)
+    return LocalRuleExecutorSQL(
+        db=db,
+        o_id=current_org_id,
+        execution_mode=get_main_rule_execution_mode(db, current_org_id),
+    )
 
 
 def _get_shadow_executor(
@@ -60,7 +66,12 @@ def _get_shadow_executor(
     """Return the test-injected shadow executor or a request-scoped production executor."""
     if app_settings.TESTING and _shadow_lre is not None:
         return _shadow_lre
-    return LocalRuleExecutorSQL(db=db, o_id=current_org_id, label="shadow")
+    return LocalRuleExecutorSQL(
+        db=db,
+        o_id=current_org_id,
+        label="shadow",
+        execution_mode=get_main_rule_execution_mode(db, current_org_id),
+    )
 
 
 def _get_allowlist_executor(
@@ -91,6 +102,61 @@ def _build_response_from_all_results(all_rule_results: dict[Any, Any]) -> dict[s
         "outcome_counters": outcome_counters,
         "outcome_set": sorted(set(outcome_counters.keys())),
     }
+
+
+def _evaluate_rollout_result(
+    *,
+    event_data: dict[str, Any],
+    lre: LocalRuleExecutorSQL,
+    rollout_entries: list[dict[str, Any]],
+    assignment_key: str,
+    list_provider: PersistentUserListManager,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    ordered_rules = list(lre.rule_engine.rules if lre.rule_engine is not None else [])
+    rollout_by_rule_id = {int(entry["r_id"]): entry for entry in rollout_entries if "r_id" in entry}
+    all_rule_results: dict[int, Any] = {}
+    rollout_logs: list[dict[str, Any]] = []
+
+    for control_rule in ordered_rules:
+        rule_id = int(control_rule.r_id)
+        control_result = control_rule(event_data)
+        returned_result = control_result
+
+        entry = rollout_by_rule_id.get(rule_id)
+        if entry is not None:
+            traffic_percent = int(entry.get("traffic_percent") or 0)
+            bucket = _get_rollout_bucket(lre.o_id, rule_id, assignment_key)
+            candidate_result = None
+            candidate_succeeded = False
+            try:
+                candidate_rule = RuleFactory.from_json(entry, list_values_provider=list_provider)
+                candidate_result = candidate_rule(event_data)
+                candidate_succeeded = True
+            except Exception:
+                candidate_result = None
+
+            selected_variant = DEPLOYMENT_VARIANT_CANDIDATE if bucket < traffic_percent else DEPLOYMENT_VARIANT_CONTROL
+            if selected_variant == DEPLOYMENT_VARIANT_CANDIDATE and candidate_succeeded:
+                returned_result = candidate_result
+
+            rollout_logs.append(
+                {
+                    "mode": DEPLOYMENT_MODE_SPLIT,
+                    "r_id": rule_id,
+                    "selected_variant": selected_variant,
+                    "traffic_percent": traffic_percent,
+                    "bucket": bucket,
+                    "control_result": control_result,
+                    "candidate_result": candidate_result,
+                    "returned_result": returned_result,
+                }
+            )
+
+        all_rule_results[rule_id] = returned_result
+        if lre.execution_mode == RULE_EXECUTION_MODE_FIRST_MATCH and returned_result is not None:
+            break
+
+    return _build_response_from_all_results(all_rule_results), rollout_logs
 
 
 def _persist_evaluate_observations(db: Any, event_data: dict, o_id: int) -> None:
@@ -156,47 +222,19 @@ def evaluate(
         ) from exc
 
     rollout_entries = list_candidate_deployments(db, lre.o_id, ROLLOUT_CONFIG_LABEL)
-    merged_all_results = dict(production_result.get("all_rule_results", {}))
     rollout_logs: list[dict[str, Any]] = []
-    assignment_key = _get_assignment_key(event)
-    list_provider = PersistentUserListManager(db, lre.o_id)
-
-    for entry in rollout_entries:
-        r_id = int(entry["r_id"])
-        traffic_percent = int(entry.get("traffic_percent") or 0)
-        bucket = _get_rollout_bucket(lre.o_id, r_id, assignment_key)
-        control_result = production_result.get("all_rule_results", {}).get(r_id)
-
-        candidate_result = None
-        candidate_succeeded = False
-        try:
-            candidate_rule = RuleFactory.from_json(entry, list_values_provider=list_provider)
-            candidate_result = candidate_rule(event.event_data)
-            candidate_succeeded = True
-        except Exception:
-            candidate_result = None
-
-        selected_variant = DEPLOYMENT_VARIANT_CANDIDATE if bucket < traffic_percent else DEPLOYMENT_VARIANT_CONTROL
-        if selected_variant == DEPLOYMENT_VARIANT_CANDIDATE and candidate_succeeded:
-            returned_result = candidate_result
-        else:
-            returned_result = control_result
-
-        merged_all_results[r_id] = returned_result
-        rollout_logs.append(
-            {
-                "mode": DEPLOYMENT_MODE_SPLIT,
-                "r_id": r_id,
-                "selected_variant": selected_variant,
-                "traffic_percent": traffic_percent,
-                "bucket": bucket,
-                "control_result": control_result,
-                "candidate_result": candidate_result,
-                "returned_result": returned_result,
-            }
+    if rollout_entries:
+        assignment_key = _get_assignment_key(event)
+        list_provider = PersistentUserListManager(db, lre.o_id)
+        result, rollout_logs = _evaluate_rollout_result(
+            event_data=event.event_data,
+            lre=lre,
+            rollout_entries=rollout_entries,
+            assignment_key=assignment_key,
+            list_provider=list_provider,
         )
-
-    result = _build_response_from_all_results(merged_all_results)
+    else:
+        result = production_result
 
     try:
         # `result` already contains the merged served outcome; passing it avoids a second rule evaluation.

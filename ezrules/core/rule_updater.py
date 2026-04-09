@@ -49,6 +49,7 @@ def save_rule_history(
         rid=rule.rid,
         logic=rule.logic,
         description=rule.description,
+        execution_order=int(rule.execution_order),
         evaluation_lane=str(rule.evaluation_lane or RULE_EVALUATION_LANE_MAIN),
         action=action,
         status=rule.status,
@@ -161,7 +162,12 @@ class RDBRuleManager(RuleManager):
         return latest_records
 
     def load_all_rules(self) -> list[RuleModel]:
-        return self.db.query(RuleModel).filter(RuleModel.o_id == self.o_id).all()
+        return (
+            self.db.query(RuleModel)
+            .filter(RuleModel.o_id == self.o_id)
+            .order_by(RuleModel.created_at.asc(), RuleModel.r_id.asc())
+            .all()
+        )
 
 
 class AbstractRuleEngineConfigProducer(ABC):
@@ -186,6 +192,11 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
             for rule in stored_rules
             if rule.status == RuleStatus.ACTIVE and str(rule.evaluation_lane or RULE_EVALUATION_LANE_MAIN) == lane
         ]
+        if lane == RULE_EVALUATION_LANE_MAIN:
+            active_rules = sorted(
+                active_rules,
+                key=lambda rule: (int(rule.execution_order), int(rule.r_id)),
+            )
         compiled_rules = [RuleFactory.from_json(r.__dict__, list_values_provider=list_provider) for r in active_rules]
         return [RuleConverter.to_json(r) for r in compiled_rules]
 
@@ -463,27 +474,14 @@ def promote_candidate_deployment_to_production(
     rule.approved_at = promoted_at
     rule.version += 1
 
-    prod_entry = {
-        "r_id": int(rule.r_id),
-        "rid": str(rule.rid),
-        "logic": str(rule.logic),
-        "description": str(rule.description),
-    }
-    prod_config = get_deployment_config(db, o_id=o_id, label="production", for_update=True)
-    if prod_config is None:
-        db.add(RuleEngineConfig(label="production", config=[prod_entry], o_id=o_id))
-    else:
-        save_config_history(db, prod_config, changed_by=changed_by)
-        updated_prod_entries = [entry for entry in prod_config.config if int(entry.get("r_id", -1)) != r_id]
-        updated_prod_entries.append(prod_entry)
-        prod_config.config = updated_prod_entries
-        prod_config.version += 1
-
     save_config_history(db, config_obj, changed_by=changed_by)
     config_obj.config = [entry for entry in config_obj.config if int(entry.get("r_id", -1)) != r_id]
     config_obj.version += 1
     clear_rule_deployment_results(db, o_id=o_id, r_id=r_id)
-    db.commit()
+
+    config_producer = RDBRuleEngineConfigProducer(db=db, o_id=o_id)
+    rule_manager = RDBRuleManager(db=db, o_id=o_id)
+    config_producer.save_config(rule_manager, changed_by=changed_by)
 
 
 def deploy_rule_to_shadow(

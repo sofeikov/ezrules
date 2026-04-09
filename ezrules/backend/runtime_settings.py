@@ -11,6 +11,10 @@ from ezrules.settings import app_settings
 
 AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY = "auto_promote_active_rule_updates"
 AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT = False
+MAIN_RULE_EXECUTION_MODE_KEY = "main_rule_execution_mode"
+MAIN_RULE_EXECUTION_MODE_ALL_MATCHES = "all_matches"
+MAIN_RULE_EXECUTION_MODE_FIRST_MATCH = "first_match"
+MAIN_RULE_EXECUTION_MODE_DEFAULT = MAIN_RULE_EXECUTION_MODE_ALL_MATCHES
 RULE_QUALITY_LOOKBACK_DAYS_KEY = "rule_quality_lookback_days"
 NEUTRAL_OUTCOME_KEY = "neutral_outcome"
 NEUTRAL_OUTCOME_DEFAULT = "RELEASE"
@@ -33,6 +37,7 @@ class RuntimeSettingSpec:
     default: Any
     min_value: int | None = None
     max_value: int | None = None
+    allowed_values: tuple[Any, ...] | None = None
 
 
 _RUNTIME_SETTING_SPECS: dict[str, RuntimeSettingSpec] = {
@@ -40,6 +45,12 @@ _RUNTIME_SETTING_SPECS: dict[str, RuntimeSettingSpec] = {
         key=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY,
         value_type=_RUNTIME_VALUE_TYPE_BOOL,
         default=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
+    ),
+    MAIN_RULE_EXECUTION_MODE_KEY: RuntimeSettingSpec(
+        key=MAIN_RULE_EXECUTION_MODE_KEY,
+        value_type=_RUNTIME_VALUE_TYPE_STRING,
+        default=MAIN_RULE_EXECUTION_MODE_DEFAULT,
+        allowed_values=(MAIN_RULE_EXECUTION_MODE_ALL_MATCHES, MAIN_RULE_EXECUTION_MODE_FIRST_MATCH),
     ),
     RULE_QUALITY_LOOKBACK_DAYS_KEY: RuntimeSettingSpec(
         key=RULE_QUALITY_LOOKBACK_DAYS_KEY,
@@ -123,7 +134,11 @@ def _coerce_to_spec(spec: RuntimeSettingSpec, value: Any) -> Any:
         raise ValueError(f"{spec.key} must be a boolean-compatible value")
 
     if spec.value_type == _RUNTIME_VALUE_TYPE_STRING:
-        return str(value)
+        normalized = str(value).strip()
+        if spec.allowed_values is not None and normalized not in spec.allowed_values:
+            allowed = ", ".join(str(item) for item in spec.allowed_values)
+            raise ValueError(f"{spec.key} must be one of: {allowed}")
+        return normalized
 
     if spec.value_type == _RUNTIME_VALUE_TYPE_JSON:
         return value
@@ -179,6 +194,10 @@ def get_auto_promote_active_rule_updates(db: Any, org_id: int) -> bool:
     return bool(get_runtime_setting(db, AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY, org_id))
 
 
+def get_main_rule_execution_mode(db: Any, org_id: int) -> str:
+    return str(get_runtime_setting(db, MAIN_RULE_EXECUTION_MODE_KEY, org_id)).strip()
+
+
 def get_neutral_outcome(db: Any, org_id: int) -> str:
     return str(get_runtime_setting(db, NEUTRAL_OUTCOME_KEY, org_id)).strip().upper()
 
@@ -189,6 +208,10 @@ def set_rule_quality_lookback_days(db: Any, value: int, org_id: int) -> None:
 
 def set_auto_promote_active_rule_updates(db: Any, value: bool, org_id: int) -> None:
     set_runtime_setting(db, AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY, value, org_id)
+
+
+def set_main_rule_execution_mode(db: Any, value: str, org_id: int) -> None:
+    set_runtime_setting(db, MAIN_RULE_EXECUTION_MODE_KEY, value.strip(), org_id)
 
 
 def set_neutral_outcome(db: Any, value: str, org_id: int) -> None:

@@ -430,6 +430,57 @@ class TestPromoteFromShadow:
         prod_entry = next(r for r in prod_config.config if r["r_id"] == shadow_rule.r_id)
         assert prod_entry["logic"] == shadow_logic
 
+    def test_promote_shadow_preserves_main_rule_execution_order(self, shadow_test_client, shadow_rule):
+        token = shadow_test_client.test_data["token"]
+        session = shadow_test_client.test_data["session"]
+
+        shadow_rule.execution_order = 2
+        shadow_rule.status = "active"
+        leading_rule = RuleModel(
+            rid="shadow_leading_rule",
+            logic="return 'LEAD'",
+            description="Runs first",
+            status="active",
+            execution_order=1,
+            o_id=1,
+        )
+        trailing_rule = RuleModel(
+            rid="shadow_trailing_rule",
+            logic="return 'TAIL'",
+            description="Runs last",
+            status="active",
+            execution_order=3,
+            o_id=1,
+        )
+        session.add_all([leading_rule, trailing_rule])
+        session.commit()
+        RDBRuleEngineConfigProducer(db=session, o_id=1).save_config(RDBRuleManager(db=session, o_id=1))
+
+        shadow_test_client.post(
+            f"/api/v2/rules/{shadow_rule.r_id}/shadow",
+            json={"logic": "return 'SHADOW_OUTCOME'", "description": "Shadow promoted"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        response = shadow_test_client.post(
+            f"/api/v2/rules/{shadow_rule.r_id}/shadow/promote",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        session.expire_all()
+
+        prod_config = (
+            session.query(RuleEngineConfig)
+            .filter(RuleEngineConfig.label == "production", RuleEngineConfig.o_id == 1)
+            .one()
+        )
+        assert [entry["r_id"] for entry in prod_config.config] == [
+            leading_rule.r_id,
+            shadow_rule.r_id,
+            trailing_rule.r_id,
+        ]
+
     def test_promote_rule_not_in_shadow_returns_400(self, shadow_test_client, shadow_rule):
         """Promoting a rule that is not in shadow should return 400."""
         token = shadow_test_client.test_data["token"]

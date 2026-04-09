@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 from sqlalchemy.exc import NoResultFound
 
-from ezrules.core.rule_engine import RuleEngineFactory
+from ezrules.core.rule_engine import RULE_EXECUTION_MODE_ALL_MATCHES, RuleEngineFactory
 from ezrules.core.user_lists import PersistentUserListManager
 
 
@@ -10,6 +10,7 @@ class AbstractRuleExecutor(ABC):
     def __init__(self):
         self.rule_engine = None
         self._current_rule_version = None
+        self._current_execution_mode = None
 
     @abstractmethod
     def _check_rule_config_is_fresh(self):
@@ -24,10 +25,11 @@ class AbstractRuleExecutor(ABC):
 
 
 class LocalRuleExecutorSQL(AbstractRuleExecutor):
-    def __init__(self, db, o_id, label: str = "production"):
+    def __init__(self, db, o_id, label: str = "production", execution_mode: str = RULE_EXECUTION_MODE_ALL_MATCHES):
         self.db = db
         self.o_id = o_id
         self.label = label
+        self.execution_mode = execution_mode
         super().__init__()
 
     def _check_rule_config_is_fresh(self):
@@ -43,11 +45,14 @@ class LocalRuleExecutorSQL(AbstractRuleExecutor):
         except NoResultFound:
             self.rule_engine = None
             self._current_rule_version = None
+            self._current_execution_mode = None
             return
 
-        if latest_record_version != self._current_rule_version:
+        if latest_record_version != self._current_rule_version or self.execution_mode != self._current_execution_mode:
             self._current_rule_version = latest_record_version
+            self._current_execution_mode = self.execution_mode
             self.rule_engine = RuleEngineFactory.from_json(
                 latest_config,
                 list_values_provider=PersistentUserListManager(self.db, self.o_id),
+                execution_mode=self.execution_mode,
             )

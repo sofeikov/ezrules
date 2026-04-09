@@ -30,6 +30,7 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
   rid: string = '';
   description: string = '';
   logic: string = '';
+  executionOrder: number = 1;
   evaluationLane: 'main' | 'allowlist' = 'main';
   neutralOutcomeLabel: string = 'RELEASE';
   testJson: string = '';
@@ -221,6 +222,7 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
       rid: this.rid,
       description: this.description,
       logic: this.logic,
+      execution_order: this.evaluationLane === 'main' ? this.executionOrder : undefined,
       evaluation_lane: this.evaluationLane,
     };
 

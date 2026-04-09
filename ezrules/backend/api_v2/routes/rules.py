@@ -203,6 +203,7 @@ def rule_to_response(rule: RuleModel, revisions: list[RuleRevisionSummary] | Non
         rid=str(rule.rid),
         description=str(rule.description),
         logic=str(rule.logic),
+        execution_order=int(getattr(rule, "execution_order", 1) or 1),
         evaluation_lane=str(getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN),
         status=get_status(rule.status),
         effective_from=rule.effective_from if rule.effective_from is not None else None,  # type: ignore[arg-type]
@@ -231,6 +232,19 @@ def normalize_evaluation_lane(value: str | None) -> str:
             detail="evaluation_lane must be either 'main' or 'allowlist'",
         )
     return lane
+
+
+def _next_execution_order(db: Any, org_id: int, lane: str) -> int:
+    max_order = (
+        db.query(RuleModel.execution_order)
+        .filter(
+            RuleModel.o_id == org_id,
+            RuleModel.evaluation_lane == lane,
+        )
+        .order_by(RuleModel.execution_order.desc(), RuleModel.r_id.desc())
+        .first()
+    )
+    return int(max_order[0]) + 1 if max_order and max_order[0] is not None else 1
 
 
 def validate_allowlist_rule(rule: Rule, allowlist_outcome: str) -> str | None:
@@ -268,6 +282,14 @@ def list_rules(
     """
     rule_manager = get_rule_manager(db, current_org_id)
     rules = rule_manager.load_all_rules()
+    rules = sorted(
+        rules,
+        key=lambda rule: (
+            0 if str(getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN)) == RULE_EVALUATION_LANE_MAIN else 1,
+            int(getattr(rule, "execution_order", 1) or 1),
+            int(rule.r_id),
+        ),
+    )
 
     shadow_r_ids = {
         int(entry["r_id"])
@@ -286,6 +308,7 @@ def list_rules(
             rid=str(rule.rid),
             description=str(rule.description),
             logic=str(rule.logic),
+            execution_order=int(getattr(rule, "execution_order", 1) or 1),
             evaluation_lane=str(
                 getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN
             ),
@@ -384,6 +407,7 @@ def get_rule_revision(
         rid=str(rule.rid),
         description=str(rule.description),
         logic=str(rule.logic),
+        execution_order=int(getattr(rule, "execution_order", 1) or 1),
         evaluation_lane=str(getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN),
         status=get_status(rule.status),
         effective_from=rule.effective_from if hasattr(rule, "effective_from") else None,  # type: ignore[arg-type]
@@ -447,6 +471,7 @@ def get_rule_history(
                 revision_number=rev.revision_number,
                 logic=str(rule.logic),
                 description=str(rule.description),
+                execution_order=int(getattr(rule, "execution_order", 1) or 1),
                 evaluation_lane=str(
                     getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN
                 ),
@@ -464,6 +489,7 @@ def get_rule_history(
             revision_number=int(latest_version.version),  # type: ignore[attr-defined]
             logic=str(latest_version.logic),
             description=str(latest_version.description),
+            execution_order=int(getattr(latest_version, "execution_order", 1) or 1),
             evaluation_lane=str(
                 getattr(latest_version, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN
             ),
@@ -531,10 +557,16 @@ def create_rule(
 
     # Create and persist the new rule
     rule_manager = get_rule_manager(db, current_org_id)
+    execution_order = (
+        int(rule_data.execution_order)
+        if rule_data.execution_order is not None
+        else _next_execution_order(db, current_org_id, evaluation_lane)
+    )
     new_rule = RuleModel(
         rid=rule_data.rid,
         logic=rule_data.logic,
         description=rule_data.description,
+        execution_order=execution_order,
         evaluation_lane=evaluation_lane,
         status=RuleStatus.DRAFT,
         effective_from=None,
@@ -602,6 +634,14 @@ def update_rule(
         if rule_data.evaluation_lane is not None
         else str(getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN)
     )
+    if rule_data.execution_order is not None:
+        new_execution_order = int(rule_data.execution_order)
+    elif new_evaluation_lane != str(
+        getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN
+    ):
+        new_execution_order = _next_execution_order(db, current_org_id, new_evaluation_lane)
+    else:
+        new_execution_order = int(getattr(rule, "execution_order", 1) or 1)
     allowlist_outcome = get_neutral_outcome(db, current_org_id)
 
     # Validate the rule logic by trying to compile it
@@ -652,6 +692,7 @@ def update_rule(
     # Apply the mutation and save (version bump handled by rule manager)
     rule.description = new_description
     rule.logic = new_logic
+    rule.execution_order = new_execution_order
     rule.evaluation_lane = new_evaluation_lane
     rule.status = next_status
     rule.effective_from = promoted_at
@@ -979,6 +1020,7 @@ def rollback_rule(
     rule.evaluation_lane = str(
         getattr(target_revision, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN
     )
+    rule.execution_order = int(getattr(target_revision, "execution_order", 1) or 1)
     rule.status = RuleStatus.DRAFT
     rule.effective_from = None
     rule.approved_by = None

@@ -4,6 +4,7 @@ import pytest
 
 from ezrules.backend import shadow_evaluation_queue
 from ezrules.backend.data_utils import Event, store_eval_result
+from ezrules.models.backend_core import RuntimeSetting
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager, deploy_rule_to_shadow
 from ezrules.models.backend_core import Organisation, Rule as RuleModel
 from ezrules.models.backend_core import RuleDeploymentResultsLog, ShadowResultsLog
@@ -133,6 +134,7 @@ def test_enqueue_shadow_evaluation_serializes_shadow_snapshot(session, fake_shad
     assert payload["event_data"] == {"amount": 100}
     assert payload["production_all_rule_results"] == {str(int(rule.r_id)): "HOLD"}
     assert payload["shadow_config_version"] == 1
+    assert payload["main_rule_execution_mode"] == "all_matches"
     assert payload["shadow_config"][0]["r_id"] == int(rule.r_id)
 
 
@@ -176,6 +178,75 @@ def test_drain_shadow_queue_uses_enqueued_config_snapshot(session, fake_shadow_r
     )
     assert comparison_log.candidate_result == "HOLD"
     assert comparison_log.control_result == "HOLD"
+
+
+def test_drain_shadow_queue_uses_enqueued_execution_mode_snapshot(session, fake_shadow_redis: FakeRedis):
+    org = _ensure_org(session)
+    session.add(
+        RuntimeSetting(
+            key="main_rule_execution_mode",
+            o_id=int(org.o_id),
+            value_type="string",
+            value="first_match",
+        )
+    )
+    session.commit()
+
+    first_rule = RuleModel(
+        logic="return 'HOLD'",
+        description="First shadow rule",
+        rid="SHADOW_QUEUE:MODE:001",
+        execution_order=1,
+        status="active",
+        o_id=org.o_id,
+    )
+    second_rule = RuleModel(
+        logic="return 'REVIEW'",
+        description="Second shadow rule",
+        rid="SHADOW_QUEUE:MODE:002",
+        execution_order=2,
+        status="active",
+        o_id=org.o_id,
+    )
+    session.add_all([first_rule, second_rule])
+    session.commit()
+
+    config_producer = RDBRuleEngineConfigProducer(db=session, o_id=org.o_id)
+    config_producer.save_config(RDBRuleManager(db=session, o_id=org.o_id))
+    deploy_rule_to_shadow(db=session, o_id=org.o_id, rule_model=first_rule, changed_by="test")
+    deploy_rule_to_shadow(db=session, o_id=org.o_id, rule_model=second_rule, changed_by="test")
+
+    tl_id = _create_testing_record(session, int(org.o_id))
+
+    shadow_evaluation_queue.enqueue_shadow_evaluation(
+        db=session,
+        tl_id=tl_id,
+        o_id=int(org.o_id),
+        event_id="shadow-queue-execution-mode",
+        event_data={"amount": 100},
+        production_all_rule_results={int(first_rule.r_id): "HOLD"},
+    )
+
+    setting = (
+        session.query(RuntimeSetting)
+        .filter(RuntimeSetting.key == "main_rule_execution_mode", RuntimeSetting.o_id == int(org.o_id))
+        .one()
+    )
+    setting.value = "all_matches"
+    session.commit()
+
+    drained = shadow_evaluation_queue.drain_shadow_evaluation_queue(batch_size=10, max_batches=1)
+
+    assert drained["drained_batches"] == 1
+    assert drained["drained_messages"] == 1
+    shadow_logs = (
+        session.query(ShadowResultsLog)
+        .filter(ShadowResultsLog.tl_id == tl_id)
+        .order_by(ShadowResultsLog.r_id.asc())
+        .all()
+    )
+    assert [int(log.r_id) for log in shadow_logs] == [int(first_rule.r_id)]
+    assert [str(log.rule_result) for log in shadow_logs] == ["HOLD"]
 
 
 def test_drain_shadow_queue_requeues_on_persist_failure(

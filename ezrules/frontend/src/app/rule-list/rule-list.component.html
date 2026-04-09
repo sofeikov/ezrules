@@ -114,6 +114,7 @@
             <thead class="bg-gray-50">
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rule ID</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -135,6 +136,9 @@
                     </span>
                     <span *ngIf="rule.in_shadow" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">SHADOW</span>
                   </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ rule.evaluation_lane === 'main' ? rule.execution_order : '—' }}
                 </td>
                 <td class="px-6 py-4">
                   <span class="text-sm text-gray-600">{{ rule.description }}</span>
