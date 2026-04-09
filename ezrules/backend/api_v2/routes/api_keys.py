@@ -14,12 +14,14 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
+from ezrules.backend.api_key_cache import publish_api_key_auth_version
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
     get_current_org_id,
     get_db,
     require_permission,
 )
+from ezrules.backend.runtime_settings import bump_api_key_cache_version
 from ezrules.core.audit_helpers import save_api_key_history
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import ApiKey, User
@@ -89,7 +91,9 @@ def create_api_key(
         changed_by=str(current_user.email),
     )
 
+    next_version = bump_api_key_cache_version(db, current_org_id)
     db.commit()
+    publish_api_key_auth_version(current_org_id, next_version)
     db.refresh(api_key)
 
     return CreateApiKeyResponse(
@@ -160,4 +164,6 @@ def revoke_api_key(
         changed_by=str(current_user.email),
     )
 
+    next_version = bump_api_key_cache_version(db, current_org_id)
     db.commit()
+    publish_api_key_auth_version(current_org_id, next_version)
