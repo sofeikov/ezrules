@@ -54,6 +54,7 @@ nav:
       - Automatic Field Type Management: blog/field-type-management.md
       - Shipping Rule Changes with Less Guesswork: blog/shadow-deployment.md
       - Rule Quality Precision & Recall: blog/rule-quality-precision-recall.md
+      - Ordered Rule Execution: blog/rule-ordering-first-match.md
   - User Guide:
       - For Analysts: user-guide/analyst-guide.md
       - For Administrators: user-guide/admin-guide.md

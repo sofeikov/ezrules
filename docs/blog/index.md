@@ -9,3 +9,4 @@ Short practical writeups on using ezrules in real workflows.
 - [Automatic Field Type Management](field-type-management.md)
 - [Shipping Rule Changes with Less Guesswork: Shadow Deployment in ezrules](shadow-deployment.md)
 - [Rule Quality in ezrules: Precision and Recall by Outcome-Label Pair](rule-quality-precision-recall.md)
+- [Ordered Rule Execution in ezrules: When First Match Beats Conflict Resolution](rule-ordering-first-match.md)
