@@ -81,6 +81,8 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 | `PUT` | `/api/v2/rules/{rule_id}` | Bearer + permission | Update rule |
 | `DELETE` | `/api/v2/rules/{rule_id}` | Bearer + `DELETE_RULE` | Delete rule |
 | `POST` | `/api/v2/rules/{rule_id}/promote` | Bearer + `PROMOTE_RULES` | Promote draft rule to active |
+| `POST` | `/api/v2/rules/{rule_id}/pause` | Bearer + `PAUSE_RULES` | Pause active rule |
+| `POST` | `/api/v2/rules/{rule_id}/resume` | Bearer + `PROMOTE_RULES` | Resume paused rule to active |
 | `POST` | `/api/v2/rules/{rule_id}/archive` | Bearer + `MODIFY_RULE` | Archive rule |
 | `POST` | `/api/v2/rules/{rule_id}/rollback` | Bearer + `MODIFY_RULE` | Create a new draft version from a historical revision (`revision_number` in body) |
 | `POST` | `/api/v2/rules/verify` | Bearer + permission | Verify rule source, extracted params, and advisory warnings for unseen fields |
@@ -94,17 +96,20 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 | `POST` | `/api/v2/rules/{rule_id}/rollout/promote` | Bearer + `PROMOTE_RULES` | Promote rollout candidate to full production |
 
 Rule lifecycle fields on rule responses:
-- `status`: `draft`, `active`, or `archived`
+- `status`: `draft`, `active`, `paused`, or `archived`
 - `evaluation_lane`: `main` or `allowlist`
 - `effective_from`: activation timestamp for active versions
 - `approved_by` / `approved_at`: approver audit metadata for promotions
 - `POST /api/v2/rules` creates draft rules.
 - `PUT /api/v2/rules/{id}` saves edits as draft by default and requires promotion to reactivate.
+- `POST /api/v2/rules/{id}/pause` moves an active rule out of live production evaluation without archiving it.
+- `POST /api/v2/rules/{id}/resume` returns a paused rule to `active` and records fresh approver metadata.
+- Editing a paused rule keeps it paused; it does not silently reactivate.
 - If runtime setting `auto_promote_active_rule_updates` is enabled for the caller's org, editing an already active rule keeps it active and updates production immediately, but the caller still needs `PROMOTE_RULES`.
 - `POST /api/v2/rules/{id}/rollback` restores the selected historical revision's logic and description into a brand new draft version, preserving the full revision chain.
-- Rule audit entries (`GET /api/v2/audit/rules*`) now include `action` (`updated`, `promoted`, `deactivated`, `rolled_back`, `deleted`) and `to_status` to show lifecycle transitions such as `draft -> active`.
+- Rule audit entries (`GET /api/v2/audit/rules*`) now include `action` (`updated`, `promoted`, `paused`, `resumed`, `deactivated`, `rolled_back`, `deleted`) and `to_status` to show lifecycle transitions such as `draft -> active` or `active -> paused`.
 - Deleting a rule preserves its history so `GET /api/v2/audit/rules/{rule_id}` remains available after deletion.
-- Rules with an active shadow deployment or rollout cannot be edited, archived, deleted, directly promoted, or rolled back until the candidate deployment is removed or promoted.
+- Rules with an active shadow deployment or rollout cannot be edited, paused, archived, deleted, directly promoted, resumed, or rolled back until the candidate deployment is removed or promoted.
 - Allowlist rules are first-class production rules. They cannot be deployed to shadow or rollout.
 
 `POST /api/v2/rules/verify` response fields:

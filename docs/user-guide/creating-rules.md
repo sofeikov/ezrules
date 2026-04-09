@@ -193,6 +193,8 @@ Allowlist rules are different: they are already production behavior. They cannot
 
 By default, editing an active rule saves a new `draft` version and removes that rule from live production until you promote it again. If your organisation enables **Settings → General → Auto-promote edits to active rules**, users who also have `PROMOTE_RULES` can save an edit to an active rule and keep it live immediately.
 
+If you need to stop an active rule temporarily without retiring it, use **Pause Rule**. A paused rule is excluded from live production evaluation but stays available for editing and later **Resume Rule** when you want to reactivate it. Pausing requires the dedicated `pause_rules` permission; resuming still requires `promote_rules`.
+
 ---
 
 ## Review History and Roll Back Safely

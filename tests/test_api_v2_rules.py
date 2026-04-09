@@ -16,8 +16,8 @@ from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.core.rule_updater import RDBRuleManager, save_rule_history
-from ezrules.models.backend_core import Organisation, Role, RuleHistory, RuleStatus, User
+from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager, save_rule_history
+from ezrules.models.backend_core import Organisation, Role, RuleEngineConfig, RuleHistory, RuleStatus, User
 from ezrules.models.backend_core import Rule as RuleModel
 
 
@@ -62,6 +62,7 @@ def rules_test_client(session):
     PermissionManager.grant_permission(rule_role.id, PermissionAction.VIEW_RULES)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.CREATE_RULE)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.MODIFY_RULE)
+    PermissionManager.grant_permission(rule_role.id, PermissionAction.PAUSE_RULES)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.PROMOTE_RULES)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.DELETE_RULE)
 
@@ -394,6 +395,114 @@ class TestRuleLifecycleAudit:
         assert history.action == "deactivated"
         assert history.status == RuleStatus.ACTIVE
         assert history.to_status == RuleStatus.ARCHIVED
+
+    def test_pause_records_transition_and_removes_rule_from_active_config(self, rules_test_client, sample_rule):
+        token = rules_test_client.test_data["token"]
+        session = rules_test_client.test_data["session"]
+        org = rules_test_client.test_data["org"]
+
+        producer = RDBRuleEngineConfigProducer(db=session, o_id=org.o_id)
+        producer.save_config(RDBRuleManager(db=session, o_id=org.o_id))
+
+        response = rules_test_client.post(
+            f"/api/v2/rules/{sample_rule.r_id}/pause",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["rule"]["status"] == "paused"
+
+        session.refresh(sample_rule)
+        assert sample_rule.status == RuleStatus.PAUSED
+
+        history = (
+            session.query(RuleHistory)
+            .filter(RuleHistory.r_id == sample_rule.r_id)
+            .order_by(RuleHistory.version.desc())
+            .first()
+        )
+        assert history is not None
+        assert history.action == "paused"
+        assert history.status == RuleStatus.ACTIVE
+        assert history.to_status == RuleStatus.PAUSED
+
+        production_config = (
+            session.query(RuleEngineConfig)
+            .filter(RuleEngineConfig.label == "production", RuleEngineConfig.o_id == org.o_id)
+            .one()
+        )
+        assert all(entry["r_id"] != sample_rule.r_id for entry in production_config.config)
+
+    def test_resume_restores_paused_rule_to_active_config(self, rules_test_client, sample_rule):
+        token = rules_test_client.test_data["token"]
+        session = rules_test_client.test_data["session"]
+        org = rules_test_client.test_data["org"]
+        user = rules_test_client.test_data["user"]
+
+        producer = RDBRuleEngineConfigProducer(db=session, o_id=org.o_id)
+        producer.save_config(RDBRuleManager(db=session, o_id=org.o_id))
+        sample_rule.status = RuleStatus.PAUSED
+        sample_rule.effective_from = None
+        sample_rule.approved_by = None
+        sample_rule.approved_at = None
+        session.commit()
+
+        response = rules_test_client.post(
+            f"/api/v2/rules/{sample_rule.r_id}/resume",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["rule"]["status"] == "active"
+
+        session.refresh(sample_rule)
+        assert sample_rule.status == RuleStatus.ACTIVE
+        assert sample_rule.approved_by == user.id
+        assert sample_rule.approved_at is not None
+
+        history = (
+            session.query(RuleHistory)
+            .filter(RuleHistory.r_id == sample_rule.r_id)
+            .order_by(RuleHistory.version.desc())
+            .first()
+        )
+        assert history is not None
+        assert history.action == "resumed"
+        assert history.status == RuleStatus.PAUSED
+        assert history.to_status == RuleStatus.ACTIVE
+
+        production_config = (
+            session.query(RuleEngineConfig)
+            .filter(RuleEngineConfig.label == "production", RuleEngineConfig.o_id == org.o_id)
+            .one()
+        )
+        assert any(entry["r_id"] == sample_rule.r_id for entry in production_config.config)
+
+    def test_update_paused_rule_keeps_paused_status(self, rules_test_client, sample_rule):
+        token = rules_test_client.test_data["token"]
+        session = rules_test_client.test_data["session"]
+
+        sample_rule.status = RuleStatus.PAUSED
+        sample_rule.effective_from = None
+        sample_rule.approved_by = None
+        sample_rule.approved_at = None
+        session.commit()
+
+        response = rules_test_client.put(
+            f"/api/v2/rules/{sample_rule.r_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"description": "Updated while paused"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["rule"]["status"] == "paused"
+
+        session.refresh(sample_rule)
+        assert sample_rule.status == RuleStatus.PAUSED
 
     def test_delete_preserves_history_with_deleted_action(self, rules_test_client, sample_rule):
         token = rules_test_client.test_data["token"]
@@ -764,3 +873,126 @@ class TestRulePermissions:
 
         session.refresh(draft_rule)
         assert draft_rule.status == RuleStatus.DRAFT
+
+    def test_resume_rule_without_promote_permission(self, session):
+        hashed_password = bcrypt.hashpw("noresumepass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+        org = session.query(Organisation).filter(Organisation.o_id == 1).first()
+        if not org:
+            org = Organisation(o_id=1, name="Test Org")
+            session.add(org)
+            session.commit()
+
+        role = session.query(Role).filter(Role.name == "rule_modify_only_resume").first()
+        if not role:
+            role = Role(name="rule_modify_only_resume", description="Can modify rules but not resume them")
+            session.add(role)
+            session.commit()
+
+        user = session.query(User).filter(User.email == "noresume@example.com").first()
+        if not user:
+            user = User(
+                email="noresume@example.com",
+                password=hashed_password,
+                active=True,
+                fs_uniquifier="noresume@example.com",
+                o_id=1,
+            )
+            user.roles.append(role)
+            session.add(user)
+            session.commit()
+
+        paused_rule = RuleModel(
+            rid="paused_without_promote_permission",
+            logic="event.amount > 42",
+            description="Paused rule that should not be resumable",
+            o_id=org.o_id,
+            status=RuleStatus.PAUSED,
+        )
+        session.add(paused_rule)
+        session.commit()
+
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+        PermissionManager.grant_permission(role.id, PermissionAction.MODIFY_RULE)
+
+        token = create_access_token(
+            user_id=int(user.id),
+            email=str(user.email),
+            roles=[role.name for role in user.roles],
+            org_id=int(user.o_id),
+        )
+
+        with TestClient(app) as client:
+            response = client.post(
+                f"/api/v2/rules/{paused_rule.r_id}/resume",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+            assert response.status_code == 403
+            assert response.json()["detail"] == "Permission denied"
+
+        session.refresh(paused_rule)
+        assert paused_rule.status == RuleStatus.PAUSED
+
+    def test_pause_rule_without_pause_permission(self, session):
+        """User with MODIFY_RULE but without PAUSE_RULES should get 403."""
+        hashed_password = bcrypt.hashpw("nopausepass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+        org = session.query(Organisation).filter(Organisation.o_id == 1).first()
+        if not org:
+            org = Organisation(o_id=1, name="Test Org")
+            session.add(org)
+            session.commit()
+
+        role = session.query(Role).filter(Role.name == "rule_modify_no_pause").first()
+        if not role:
+            role = Role(name="rule_modify_no_pause", description="Can modify rules but not pause them")
+            session.add(role)
+            session.commit()
+
+        user = session.query(User).filter(User.email == "nopause@example.com").first()
+        if not user:
+            user = User(
+                email="nopause@example.com",
+                password=hashed_password,
+                active=True,
+                fs_uniquifier="nopause@example.com",
+                o_id=1,
+            )
+            user.roles.append(role)
+            session.add(user)
+            session.commit()
+
+        active_rule = RuleModel(
+            rid="active_without_pause_permission",
+            logic="event.amount > 42",
+            description="Active rule that should not be pausable",
+            o_id=org.o_id,
+            status=RuleStatus.ACTIVE,
+        )
+        session.add(active_rule)
+        session.commit()
+
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+        PermissionManager.grant_permission(role.id, PermissionAction.MODIFY_RULE)
+
+        token = create_access_token(
+            user_id=int(user.id),
+            email=str(user.email),
+            roles=[role.name for role in user.roles],
+            org_id=int(user.o_id),
+        )
+
+        with TestClient(app) as client:
+            response = client.post(
+                f"/api/v2/rules/{active_rule.r_id}/pause",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+            assert response.status_code == 403
+            assert response.json()["detail"] == "Permission denied"
+
+        session.refresh(active_rule)
+        assert active_rule.status == RuleStatus.ACTIVE

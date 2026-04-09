@@ -10,8 +10,8 @@ export interface RuleHistoryEntry {
   logic: string;
   description: string;
   action: string;
-  status: 'draft' | 'active' | 'archived';
-  to_status: 'draft' | 'active' | 'archived' | null;
+  status: 'draft' | 'active' | 'paused' | 'archived';
+  to_status: 'draft' | 'active' | 'paused' | 'archived' | null;
   approved_by: number | null;
   approved_at: string | null;
   changed: string | null;

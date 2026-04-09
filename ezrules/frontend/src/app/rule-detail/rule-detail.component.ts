@@ -87,7 +87,9 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   rolloutDeployError: string | null = null;
   rolloutTrafficPercent: number = 10;
   canModifyRules: boolean = false;
+  canPauseRules: boolean = false;
   canPromoteRules: boolean = false;
+  lifecycleActionLoading: 'pause' | 'resume' | null = null;
 
   // Backtesting properties
   backtestResults: BacktestResultItem[] = [];
@@ -165,6 +167,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     this.authService.getCurrentUser().subscribe({
       next: (user) => {
         this.canModifyRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyRule);
+        this.canPauseRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.pauseRules);
         this.canPromoteRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.promoteRules);
         if (!this.canModifyRules) {
           this.isEditMode = false;
@@ -172,6 +175,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.canModifyRules = false;
+        this.canPauseRules = false;
         this.canPromoteRules = false;
         this.isEditMode = false;
       }
@@ -446,6 +450,67 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
         this.saving = false;
         this.saveError = error.error?.detail || error.error?.error || 'Failed to save rule. Please try again.';
         console.error('Error saving rule:', error);
+      }
+    });
+  }
+
+  pauseRule(): void {
+    if (!this.rule || !this.canPauseRules || this.rule.status !== 'active' || this.lifecycleActionLoading) {
+      return;
+    }
+    const confirmed = window.confirm(`Pause rule ${this.rule.rid}?`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.lifecycleActionLoading = 'pause';
+    this.saveError = null;
+    this.saveSuccess = false;
+    this.ruleService.pauseRule(this.rule.r_id).subscribe({
+      next: (response) => {
+        this.lifecycleActionLoading = null;
+        if (response.success && response.rule) {
+          this.rule = response.rule;
+          this.saveSuccess = true;
+          this.saveSuccessMessage = response.message || 'Rule paused.';
+          this.isEditMode = false;
+          this.loadShadowEntry(this.rule.r_id);
+          this.loadRolloutEntry(this.rule.r_id);
+          return;
+        }
+        this.saveError = response.error || 'Failed to pause rule.';
+      },
+      error: (error) => {
+        this.lifecycleActionLoading = null;
+        this.saveError = error.error?.detail || error.error?.error || 'Failed to pause rule. Please try again.';
+      }
+    });
+  }
+
+  resumeRule(): void {
+    if (!this.rule || !this.canPromoteRules || this.rule.status !== 'paused' || this.lifecycleActionLoading) {
+      return;
+    }
+
+    this.lifecycleActionLoading = 'resume';
+    this.saveError = null;
+    this.saveSuccess = false;
+    this.ruleService.resumeRule(this.rule.r_id).subscribe({
+      next: (response) => {
+        this.lifecycleActionLoading = null;
+        if (response.success && response.rule) {
+          this.rule = response.rule;
+          this.saveSuccess = true;
+          this.saveSuccessMessage = response.message || 'Rule resumed.';
+          this.loadShadowEntry(this.rule.r_id);
+          this.loadRolloutEntry(this.rule.r_id);
+          return;
+        }
+        this.saveError = response.error || 'Failed to resume rule.';
+      },
+      error: (error) => {
+        this.lifecycleActionLoading = null;
+        this.saveError = error.error?.detail || error.error?.error || 'Failed to resume rule. Please try again.';
       }
     });
   }
@@ -874,7 +939,11 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   }
 
   showReadOnlyNotice(): boolean {
-    return !this.isRevisionView && !this.canModifyRules && !this.canPromoteRules;
+    return !this.isRevisionView && !this.canModifyRules && !this.canPauseRules && !this.canPromoteRules;
+  }
+
+  isLifecycleActionLoading(action: 'pause' | 'resume'): boolean {
+    return this.lifecycleActionLoading === action;
   }
 
   isAllowlistRule(): boolean {

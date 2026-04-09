@@ -154,6 +154,24 @@
                       <span *ngIf="isActionLoading(rule.r_id, 'promote')">Promoting...</span>
                     </button>
                     <button
+                      *ngIf="canPause(rule)"
+                      (click)="pauseRule(rule)"
+                      [disabled]="isActionLoading(rule.r_id, 'pause')"
+                      class="text-yellow-700 hover:text-yellow-800 text-sm font-medium disabled:text-gray-400"
+                    >
+                      <span *ngIf="!isActionLoading(rule.r_id, 'pause')">Pause</span>
+                      <span *ngIf="isActionLoading(rule.r_id, 'pause')">Pausing...</span>
+                    </button>
+                    <button
+                      *ngIf="canResume(rule)"
+                      (click)="resumeRule(rule)"
+                      [disabled]="isActionLoading(rule.r_id, 'resume')"
+                      class="text-green-700 hover:text-green-800 text-sm font-medium disabled:text-gray-400"
+                    >
+                      <span *ngIf="!isActionLoading(rule.r_id, 'resume')">Resume</span>
+                      <span *ngIf="isActionLoading(rule.r_id, 'resume')">Resuming...</span>
+                    </button>
+                    <button
                       *ngIf="canArchive(rule)"
                       (click)="archiveRule(rule)"
                       [disabled]="isActionLoading(rule.r_id, 'archive')"

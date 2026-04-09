@@ -629,7 +629,13 @@ def update_rule(
             )
 
     promoted_at = datetime.now(UTC) if auto_promote_active_updates else None
-    next_status = RuleStatus.ACTIVE if auto_promote_active_updates else RuleStatus.DRAFT
+    next_status = (
+        RuleStatus.ACTIVE
+        if auto_promote_active_updates
+        else RuleStatus.PAUSED
+        if rule.status == RuleStatus.PAUSED
+        else RuleStatus.DRAFT
+    )
 
     # Snapshot current state before mutation
     save_rule_history(
@@ -672,6 +678,8 @@ def update_rule(
         message=(
             "Rule updated and kept active."
             if auto_promote_active_updates
+            else "Rule updated and remains paused."
+            if next_status == RuleStatus.PAUSED
             else "Rule updated in draft status. Promote to activate."
         ),
         rule=rule_to_response(rule, revisions),
@@ -707,7 +715,6 @@ def delete_rule(
 
     was_active = is_active(rule)
 
-    # Record explicit deletion audit event before deleting the row.
     save_rule_history(
         db,
         rule,
@@ -716,10 +723,8 @@ def delete_rule(
         to_status=None,
     )
 
-    # Remove from shadow config if present.
     remove_rule_from_shadow(db, o_id=current_org_id, r_id=rule_id, changed_by=str(user.email))
 
-    # Delete the rule (DB cascade handles backtesting results)
     db.delete(rule)
     db.commit()
 
@@ -749,6 +754,8 @@ def promote_rule(
     ensure_no_active_candidate_deployment(db, current_org_id, rule_id)
     if rule.status == RuleStatus.ARCHIVED:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archived rules cannot be promoted")
+    if rule.status == RuleStatus.PAUSED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Paused rules must be resumed")
     if rule.status == RuleStatus.ACTIVE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rule is already active")
 
@@ -773,6 +780,96 @@ def promote_rule(
     return RuleMutationResponse(
         success=True,
         message="Rule promoted to active",
+        rule=rule_to_response(rule),
+    )
+
+
+@router.post("/{rule_id}/pause", response_model=RuleMutationResponse)
+def pause_rule(
+    rule_id: int,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.PAUSE_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> RuleMutationResponse:
+    """Pause an active rule without archiving it."""
+    rule_manager = get_rule_manager(db, current_org_id)
+    config_producer = get_config_producer(db, current_org_id)
+    rule = rule_manager.load_rule(rule_id)
+    if rule is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
+    ensure_no_active_candidate_deployment(db, current_org_id, rule_id)
+    if rule.status == RuleStatus.ARCHIVED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archived rules cannot be paused")
+    if rule.status == RuleStatus.DRAFT:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Draft rules cannot be paused")
+    if rule.status == RuleStatus.PAUSED:
+        return RuleMutationResponse(success=True, message="Rule already paused", rule=rule_to_response(rule))
+
+    save_rule_history(
+        db,
+        rule,
+        changed_by=str(user.email),
+        action="paused",
+        to_status=RuleStatus.PAUSED,
+    )
+    rule.status = RuleStatus.PAUSED
+    rule.effective_from = None
+    rule.approved_by = None
+    rule.approved_at = None
+    rule_manager.save_rule(rule)
+    config_producer.save_config(rule_manager, changed_by=str(user.email))
+
+    return RuleMutationResponse(
+        success=True,
+        message="Rule paused",
+        rule=rule_to_response(rule),
+    )
+
+
+@router.post("/{rule_id}/resume", response_model=RuleMutationResponse)
+def resume_rule(
+    rule_id: int,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.PROMOTE_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> RuleMutationResponse:
+    """Resume a paused rule and restore it to active status."""
+    rule_manager = get_rule_manager(db, current_org_id)
+    config_producer = get_config_producer(db, current_org_id)
+    rule = rule_manager.load_rule(rule_id)
+    if rule is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
+    ensure_no_active_candidate_deployment(db, current_org_id, rule_id)
+    if rule.status == RuleStatus.ARCHIVED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Archived rules cannot be resumed")
+    if rule.status == RuleStatus.DRAFT:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Draft rules cannot be resumed")
+    if rule.status == RuleStatus.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rule is already active")
+
+    resumed_at = datetime.now(UTC)
+    save_rule_history(
+        db,
+        rule,
+        changed_by=str(user.email),
+        action="resumed",
+        to_status=RuleStatus.ACTIVE,
+        effective_from_override=resumed_at,
+        approved_by_override=int(user.id),
+        approved_at_override=resumed_at,
+    )
+    rule.status = RuleStatus.ACTIVE
+    rule.effective_from = resumed_at
+    rule.approved_by = user.id
+    rule.approved_at = resumed_at
+    rule_manager.save_rule(rule)
+    config_producer.save_config(rule_manager, changed_by=str(user.email))
+
+    return RuleMutationResponse(
+        success=True,
+        message="Rule resumed to active",
         rule=rule_to_response(rule),
     )
 
@@ -806,7 +903,6 @@ def archive_rule(
     rule.status = RuleStatus.ARCHIVED
     rule_manager.save_rule(rule)
 
-    # Archived rules must not remain deployable in shadow.
     remove_rule_from_shadow(db, o_id=current_org_id, r_id=rule_id, changed_by=str(user.email))
 
     if was_active:
