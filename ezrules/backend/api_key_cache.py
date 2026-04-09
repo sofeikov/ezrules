@@ -66,19 +66,17 @@ class ApiKeyAuthCache:
     def load_hashed(self, db: Any, key_hash: str) -> ApiKeyAuthMetadata | None:
         cached_entry = self._get_entry(key_hash)
         if cached_entry is not None:
-            redis_version = self._read_version(cached_entry.metadata.org_id)
-            if (
-                redis_version is not None
-                and cached_entry.version == redis_version
-                and not self._is_expired(cached_entry)
-            ):
+            cached_org_id = cached_entry.metadata.org_id
+            is_expired = self._is_expired(cached_entry)
+            redis_version = self._read_version(cached_org_id)
+            if redis_version is not None and cached_entry.version == redis_version and not is_expired:
                 return cached_entry.metadata
 
             durable_version: str | None = None
-            if redis_version is None or cached_entry.version != redis_version or self._is_expired(cached_entry):
-                durable_version = self._read_durable_version(db, cached_entry.metadata.org_id)
+            if redis_version is None or cached_entry.version != redis_version or is_expired:
+                durable_version = self._read_durable_version(db, cached_org_id)
                 if redis_version != durable_version:
-                    self._write_version(cached_entry.metadata.org_id, durable_version)
+                    self._write_version(cached_org_id, durable_version)
 
             current_version = durable_version or redis_version
             if current_version is not None and cached_entry.version == current_version:

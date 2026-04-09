@@ -51,6 +51,12 @@ class CreateApiKeyResponse(ApiKeyResponse):
     raw_key: str
 
 
+def publish_api_key_cache_invalidation(db: Any, org_id: int) -> None:
+    next_version = bump_api_key_cache_version(db, org_id)
+    db.commit()
+    publish_api_key_auth_version(org_id, next_version)
+
+
 # =============================================================================
 # ENDPOINTS
 # =============================================================================
@@ -91,9 +97,7 @@ def create_api_key(
         changed_by=str(current_user.email),
     )
 
-    next_version = bump_api_key_cache_version(db, current_org_id)
-    db.commit()
-    publish_api_key_auth_version(current_org_id, next_version)
+    publish_api_key_cache_invalidation(db, current_org_id)
     db.refresh(api_key)
 
     return CreateApiKeyResponse(
@@ -164,6 +168,4 @@ def revoke_api_key(
         changed_by=str(current_user.email),
     )
 
-    next_version = bump_api_key_cache_version(db, current_org_id)
-    db.commit()
-    publish_api_key_auth_version(current_org_id, next_version)
+    publish_api_key_cache_invalidation(db, current_org_id)
