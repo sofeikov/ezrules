@@ -1,5 +1,11 @@
 # What's New
 
+## v1.9.0
+
+* **Ordered main-rule execution**: Main rules now carry an explicit `execution_order`, and organisations can switch main-lane evaluation between legacy `all_matches` behavior and a new `first_match` mode that persists only the earliest matching main rule.
+* **Settings control for main-lane semantics**: **Settings → General** now exposes `main_rule_execution_mode`, so operators can enable first-match serving without changing allowlist behavior.
+* **Rule ordering controls and audit trail**: The Rules list now shows execution order only when first-match mode is enabled, supports button-based reordering with a dedicated `reorder_rules` permission, and records reorder actions in rule history.
+
 ## v1.8.0
 
 * **Paused rule lifecycle state**: Rules can now be moved from `active` to `paused` without archiving or editing their logic, which removes them from live production evaluation while preserving the rule row, history, and later resume path.

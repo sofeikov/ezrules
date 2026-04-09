@@ -26,6 +26,7 @@ export const ROUTE_PERMISSION_REQUIREMENTS = {
 export const ACTION_PERMISSION_REQUIREMENTS = {
   createRule: { allOf: ['create_rule'] },
   modifyRule: { allOf: ['modify_rule'] },
+  reorderRules: { allOf: ['reorder_rules'] },
   pauseRules: { allOf: ['pause_rules'] },
   promoteRules: { allOf: ['promote_rules'] },
   deleteRule: { allOf: ['delete_rule'] },
@@ -54,6 +55,7 @@ export const ACTION_PERMISSION_REQUIREMENTS = {
 export const PERMISSION_LABELS: Record<string, string> = {
   create_rule: 'Create rules',
   modify_rule: 'Modify rules',
+  reorder_rules: 'Reorder rules',
   pause_rules: 'Pause rules',
   promote_rules: 'Promote rules',
   delete_rule: 'Delete rules',

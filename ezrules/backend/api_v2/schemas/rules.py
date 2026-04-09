@@ -22,6 +22,7 @@ class RuleCreate(BaseModel):
     rid: str = Field(..., min_length=1, description="Unique rule identifier (e.g., 'rule_001')")
     description: str = Field(..., min_length=1, description="Human-readable description of what the rule does")
     logic: str = Field(..., min_length=1, description="Rule logic expression")
+    execution_order: int | None = Field(default=None, ge=1, description="Execution order for main rules")
     evaluation_lane: str = Field(default="main", description="Evaluation lane: main or allowlist")
 
     model_config = {
@@ -43,6 +44,7 @@ class RuleUpdate(BaseModel):
 
     description: str | None = Field(None, description="New description for the rule")
     logic: str | None = Field(None, description="New rule logic expression")
+    execution_order: int | None = Field(None, ge=1, description="Execution order for main rules")
     evaluation_lane: str | None = Field(None, description="Evaluation lane: main or allowlist")
 
 
@@ -65,6 +67,15 @@ class RuleRollbackRequest(BaseModel):
     revision_number: int = Field(..., ge=1, description="Historical revision number to restore")
 
 
+class MainRuleOrderUpdateRequest(BaseModel):
+    """Replace the full ordered main-rule sequence."""
+
+    ordered_r_ids: list[int] = Field(
+        default_factory=list,
+        description="Main rule IDs ordered from earliest to latest execution",
+    )
+
+
 # =============================================================================
 # RESPONSE SCHEMAS
 # =============================================================================
@@ -84,6 +95,7 @@ class RuleResponse(BaseModel):
     rid: str = Field(..., description="Rule identifier")
     description: str
     logic: str
+    execution_order: int = Field(..., ge=1, description="Execution order used for main-rule evaluation")
     evaluation_lane: str = Field(..., description="Evaluation lane for this rule")
     status: RuleStatus = Field(..., description="Rule lifecycle status")
     effective_from: datetime | None = Field(None, description="When the currently active version became effective")
@@ -103,6 +115,7 @@ class RuleListItem(BaseModel):
     rid: str
     description: str
     logic: str
+    execution_order: int = Field(..., ge=1, description="Execution order used for main-rule evaluation")
     evaluation_lane: str = Field(..., description="Evaluation lane for this rule")
     status: RuleStatus = Field(..., description="Rule lifecycle status")
     effective_from: datetime | None = Field(None, description="When the currently active version became effective")
@@ -129,6 +142,7 @@ class RuleHistoryEntry(BaseModel):
     revision_number: int
     logic: str
     description: str
+    execution_order: int = Field(..., ge=1, description="Execution order captured in this revision")
     evaluation_lane: str = Field(..., description="Evaluation lane for this revision")
     status: RuleStatus = Field(..., description="Rule lifecycle status in this revision")
     effective_from: datetime | None = Field(None, description="When this revision became effective")
@@ -183,3 +197,10 @@ class RuleMutationResponse(BaseModel):
     message: str
     rule: RuleResponse | None = None
     error: str | None = None
+
+
+class RuleReorderResponse(BaseModel):
+    """Response for main-rule reorder operations."""
+
+    success: bool
+    message: str

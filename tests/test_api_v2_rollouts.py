@@ -212,6 +212,58 @@ class TestRolloutEndpoints:
         assert rollout_config is not None
         assert all(entry["r_id"] != active_rollout_rule.r_id for entry in rollout_config.config)
 
+    def test_promote_rollout_preserves_main_rule_execution_order(self, rollout_test_client, active_rollout_rule):
+        token = rollout_test_client.test_data["token"]
+        session = rollout_test_client.test_data["session"]
+
+        active_rollout_rule.execution_order = 2
+        leading_rule = RuleModel(
+            rid="rollout_leading_rule",
+            logic="return 'LEAD'",
+            description="Runs first",
+            status=RuleStatus.ACTIVE,
+            effective_from=datetime.now(UTC),
+            execution_order=1,
+            o_id=1,
+        )
+        trailing_rule = RuleModel(
+            rid="rollout_trailing_rule",
+            logic="return 'TAIL'",
+            description="Runs last",
+            status=RuleStatus.ACTIVE,
+            effective_from=datetime.now(UTC),
+            execution_order=3,
+            o_id=1,
+        )
+        session.add_all([leading_rule, trailing_rule])
+        session.commit()
+        RDBRuleEngineConfigProducer(db=session, o_id=1).save_config(RDBRuleManager(db=session, o_id=1))
+
+        rollout_test_client.post(
+            f"/api/v2/rules/{active_rollout_rule.r_id}/rollout",
+            json={"logic": "return 'CANDIDATE'", "description": "Candidate", "traffic_percent": 40},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        response = rollout_test_client.post(
+            f"/api/v2/rules/{active_rollout_rule.r_id}/rollout/promote",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        session.expire_all()
+
+        prod_config = (
+            session.query(RuleEngineConfig)
+            .filter(RuleEngineConfig.label == "production", RuleEngineConfig.o_id == 1)
+            .one()
+        )
+        assert [entry["r_id"] for entry in prod_config.config] == [
+            leading_rule.r_id,
+            active_rollout_rule.r_id,
+            trailing_rule.r_id,
+        ]
+
     def test_base_rule_update_blocked_while_rollout_active(self, rollout_test_client, active_rollout_rule):
         token = rollout_test_client.test_data["token"]
 

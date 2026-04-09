@@ -19,8 +19,14 @@ import {
   templateUrl: './settings.component.html'
 })
 export class SettingsComponent implements OnInit {
+  readonly mainRuleExecutionModeOptions = [
+    { value: 'all_matches', label: 'Collect all matches' },
+    { value: 'first_match', label: 'Stop on first match' },
+  ] as const;
   autoPromoteActiveRuleUpdates: boolean = false;
   defaultAutoPromoteActiveRuleUpdates: boolean = false;
+  mainRuleExecutionMode: string = 'all_matches';
+  defaultMainRuleExecutionMode: string = 'all_matches';
   loading: boolean = true;
   saving: boolean = false;
   hierarchySaving: boolean = false;
@@ -84,6 +90,8 @@ export class SettingsComponent implements OnInit {
       next: ({ settings, hierarchy, options, pairs }) => {
         this.autoPromoteActiveRuleUpdates = settings.autoPromoteActiveRuleUpdates;
         this.defaultAutoPromoteActiveRuleUpdates = settings.defaultAutoPromoteActiveRuleUpdates;
+        this.mainRuleExecutionMode = settings.mainRuleExecutionMode;
+        this.defaultMainRuleExecutionMode = settings.defaultMainRuleExecutionMode;
         this.ruleQualityLookbackDays = settings.ruleQualityLookbackDays;
         this.defaultRuleQualityLookbackDays = settings.defaultRuleQualityLookbackDays;
         this.neutralOutcome = settings.neutralOutcome;
@@ -129,6 +137,7 @@ export class SettingsComponent implements OnInit {
     this.saving = true;
     const updateRequest = {
       autoPromoteActiveRuleUpdates: this.canManagePermissions ? this.autoPromoteActiveRuleUpdates : undefined,
+      mainRuleExecutionMode: this.canManagePermissions ? this.mainRuleExecutionMode : undefined,
       ruleQualityLookbackDays: this.canManagePermissions ? Math.floor(this.ruleQualityLookbackDays) : undefined,
       neutralOutcome: this.canManageNeutralOutcome ? this.neutralOutcome : undefined,
     };
@@ -136,6 +145,8 @@ export class SettingsComponent implements OnInit {
       next: (settings) => {
         this.autoPromoteActiveRuleUpdates = settings.autoPromoteActiveRuleUpdates;
         this.defaultAutoPromoteActiveRuleUpdates = settings.defaultAutoPromoteActiveRuleUpdates;
+        this.mainRuleExecutionMode = settings.mainRuleExecutionMode;
+        this.defaultMainRuleExecutionMode = settings.defaultMainRuleExecutionMode;
         this.ruleQualityLookbackDays = settings.ruleQualityLookbackDays;
         this.defaultRuleQualityLookbackDays = settings.defaultRuleQualityLookbackDays;
         this.neutralOutcome = settings.neutralOutcome;

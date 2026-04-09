@@ -7,6 +7,7 @@ class PermissionAction(Enum):
     # Rule Management
     CREATE_RULE = "create_rule"
     MODIFY_RULE = "modify_rule"
+    REORDER_RULES = "reorder_rules"
     PAUSE_RULES = "pause_rules"
     PROMOTE_RULES = "promote_rules"
     DELETE_RULE = "delete_rule"
@@ -62,6 +63,7 @@ class PermissionAction(Enum):
         return [
             (cls.CREATE_RULE.value, "Create new rules", "rule"),
             (cls.MODIFY_RULE.value, "Modify existing rules", "rule"),
+            (cls.REORDER_RULES.value, "Reorder main rules", "rule"),
             (cls.PAUSE_RULES.value, "Pause active rules without archiving them", "rule"),
             (cls.PROMOTE_RULES.value, "Promote draft or shadow rules to production", "rule"),
             (cls.DELETE_RULE.value, "Delete rules", "rule"),
@@ -120,6 +122,7 @@ class RoleType(Enum):
             return [
                 PermissionAction.CREATE_RULE,
                 PermissionAction.MODIFY_RULE,
+                PermissionAction.REORDER_RULES,
                 PermissionAction.VIEW_RULES,
                 PermissionAction.VIEW_OUTCOMES,
                 PermissionAction.VIEW_LISTS,

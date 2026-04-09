@@ -140,8 +140,26 @@ test.describe('Rule List Page', () => {
             email: 'manager@example.com',
             active: true,
             roles: [{ id: 1, name: 'manager', description: 'Rule manager' }],
-            permissions: ['view_rules', 'modify_rule', 'pause_rules', 'promote_rules'],
+            permissions: ['view_rules', 'modify_rule', 'pause_rules', 'promote_rules', 'reorder_rules'],
             last_login_at: null,
+          }),
+        });
+      });
+
+      await page.route('**/api/v2/settings/runtime', async route => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            auto_promote_active_rule_updates: false,
+            default_auto_promote_active_rule_updates: false,
+            main_rule_execution_mode: 'all_matches',
+            default_main_rule_execution_mode: 'all_matches',
+            rule_quality_lookback_days: 30,
+            default_rule_quality_lookback_days: 30,
+            neutral_outcome: 'RELEASE',
+            default_neutral_outcome: 'RELEASE',
+            invalid_allowlist_rules: [],
           }),
         });
       });
@@ -159,6 +177,7 @@ test.describe('Rule List Page', () => {
               rid: 'pause_me',
               description: 'Pauseable rule',
               logic: 'event.amount > 100',
+              execution_order: 1,
               evaluation_lane: 'main',
               status: 'paused',
               effective_from: null,
@@ -182,6 +201,7 @@ test.describe('Rule List Page', () => {
                 rid: 'pause_me',
                 description: 'Pauseable rule',
                 logic: 'event.amount > 100',
+                execution_order: 1,
                 evaluation_lane: 'main',
                 status: paused ? 'paused' : 'active',
                 effective_from: null,

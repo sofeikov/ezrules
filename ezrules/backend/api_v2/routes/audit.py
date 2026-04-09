@@ -71,6 +71,7 @@ def rule_history_to_response(history: RuleHistory) -> RuleHistoryEntry:
         version=int(history.version),
         logic=str(history.logic),
         description=str(history.description),
+        execution_order=int(history.execution_order),
         action=str(history.action),
         status=history.status,
         to_status=history.to_status,

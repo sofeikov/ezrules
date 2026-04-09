@@ -32,6 +32,7 @@ For most fraud/compliance logic, leave the lane as **Main rules**.
 Choose **Allowlist rules** only when the rule expresses an explicit trust decision and should stop the rest of the evaluation flow.
 
 See [Allowlist Rules](allowlist-rules.md) for the full rationale and constraints.
+If you plan to run the main lane in strict sequence, see [Ordered Rule Execution in ezrules](../blog/rule-ordering-first-match.md) for when first-match mode is useful and how the platform applies it.
 
 ---
 

@@ -56,6 +56,23 @@
                 Allowlist rules short-circuit evaluation when they match. They must return
                 <span class="font-semibold text-gray-900">{{ neutralOutcomeLabel() }}</span>.
               </p>
+              <div class="mt-4">
+                <label for="settings-mainRuleExecutionMode" class="block text-sm font-medium text-gray-700 mb-2">
+                  Main rule execution mode
+                </label>
+                <select
+                  id="settings-mainRuleExecutionMode"
+                  class="border border-gray-300 rounded-md px-3 py-2 text-sm w-full md:w-72 disabled:bg-gray-100"
+                  [(ngModel)]="mainRuleExecutionMode"
+                  [disabled]="!canManagePermissions || saving"
+                >
+                  <option *ngFor="let option of mainRuleExecutionModeOptions" [value]="option.value">{{ option.label }}</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-2">
+                  Current default:
+                  {{ defaultMainRuleExecutionMode === 'first_match' ? 'Stop on first match' : 'Collect all matches' }}.
+                </p>
+              </div>
               <p *ngIf="neutralOutcomeMissingFromCatalog()" class="text-xs text-amber-700 mt-2">
                 The stored neutral outcome is not present in the current outcomes catalog. Select a current outcome and save.
               </p>
@@ -68,7 +85,7 @@
                   [disabled]="saving"
                   (click)="save()"
                 >
-                  {{ saving ? 'Saving...' : 'Save Neutral Outcome' }}
+                  {{ saving ? 'Saving...' : 'Save Outcome Settings' }}
                 </button>
               </div>
             </div>

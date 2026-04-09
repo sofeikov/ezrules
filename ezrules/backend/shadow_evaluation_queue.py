@@ -7,8 +7,9 @@ from typing import Any
 
 from redis import Redis
 
+from ezrules.backend.runtime_settings import get_main_rule_execution_mode
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
-from ezrules.core.rule_engine import RuleEngineFactory
+from ezrules.core.rule_engine import RULE_EXECUTION_MODE_ALL_MATCHES, RuleEngineFactory
 from ezrules.core.rule_updater import (
     DEPLOYMENT_MODE_SHADOW,
     DEPLOYMENT_VARIANT_CONTROL,
@@ -41,6 +42,7 @@ def _serialize_shadow_payload(
     production_all_rule_results: dict[Any, Any],
     shadow_config: list[dict[str, Any]],
     shadow_config_version: int,
+    main_rule_execution_mode: str,
 ) -> str:
     return json.dumps(
         {
@@ -51,6 +53,7 @@ def _serialize_shadow_payload(
             "production_all_rule_results": {str(r_id): result for r_id, result in production_all_rule_results.items()},
             "shadow_config": shadow_config,
             "shadow_config_version": shadow_config_version,
+            "main_rule_execution_mode": main_rule_execution_mode,
             "enqueued_at": datetime.now(UTC).isoformat(),
         },
         separators=(",", ":"),
@@ -82,6 +85,7 @@ def enqueue_shadow_evaluation(
         production_all_rule_results=production_all_rule_results,
         shadow_config=shadow_config,
         shadow_config_version=int(config_obj.version),
+        main_rule_execution_mode=get_main_rule_execution_mode(db, o_id),
     )
     try:
         get_shadow_evaluation_queue_client().lpush(app_settings.SHADOW_EVALUATION_QUEUE_KEY, payload)
@@ -123,6 +127,7 @@ def _persist_shadow_results(payload: dict[str, Any]) -> int:
         int(r_id): result for r_id, result in dict(payload.get("production_all_rule_results") or {}).items()
     }
     shadow_config = list(payload.get("shadow_config") or [])
+    main_rule_execution_mode = str(payload.get("main_rule_execution_mode") or RULE_EXECUTION_MODE_ALL_MATCHES)
 
     if not shadow_config:
         return 0
@@ -131,7 +136,11 @@ def _persist_shadow_results(payload: dict[str, Any]) -> int:
     set_organization_id(o_id)
     set_user_list_manager(list_provider)
 
-    shadow_engine = RuleEngineFactory.from_json(shadow_config, list_values_provider=list_provider)
+    shadow_engine = RuleEngineFactory.from_json(
+        shadow_config,
+        list_values_provider=list_provider,
+        execution_mode=main_rule_execution_mode,
+    )
     shadow_result = shadow_engine(event_data)
 
     persisted_logs = 0

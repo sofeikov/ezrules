@@ -7,6 +7,8 @@ import { environment } from '../../environments/environment';
 export interface RuntimeSettings {
   autoPromoteActiveRuleUpdates: boolean;
   defaultAutoPromoteActiveRuleUpdates: boolean;
+  mainRuleExecutionMode: string;
+  defaultMainRuleExecutionMode: string;
   ruleQualityLookbackDays: number;
   defaultRuleQualityLookbackDays: number;
   neutralOutcome: string;
@@ -44,6 +46,7 @@ export interface OutcomeHierarchyItem {
 
 export interface RuntimeSettingsUpdateRequest {
   autoPromoteActiveRuleUpdates?: boolean;
+  mainRuleExecutionMode?: string;
   ruleQualityLookbackDays?: number;
   neutralOutcome?: string;
 }
@@ -51,6 +54,8 @@ export interface RuntimeSettingsUpdateRequest {
 interface RuntimeSettingsV2 {
   auto_promote_active_rule_updates: boolean;
   default_auto_promote_active_rule_updates: boolean;
+  main_rule_execution_mode: string;
+  default_main_rule_execution_mode: string;
   rule_quality_lookback_days: number;
   default_rule_quality_lookback_days: number;
   neutral_outcome: string;
@@ -106,33 +111,18 @@ export class RuntimeSettingsService {
 
   getRuntimeSettings(): Observable<RuntimeSettings> {
     return this.http.get<RuntimeSettingsV2>(this.settingsUrl).pipe(
-      map(response => ({
-        autoPromoteActiveRuleUpdates: response.auto_promote_active_rule_updates,
-        defaultAutoPromoteActiveRuleUpdates: response.default_auto_promote_active_rule_updates,
-        ruleQualityLookbackDays: response.rule_quality_lookback_days,
-        defaultRuleQualityLookbackDays: response.default_rule_quality_lookback_days,
-        neutralOutcome: response.neutral_outcome,
-        defaultNeutralOutcome: response.default_neutral_outcome,
-        invalidAllowlistRules: response.invalid_allowlist_rules.map(rule => this.mapInvalidAllowlistRule(rule))
-      }))
+      map(response => this.mapRuntimeSettings(response))
     );
   }
 
   updateRuntimeSettings(request: RuntimeSettingsUpdateRequest): Observable<RuntimeSettings> {
     return this.http.put<RuntimeSettingsV2>(this.settingsUrl, {
       auto_promote_active_rule_updates: request.autoPromoteActiveRuleUpdates,
+      main_rule_execution_mode: request.mainRuleExecutionMode,
       rule_quality_lookback_days: request.ruleQualityLookbackDays,
       neutral_outcome: request.neutralOutcome,
     }).pipe(
-      map(response => ({
-        autoPromoteActiveRuleUpdates: response.auto_promote_active_rule_updates,
-        defaultAutoPromoteActiveRuleUpdates: response.default_auto_promote_active_rule_updates,
-        ruleQualityLookbackDays: response.rule_quality_lookback_days,
-        defaultRuleQualityLookbackDays: response.default_rule_quality_lookback_days,
-        neutralOutcome: response.neutral_outcome,
-        defaultNeutralOutcome: response.default_neutral_outcome,
-        invalidAllowlistRules: response.invalid_allowlist_rules.map(rule => this.mapInvalidAllowlistRule(rule))
-      }))
+      map(response => this.mapRuntimeSettings(response))
     );
   }
 
@@ -212,6 +202,20 @@ export class RuntimeSettingsService {
       rid: rule.rid,
       description: rule.description,
       error: rule.error,
+    };
+  }
+
+  private mapRuntimeSettings(response: RuntimeSettingsV2): RuntimeSettings {
+    return {
+      autoPromoteActiveRuleUpdates: response.auto_promote_active_rule_updates,
+      defaultAutoPromoteActiveRuleUpdates: response.default_auto_promote_active_rule_updates,
+      mainRuleExecutionMode: response.main_rule_execution_mode,
+      defaultMainRuleExecutionMode: response.default_main_rule_execution_mode,
+      ruleQualityLookbackDays: response.rule_quality_lookback_days,
+      defaultRuleQualityLookbackDays: response.default_rule_quality_lookback_days,
+      neutralOutcome: response.neutral_outcome,
+      defaultNeutralOutcome: response.default_neutral_outcome,
+      invalidAllowlistRules: response.invalid_allowlist_rules.map((rule) => this.mapInvalidAllowlistRule(rule)),
     };
   }
 }

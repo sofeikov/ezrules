@@ -62,6 +62,7 @@ def rules_test_client(session):
     PermissionManager.grant_permission(rule_role.id, PermissionAction.VIEW_RULES)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.CREATE_RULE)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.MODIFY_RULE)
+    PermissionManager.grant_permission(rule_role.id, PermissionAction.REORDER_RULES)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.PAUSE_RULES)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.PROMOTE_RULES)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.DELETE_RULE)
@@ -129,6 +130,206 @@ class TestListRules:
         data = response.json()
         assert "rules" in data
         assert isinstance(data["rules"], list)
+
+
+class TestMainRuleOrdering:
+    def test_update_main_rule_order_swaps_execution_order_and_records_history(self, rules_test_client, session):
+        token = rules_test_client.test_data["token"]
+        org = rules_test_client.test_data["org"]
+
+        first_rule = RuleModel(
+            rid="reorder_rule_001",
+            logic="return 'A'",
+            description="First",
+            execution_order=1,
+            evaluation_lane="main",
+            o_id=org.o_id,
+        )
+        second_rule = RuleModel(
+            rid="reorder_rule_002",
+            logic="return 'B'",
+            description="Second",
+            execution_order=2,
+            evaluation_lane="main",
+            o_id=org.o_id,
+        )
+        session.add_all([first_rule, second_rule])
+        session.commit()
+
+        response = rules_test_client.put(
+            "/api/v2/rules/main-order",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"ordered_r_ids": [second_rule.r_id, first_rule.r_id]},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+
+        session.expire_all()
+        refreshed_first = session.get(RuleModel, first_rule.r_id)
+        refreshed_second = session.get(RuleModel, second_rule.r_id)
+        assert refreshed_first.execution_order == 2
+        assert refreshed_second.execution_order == 1
+
+        history_actions = (
+            session.query(RuleHistory)
+            .filter(RuleHistory.r_id.in_([first_rule.r_id, second_rule.r_id]))
+            .order_by(RuleHistory.r_id.asc(), RuleHistory.version.asc())
+            .all()
+        )
+        assert [entry.action for entry in history_actions] == ["reordered", "reordered"]
+
+    def test_update_main_rule_order_excludes_archived_rules(self, rules_test_client, session):
+        token = rules_test_client.test_data["token"]
+        org = rules_test_client.test_data["org"]
+
+        first_rule = RuleModel(
+            rid="reorder_active_rule_001",
+            logic="return 'A'",
+            description="First active",
+            execution_order=1,
+            evaluation_lane="main",
+            status=RuleStatus.ACTIVE,
+            o_id=org.o_id,
+        )
+        archived_rule = RuleModel(
+            rid="reorder_archived_rule",
+            logic="return 'ARCHIVED'",
+            description="Archived rule",
+            execution_order=2,
+            evaluation_lane="main",
+            status=RuleStatus.ARCHIVED,
+            o_id=org.o_id,
+        )
+        second_rule = RuleModel(
+            rid="reorder_active_rule_002",
+            logic="return 'B'",
+            description="Second active",
+            execution_order=3,
+            evaluation_lane="main",
+            status=RuleStatus.ACTIVE,
+            o_id=org.o_id,
+        )
+        session.add_all([first_rule, archived_rule, second_rule])
+        session.commit()
+
+        response = rules_test_client.put(
+            "/api/v2/rules/main-order",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"ordered_r_ids": [second_rule.r_id, first_rule.r_id]},
+        )
+
+        assert response.status_code == 200
+        session.expire_all()
+        assert session.get(RuleModel, second_rule.r_id).execution_order == 1
+        assert session.get(RuleModel, first_rule.r_id).execution_order == 2
+        assert session.get(RuleModel, archived_rule.r_id).execution_order == 2
+
+    def test_update_main_rule_order_requires_reorder_permission(self, session):
+        hashed_password = bcrypt.hashpw("reorderpass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        org = session.query(Organisation).filter(Organisation.o_id == 1).first()
+        if not org:
+            org = Organisation(o_id=1, name="Test Org")
+            session.add(org)
+            session.commit()
+
+        role = Role(name="rule_modify_only", description="Can modify rules without reordering")
+        session.add(role)
+        session.commit()
+
+        user = User(
+            email="reorder-denied@example.com",
+            password=hashed_password,
+            active=True,
+            fs_uniquifier="reorder-denied@example.com",
+            o_id=1,
+        )
+        user.roles.append(role)
+        session.add(user)
+        session.commit()
+
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+        PermissionManager.grant_permission(role.id, PermissionAction.VIEW_RULES)
+        PermissionManager.grant_permission(role.id, PermissionAction.MODIFY_RULE)
+
+        rule = RuleModel(
+            rid="reorder_denied_rule",
+            logic="return 'A'",
+            description="Denied",
+            execution_order=1,
+            evaluation_lane="main",
+            o_id=1,
+        )
+        session.add(rule)
+        session.commit()
+
+        token = create_access_token(
+            user_id=int(user.id),
+            email=str(user.email),
+            roles=[role.name],
+            org_id=int(user.o_id),
+        )
+
+        with TestClient(app) as client:
+            response = client.put(
+                "/api/v2/rules/main-order",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"ordered_r_ids": [rule.r_id]},
+            )
+
+        assert response.status_code == 403
+
+
+class TestAllowlistExecutionOrderValidation:
+    def test_create_allowlist_rule_rejects_execution_order(self, rules_test_client):
+        token = rules_test_client.test_data["token"]
+
+        response = rules_test_client.post(
+            "/api/v2/rules",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "rid": "allowlist_with_order",
+                "description": "Allowlist should reject explicit order",
+                "logic": 'if $country == "GB":\n\treturn "RELEASE"',
+                "evaluation_lane": "allowlist",
+                "execution_order": 1,
+            },
+        )
+
+        assert response.status_code == 201
+        payload = response.json()
+        assert payload["success"] is False
+        assert payload["error"] == "execution_order is supported only for main rules."
+
+    def test_update_allowlist_rule_rejects_execution_order(self, rules_test_client, session):
+        token = rules_test_client.test_data["token"]
+        org = rules_test_client.test_data["org"]
+        rule = RuleModel(
+            rid="allowlist_update_order",
+            logic='if $country == "GB":\n\treturn "RELEASE"',
+            description="Allowlist rule",
+            evaluation_lane="allowlist",
+            o_id=org.o_id,
+        )
+        session.add(rule)
+        session.commit()
+
+        response = rules_test_client.put(
+            f"/api/v2/rules/{rule.r_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "description": "Updated allowlist rule",
+                "logic": 'if $country == "GB":\n\treturn "RELEASE"',
+                "evaluation_lane": "allowlist",
+                "execution_order": 2,
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["success"] is False
+        assert payload["error"] == "execution_order is supported only for main rules."
 
     def test_list_rules_with_rules(self, rules_test_client, sample_rule):
         """Should return list of rules."""
