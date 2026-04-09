@@ -28,7 +28,6 @@ For permission checking, use require_permission():
         return {"rules": [...]}
 """
 
-import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -37,11 +36,12 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import joinedload, sessionmaker
 
+from ezrules.backend.api_key_cache import load_api_key_auth_metadata
 from ezrules.backend.api_v2.auth.jwt import decode_token
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.user_lists import PersistentUserListManager
-from ezrules.models.backend_core import Action, ApiKey, RoleActions, User
+from ezrules.models.backend_core import Action, RoleActions, User
 from ezrules.models.database import db_session, engine
 from ezrules.settings import app_settings
 
@@ -119,11 +119,10 @@ def get_evaluator_request_state(request: Request) -> EvaluatorRequestState:
 
 def get_org_id_for_api_key(api_key: str, db: Any) -> int | None:
     """Resolve an org ID from an API key, if the key is valid."""
-    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-    db_key = db.query(ApiKey).filter(ApiKey.key_hash == key_hash, ApiKey.revoked_at.is_(None)).first()
-    if db_key is None:
+    metadata = load_api_key_auth_metadata(db, api_key)
+    if metadata is None:
         return None
-    return int(db_key.o_id)
+    return metadata.org_id
 
 
 def get_user_for_access_token(
