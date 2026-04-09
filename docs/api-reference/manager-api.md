@@ -79,6 +79,7 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 | `GET` | `/api/v2/rules/{rule_id}` | Bearer + permission | Rule details |
 | `GET` | `/api/v2/rules/{rule_id}/revisions/{revision_number}` | Bearer + permission | Specific historical revision |
 | `PUT` | `/api/v2/rules/{rule_id}` | Bearer + permission | Update rule |
+| `PUT` | `/api/v2/rules/main-order` | Bearer + `REORDER_RULES` | Replace the full ordered main-rule sequence |
 | `DELETE` | `/api/v2/rules/{rule_id}` | Bearer + `DELETE_RULE` | Delete rule |
 | `POST` | `/api/v2/rules/{rule_id}/promote` | Bearer + `PROMOTE_RULES` | Promote draft rule to active |
 | `POST` | `/api/v2/rules/{rule_id}/pause` | Bearer + `PAUSE_RULES` | Pause active rule |
@@ -108,7 +109,7 @@ Rule lifecycle fields on rule responses:
 - Editing a paused rule keeps it paused; it does not silently reactivate.
 - If runtime setting `auto_promote_active_rule_updates` is enabled for the caller's org, editing an already active rule keeps it active and updates production immediately, but the caller still needs `PROMOTE_RULES`.
 - `POST /api/v2/rules/{id}/rollback` restores the selected historical revision's logic and description into a brand new draft version, preserving the full revision chain.
-- Rule audit entries (`GET /api/v2/audit/rules*`) now include `action` (`updated`, `promoted`, `paused`, `resumed`, `deactivated`, `rolled_back`, `deleted`) and `to_status` to show lifecycle transitions such as `draft -> active` or `active -> paused`.
+- Rule audit entries (`GET /api/v2/audit/rules*`) now include `action` (`updated`, `reordered`, `promoted`, `paused`, `resumed`, `deactivated`, `rolled_back`, `deleted`), `execution_order`, and `to_status` to show lifecycle transitions such as `draft -> active` or `active -> paused`.
 - Deleting a rule preserves its history so `GET /api/v2/audit/rules/{rule_id}` remains available after deletion.
 - Rules with an active shadow deployment or rollout cannot be edited, paused, archived, deleted, directly promoted, resumed, or rolled back until the candidate deployment is removed or promoted.
 - Allowlist rules are first-class production rules. They cannot be deployed to shadow or rollout.

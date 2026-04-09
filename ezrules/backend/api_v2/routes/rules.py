@@ -22,11 +22,13 @@ from ezrules.backend.api_v2.auth.dependencies import (
 )
 from ezrules.backend.api_v2.schemas.rollouts import RolloutDeployRequest, RolloutDeployResponse
 from ezrules.backend.api_v2.schemas.rules import (
+    MainRuleOrderUpdateRequest,
     RuleCreate,
     RuleHistoryEntry,
     RuleHistoryResponse,
     RuleListItem,
     RuleMutationResponse,
+    RuleReorderResponse,
     RuleResponse,
     RuleRevisionSummary,
     RuleRollbackRequest,
@@ -247,6 +249,19 @@ def _next_execution_order(db: Any, org_id: int, lane: str) -> int:
     return int(max_order[0]) + 1 if max_order and max_order[0] is not None else 1
 
 
+def _list_main_rules_in_execution_order(db: Any, org_id: int) -> list[RuleModel]:
+    return (
+        db.query(RuleModel)
+        .filter(
+            RuleModel.o_id == org_id,
+            RuleModel.evaluation_lane == RULE_EVALUATION_LANE_MAIN,
+            RuleModel.status != RuleStatus.ARCHIVED,
+        )
+        .order_by(RuleModel.execution_order.asc(), RuleModel.r_id.asc())
+        .all()
+    )
+
+
 def validate_allowlist_rule(rule: Rule, allowlist_outcome: str) -> str | None:
     visitor = AllowedOutcomeReturnVisitor()
     visitor.visit(rule._rule_ast)
@@ -261,6 +276,71 @@ def validate_allowlist_rule(rule: Rule, allowlist_outcome: str) -> str | None:
             f"Found {rendered_values}."
         )
     return None
+
+
+def validate_execution_order_for_lane(evaluation_lane: str, execution_order: int | None) -> str | None:
+    if evaluation_lane == RULE_EVALUATION_LANE_ALLOWLIST and execution_order is not None:
+        return "execution_order is supported only for main rules."
+    return None
+
+
+@router.put("/main-order", response_model=RuleReorderResponse)
+def update_main_rule_order(
+    request_data: MainRuleOrderUpdateRequest,
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.REORDER_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> RuleReorderResponse:
+    """Replace the full ordered main-rule sequence for the current organization."""
+    main_rules = _list_main_rules_in_execution_order(db, current_org_id)
+    current_ids = [int(rule.r_id) for rule in main_rules]
+    requested_ids = [int(rule_id) for rule_id in request_data.ordered_r_ids]
+
+    if len(requested_ids) != len(set(requested_ids)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Main rule order contains duplicate IDs")
+
+    if requested_ids != current_ids and sorted(requested_ids) != sorted(current_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Main rule order update must include every existing main rule exactly once",
+        )
+
+    by_id = {int(rule.r_id): rule for rule in main_rules}
+    changed_rules = [
+        by_id[rule_id]
+        for execution_order, rule_id in enumerate(requested_ids, start=1)
+        if int(by_id[rule_id].execution_order) != execution_order
+    ]
+
+    if not changed_rules:
+        return RuleReorderResponse(
+            success=True,
+            message="Main rule order unchanged.",
+        )
+
+    for rule in changed_rules:
+        save_rule_history(
+            db,
+            rule,
+            changed_by=str(user.email),
+            action="reordered",
+        )
+
+    for execution_order, rule_id in enumerate(requested_ids, start=1):
+        rule = by_id[rule_id]
+        rule.execution_order = execution_order
+        if rule in changed_rules:
+            rule.version += 1
+
+    get_config_producer(db, current_org_id).save_config(
+        get_rule_manager(db, current_org_id), changed_by=str(user.email)
+    )
+
+    return RuleReorderResponse(
+        success=True,
+        message="Main rule order updated.",
+    )
 
 
 # =============================================================================
@@ -529,6 +609,13 @@ def create_rule(
     a 400 error is returned with details about what's wrong.
     """
     evaluation_lane = normalize_evaluation_lane(rule_data.evaluation_lane)
+    execution_order_error = validate_execution_order_for_lane(evaluation_lane, rule_data.execution_order)
+    if execution_order_error is not None:
+        return RuleMutationResponse(
+            success=False,
+            message="Rule validation failed",
+            error=execution_order_error,
+        )
     allowlist_outcome = get_neutral_outcome(db, current_org_id)
 
     # Validate the rule logic by trying to compile it
@@ -634,6 +721,13 @@ def update_rule(
         if rule_data.evaluation_lane is not None
         else str(getattr(rule, "evaluation_lane", RULE_EVALUATION_LANE_MAIN) or RULE_EVALUATION_LANE_MAIN)
     )
+    execution_order_error = validate_execution_order_for_lane(new_evaluation_lane, rule_data.execution_order)
+    if execution_order_error is not None:
+        return RuleMutationResponse(
+            success=False,
+            message="Rule validation failed",
+            error=execution_order_error,
+        )
     if rule_data.execution_order is not None:
         new_execution_order = int(rule_data.execution_order)
     elif new_evaluation_lane != str(

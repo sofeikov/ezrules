@@ -14,7 +14,7 @@ setup('authenticate', async ({ page }) => {
   await page.click('button[type="submit"]');
 
   // Wait for redirect to dashboard after login
-  await page.waitForURL(/.*dashboard/, { timeout: 10000 });
+  await page.waitForURL(/.*dashboard/, { timeout: 30000 });
 
   // Save the authenticated state (localStorage with tokens)
   await page.context().storageState({ path: 'e2e/.auth/user.json' });

@@ -67,6 +67,15 @@ class RuleRollbackRequest(BaseModel):
     revision_number: int = Field(..., ge=1, description="Historical revision number to restore")
 
 
+class MainRuleOrderUpdateRequest(BaseModel):
+    """Replace the full ordered main-rule sequence."""
+
+    ordered_r_ids: list[int] = Field(
+        default_factory=list,
+        description="Main rule IDs ordered from earliest to latest execution",
+    )
+
+
 # =============================================================================
 # RESPONSE SCHEMAS
 # =============================================================================
@@ -188,3 +197,10 @@ class RuleMutationResponse(BaseModel):
     message: str
     rule: RuleResponse | None = None
     error: str | None = None
+
+
+class RuleReorderResponse(BaseModel):
+    """Response for main-rule reorder operations."""
+
+    success: bool
+    message: str

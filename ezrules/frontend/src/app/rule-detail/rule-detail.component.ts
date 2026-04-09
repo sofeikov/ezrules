@@ -67,7 +67,6 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   isEditMode: boolean = false;
   editedDescription: string = '';
   editedLogic: string = '';
-  editedExecutionOrder: number = 1;
   editedEvaluationLane: RuleEvaluationLane = 'main';
   saving: boolean = false;
   saveError: string | null = null;
@@ -190,9 +189,6 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     this.ruleService.getRule(ruleId).subscribe({
       next: (rule) => {
         this.rule = rule;
-        if (this.isEditMode) {
-          this.editedExecutionOrder = rule.execution_order;
-        }
         this.backtestResults = [];
         this.loading = false;
         this.fillInExampleParams();
@@ -395,7 +391,6 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
       // Entering edit mode - copy current values
       this.editedDescription = this.rule.description;
       this.editedLogic = this.rule.logic;
-      this.editedExecutionOrder = this.rule.execution_order;
       this.editedEvaluationLane = this.rule.evaluation_lane;
       this.rolloutTrafficPercent = this.rolloutEntry?.traffic_percent ?? 10;
       this.saveError = null;
@@ -416,7 +411,6 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     if (this.rule) {
       this.editedDescription = this.rule.description;
       this.editedLogic = this.rule.logic;
-      this.editedExecutionOrder = this.rule.execution_order;
       this.editedEvaluationLane = this.rule.evaluation_lane;
       this.rolloutTrafficPercent = this.rolloutEntry?.traffic_percent ?? 10;
       this.fillInExampleParams();
@@ -435,7 +429,6 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     const updateData: UpdateRuleRequest = {
       description: this.editedDescription,
       logic: this.editedLogic,
-      execution_order: this.editedEvaluationLane === 'main' ? this.editedExecutionOrder : undefined,
       evaluation_lane: this.editedEvaluationLane,
     };
 
@@ -963,4 +956,5 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     }
     return this.mainLaneDescription;
   }
+
 }

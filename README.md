@@ -297,7 +297,7 @@ Use the **Rule Quality** page to evaluate underperforming rules from labeled eve
   - `GET /api/v2/analytics/rule-quality/reports/{report_id}` (poll status/result)
 
 Default lookback for Rule Quality can be configured in **Settings → General** and is stored as a runtime setting.
-**Settings → General** also includes org-scoped controls for auto-promoting edits to already active rules and for switching the main rule lane between `all_matches` and `first_match` evaluation. When active-rule auto-promotion is enabled, users still need `promote_rules` in addition to `modify_rule` to keep a saved edit live immediately.
+**Settings → General** also includes org-scoped controls for auto-promoting edits to already active rules and for switching the main rule lane between `all_matches` and `first_match` evaluation. When first-match mode is enabled, the Rules page exposes button-based main-rule reordering and a dedicated `reorder_rules` permission controls who can save that sequence. When active-rule auto-promotion is enabled, users still need `promote_rules` in addition to `modify_rule` to keep a saved edit live immediately.
 Curated rule-quality pairs are also managed in **Settings → General** and drive which pairs appear in reports.
 `uv run ezrules reset-dev` seeds the demo label/outcome catalogs, activates a curated pair set (`RELEASE -> CHARGEBACK`, `HOLD -> CHARGEBACK`, `CANCEL -> FRAUD`), and writes a root-level `test_labels.csv` from the generated labeled events.
 

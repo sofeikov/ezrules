@@ -112,6 +112,15 @@ export interface CreateRuleResponse {
   rule?: RuleDetail;
 }
 
+export interface MainRuleOrderUpdateRequest {
+  ordered_r_ids: number[];
+}
+
+export interface RuleReorderResponse {
+  success: boolean;
+  message: string;
+}
+
 export interface ShadowDeployResponse {
   success: boolean;
   message: string;
@@ -268,6 +277,10 @@ export class RuleService {
 
   createRule(data: CreateRuleRequest): Observable<CreateRuleResponse> {
     return this.http.post<CreateRuleResponse>(this.apiUrl, data);
+  }
+
+  updateMainRuleOrder(data: MainRuleOrderUpdateRequest): Observable<RuleReorderResponse> {
+    return this.http.put<RuleReorderResponse>(`${this.apiUrl}/main-order`, data);
   }
 
   deployToShadow(ruleId: number, logic: string, description: string): Observable<ShadowDeployResponse> {
