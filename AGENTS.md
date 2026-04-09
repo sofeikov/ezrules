@@ -86,13 +86,14 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 13. If a task changes shipped code, API behavior, or user-visible behavior, bump the project version as part of the same change. Choose a **patch** bump by default. Choose a **minor** bump when the change introduces a new feature, new user-visible workflow, or new API surface that should read as a feature release.
 14. The version bump must happen **before** editing `docs/whatsnew.md`. Treat `pyproject.toml` as the canonical project version source unless the repo introduces a deeper override later. After bumping the version, create or update the matching topmost version section in `docs/whatsnew.md` and place the current change notes there. Never add new work under an already released older version section, and never update `docs/whatsnew.md` before the version bump is in place.
 15. When tests are approved, run ALL tests, not selective subsets.
-16. When the user requests the full test suite, also validate the demo Docker path by testing `docker compose -f docker-compose.demo.yml up --build` and confirming the demo stack starts successfully; tear it down afterward.
-17. When tests require starting local services manually, run the API/backend and Angular frontend on random available high ports instead of standard ports like `8888` and `4200` to reduce the chance of blocking commonly used defaults.
-18. When running the full test suite locally, always use private database names for this worktree/agent instead of shared names like `tests` or `ezrules`. This applies to backend pytest, CLI test helpers, reset-dev, and any Playwright/dev-stack runs.
-19. Prefer the existing private E2E naming convention, for example `tests_e2e_<suffix>` and `ezrules_e2e_<suffix>`.
-20. After tests are done, kill any API/backend and Angular dev servers you started manually, regardless of which ports were used.
-21. After all tests pass, reset the dev environment using the same private dev DB you used for the run, not the shared `ezrules` DB.
-22. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
+16. For any change to shipped code, run the full local test suite even when the change appears backend-only. Treat the full suite as backend pytest, CLI helper coverage, frontend automated tests present in the repo, and any required supporting verification steps documented here.
+17. When the user requests the full test suite, also validate the demo Docker path by testing `docker compose -f docker-compose.demo.yml up --build` and confirming the demo stack starts successfully; tear it down afterward.
+18. When tests require starting local services manually, run the API/backend and Angular frontend on random available high ports instead of standard ports like `8888` and `4200` to reduce the chance of blocking commonly used defaults.
+19. When running the full test suite locally, always use private database names for this worktree/agent instead of shared names like `tests` or `ezrules`. This applies to backend pytest, CLI test helpers, reset-dev, and any Playwright/dev-stack runs.
+20. Prefer the existing private E2E naming convention, for example `tests_e2e_<suffix>` and `ezrules_e2e_<suffix>`.
+21. After tests are done, kill any API/backend and Angular dev servers you started manually, regardless of which ports were used.
+22. After all tests pass, reset the dev environment using the same private dev DB you used for the run, not the shared `ezrules` DB.
+23. Make sure that the new code does not affect the github action configurations. If it does, make sure the changes are reflectd in the testing infra in github actions
 
 # Writing New Documentation
 1. Canonical documentation map: [DOCUMENTATION_MAP.md](DOCUMENTATION_MAP.md)

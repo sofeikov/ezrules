@@ -399,6 +399,8 @@ def update_user(
     # Update password if provided
     if user_data.password is not None:
         target_user.password = hash_password(user_data.password)
+        # Match self-service reset behavior: a password rotation revokes all refresh sessions.
+        db.query(UserSession).filter(UserSession.user_id == int(target_user.id)).delete(synchronize_session=False)
         changes.append("password changed")
 
     # Update active status if provided
