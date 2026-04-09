@@ -63,6 +63,7 @@ class TestRoleType:
         expected = [
             PermissionAction.CREATE_RULE,
             PermissionAction.MODIFY_RULE,
+            PermissionAction.REORDER_RULES,
             PermissionAction.VIEW_RULES,
             PermissionAction.VIEW_OUTCOMES,
             PermissionAction.VIEW_LISTS,
