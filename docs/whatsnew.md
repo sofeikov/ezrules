@@ -1,5 +1,11 @@
 # What's New
 
+## v1.8.0
+
+* **Paused rule lifecycle state**: Rules can now be moved from `active` to `paused` without archiving or editing their logic, which removes them from live production evaluation while preserving the rule row, history, and later resume path.
+* **Resume workflow and audit trail**: Added explicit resume behavior for paused rules, with lifecycle audit entries now recording `active -> paused` and `paused -> active` transitions.
+* **Dedicated pause permission**: Pausing active rules now requires a new `pause_rules` permission, separate from both generic rule editing and live promotion.
+
 ## v1.7.1
 
 * **Async shadow evaluation**: Live `/api/v2/evaluate` calls now enqueue shadow comparisons after the canonical event write and let a periodic Celery drain persist shadow results later, so shadow-enabled traffic no longer waits for best-effort shadow rule execution before the production response returns.

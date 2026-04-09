@@ -9,7 +9,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Rule Engine**: Flexible Python-based rule execution with custom logic support
 - **Management Interface**: Modern web UI for creating and managing rules
 - **Rule Authoring UX**: CodeMirror-powered rule editor with Python-aware highlighting, inline validation diagnostics, autocomplete for observed `$fields` and `@userLists`, and detected-reference chips while you write
-- **Enterprise Security**: Granular role-based access control with 33 permission types; API key authentication for service-to-service integration
+- **Enterprise Security**: Granular role-based access control with 34 permission types; API key authentication for service-to-service integration
 - **Org-Aware Admin APIs**: Manager access tokens now carry organisation context, and manager APIs resolve rules, users, roles, labels, settings, analytics, tested events, backtesting history, and audit reads against the authenticated user's org
 - **Transaction Labeling**: Comprehensive fraud analytics with API and bulk CSV upload capabilities
 - **Analytics Dashboard**: Real-time transaction volume charts, outcome trends, and ranked most/least firing active rules with configurable time ranges (1h, 6h, 12h, 24h, 30d)
@@ -22,7 +22,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Tested Events View**: Inspect the latest stored transactions, their uploaded labels, final resolved outcomes, the raw event payload, every rule that fired for each event, see referenced payload fields highlighted inline inside the JSON with hover-based rule focus, jump straight from a trigger to the rule detail page, and refresh the list without reloading the whole app
 - **Shadow Deployment**: Deploy rules to a shadow environment that observes live traffic without affecting production outcomes; live shadow comparisons now run asynchronously off the request path, and validated shadows can still be promoted to production in one step
 - **Rule Rollouts**: Shift a candidate rule onto a stable percentage of live traffic with deterministic bucketing, compare candidate vs control on the same events, and promote when the rollout looks good
-- **Rule Lifecycle Controls**: Rules now support `draft`, `active`, and `archived` states with explicit promotion and approver tracking (`effective_from`, `approved_by`, `approved_at`), plus an org-level setting to auto-promote edits made to already active rules
+- **Rule Lifecycle Controls**: Rules now support `draft`, `active`, `paused`, and `archived` states with explicit promotion and approver tracking (`effective_from`, `approved_by`, `approved_at`), a pause/resume workflow for temporarily disabling live evaluation without archiving, and an org-level setting to auto-promote edits made to already active rules
 - **Permission-Aware UI**: Navigation, route access, and mutating controls are filtered against the current user's effective permissions; direct links now land on an explicit access-denied page, and view-only users see read-only states instead of clickable controls that fail with `403`
 - **Revision Rollback**: Restore logic and description from a historical rule revision into a new draft version directly from the history timeline, without deleting any audit history
 - **Backtesting**: Test rule changes against historical data before deployment, with outcome counts plus label-aware precision/recall/F1 when labeled history exists; backtests use a common eligible subset when proposed logic references newly introduced fields, persist result payloads and queue status in history, and support cancel/retry controls for queued or failed jobs
@@ -181,12 +181,13 @@ The management UI consumes the authenticated user's effective permissions from `
 
 ### Permission Types
 
-The system supports 32 granular permission types:
+The system supports 34 granular permission types:
 
 **Rule Management:**
 - `create_rule` - Create new business rules
 - `modify_rule` - Edit existing rules
-- `promote_rules` - Promote draft, shadow, rollout, and auto-promoted active-rule edits to production
+- `pause_rules` - Pause active rules without archiving them
+- `promote_rules` - Promote draft, paused, shadow, rollout, and auto-promoted active-rule edits to production
 - `delete_rule` - Delete rules
 - `view_rules` - View rules and rule history
 
@@ -230,7 +231,7 @@ The system supports 32 granular permission types:
 Three pre-configured roles are created per organisation:
 
 - **Admin**: Full system access with all permissions
-- **Rule Editor**: Can create and modify rules, deploy drafts to shadow, and view outcomes and lists; promotion remains a separate permission
+- **Rule Editor**: Can create and modify rules, deploy drafts to shadow, and view outcomes and lists; pause and promotion remain separate permissions
 - **Read-only**: View-only access to rules, outcomes, and lists
 
 ### Role Assignment

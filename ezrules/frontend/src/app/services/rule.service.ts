@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
-export type RuleStatus = 'draft' | 'active' | 'archived';
+export type RuleStatus = 'draft' | 'active' | 'paused' | 'archived';
 export type RuleEvaluationLane = 'main' | 'allowlist';
 
 export interface Rule {
@@ -301,6 +301,14 @@ export class RuleService {
 
   promoteRule(ruleId: number): Observable<UpdateRuleResponse> {
     return this.http.post<UpdateRuleResponse>(`${this.apiUrl}/${ruleId}/promote`, {});
+  }
+
+  pauseRule(ruleId: number): Observable<UpdateRuleResponse> {
+    return this.http.post<UpdateRuleResponse>(`${this.apiUrl}/${ruleId}/pause`, {});
+  }
+
+  resumeRule(ruleId: number): Observable<UpdateRuleResponse> {
+    return this.http.post<UpdateRuleResponse>(`${this.apiUrl}/${ruleId}/resume`, {});
   }
 
   archiveRule(ruleId: number): Observable<UpdateRuleResponse> {

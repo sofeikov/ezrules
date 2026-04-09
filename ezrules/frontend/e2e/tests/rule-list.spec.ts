@@ -123,6 +123,92 @@ test.describe('Rule List Page', () => {
         await expect(editLink).toBeVisible();
       }
     });
+
+    test('should pause an active rule and refresh its status badge', async ({ page }) => {
+      let paused = false;
+
+      await page.addInitScript(() => {
+        window.localStorage.setItem('ezrules_access_token', 'test-token');
+      });
+
+      await page.route('**/api/v2/auth/me', async route => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: 1,
+            email: 'manager@example.com',
+            active: true,
+            roles: [{ id: 1, name: 'manager', description: 'Rule manager' }],
+            permissions: ['view_rules', 'modify_rule', 'pause_rules', 'promote_rules'],
+            last_login_at: null,
+          }),
+        });
+      });
+
+      await page.route('**/api/v2/rules/42/pause', async route => {
+        paused = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            message: 'Rule paused',
+            rule: {
+              r_id: 42,
+              rid: 'pause_me',
+              description: 'Pauseable rule',
+              logic: 'event.amount > 100',
+              evaluation_lane: 'main',
+              status: 'paused',
+              effective_from: null,
+              approved_by: null,
+              approved_at: null,
+              created_at: null,
+              revisions: [],
+            },
+          }),
+        });
+      });
+
+      await page.route('**/api/v2/rules', async route => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            rules: [
+              {
+                r_id: 42,
+                rid: 'pause_me',
+                description: 'Pauseable rule',
+                logic: 'event.amount > 100',
+                evaluation_lane: 'main',
+                status: paused ? 'paused' : 'active',
+                effective_from: null,
+                approved_by: null,
+                approved_at: null,
+                created_at: null,
+                in_shadow: false,
+                in_rollout: false,
+                rollout_percent: null,
+              },
+            ],
+            evaluator_endpoint: `${API_BASE}/api/v2/evaluate`,
+          }),
+        });
+      });
+
+      page.once('dialog', async dialog => {
+        await dialog.accept();
+      });
+
+      await rulePage.goto();
+      await rulePage.waitForRulesToLoad();
+      await page.getByRole('button', { name: 'Pause' }).click();
+
+      await expect(page.locator('tbody tr').first()).toContainText('PAUSED');
+      await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
+    });
   });
 
   test.describe('How to Run Section', () => {

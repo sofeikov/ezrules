@@ -1,11 +1,11 @@
-# Rule Lifecycle Management in ezrules: Draft, Promote, Roll Back, Archive with Audit Trail
+# Rule Lifecycle Management in ezrules: Draft, Promote, Pause, Roll Back, Archive with Audit Trail
 
 Rule engines usually fail at one of two extremes:
 
 - Every edit is live immediately, which is fast but risky.
 - Every edit requires an external process, which is safe but slow.
 
-ezrules now supports an explicit lifecycle so teams can move fast without losing control: `draft` -> `active` -> `archived`, with promotion approvals captured in the audit trail and rollback available when a historical revision needs to be restored as a new draft.
+ezrules now supports an explicit lifecycle so teams can move fast without losing control: `draft` -> `active` -> `paused` -> `active` or `archived`, with promotion approvals captured in the audit trail and rollback available when a historical revision needs to be restored as a new draft.
 
 ## Why lifecycle controls matter
 
@@ -15,6 +15,7 @@ The useful middle ground is to separate:
 
 - rule authoring (`draft`)
 - rule deployment (`active`)
+- temporary operational disablement (`paused`)
 - retirement (`archived`)
 
 This gives you cleaner change control and a clear operational state for every rule.
@@ -23,7 +24,7 @@ This gives you cleaner change control and a clear operational state for every ru
 
 Each rule now includes lifecycle metadata:
 
-- `status`: `draft`, `active`, or `archived`
+- `status`: `draft`, `active`, `paused`, or `archived`
 - `effective_from`: when the active version became effective
 - `approved_by`: user id who approved promotion
 - `approved_at`: when promotion was approved
@@ -38,6 +39,8 @@ The lifecycle is enforced by API behavior:
 - `PUT /api/v2/rules/{id}` saves edits as `draft` and clears previous approval metadata by default
 - `POST /api/v2/rules/{id}/rollback` restores a historical revision's logic and description into a brand new `draft`
 - `POST /api/v2/rules/{id}/promote` moves `draft` to `active` and records approver + approval timestamp
+- `POST /api/v2/rules/{id}/pause` moves `active` to `paused` without archiving the rule and requires a dedicated pause permission
+- `POST /api/v2/rules/{id}/resume` moves `paused` back to `active`
 - `POST /api/v2/rules/{id}/archive` moves a rule to `archived`
 - `DELETE /api/v2/rules/{id}` deletes the rule (requires `DELETE_RULE`)
 
@@ -52,11 +55,16 @@ flowchart LR
     C --> B
     B --> D[Promote]
     D --> E[active]
-    E --> F[Edit or detect issue]
-    F --> G[Rollback to prior revision]
-    G --> B
-    E --> H[Archive]
-    H --> I[archived]
+    E --> F[Pause]
+    F --> G[paused]
+    G --> H[Resume]
+    H --> E
+    E --> I[Edit or detect issue]
+    I --> J[Rollback to prior revision]
+    J --> B
+    E --> K[Archive]
+    G --> K
+    K --> L[archived]
 ```
 
 ## Promotion is a first-class approval step
@@ -68,6 +76,16 @@ Promotion is no longer an implicit side effect of editing. It is an explicit ope
 - when it became effective
 
 That gives you a defensible trail for internal governance and external audits, while keeping authoring fast for rule editors.
+
+## Pause is not archive
+
+Pausing is useful when a rule should stop affecting live outcomes right now, but you expect to reuse it.
+
+- `paused` rules are excluded from production config
+- the rule can be resumed later without recreating it
+- teams can distinguish "temporarily off" from "retired"
+
+Use pause when you want a reversible operational stop. Use archive when the rule is retired.
 
 ## Archive is not delete
 
@@ -103,6 +121,14 @@ curl -X POST http://localhost:8888/api/v2/rules/42/rollback \
 curl -X POST http://localhost:8888/api/v2/rules/42/promote \
   -H "Authorization: Bearer <access_token>"
 
+# Pause rule 42
+curl -X POST http://localhost:8888/api/v2/rules/42/pause \
+  -H "Authorization: Bearer <access_token>"
+
+# Resume rule 42
+curl -X POST http://localhost:8888/api/v2/rules/42/resume \
+  -H "Authorization: Bearer <access_token>"
+
 # Archive rule 42
 curl -X POST http://localhost:8888/api/v2/rules/42/archive \
   -H "Authorization: Bearer <access_token>"
@@ -112,7 +138,7 @@ curl -X POST http://localhost:8888/api/v2/rules/42/archive \
 
 Lifecycle and shadow solve different concerns:
 
-- Lifecycle controls whether a rule is draft, active, or archived in production management flow.
+- Lifecycle controls whether a rule is draft, active, paused, or archived in production management flow.
 - Shadow deployment validates candidate behavior on live traffic before promotion.
 
 A practical sequence is:

@@ -132,6 +132,13 @@ def test_rule_activity_returns_ranked_active_rules_including_zero_hits(session):
         o_id=1,
         status=RuleStatus.ARCHIVED,
     )
+    paused_rule = RuleModel(
+        rid="paused_rule",
+        logic="return 'HOLD'",
+        description="Paused rule",
+        o_id=1,
+        status=RuleStatus.PAUSED,
+    )
     other_org = Organisation(o_id=2, name="other_org")
     other_org_rule = RuleModel(
         rid="other_org_rule",
@@ -148,6 +155,7 @@ def test_rule_activity_returns_ranked_active_rules_including_zero_hits(session):
             delta_rule,
             draft_rule,
             archived_rule,
+            paused_rule,
             other_org,
             other_org_rule,
         ]
@@ -211,6 +219,7 @@ def test_rule_activity_returns_ranked_active_rules_including_zero_hits(session):
         item["rid"] for ranking in (payload["most_firing"], payload["least_firing"]) for item in ranking
     }
     assert "draft_rule" not in returned_rule_ids
+    assert "paused_rule" not in returned_rule_ids
     assert "archived_rule" not in returned_rule_ids
     assert "other_org_rule" not in returned_rule_ids
 
