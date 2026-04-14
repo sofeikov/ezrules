@@ -37,3 +37,17 @@ Use it as the canonical decision log until formal ADR files are introduced.
 - **Why**: isolates long-running reprocessing from request/response latency.
 - **Tradeoff**: introduces Redis/worker operational dependency and queue management.
 - **Related docs**: [Admin Guide](../user-guide/admin-guide.md), [Deployment Guide](deployment.md).
+
+## ADR-006: Document An ECS/Fargate Reference Topology
+
+- **Decision**: document an AWS ECS/Fargate reference topology with distinct `frontend`, `api`, `celery-worker`, `celery-beat`, and init/migration task responsibilities.
+- **Why**: this records one production-oriented deployment shape that matches the current unified FastAPI + Celery + PostgreSQL + Redis architecture without prescribing it as the only valid deployment model.
+- **Tradeoff**: the repository documents one concrete topology, but users may still choose other hosting approaches and must adapt the same runtime responsibilities there.
+- **Related docs**: [Deployment Guide](deployment.md), [Configuration](../getting-started/configuration.md).
+
+## ADR-007: Same-Origin Browser Access By Default
+
+- **Decision**: production frontend builds default to same-origin API requests, with optional explicit CORS configuration only for split-origin deployments.
+- **Why**: same-origin ALB routing removes the need for fragile localhost defaults and keeps browser auth flows simple in production.
+- **Tradeoff**: split-origin deployments must set both the frontend API URL and backend CORS configuration deliberately.
+- **Related docs**: [Deployment Guide](deployment.md), [Configuration](../getting-started/configuration.md).

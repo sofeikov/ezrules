@@ -1,5 +1,14 @@
 # What's New
 
+## v1.10.0
+
+* **Documented ECS/Fargate deployment example**: The deployment guide now documents one AWS-oriented topology for `frontend`, `api`, `celery-worker`, `celery-beat`, and the one-shot init/migration task, plus the required Postgres and Redis dependencies.
+* **Production frontend no longer falls back to localhost**: Angular production builds now default to same-origin API calls, while local single-host validation stacks opt into `http://localhost:8888` explicitly at image build time.
+* **Configurable production CORS**: Backend CORS is no longer hard-coded to localhost-only behavior; deployments can now keep the recommended same-origin ALB routing or explicitly allow named browser origins / regexes through environment configuration.
+* **Compose stacks now include Celery beat**: Demo, local production-validation, and development Docker stacks now ship the required scheduler process so async field-observation and shadow drains match the documented runtime topology.
+* **Legacy deployment manifests removed**: The obsolete `deployment/aws` and `deployment/k8s` manifests were deleted because they no longer reflect the current unified FastAPI + Celery + Postgres + Redis architecture.
+* **Frontend environment wiring normalized**: Angular now uses the standard `environment.ts` / `environment.production.ts` split with one canonical import path, and the VS Code FastAPI launch config explicitly allows `http://localhost:4200`, so local login requests reach `http://localhost:8888` while production still defaults to same-origin API calls.
+
 ## v1.9.0
 
 * **Ordered main-rule execution**: Main rules now carry an explicit `execution_order`, and organisations can switch main-lane evaluation between legacy `all_matches` behavior and a new `first_match` mode that persists only the earliest matching main rule.

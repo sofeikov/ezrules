@@ -1,206 +1,157 @@
-# Deployment Guide (Local Runbook)
+# Deployment Guide
 
-This runbook covers local deployment. Two local deployment modes are supported.
+This page describes the deployment topology that matches the current repository.
 
 For system boundaries and design rationale, use [Architecture Overview](overview.md).
 For environment variable details, use [Configuration](../getting-started/configuration.md).
 
 ---
 
-## Scope
+## ECS/Fargate Example
 
-In scope:
+This section documents one AWS ECS/Fargate deployment shape for ezrules. It is a reference topology, not a requirement for all deployments or self-hosted users.
 
-- single-host local setup, both deployment modes
-- API service startup and verification
-- backtesting worker readiness
+The application runtime is split across these services/tasks:
 
-Out of scope:
+| Runtime | Responsibility |
+|---|---|
+| `frontend` | Serves the Angular SPA |
+| `api` | Runs `uv run ezrules api --port 8888` for manager APIs and `/api/v2/evaluate` |
+| `celery-worker` | Runs `uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo` for backtesting jobs |
+| `celery-beat` | Runs `uv run celery -A ezrules.backend.tasks beat -l INFO` for field-observation and shadow drain schedules |
+| `init` / migration task | One-shot task that runs schema setup, Alembic migrations, and initial org bootstrap before services start |
 
-- production topology design
-- cloud platform-specific deployment automation
+Required backing services:
+
+| Dependency | Purpose |
+|---|---|
+| PostgreSQL | Source of truth for rules, auth, outcomes, audit history, and analytics data |
+| Redis | Celery broker plus the default queue backing store for async field-observation and shadow drains |
 
 ---
 
-## Deployment Modes
+## Public Routing
 
-### Mode 1 — Full Docker (demo or production)
+Use same-origin browser routing by default.
 
-Everything runs inside Docker. No local Python or Node required.
+Recommended ALB routing:
 
-| Container | What it does |
+| Path | Target |
 |---|---|
-| `postgres` | Database (`5432` not exposed to host by default) |
-| `redis` | Celery broker plus async observation/shadow queue backing store (`6379` not exposed to host by default) |
-| `init` | One-shot: creates DB schema, admin user, optional seed data |
-| `api` | FastAPI service on `localhost:8888` |
-| `worker` | Celery worker/beat process for backtesting and async queue drains |
-| `frontend` | nginx serving the Angular SPA on `localhost:4200` |
+| `/*` | `frontend` service |
+| `/api/*` | `api` service |
+| `/docs` | `api` service |
+| `/redoc` | `api` service |
+| `/openapi.json` | `api` service |
+| `/ping` | `api` service |
 
-**Demo** (pre-seeded with sample rules and events):
+Why this is the default:
+
+- the production frontend build now defaults to same-origin API requests
+- browser auth, cookies, and refresh flows stay on one public origin
+- no explicit CORS configuration is needed for the main UI path
+
+If you intentionally split frontend and API across different public origins:
+
+1. Build the frontend image with `EZRULES_FRONTEND_API_URL=https://api.example.com`.
+2. Set `EZRULES_CORS_ALLOWED_ORIGINS=https://app.example.com` on the API task.
+3. Use `EZRULES_CORS_ALLOW_ORIGIN_REGEX` only when a fixed allowlist is not practical.
+
+---
+
+## ECS Runtime Contract
+
+Minimum task/service contract:
+
+- `frontend` can be scaled independently from the API
+- `api` must have network access to PostgreSQL and Redis
+- `celery-worker` must share the same code image and runtime env as `api`, plus broker connectivity
+- `celery-beat` must share the same code image and runtime env as `api`, plus broker connectivity
+- `init` must run to completion before `api`, `celery-worker`, and `celery-beat` are treated as ready
+
+Minimum environment inputs:
+
+- `EZRULES_DB_ENDPOINT`
+- `EZRULES_APP_SECRET`
+- `EZRULES_CELERY_BROKER_URL`
+- `EZRULES_APP_BASE_URL`
+- optional SMTP settings if invite/reset emails should leave the environment
+- optional `EZRULES_CORS_ALLOWED_ORIGINS` / `EZRULES_CORS_ALLOW_ORIGIN_REGEX` only for split-origin deployments
+
+Recommended production rollout sequence:
+
+1. Run the `init` task against the target database.
+2. Deploy or update the `api` service.
+3. Deploy or update `celery-worker`.
+4. Deploy or update `celery-beat`.
+5. Deploy or update `frontend`.
+6. Verify `/ping`, login, a sample `/api/v2/evaluate` request, and one async queue-driven flow.
+
+---
+
+## Local Validation Modes
+
+The repository still ships local Docker setups for validation and development.
+
+### Demo stack
+
+Use `docker-compose.demo.yml` when you want a seeded environment:
 
 ```bash
 docker compose -f docker-compose.demo.yml up --build
 ```
 
-Re-running that command recreates the demo database from scratch so older persisted schemas do not break the stack.
+This starts:
 
-**Production** (empty database, credentials from `.env`):
+- PostgreSQL
+- Redis
+- `init`
+- `api`
+- `celery-worker`
+- `celery-beat`
+- `frontend`
+- Mailpit
+
+The database is recreated from scratch on each full rerun so old schemas do not poison the demo.
+
+### Production-validation stack
+
+Use `docker-compose.prod.yml` to validate the production images and startup sequence locally:
 
 ```bash
-cp .env.example .env   # fill in EZRULES_APP_SECRET, EZRULES_ORG_NAME, EZRULES_ADMIN_EMAIL, EZRULES_ADMIN_PASSWORD
+cp .env.example .env
 docker compose -f docker-compose.prod.yml up --build
 ```
 
-Re-running that command with the existing production volume intact keeps the data and applies pending migrations before services start.
+This mirrors the app-level runtime split but remains a single-host Docker setup rather than an ECS deployment.
 
-Verify:
+### Development mode
 
-```bash
-curl http://localhost:8888/ping        # → {"status":"ok"}
-# open http://localhost:4200 in a browser
-```
-
-Stop containers:
-
-```bash
-docker compose -f docker-compose.demo.yml down
-# or
-docker compose -f docker-compose.prod.yml down
-```
-
-For the production stack, that keeps the Docker volume data intact.
-For the demo stack, the next `up --build` run reseeds the database from scratch.
-
-Stop and delete all data:
-
-```bash
-docker compose -f docker-compose.demo.yml down -v
-# or
-docker compose -f docker-compose.prod.yml down -v
-```
+Use `docker compose up -d` to run infrastructure locally while you keep API and frontend as local dev processes.
+That stack now includes both `celery-worker` and `celery-beat` so async queue drains behave like the documented runtime.
 
 ---
 
-### Mode 2 — Development (infrastructure in Docker, services local)
+## Validation Checklist
 
-PostgreSQL, Redis, and the Celery worker run in Docker. The API and Angular dev server run as local processes, enabling hot-reload and debugger attachment.
+Use this after any deployment change:
 
-**What runs where:**
-
-- Docker: PostgreSQL (`localhost:5432`), Redis (`localhost:6379`), Celery worker
-- Local: FastAPI (`localhost:8888`), Angular dev server (`localhost:4200`)
-
-**Preflight:** Docker, Python 3.12+, `uv`, Node 20+, ports `5432 6379 8888 4200` free.
-
-#### 1. Start infrastructure
-
-```bash
-docker compose up -d
-```
-
-Expected: `docker compose ps` shows postgres, redis, worker as `Up`.
-
-Rollback:
-
-```bash
-docker compose down        # keep volumes
-docker compose down -v     # remove volumes
-```
-
-#### 2. Install dependencies
-
-```bash
-uv sync
-```
-
-#### 3. Initialize database
-
-```bash
-uv run ezrules init-db
-uv run ezrules bootstrap-org --name your-org --admin-email admin@example.com --admin-password admin
-```
-
-`init-db` performs database creation (if needed), Alembic migration to head, and initialization of the global action catalogue.
-`bootstrap-org` creates the organisation, seeds default roles and user lists, and ensures the initial admin user exists.
-Outcomes and labels remain empty until you create them through the UI or API.
-
-Requires `settings.env` with `EZRULES_DB_ENDPOINT` and `EZRULES_APP_SECRET`.
-
-#### 4. Run API
-
---8<-- "snippets/start-api.md"
-
-Optional (with auto-reload):
-
-```bash
-uv run ezrules api --port 8888 --reload
-```
-
-Expected: `http://localhost:8888/ping` responds.
-
-#### 5. Run frontend
-
-```bash
-cd ezrules/frontend
-npm install
-npm start
-```
-
-Expected: `http://localhost:4200` loads login page.
-
-#### 6. Verify
-
-- Health check: `http://localhost:8888/ping`
-- OpenAPI: `http://localhost:8888/docs`
-- Frontend: `http://localhost:4200`
-
-#### Clean shutdown
-
-Stop local processes, then:
-
-```bash
-docker compose down
-```
+1. `curl http://<api-host>/ping` returns `{"status":"ok"}`.
+2. Browser login succeeds through the public frontend.
+3. `POST /api/v2/evaluate` succeeds with a valid API key or Bearer token.
+4. A queued backtest can move beyond `PENDING`.
+5. Shadow/field-observation drains keep progressing, confirming `celery-beat` is alive.
 
 ---
 
-## Common Failure Modes
+## Follow-Up Infra Work
 
-| Symptom | Likely Cause | Action |
-|---|---|---|
-| `init` container exits non-zero | DB not ready or env var missing | Check `docker compose logs init` |
-| API fails to start | DB endpoint invalid or DB down | Check `settings.env`, then `docker compose ps` |
-| Port `8888` or `4200` conflict | Another process holds the port | `lsof -i :8888` to identify, then stop it |
-| Backtests stay `PENDING` or shadow stats stop updating | Worker or Redis unavailable | `docker compose ps` — confirm worker and redis are `Up` |
-| Frontend cannot log in | API not reachable or no admin user | Verify `/ping`, re-run `add-user` |
+This repository now documents the correct app/runtime topology, but infra implementation is still external work.
 
----
+Typical follow-up items:
 
-## Backtesting Notes
-
-- Backtesting enqueues Celery tasks via Redis
-- Worker must be running or tasks remain `PENDING` indefinitely
-- All three deployment modes include a running worker
-
-## Async Queue Notes
-
-- Live field observations and live shadow evaluation both rely on Redis-backed queues by default
-- Those queues reuse `EZRULES_CELERY_BROKER_URL` unless you explicitly set `EZRULES_OBSERVATION_QUEUE_REDIS_URL` or `EZRULES_SHADOW_EVALUATION_QUEUE_REDIS_URL`
-- The periodic drain cadence is controlled by the corresponding `*_DRAIN_INTERVAL_SECONDS`, `*_DRAIN_BATCH_SIZE`, and `*_MAX_BATCHES_PER_DRAIN` settings
-- If Celery beat is not running, shadow results and buffered field observations will lag even though `/api/v2/evaluate` still succeeds
-
----
-
-## Common Development Commands
-
-```bash
-docker compose up -d
-uv run ezrules api --port 8888
-uv run poe check
-EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/tests_e2e_local \
-EZRULES_TESTING=true \
-EZRULES_APP_SECRET=test-secret \
-EZRULES_ORG_ID=1 \
-uv run pytest --cov=ezrules.backend --cov=ezrules.core --cov-report=term-missing --cov-report=xml tests
-```
+- ECS task definitions and service autoscaling policies
+- ALB listeners, target groups, and TLS certificates
+- secrets delivery for app/API/SMTP credentials
+- RDS PostgreSQL and Redis provisioning
+- logging, metrics, and alerting for `api`, `celery-worker`, and `celery-beat`

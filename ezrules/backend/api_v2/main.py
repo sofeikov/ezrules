@@ -4,6 +4,8 @@ FastAPI application for ezrules API v2.
 This is the main entry point for the new FastAPI-based API.
 """
 
+from collections.abc import Sequence
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -37,7 +39,20 @@ from ezrules.backend.api_v2.routes import (
 )
 from ezrules.core.application_context import reset_context
 from ezrules.models.database import db_session
-from ezrules.settings import app_settings
+from ezrules.settings import Settings, app_settings
+
+
+def build_cors_middleware_kwargs(settings: Settings) -> dict[str, bool | str | Sequence[str] | None]:
+    allowed_origins = settings.cors_allowed_origins
+
+    return {
+        "allow_origins": allowed_origins,
+        "allow_origin_regex": settings.CORS_ALLOW_ORIGIN_REGEX,
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+    }
+
 
 # Create FastAPI app
 app = FastAPI(
@@ -48,16 +63,9 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Configure CORS
-# In development, allow all localhost origins (any port)
-# In production, this should be configured via environment variables
-app.add_middleware(
-    CORSMiddleware,
-    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Default behavior is same-origin only. Local development and split-origin
+# deployments must opt in to browser origins explicitly.
+app.add_middleware(CORSMiddleware, **build_cors_middleware_kwargs(app_settings))
 
 
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):

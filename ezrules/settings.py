@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379"
     TESTING: bool | None = False
     MAX_BODY_SIZE_KB: int = 1024
+    CORS_ALLOWED_ORIGINS: str | None = None
+    CORS_ALLOW_ORIGIN_REGEX: str | None = None
     SMTP_HOST: str | None = None
     SMTP_PORT: int = 587
     SMTP_USER: str | None = None
@@ -34,6 +36,13 @@ class Settings(BaseSettings):
     SHADOW_EVALUATION_QUEUE_MAX_BATCHES_PER_DRAIN: int = 10
     SHADOW_EVALUATION_QUEUE_LOCK_TIMEOUT_SECONDS: int = 30
     SHADOW_EVALUATION_QUEUE_DRAIN_INTERVAL_SECONDS: int = 5
+
+    @property
+    def cors_allowed_origins(self) -> list[str]:
+        raw_value = self.CORS_ALLOWED_ORIGINS
+        if not raw_value:
+            return []
+        return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
 
 
 app_settings = Settings()  # type: ignore[missing-argument]
