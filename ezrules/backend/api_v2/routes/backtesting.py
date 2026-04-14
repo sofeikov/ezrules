@@ -105,7 +105,12 @@ def _record_result_metrics(task_record: RuleBackTestingResult) -> dict[str, Any]
 
 
 def _record_datetime(value: Any) -> datetime | None:
-    return cast(datetime | None, value)
+    record_datetime = cast(datetime | None, value)
+    if record_datetime is None:
+        return None
+    if record_datetime.tzinfo is None:
+        return record_datetime.replace(tzinfo=UTC)
+    return record_datetime
 
 
 def _persist_record_from_async_result(task_record: RuleBackTestingResult, db: Any) -> RuleBackTestingResult:

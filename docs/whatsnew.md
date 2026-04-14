@@ -7,7 +7,7 @@
 * **Configurable production CORS**: Backend CORS is no longer hard-coded to localhost-only behavior; deployments can now keep the recommended same-origin ALB routing or explicitly allow named browser origins / regexes through environment configuration.
 * **Compose stacks now include Celery beat**: Demo, local production-validation, and development Docker stacks now ship the required scheduler process so async field-observation and shadow drains match the documented runtime topology.
 * **Legacy deployment manifests removed**: The obsolete `deployment/aws` and `deployment/k8s` manifests were deleted because they no longer reflect the current unified FastAPI + Celery + Postgres + Redis architecture.
-* **Local dev login path restored**: Angular local development now imports the dev environment again, and the VS Code FastAPI launch config explicitly allows `http://localhost:4200`, so login requests reach `http://localhost:8888` instead of falling back to broken same-origin `/api` calls on the dev server.
+* **Frontend environment wiring normalized**: Angular now uses the standard `environment.ts` / `environment.production.ts` split with one canonical import path, and the VS Code FastAPI launch config explicitly allows `http://localhost:4200`, so local login requests reach `http://localhost:8888` while production still defaults to same-origin API calls.
 
 ## v1.9.0
 
