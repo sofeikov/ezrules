@@ -1,5 +1,6 @@
-# Production stack: full application with an empty database.
-# Intended for real usage. Credentials are loaded from a .env file.
+# Production-like single-host validation stack.
+# Intended for local validation of the production images and startup sequence.
+# For one AWS-oriented deployment example, see docs/architecture/deployment.md.
 #
 # Setup:
 #   cp .env.example .env   # then edit .env with EZRULES_APP_SECRET, EZRULES_ORG_NAME, EZRULES_ADMIN_EMAIL, and EZRULES_ADMIN_PASSWORD
@@ -72,6 +73,7 @@ services:
       EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
       EZRULES_APP_SECRET: ${EZRULES_APP_SECRET}
       EZRULES_CELERY_BROKER_URL: redis://redis:6379
+      EZRULES_CORS_ALLOWED_ORIGINS: http://localhost:4200
       EZRULES_SMTP_HOST: ${EZRULES_SMTP_HOST:-mailpit}
       EZRULES_SMTP_PORT: ${EZRULES_SMTP_PORT:-1025}
       EZRULES_SMTP_USER: ${EZRULES_SMTP_USER:-}
@@ -92,10 +94,25 @@ services:
       EZRULES_APP_SECRET: ${EZRULES_APP_SECRET}
       EZRULES_CELERY_BROKER_URL: redis://redis:6379
 
+  beat:
+    build: .
+    command: uv run celery -A ezrules.backend.tasks beat -l INFO
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
+      EZRULES_APP_SECRET: ${EZRULES_APP_SECRET}
+      EZRULES_CELERY_BROKER_URL: redis://redis:6379
+
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        EZRULES_FRONTEND_API_URL: http://localhost:8888
     ports:
       - "4200:80"
     depends_on:

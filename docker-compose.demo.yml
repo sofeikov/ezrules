@@ -74,6 +74,7 @@ services:
       EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
       EZRULES_APP_SECRET: demo_secret_do_not_use_in_production
       EZRULES_CELERY_BROKER_URL: redis://redis:6379
+      EZRULES_CORS_ALLOWED_ORIGINS: http://localhost:4200
       EZRULES_SMTP_HOST: mailpit
       EZRULES_SMTP_PORT: 1025
       EZRULES_FROM_EMAIL: no-reply@ezrules.local
@@ -92,10 +93,25 @@ services:
       EZRULES_APP_SECRET: demo_secret_do_not_use_in_production
       EZRULES_CELERY_BROKER_URL: redis://redis:6379
 
+  beat:
+    build: .
+    command: uv run celery -A ezrules.backend.tasks beat -l INFO
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      EZRULES_DB_ENDPOINT: postgresql://postgres:root@postgres:5432/ezrules
+      EZRULES_APP_SECRET: demo_secret_do_not_use_in_production
+      EZRULES_CELERY_BROKER_URL: redis://redis:6379
+
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        EZRULES_FRONTEND_API_URL: http://localhost:8888
     ports:
       - "4200:80"
     depends_on:
