@@ -47,10 +47,12 @@ jobs:
       EZRULES_TESTING: "false"
       EZRULES_APP_SECRET: "test-secret"
       EZRULES_ORG_ID: "1"
+      EZRULES_CORS_ALLOWED_ORIGINS: "http://localhost:4200"
       EZRULES_CELERY_BROKER_URL: redis://localhost:6379
       EZRULES_SMTP_HOST: localhost
       EZRULES_SMTP_PORT: "1025"
       EZRULES_FROM_EMAIL: no-reply@ezrules.local
+      EZRULES_FRONTEND_API_URL: "http://localhost:8888"
 
     steps:
     - uses: actions/checkout@v4
