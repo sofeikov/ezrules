@@ -20,6 +20,7 @@ EZRULES_DB_ENDPOINT=postgresql://postgres:password@localhost:5432/ezrules
 EZRULES_APP_SECRET=dev-secret-key-change-me
 EZRULES_EVALUATOR_ENDPOINT=http://localhost:8888/api/v2
 EZRULES_APP_BASE_URL=http://localhost:4200
+EZRULES_CORS_ALLOWED_ORIGINS=http://localhost:4200
 EZRULES_SMTP_HOST=smtp.example.com
 EZRULES_SMTP_PORT=587
 EZRULES_SMTP_USER=mailer-user
@@ -51,6 +52,8 @@ Manager requests and API-key evaluation derive org context from the authenticate
 | `EZRULES_EVALUATOR_ENDPOINT` | No | `localhost:9999` | `http://localhost:8888/api/v2` | Evaluator base URL advertised in `GET /api/v2/rules` responses |
 | `EZRULES_TESTING` | No | `false` | `true` in tests | Testing mode |
 | `EZRULES_MAX_BODY_SIZE_KB` | No | `1024` | `2048` | Reject requests whose declared body size exceeds this limit |
+| `EZRULES_CORS_ALLOWED_ORIGINS` | No | None | `https://app.example.com,https://ops.example.com` | Comma-separated browser origins allowed to call the API cross-origin |
+| `EZRULES_CORS_ALLOW_ORIGIN_REGEX` | No | None | `^https://.*\.example\.com$` | Regex alternative to `EZRULES_CORS_ALLOWED_ORIGINS` for cross-origin browser access |
 | `EZRULES_CELERY_BROKER_URL` | No | `redis://localhost:6379` | `redis://host:6379/0` | Celery broker for backtesting |
 | `EZRULES_OBSERVATION_QUEUE_REDIS_URL` | No | `EZRULES_CELERY_BROKER_URL` | `redis://host:6379/1` | Optional dedicated Redis URL for async field-observation buffering |
 | `EZRULES_OBSERVATION_QUEUE_DRAIN_INTERVAL_SECONDS` | No | `5` | `5` | Celery beat interval for draining buffered field observations |
@@ -86,6 +89,7 @@ export EZRULES_DB_ENDPOINT="postgresql://postgres:mypassword@localhost:5432/ezru
 export EZRULES_APP_SECRET="your-secret-key"
 export EZRULES_EVALUATOR_ENDPOINT="http://localhost:8888/api/v2"
 export EZRULES_APP_BASE_URL="http://localhost:4200"
+export EZRULES_CORS_ALLOWED_ORIGINS="http://localhost:4200"
 export EZRULES_SMTP_HOST="smtp.example.com"
 export EZRULES_SMTP_PORT="587"
 export EZRULES_SMTP_USER="mailer-user"
@@ -154,6 +158,20 @@ If you use async field-observation buffering or async shadow evaluation:
 - leave `EZRULES_OBSERVATION_QUEUE_REDIS_URL` / `EZRULES_SHADOW_EVALUATION_QUEUE_REDIS_URL` unset to reuse the main broker, or point them at dedicated Redis instances
 - keep Celery beat running so queue drain tasks execute on schedule
 - tune the `*_DRAIN_INTERVAL_SECONDS`, `*_DRAIN_BATCH_SIZE`, and `*_MAX_BATCHES_PER_DRAIN` settings only if you need different throughput or lag tradeoffs
+
+### Browser Routing And CORS
+
+The recommended production setup is same-origin routing through an ALB or reverse proxy:
+
+- Serve the Angular frontend on the public host.
+- Route `/api/*`, `/docs`, `/redoc`, `/openapi.json`, and `/ping` to the API service on the same host.
+- Leave the frontend production API URL unset so the built app uses same-origin requests by default.
+
+If you must deploy the frontend and API on different public origins:
+
+- build the frontend image with `EZRULES_FRONTEND_API_URL=https://api.example.com`
+- set `EZRULES_CORS_ALLOWED_ORIGINS=https://app.example.com` on the API service
+- use `EZRULES_CORS_ALLOW_ORIGIN_REGEX` only when a fixed origin list is not practical
 
 ---
 

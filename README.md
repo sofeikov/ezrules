@@ -44,6 +44,13 @@ ezrules consists of several core components:
 3. Outcomes are aggregated, resolved through the configured severity hierarchy, and stored
 4. Results are available via API and web interface, including the dedicated **Tested Events** page for recent stored evaluations
 
+## 🚢 Deployment Guide
+
+The repository includes a documented AWS ECS/Fargate deployment example.
+Use [docs/architecture/deployment.md](docs/architecture/deployment.md) for one production-oriented topology, ALB routing guidance, and the `frontend` / `api` / `celery-worker` / `celery-beat` / init-task split.
+
+The checked-in `docker-compose.prod.yml` file remains useful for single-host validation of the shipped images.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -83,9 +90,10 @@ docker compose -f docker-compose.demo.yml down -v
 
 ---
 
-### Option B — Production (real data)
+### Option B — Single-Host Production Validation
 
 Full stack with an empty database. Credentials come from a `.env` file you control.
+Use this to validate the production images locally. The ECS/Fargate guide above is one documented deployment path, not a requirement for open-source self-hosting.
 
 ```bash
 git clone https://github.com/sofeikov/ezrules.git
@@ -114,7 +122,7 @@ docker compose -f docker-compose.prod.yml down
 
 ### Option C — Development (contributing to the project)
 
-Runs only the infrastructure (PostgreSQL, Redis, Celery worker) via Docker. The API and frontend run locally for fast iteration.
+Runs only the infrastructure (PostgreSQL, Redis, Celery worker, Celery beat) via Docker. The API and frontend run locally for fast iteration.
 
 ```bash
 git clone https://github.com/sofeikov/ezrules.git
@@ -130,6 +138,7 @@ uv sync
 cat > settings.env <<EOF
 EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules
 EZRULES_APP_SECRET=dev_secret
+EZRULES_CORS_ALLOWED_ORIGINS=http://localhost:4200
 EZRULES_SMTP_HOST=localhost
 EZRULES_SMTP_PORT=1025
 EZRULES_FROM_EMAIL=no-reply@ezrules.local

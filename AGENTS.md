@@ -41,6 +41,12 @@ uv run pytest -q --cov=ezrules.backend --cov=ezrules.core --cov-report=xml tests
 When creating a new git worktree for this repository, copy the root `.vscode/` folder into the new worktree before starting work so all launch/run configurations remain available there.
 When working in a new git worktree, proactively ensure dependencies are installed in that worktree before starting: run `uv sync` for Python deps and make sure frontend deps are present in `ezrules/frontend/` (run `npm install` there if `node_modules` is missing) so the user does not have to do manual dependency setup.
 
+For bugs reported against a running local app, launch config, browser auth flow, or frontend/backend connectivity, reproduce the exact local topology first before drawing conclusions:
+- Start from the active `.vscode/launch.json`, `settings.env`, currently used ports, and the user's actual local workflow unless the user says otherwise.
+- Verify the full browser path, not just direct API behavior: confirm the request URL the browser is using, whether it reaches backend logs, the effective frontend runtime config / served bundle API base URL, and the backend CORS response for the real frontend origin.
+- Treat direct API calls, unit tests, and alternate E2E harnesses as secondary evidence only; they do not close a local-setup bug unless they exercise the same topology the user is running.
+- For local frontend/backend connectivity bugs, do not conclude until you have checked all of: effective frontend API base URL, backend listener state, browser-origin request behavior, and launch-config env vars that affect routing or CORS.
+
 All common operations are available as VS Code launch configs; use these instead of manual commands where possible:
 - **Reset Dev Environment**: recreates dev DB (`ezrules`), adds admin user, generates fake data.
   Equivalent CLI: `EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules EZRULES_TESTING=true uv run ezrules reset-dev`

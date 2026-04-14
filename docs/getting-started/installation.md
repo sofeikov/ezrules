@@ -14,7 +14,7 @@ cd ezrules
 docker compose -f docker-compose.demo.yml up --build
 ```
 
-All services start automatically (PostgreSQL, Redis, Celery worker, API, frontend). The database is seeded with 10 sample rules and 100 events.
+All services start automatically (PostgreSQL, Redis, Celery worker, Celery beat, API, frontend). The database is seeded with 10 sample rules and 100 events.
 If you re-run the same command later, the demo database is recreated from scratch so older persisted schemas do not break the stack.
 
 | Service | URL |
@@ -34,7 +34,7 @@ docker compose -f docker-compose.demo.yml up --build
 
 ---
 
-## Path 2 — Production (real data)
+## Path 2 — Single-Host Production Validation
 
 **Prerequisites:** Docker + Docker Compose, Git.
 
@@ -63,6 +63,8 @@ The database is initialised empty. Login with the credentials you set in `.env`.
 By default, SMTP is routed to local Mailpit (`http://localhost:8025`) unless SMTP env vars override it.
 Re-running the same command later keeps the existing Docker volume and applies pending migrations before the stack starts.
 
+Use this single-host stack to validate the production images locally. If you want an AWS-oriented deployment example, follow [Deployment Guide](../architecture/deployment.md) for the documented ECS/Fargate topology.
+
 Data persists in a Docker volume between restarts. To stop without losing data:
 
 ```bash
@@ -89,7 +91,7 @@ uv sync
 docker compose up -d
 ```
 
-This starts PostgreSQL, Redis, and the Celery worker. The API and frontend run as local processes.
+This starts PostgreSQL, Redis, the Celery worker, and Celery beat. The API and frontend run as local processes.
 It also starts Mailpit for local email capture on `http://localhost:8025`.
 
 ### 3) Configure `settings.env`
@@ -97,6 +99,7 @@ It also starts Mailpit for local email capture on `http://localhost:8025`.
 ```bash
 EZRULES_DB_ENDPOINT=postgresql://postgres:root@localhost:5432/ezrules
 EZRULES_APP_SECRET=dev_secret
+EZRULES_CORS_ALLOWED_ORIGINS=http://localhost:4200
 EZRULES_SMTP_HOST=localhost
 EZRULES_SMTP_PORT=1025
 EZRULES_FROM_EMAIL=no-reply@ezrules.local
@@ -214,4 +217,5 @@ If you do not use Docker Compose for worker management:
 
 ```bash
 uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo
+uv run celery -A ezrules.backend.tasks beat -l INFO
 ```
