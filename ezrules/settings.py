@@ -46,4 +46,5 @@ class Settings(BaseSettings):
             return []
         return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
 
+
 app_settings = Settings(_env_file=SETTINGS_ENV_FILE)  # type: ignore[missing-argument]
