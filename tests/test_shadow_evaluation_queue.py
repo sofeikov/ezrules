@@ -84,7 +84,7 @@ def _ensure_org(session) -> Organisation:
 
 def _create_shadow_rule(session) -> RuleModel:
     org = _ensure_org(session)
-    rule = RuleModel(logic="return 'HOLD'", description="Shadow queue rule", rid="SHADOW_QUEUE:001", o_id=org.o_id)
+    rule = RuleModel(logic="return !HOLD", description="Shadow queue rule", rid="SHADOW_QUEUE:001", o_id=org.o_id)
     session.add(rule)
     session.commit()
 
@@ -156,7 +156,7 @@ def test_drain_shadow_queue_uses_enqueued_config_snapshot(session, fake_shadow_r
         o_id=int(rule.o_id),
         rule_model=rule,
         changed_by="test",
-        logic_override="return 'REVIEW'",
+        logic_override="return !REVIEW",
     )
 
     drained = shadow_evaluation_queue.drain_shadow_evaluation_queue(batch_size=10, max_batches=1)
@@ -193,7 +193,7 @@ def test_drain_shadow_queue_uses_enqueued_execution_mode_snapshot(session, fake_
     session.commit()
 
     first_rule = RuleModel(
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="First shadow rule",
         rid="SHADOW_QUEUE:MODE:001",
         execution_order=1,
@@ -201,7 +201,7 @@ def test_drain_shadow_queue_uses_enqueued_execution_mode_snapshot(session, fake_
         o_id=org.o_id,
     )
     second_rule = RuleModel(
-        logic="return 'REVIEW'",
+        logic="return !REVIEW",
         description="Second shadow rule",
         rid="SHADOW_QUEUE:MODE:002",
         execution_order=2,

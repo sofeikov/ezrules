@@ -92,49 +92,49 @@ def test_rule_activity_returns_ranked_active_rules_including_zero_hits(session):
     now = datetime.datetime.now()
     alpha_rule = RuleModel(
         rid="alpha_active",
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Alpha active rule",
         o_id=1,
         status=RuleStatus.ACTIVE,
     )
     beta_rule = RuleModel(
         rid="beta_active",
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Beta active rule",
         o_id=1,
         status=RuleStatus.ACTIVE,
     )
     gamma_rule = RuleModel(
         rid="gamma_active",
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Gamma active rule",
         o_id=1,
         status=RuleStatus.ACTIVE,
     )
     delta_rule = RuleModel(
         rid="delta_active",
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Delta active rule",
         o_id=1,
         status=RuleStatus.ACTIVE,
     )
     draft_rule = RuleModel(
         rid="draft_rule",
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Draft rule",
         o_id=1,
         status=RuleStatus.DRAFT,
     )
     archived_rule = RuleModel(
         rid="archived_rule",
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Archived rule",
         o_id=1,
         status=RuleStatus.ARCHIVED,
     )
     paused_rule = RuleModel(
         rid="paused_rule",
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Paused rule",
         o_id=1,
         status=RuleStatus.PAUSED,
@@ -142,7 +142,7 @@ def test_rule_activity_returns_ranked_active_rules_including_zero_hits(session):
     other_org = Organisation(o_id=2, name="other_org")
     other_org_rule = RuleModel(
         rid="other_org_rule",
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Other org rule",
         o_id=2,
         status=RuleStatus.ACTIVE,

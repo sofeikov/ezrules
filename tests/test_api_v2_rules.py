@@ -139,7 +139,7 @@ class TestMainRuleOrdering:
 
         first_rule = RuleModel(
             rid="reorder_rule_001",
-            logic="return 'A'",
+            logic="return !A",
             description="First",
             execution_order=1,
             evaluation_lane="main",
@@ -147,7 +147,7 @@ class TestMainRuleOrdering:
         )
         second_rule = RuleModel(
             rid="reorder_rule_002",
-            logic="return 'B'",
+            logic="return !B",
             description="Second",
             execution_order=2,
             evaluation_lane="main",
@@ -185,7 +185,7 @@ class TestMainRuleOrdering:
 
         first_rule = RuleModel(
             rid="reorder_active_rule_001",
-            logic="return 'A'",
+            logic="return !A",
             description="First active",
             execution_order=1,
             evaluation_lane="main",
@@ -194,7 +194,7 @@ class TestMainRuleOrdering:
         )
         archived_rule = RuleModel(
             rid="reorder_archived_rule",
-            logic="return 'ARCHIVED'",
+            logic="return !ARCHIVED",
             description="Archived rule",
             execution_order=2,
             evaluation_lane="main",
@@ -203,7 +203,7 @@ class TestMainRuleOrdering:
         )
         second_rule = RuleModel(
             rid="reorder_active_rule_002",
-            logic="return 'B'",
+            logic="return !B",
             description="Second active",
             execution_order=3,
             evaluation_lane="main",
@@ -255,7 +255,7 @@ class TestMainRuleOrdering:
 
         rule = RuleModel(
             rid="reorder_denied_rule",
-            logic="return 'A'",
+            logic="return !A",
             description="Denied",
             execution_order=1,
             evaluation_lane="main",
@@ -291,7 +291,7 @@ class TestAllowlistExecutionOrderValidation:
             json={
                 "rid": "allowlist_with_order",
                 "description": "Allowlist should reject explicit order",
-                "logic": 'if $country == "GB":\n\treturn "RELEASE"',
+                "logic": 'if $country == "GB":\n\treturn !RELEASE',
                 "evaluation_lane": "allowlist",
                 "execution_order": 1,
             },
@@ -307,7 +307,7 @@ class TestAllowlistExecutionOrderValidation:
         org = rules_test_client.test_data["org"]
         rule = RuleModel(
             rid="allowlist_update_order",
-            logic='if $country == "GB":\n\treturn "RELEASE"',
+            logic='if $country == "GB":\n\treturn !RELEASE',
             description="Allowlist rule",
             evaluation_lane="allowlist",
             o_id=org.o_id,
@@ -320,7 +320,7 @@ class TestAllowlistExecutionOrderValidation:
             headers={"Authorization": f"Bearer {token}"},
             json={
                 "description": "Updated allowlist rule",
-                "logic": 'if $country == "GB":\n\treturn "RELEASE"',
+                "logic": 'if $country == "GB":\n\treturn !RELEASE',
                 "evaluation_lane": "allowlist",
                 "execution_order": 2,
             },
@@ -450,6 +450,24 @@ class TestCreateRule:
         data = response.json()
         assert data["success"] is False
         assert "error" in data
+
+    def test_create_rule_rejects_quoted_outcome_return(self, rules_test_client):
+        token = rules_test_client.test_data["token"]
+
+        response = rules_test_client.post(
+            "/api/v2/rules",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "rid": "legacy_outcome_rule",
+                "description": "Uses old quoted outcome syntax",
+                "logic": 'if $amount > 100:\n\treturn "HOLD"',
+            },
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["success"] is False
+        assert "Use return !HOLD" in data["error"]
 
     def test_create_rule_missing_fields(self, rules_test_client):
         """Should return 422 for missing required fields."""
@@ -748,6 +766,7 @@ class TestVerifyRule:
         assert "params" in data
         assert "amount" in data["params"]
         assert "currency" in data["params"]
+        assert data["referenced_outcomes"] == []
 
     def test_verify_rule_invalid(self, rules_test_client):
         """Should return empty params for invalid rule."""
@@ -762,6 +781,21 @@ class TestVerifyRule:
         assert response.status_code == 200
         data = response.json()
         assert data["params"] == []
+
+    def test_verify_rule_rejects_quoted_outcome_return(self, rules_test_client):
+        token = rules_test_client.test_data["token"]
+
+        response = rules_test_client.post(
+            "/api/v2/rules/verify",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"rule_source": 'if $amount > 100:\n\treturn "HOLD"'},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is False
+        assert data["referenced_outcomes"] == []
+        assert "Use return !HOLD" in data["errors"][0]["message"]
 
 
 # =============================================================================
@@ -817,7 +851,7 @@ class TestTestRule:
             "/api/v2/rules/test",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "rule_source": 'if $amount > 100:\n\treturn "HOLD"',
+                "rule_source": "if $amount > 100:\n\treturn !HOLD",
                 "test_json": '{"amount": 150}',
             },
         )
@@ -835,7 +869,7 @@ class TestTestRule:
             "/api/v2/rules/test",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "rule_source": 'if $amount > 100:\n\treturn "HOLD"',
+                "rule_source": "if $amount > 100:\n\treturn !HOLD",
                 "test_json": '{"amount": 50}',
             },
         )

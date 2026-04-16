@@ -7,7 +7,7 @@ from ezrules.core.rule_engine import (
 
 
 def test_rule_engine_all_matches_keeps_existing_behavior():
-    rules = [Rule(logic='return "HOLD"', rid="rule-1", r_id=1), Rule(logic='return "RELEASE"', rid="rule-2", r_id=2)]
+    rules = [Rule(logic="return !HOLD", rid="rule-1", r_id=1), Rule(logic="return !RELEASE", rid="rule-2", r_id=2)]
 
     result = RuleEngine(rules=rules, execution_mode=RULE_EXECUTION_MODE_ALL_MATCHES)({"amount": 10})
 
@@ -18,7 +18,7 @@ def test_rule_engine_all_matches_keeps_existing_behavior():
 
 
 def test_rule_engine_first_match_stops_after_first_hit():
-    rules = [Rule(logic='return "HOLD"', rid="rule-1", r_id=1), Rule(logic='return "RELEASE"', rid="rule-2", r_id=2)]
+    rules = [Rule(logic="return !HOLD", rid="rule-1", r_id=1), Rule(logic="return !RELEASE", rid="rule-2", r_id=2)]
 
     result = RuleEngine(rules=rules, execution_mode=RULE_EXECUTION_MODE_FIRST_MATCH)({"amount": 10})
 

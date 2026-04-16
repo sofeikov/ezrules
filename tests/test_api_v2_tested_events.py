@@ -83,9 +83,9 @@ class TestListTestedEvents:
 
         session.add_all(
             [
-                Rule(logic="return 'HOLD'", description="Always hold", rid="EVENTS:001", o_id=org.o_id, r_id=9101),
+                Rule(logic="return !HOLD", description="Always hold", rid="EVENTS:001", o_id=org.o_id, r_id=9101),
                 Rule(
-                    logic="if $amount >= 1000:\n\treturn 'RELEASE'",
+                    logic="if $amount >= 1000:\n\treturn !RELEASE",
                     description="Release high-value traffic",
                     rid="EVENTS:002",
                     o_id=org.o_id,
@@ -138,7 +138,7 @@ class TestListTestedEvents:
 
         session.add(
             Rule(
-                logic="if $amount > 10000:\n\treturn 'CANCEL'",
+                logic="if $amount > 10000:\n\treturn !CANCEL",
                 description="Block very high amounts",
                 rid="EVENTS:003",
                 o_id=org.o_id,

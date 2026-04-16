@@ -113,7 +113,7 @@ def sample_analytics_data(session):
     # Create a rule
     rule = RuleModel(
         rid="analytics_rule",
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Test rule for analytics",
         o_id=org.o_id,
     )
@@ -172,13 +172,13 @@ def sample_rule_quality_data(session):
 
     rule_a = RuleModel(
         rid="quality_rule_a",
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Rule A",
         o_id=org.o_id,
     )
     rule_b = RuleModel(
         rid="quality_rule_b",
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Rule B",
         o_id=org.o_id,
     )

@@ -269,14 +269,14 @@ def test_shadow_routes_and_tested_events_are_org_scoped(session):
         session,
         org_id=int(org.o_id),
         rid="PHASE2:SHADOW:ORG1",
-        logic='return "ORG1_HOLD"',
+        logic="return !ORG1_HOLD",
         description="Org 1 shadow rule",
     )
     other_rule = _create_rule(
         session,
         org_id=int(other_org.o_id),
         rid="PHASE2:SHADOW:ORG2",
-        logic='return "ORG2_REVIEW"',
+        logic="return !ORG2_REVIEW",
         description="Org 2 shadow rule",
     )
 
@@ -371,14 +371,14 @@ def test_api_keys_and_evaluate_use_auth_derived_org(session):
         session,
         org_id=int(org.o_id),
         rid="PHASE2:EVAL:ORG1",
-        logic='return "ORG1_HOLD"',
+        logic="return !ORG1_HOLD",
         description="Org 1 evaluate rule",
     )
     _create_rule(
         session,
         org_id=int(other_org.o_id),
         rid="PHASE2:EVAL:ORG2",
-        logic='return "ORG2_REVIEW"',
+        logic="return !ORG2_REVIEW",
         description="Org 2 evaluate rule",
     )
     _save_production_config(session, int(org.o_id))
@@ -543,14 +543,14 @@ def test_analytics_rule_quality_and_reports_are_org_scoped(session, monkeypatch)
         session,
         org_id=int(org.o_id),
         rid="PHASE2:ANALYTICS:ORG1",
-        logic='return "HOLD"',
+        logic="return !HOLD",
         description="Org 1 analytics rule",
     )
     other_rule = _create_rule(
         session,
         org_id=int(other_org.o_id),
         rid="PHASE2:ANALYTICS:ORG2",
-        logic='return "REVIEW"',
+        logic="return !REVIEW",
         description="Org 2 analytics rule",
     )
 

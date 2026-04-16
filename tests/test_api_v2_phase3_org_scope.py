@@ -254,7 +254,7 @@ def test_backtesting_endpoints_hide_other_org_rules(session):
     )
     other_rule = Rule(
         rid="PHASE3:OTHER",
-        logic='return "HOLD"',
+        logic="return !HOLD",
         description="Other org rule",
         o_id=int(other_org.o_id),
     )
@@ -267,7 +267,7 @@ def test_backtesting_endpoints_hide_other_org_rules(session):
         trigger_response = client.post(
             "/api/v2/backtesting",
             headers=_auth_headers(user),
-            json={"r_id": int(other_rule.r_id), "new_rule_logic": 'return "BLOCK"'},
+            json={"r_id": int(other_rule.r_id), "new_rule_logic": "return !BLOCK"},
         )
         assert trigger_response.status_code == 404
 

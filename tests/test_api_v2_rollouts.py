@@ -17,6 +17,7 @@ from ezrules.core.rule_updater import (
     deploy_rule_to_shadow,
 )
 from ezrules.models.backend_core import (
+    AllowedOutcome,
     Organisation,
     Role,
     Rule as RuleModel,
@@ -49,6 +50,17 @@ def rollout_test_client(session):
         org = Organisation(o_id=1, name="Test Org")
         session.add(org)
         session.commit()
+
+    rollout_outcomes = ["CONTROL", "CANDIDATE", "DRAFT", "LEAD", "TAIL", "UPDATED"]
+    for severity_rank, outcome_name in enumerate(rollout_outcomes, start=1):
+        existing_outcome = (
+            session.query(AllowedOutcome)
+            .filter(AllowedOutcome.o_id == int(org.o_id), AllowedOutcome.outcome_name == outcome_name)
+            .first()
+        )
+        if existing_outcome is None:
+            session.add(AllowedOutcome(outcome_name=outcome_name, severity_rank=severity_rank, o_id=int(org.o_id)))
+    session.commit()
 
     role = session.query(Role).filter(Role.name == "rollout_manager").first()
     if not role:
@@ -97,7 +109,7 @@ def active_rollout_rule(session):
 
     rule = RuleModel(
         rid="rollout_test_rule",
-        logic="return 'CONTROL'",
+        logic="return !CONTROL",
         description="Rule for rollout testing",
         status=RuleStatus.ACTIVE,
         effective_from=datetime.now(UTC),
@@ -119,7 +131,7 @@ class TestRolloutEndpoints:
 
         response = rollout_test_client.post(
             f"/api/v2/rules/{active_rollout_rule.r_id}/rollout",
-            json={"logic": "return 'CANDIDATE'", "description": "Candidate", "traffic_percent": 25},
+            json={"logic": "return !CANDIDATE", "description": "Candidate", "traffic_percent": 25},
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -134,15 +146,15 @@ class TestRolloutEndpoints:
         )
         assert rollout_config is not None
         rollout_entry = next(entry for entry in rollout_config.config if entry["r_id"] == active_rollout_rule.r_id)
-        assert rollout_entry["logic"] == "return 'CANDIDATE'"
+        assert rollout_entry["logic"] == "return !CANDIDATE"
         assert rollout_entry["traffic_percent"] == 25
-        assert rollout_entry["control"]["logic"] == "return 'CONTROL'"
+        assert rollout_entry["control"]["logic"] == "return !CONTROL"
 
     def test_rollout_requires_active_rule(self, rollout_test_client, session):
         token = rollout_test_client.test_data["token"]
         draft_rule = RuleModel(
             rid="draft_rollout_rule",
-            logic="return 'DRAFT'",
+            logic="return !DRAFT",
             description="Draft rule",
             status=RuleStatus.DRAFT,
             o_id=1,
@@ -152,7 +164,7 @@ class TestRolloutEndpoints:
 
         response = rollout_test_client.post(
             f"/api/v2/rules/{draft_rule.r_id}/rollout",
-            json={"logic": "return 'CANDIDATE'", "description": "Candidate", "traffic_percent": 10},
+            json={"logic": "return !CANDIDATE", "description": "Candidate", "traffic_percent": 10},
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -167,7 +179,7 @@ class TestRolloutEndpoints:
 
         response = rollout_test_client.post(
             f"/api/v2/rules/{active_rollout_rule.r_id}/rollout",
-            json={"logic": "return 'CANDIDATE'", "description": "Candidate", "traffic_percent": 10},
+            json={"logic": "return !CANDIDATE", "description": "Candidate", "traffic_percent": 10},
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -180,7 +192,7 @@ class TestRolloutEndpoints:
 
         rollout_test_client.post(
             f"/api/v2/rules/{active_rollout_rule.r_id}/rollout",
-            json={"logic": "return 'CANDIDATE'", "description": "Candidate", "traffic_percent": 40},
+            json={"logic": "return !CANDIDATE", "description": "Candidate", "traffic_percent": 40},
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -193,7 +205,7 @@ class TestRolloutEndpoints:
         session.expire_all()
 
         promoted_rule = session.get(RuleModel, active_rollout_rule.r_id)
-        assert promoted_rule.logic == "return 'CANDIDATE'"
+        assert promoted_rule.logic == "return !CANDIDATE"
         assert promoted_rule.description == "Candidate"
 
         prod_config = (
@@ -202,7 +214,7 @@ class TestRolloutEndpoints:
             .first()
         )
         prod_entry = next(entry for entry in prod_config.config if entry["r_id"] == active_rollout_rule.r_id)
-        assert prod_entry["logic"] == "return 'CANDIDATE'"
+        assert prod_entry["logic"] == "return !CANDIDATE"
 
         rollout_config = (
             session.query(RuleEngineConfig)
@@ -219,7 +231,7 @@ class TestRolloutEndpoints:
         active_rollout_rule.execution_order = 2
         leading_rule = RuleModel(
             rid="rollout_leading_rule",
-            logic="return 'LEAD'",
+            logic="return !LEAD",
             description="Runs first",
             status=RuleStatus.ACTIVE,
             effective_from=datetime.now(UTC),
@@ -228,7 +240,7 @@ class TestRolloutEndpoints:
         )
         trailing_rule = RuleModel(
             rid="rollout_trailing_rule",
-            logic="return 'TAIL'",
+            logic="return !TAIL",
             description="Runs last",
             status=RuleStatus.ACTIVE,
             effective_from=datetime.now(UTC),
@@ -241,7 +253,7 @@ class TestRolloutEndpoints:
 
         rollout_test_client.post(
             f"/api/v2/rules/{active_rollout_rule.r_id}/rollout",
-            json={"logic": "return 'CANDIDATE'", "description": "Candidate", "traffic_percent": 40},
+            json={"logic": "return !CANDIDATE", "description": "Candidate", "traffic_percent": 40},
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -269,13 +281,13 @@ class TestRolloutEndpoints:
 
         rollout_test_client.post(
             f"/api/v2/rules/{active_rollout_rule.r_id}/rollout",
-            json={"logic": "return 'CANDIDATE'", "description": "Candidate", "traffic_percent": 25},
+            json={"logic": "return !CANDIDATE", "description": "Candidate", "traffic_percent": 25},
             headers={"Authorization": f"Bearer {token}"},
         )
 
         response = rollout_test_client.put(
             f"/api/v2/rules/{active_rollout_rule.r_id}",
-            json={"logic": "return 'UPDATED'", "description": "Updated"},
+            json={"logic": "return !UPDATED", "description": "Updated"},
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -296,7 +308,7 @@ class TestRolloutEvaluation:
             rule_model=session.get(RuleModel, active_rollout_rule.r_id),
             traffic_percent=10,
             changed_by="test",
-            logic_override="return 'CANDIDATE'",
+            logic_override="return !CANDIDATE",
             description_override="Candidate",
         )
 
@@ -339,7 +351,7 @@ class TestRolloutEvaluation:
             rule_model=active_rollout_rule,
             traffic_percent=10,
             changed_by="test",
-            logic_override="return 'CANDIDATE'",
+            logic_override="return !CANDIDATE",
             description_override="Candidate",
         )
 
@@ -358,7 +370,7 @@ class TestRolloutEvaluation:
             rule_model=session.get(RuleModel, active_rollout_rule.r_id),
             traffic_percent=20,
             changed_by="test",
-            logic_override="return 'CANDIDATE'",
+            logic_override="return !CANDIDATE",
             description_override="Candidate",
         )
 

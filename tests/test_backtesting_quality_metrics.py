@@ -77,7 +77,7 @@ def labeled_backtest_fixture(session):
 
     rule = RuleModel(
         rid="bt_quality_rule",
-        logic='if $amount > 100:\n\treturn "HOLD"',
+        logic="if $amount > 100:\n\treturn !HOLD",
         description="Backtesting quality coverage rule",
         o_id=org.o_id,
     )
@@ -111,7 +111,7 @@ def labeled_backtest_fixture(session):
 def test_backtest_task_returns_label_counts_and_quality_metrics(session, labeled_backtest_fixture):
     result = backtest_rule_change(
         labeled_backtest_fixture["rule"].r_id,
-        'if $amount > 150:\n\treturn "BLOCK"',
+        "if $amount > 150:\n\treturn !BLOCK",
         int(labeled_backtest_fixture["org"].o_id),
     )
 
@@ -226,7 +226,7 @@ def test_get_task_result_serializes_quality_metrics(backtesting_quality_client, 
     org = session.query(Organisation).filter(Organisation.o_id == 1).one()
     rule = RuleModel(
         rid="bt_quality_task_rule",
-        logic='return "HOLD"',
+        logic="return !HOLD",
         description="Backtesting task status rule",
         o_id=int(org.o_id),
     )

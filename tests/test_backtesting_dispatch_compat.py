@@ -34,7 +34,7 @@ def test_trigger_backtest_uses_legacy_three_arg_task_signature(controls_client, 
         headers={"Authorization": f"Bearer {token}"},
         json={
             "r_id": int(rule.r_id),
-            "new_rule_logic": 'if $amount > 40:\n\treturn "BLOCK"',
+            "new_rule_logic": "if $amount > 40:\n\treturn !BLOCK",
         },
     )
 
@@ -42,7 +42,7 @@ def test_trigger_backtest_uses_legacy_three_arg_task_signature(controls_client, 
     payload = response.json()
     assert queued["args"] == [
         int(rule.r_id),
-        'if $amount > 40:\n\treturn "BLOCK"',
+        "if $amount > 40:\n\treturn !BLOCK",
         int(org.o_id),
     ]
     assert queued["task_id"] == payload["task_id"]
@@ -59,7 +59,7 @@ def test_retry_backtest_uses_legacy_three_arg_task_signature(controls_client, mo
         r_id=int(rule.r_id),
         task_id="failed-task",
         stored_logic=rule.logic,
-        proposed_logic='if $amount > 40:\n\treturn "BLOCK"',
+        proposed_logic="if $amount > 40:\n\treturn !BLOCK",
         status="failed",
         result_metrics={"error": "worker crashed"},
     )
@@ -82,7 +82,7 @@ def test_retry_backtest_uses_legacy_three_arg_task_signature(controls_client, mo
     payload = response.json()
     assert queued["args"] == [
         int(rule.r_id),
-        'if $amount > 40:\n\treturn "BLOCK"',
+        "if $amount > 40:\n\treturn !BLOCK",
         int(org.o_id),
     ]
     assert queued["task_id"] == payload["task_id"]

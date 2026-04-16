@@ -27,7 +27,7 @@ def _track_commit_events(session):
 def test_eval_and_store_commits_once_for_parent_and_results(session):
     org = session.query(backend_core.Organisation).one()
     rule = backend_core.Rule(
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Always hold",
         rid="EVAL_TXN:001",
         o_id=org.o_id,
@@ -71,7 +71,7 @@ def test_eval_and_store_commits_once_for_parent_and_results(session):
 def test_eval_and_store_preserves_caller_commit_control(session):
     org = session.query(backend_core.Organisation).one()
     rule = backend_core.Rule(
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Always hold",
         rid="EVAL_TXN:002",
         o_id=org.o_id,

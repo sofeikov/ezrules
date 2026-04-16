@@ -17,7 +17,7 @@ from ezrules.models.backend_core import FieldObservation, Organisation, Rule
 def _setup_rule(session, rid, r_id):
     """Create a minimal rule and persist a rule engine config."""
     org = session.query(Organisation).one()
-    rule = Rule(logic="return 'HOLD'", description="obs test rule", rid=rid, o_id=org.o_id, r_id=r_id)
+    rule = Rule(logic="return !HOLD", description="obs test rule", rid=rid, o_id=org.o_id, r_id=r_id)
     session.add(rule)
     session.commit()
     RDBRuleEngineConfigProducer(db=session, o_id=org.o_id).save_config(RDBRuleManager(db=session, o_id=org.o_id))
