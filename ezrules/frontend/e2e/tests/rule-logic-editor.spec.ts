@@ -41,12 +41,17 @@ test.describe('Rule Logic Editor', () => {
       await page.keyboard.press('Control+Space');
       await expect(page.locator('.cm-tooltip-autocomplete')).toContainText('$editor_amount_signal');
 
-      await replaceEditorContent(page, `return $editor_amount_signal > 0 and "GB" in @${listName}`);
+      await replaceEditorContent(page, 'return !HO');
+      await page.keyboard.press('Control+Space');
+      await expect(page.locator('.cm-tooltip-autocomplete')).toContainText('!HOLD');
+
+      await replaceEditorContent(page, `if $editor_amount_signal > 0 and "GB" in @${listName}:\n\treturn !HOLD`);
       await page.waitForResponse((response) => response.url().includes('/api/v2/rules/verify'));
 
       const detectedReferences = page.locator('.bg-slate-50').filter({ hasText: 'Detected references' });
       await expect(detectedReferences).toContainText('$editor_amount_signal');
       await expect(detectedReferences).toContainText(`@${listName}`);
+      await expect(detectedReferences).toContainText('!HOLD');
     } finally {
       const listsResponse = await request.get(`${API_BASE}/api/v2/user-lists`, {
         headers: authHeaders,

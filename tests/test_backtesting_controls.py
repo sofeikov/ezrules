@@ -71,7 +71,7 @@ def backtesting_controls_client(session):
     celery_app.conf.task_eager_propagates = original_eager_propagates
 
 
-def _create_rule_with_history(session, *, logic: str = 'if $amount > 100:\n\treturn "HOLD"') -> RuleModel:
+def _create_rule_with_history(session, *, logic: str = "if $amount > 100:\n\treturn !HOLD") -> RuleModel:
     org = _ensure_org(session)
     rule = RuleModel(
         rid=f"BT_CTRL_{session.query(RuleModel).count() + 1}",
@@ -117,7 +117,7 @@ def test_trigger_backtest_persists_result_metrics(backtesting_controls_client, m
         headers={"Authorization": f"Bearer {token}"},
         json={
             "r_id": int(rule.r_id),
-            "new_rule_logic": 'if $amount > 40:\n\treturn "BLOCK"',
+            "new_rule_logic": "if $amount > 40:\n\treturn !BLOCK",
         },
     )
 
@@ -154,7 +154,7 @@ def test_cancel_backtest_marks_job_cancelled_and_revokes(backtesting_controls_cl
         r_id=int(rule.r_id),
         task_id="cancel-me",
         stored_logic=rule.logic,
-        proposed_logic='if $amount > 200:\n\treturn "BLOCK"',
+        proposed_logic="if $amount > 200:\n\treturn !BLOCK",
         status="running",
     )
     session.add(record)
@@ -210,14 +210,14 @@ def test_retry_backtest_requeues_failed_snapshot(backtesting_controls_client):
         r_id=int(rule.r_id),
         task_id="failed-task",
         stored_logic=rule.logic,
-        proposed_logic='if $amount > 40:\n\treturn "BLOCK"',
+        proposed_logic="if $amount > 40:\n\treturn !BLOCK",
         status="failed",
         result_metrics={"error": "worker crashed"},
     )
     session.add(failed_record)
     session.commit()
 
-    rule.logic = 'if $amount > 1000:\n\treturn "IGNORE"'
+    rule.logic = "if $amount > 1000:\n\treturn !IGNORE"
     session.commit()
 
     response = backtesting_controls_client.post(

@@ -6,6 +6,8 @@ import pyparsing as pp
 
 from ezrules.core.user_lists import AbstractUserListManager
 
+OUTCOME_HELPER_NAME = "__ezrules_outcome__"
+
 
 class RuleParamExtractor(ast.NodeVisitor):
     def __init__(self):
@@ -25,6 +27,7 @@ class TriggerReferenceExtractor:
         line_parser = search_for_word
         line_parser.ignore(pp.QuotedString('"'))
         line_parser.ignore(pp.QuotedString("'"))
+        line_parser.ignore(pp.pythonStyleComment)
         self._parser = line_parser
 
     def extract(self, code: str) -> list[str]:
@@ -52,11 +55,19 @@ class DollarNotationConverter:
         line_parser = search_for_word
         line_parser.ignore(pp.QuotedString('"'))
         line_parser.ignore(pp.QuotedString("'"))
+        line_parser.ignore(pp.pythonStyleComment)
         line_parser.setParseAction(self.replace_with_matched_text)
         self._parser = line_parser
 
     def transform_rule(self, code: str):
         return self._parser.transform_string(code)
+
+
+class BangNotationConverter(DollarNotationConverter):
+    TRIGGER_CHAR = "!"
+
+    def replace_with_matched_text(self, tokens):
+        return f"{OUTCOME_HELPER_NAME}({json.dumps(tokens[0][1:].upper())})"
 
 
 class AtNotationConverter(DollarNotationConverter):
@@ -73,3 +84,21 @@ class AtNotationConverter(DollarNotationConverter):
 class UserListReferenceExtractor(TriggerReferenceExtractor):
     def __init__(self):
         super().__init__("@")
+
+
+class OutcomeReferenceExtractor(TriggerReferenceExtractor):
+    def __init__(self):
+        super().__init__("!")
+
+
+def extract_outcome_helper_value(node: ast.AST | None) -> str | None:
+    if not isinstance(node, ast.Call):
+        return None
+    if node.keywords or len(node.args) != 1:
+        return None
+    if not isinstance(node.func, ast.Name) or node.func.id != OUTCOME_HELPER_NAME:
+        return None
+    argument = node.args[0]
+    if not isinstance(argument, ast.Constant) or not isinstance(argument.value, str):
+        return None
+    return argument.value

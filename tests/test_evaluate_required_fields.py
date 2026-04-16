@@ -23,7 +23,7 @@ class TestEvaluateRequiredFieldContracts:
             session,
             rid="REQ:EVAL:001",
             r_id=9301,
-            logic="return 'PASS'",
+            logic="return !PASS",
         )
         session.add(FieldTypeConfig(field_name="amount", configured_type="integer", required=True, o_id=org.o_id))
         session.commit()
@@ -55,7 +55,7 @@ class TestEvaluateRequiredFieldContracts:
             session,
             rid="REQ:EVAL:002",
             r_id=9302,
-            logic="return 'PASS'",
+            logic="return !PASS",
         )
         session.add(FieldTypeConfig(field_name="amount", configured_type="integer", required=True, o_id=org.o_id))
         session.commit()
@@ -87,7 +87,7 @@ class TestEvaluateRequiredFieldContracts:
             session,
             rid="REQ:EVAL:003",
             r_id=9303,
-            logic='if $country == "US":\n\treturn "HOLD"',
+            logic='if $country == "US":\n\treturn !HOLD',
         )
 
         with TestClient(app) as client:

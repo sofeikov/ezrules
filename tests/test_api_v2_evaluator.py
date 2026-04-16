@@ -46,7 +46,7 @@ class TestEvaluate:
         org = session.query(Organisation).one()
 
         # Create a rule
-        rule = Rule(logic="return 'HOLD'", description="Always hold", rid="EVAL_V2:001", o_id=org.o_id, r_id=9001)
+        rule = Rule(logic="return !HOLD", description="Always hold", rid="EVAL_V2:001", o_id=org.o_id, r_id=9001)
         session.add(rule)
         session.commit()
 
@@ -85,9 +85,9 @@ class TestEvaluate:
 
         session.add_all(
             [
-                Rule(logic="return 'HOLD'", description="Always hold", rid="EVAL_V2:002", o_id=org.o_id, r_id=9002),
+                Rule(logic="return !HOLD", description="Always hold", rid="EVAL_V2:002", o_id=org.o_id, r_id=9002),
                 Rule(
-                    logic="return 'RELEASE'",
+                    logic="return !RELEASE",
                     description="Always release",
                     rid="EVAL_V2:003",
                     o_id=org.o_id,

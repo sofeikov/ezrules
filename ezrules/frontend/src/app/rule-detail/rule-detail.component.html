@@ -241,6 +241,7 @@
                   [diagnostics]="verifyErrors"
                   [fieldSuggestions]="fieldSuggestions"
                   [listSuggestions]="listSuggestions"
+                  [outcomeSuggestions]="outcomeSuggestions"
                   placeholderText="Enter rule logic"
                 ></app-rule-logic-editor>
                 <div *ngIf="!isEditMode" data-testid="rule-logic-readonly">
@@ -270,7 +271,7 @@
                 </ul>
               </div>
 
-              <div *ngIf="isEditMode && (verifiedParams.length > 0 || referencedLists.length > 0)" class="bg-slate-50 border border-slate-200 rounded-lg p-4">
+              <div *ngIf="isEditMode && (verifiedParams.length > 0 || referencedLists.length > 0 || referencedOutcomes.length > 0)" class="bg-slate-50 border border-slate-200 rounded-lg p-4">
                 <p class="text-sm font-medium text-slate-900 mb-3">Detected references</p>
                 <div *ngIf="verifiedParams.length > 0" class="mb-3">
                   <p class="text-xs uppercase tracking-wide text-slate-500 mb-2">Fields</p>
@@ -285,6 +286,14 @@
                   <div class="flex flex-wrap gap-2">
                     <span *ngFor="let listName of referencedLists" class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
                       &#64;{{ listName }}
+                    </span>
+                  </div>
+                </div>
+                <div *ngIf="referencedOutcomes.length > 0" class="mt-3">
+                  <p class="text-xs uppercase tracking-wide text-slate-500 mb-2">Outcomes</p>
+                  <div class="flex flex-wrap gap-2">
+                    <span *ngFor="let outcomeName of referencedOutcomes" class="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-800">
+                      !{{ outcomeName }}
                     </span>
                   </div>
                 </div>

@@ -11,6 +11,7 @@ import {
   RuleEditorAssistService,
   RuleEditorFieldSuggestion,
   RuleEditorListSuggestion,
+  RuleEditorOutcomeSuggestion,
 } from '../services/rule-editor-assist.service';
 import { RuntimeSettingsService } from '../services/runtime-settings.service';
 import { SidebarComponent } from '../components/sidebar.component';
@@ -39,8 +40,10 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
   verifyWarnings: string[] = [];
   verifiedParams: string[] = [];
   referencedLists: string[] = [];
+  referencedOutcomes: string[] = [];
   fieldSuggestions: RuleEditorFieldSuggestion[] = [];
   listSuggestions: RuleEditorListSuggestion[] = [];
+  outcomeSuggestions: RuleEditorOutcomeSuggestion[] = [];
   testing: boolean = false;
   saving: boolean = false;
   saveError: string | null = null;
@@ -61,6 +64,7 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
     this.assistSubscription = this.ruleEditorAssistService.getAssistData().subscribe((assistData) => {
       this.fieldSuggestions = assistData.fields;
       this.listSuggestions = assistData.lists;
+      this.outcomeSuggestions = assistData.outcomes;
     });
     this.runtimeSettingsService.getRuntimeSettings().subscribe({
       next: (settings) => {
@@ -131,6 +135,7 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
         this.verifyWarnings = [];
         this.verifiedParams = [];
         this.referencedLists = [];
+        this.referencedOutcomes = [];
       }
       return;
     }
@@ -151,6 +156,7 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
         this.verifyWarnings = response.warnings ?? [];
         this.verifiedParams = response.params ?? [];
         this.referencedLists = response.referenced_lists ?? [];
+        this.referencedOutcomes = response.referenced_outcomes ?? [];
         if (!response.valid || this.verifyErrors.length > 0) {
           return of<string | null>(null);
         }
@@ -179,6 +185,7 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
         this.verifyWarnings = [];
         this.verifiedParams = [];
         this.referencedLists = [];
+        this.referencedOutcomes = [];
         console.error('Error verifying rule:', error);
       }
     });
@@ -247,7 +254,7 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
 
   selectedLaneDescription(): string {
     if (this.evaluationLane === 'allowlist') {
-      return `Allowlist rules short-circuit evaluation when they match. They must return ${this.neutralOutcomeLabel}.`;
+      return `Allowlist rules short-circuit evaluation when they match. They must return !${this.neutralOutcomeLabel}.`;
     }
     return this.mainLaneDescription;
   }

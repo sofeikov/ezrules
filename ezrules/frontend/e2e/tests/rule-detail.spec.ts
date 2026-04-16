@@ -71,7 +71,7 @@ test.describe('Rule Detail Page', () => {
       data: {
         rid: `E2E_DETAIL_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         description: 'E2E test rule for rule detail tests',
-        logic: "if $amount > 100:\n\treturn 'HOLD'",
+        logic: "if $amount > 100:\n\treturn !HOLD",
       },
     });
     const data = await resp.json();
@@ -298,7 +298,7 @@ test.describe('Rule Detail Page', () => {
       await ruleDetailPage.goto(testRuleId);
       await ruleDetailPage.waitForRuleToLoad();
       await ruleDetailPage.clickEdit();
-      await ruleDetailPage.setLogic("if $amount > 150:\n\treturn 'BLOCK'");
+      await ruleDetailPage.setLogic("if $amount > 150:\n\treturn !CANCEL");
 
       await backtestingPage.clickBacktest();
       await backtestingPage.waitForBacktestResults();

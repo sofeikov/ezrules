@@ -81,14 +81,14 @@ def test_returns_referenced_fields_for_triggered_rules(session, tested_events_fi
     session.add_all(
         [
             Rule(
-                logic="if $amount >= 1000:\n\treturn 'HOLD'",
+                logic="if $amount >= 1000:\n\treturn !HOLD",
                 description="Hold high-value traffic",
                 rid="EVENTS:FIELDS:001",
                 o_id=org.o_id,
                 r_id=9201,
             ),
             Rule(
-                logic="if $country == 'GB':\n\treturn 'RELEASE'",
+                logic="if $country == 'GB':\n\treturn !RELEASE",
                 description="Release GB traffic",
                 rid="EVENTS:FIELDS:002",
                 o_id=org.o_id,

@@ -73,7 +73,7 @@ By the end of this page, you should have:
 
 ```python
 if $amount > 10000:
-    return 'HOLD'
+    return !HOLD
 ```
 
 4. Leave **Rule Lane** set to **Main rules**

@@ -7,7 +7,7 @@ def test_backtest_skips_records_when_proposed_score_field_never_appeared_in_hist
     org = session.query(Organisation).filter(Organisation.o_id == 1).one()
     rule = RuleModel(
         rid="BT_SCORE_REGRESSION_001",
-        logic='if $amount > 100:\n\treturn "HOLD"',
+        logic="if $amount > 100:\n\treturn !HOLD",
         description="Backtest regression coverage for unseen score field",
         o_id=int(org.o_id),
     )
@@ -32,7 +32,7 @@ def test_backtest_skips_records_when_proposed_score_field_never_appeared_in_hist
 
     result = backtest_rule_change(
         int(rule.r_id),
-        'if $score > 100:\n\treturn "HOLD"',
+        "if $score > 100:\n\treturn !HOLD",
         int(org.o_id),
     )
 

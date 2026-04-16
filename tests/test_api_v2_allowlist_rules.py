@@ -15,6 +15,7 @@ from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
 from ezrules.models.backend_core import (
+    AllowedOutcome,
     ApiKey,
     Organisation,
     Role,
@@ -32,6 +33,16 @@ def allowlist_rules_client(session):
     """Create a test client with rule-management permissions."""
     hashed_password = bcrypt.hashpw("allowlistpass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
     org = session.query(Organisation).one()
+
+    for severity_rank, outcome_name in enumerate(("RELEASE", "HOLD", "CANCEL"), start=1):
+        existing_outcome = (
+            session.query(AllowedOutcome)
+            .filter(AllowedOutcome.o_id == int(org.o_id), AllowedOutcome.outcome_name == outcome_name)
+            .first()
+        )
+        if existing_outcome is None:
+            session.add(AllowedOutcome(outcome_name=outcome_name, severity_rank=severity_rank, o_id=int(org.o_id)))
+    session.commit()
 
     role = session.query(Role).filter(Role.name == "allowlist_rule_manager", Role.o_id == org.o_id).first()
     if not role:
@@ -98,7 +109,7 @@ class TestAllowlistRuleCrud:
             json={
                 "rid": "ALLOWLIST_CREATE_OK",
                 "description": "Allowlist release rule",
-                "logic": 'if $country == "GB":\n\treturn "RELEASE"',
+                "logic": 'if $country == "GB":\n\treturn !RELEASE',
                 "evaluation_lane": "allowlist",
             },
         )
@@ -117,7 +128,7 @@ class TestAllowlistRuleCrud:
             json={
                 "rid": "ALLOWLIST_CREATE_BAD",
                 "description": "Invalid allowlist rule",
-                "logic": 'if $country == "GB":\n\treturn "HOLD"',
+                "logic": 'if $country == "GB":\n\treturn !HOLD',
                 "evaluation_lane": "allowlist",
             },
         )
@@ -125,7 +136,7 @@ class TestAllowlistRuleCrud:
         assert response.status_code == 201
         payload = response.json()
         assert payload["success"] is False
-        assert "Allowlist rules must return only the configured neutral outcome 'RELEASE'" in payload["error"]
+        assert "Allowlist rules must return only the configured neutral outcome !RELEASE" in payload["error"]
 
     def test_create_rule_uses_configured_neutral_outcome(self, allowlist_rules_client):
         token = allowlist_rules_client.test_data["token"]
@@ -147,7 +158,7 @@ class TestAllowlistRuleCrud:
             json={
                 "rid": "ALLOWLIST_CREATE_HOLD",
                 "description": "Allowlist hold rule",
-                "logic": 'if $country == "GB":\n\treturn "HOLD"',
+                "logic": 'if $country == "GB":\n\treturn !HOLD',
                 "evaluation_lane": "allowlist",
             },
         )
@@ -164,7 +175,7 @@ class TestAllowlistEvaluation:
         session.add_all(
             [
                 RuleModel(
-                    logic='if $country == "GB":\n\treturn "RELEASE"',
+                    logic='if $country == "GB":\n\treturn !RELEASE',
                     description="Allowlist release for GB",
                     rid="ALLOWLIST_MATCH",
                     evaluation_lane="allowlist",
@@ -173,7 +184,7 @@ class TestAllowlistEvaluation:
                     r_id=9201,
                 ),
                 RuleModel(
-                    logic='return "HOLD"',
+                    logic="return !HOLD",
                     description="Main rule that would otherwise hold",
                     rid="MAIN_HOLD",
                     evaluation_lane="main",

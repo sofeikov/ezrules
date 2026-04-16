@@ -4,6 +4,7 @@ from typing import Any
 
 from ezrules.core.outcomes import Outcome
 from ezrules.core.rule import Rule
+from ezrules.core.rule_helpers import extract_outcome_helper_value
 
 
 class RuleChecker:
@@ -17,7 +18,10 @@ class AllowedOutcomeReturnVisitor(ast.NodeVisitor):
         self.values = []
 
     def visit_Return(self, node) -> Any:
-        if isinstance(node.value, ast.Constant):
+        outcome_value = extract_outcome_helper_value(node.value)
+        if outcome_value is not None:
+            self.values.append(outcome_value)
+        elif isinstance(node.value, ast.Constant):
             self.values.append(node.value.value)
         else:
             self.values.append(None)

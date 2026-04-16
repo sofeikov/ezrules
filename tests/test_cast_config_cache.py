@@ -55,7 +55,7 @@ def reset_cast_config_state():
 
 
 def _setup_rule_engine(session, org: Organisation, rid: str, r_id: int) -> None:
-    rule = Rule(logic="return 'PASS'", description="cast config cache test rule", rid=rid, o_id=org.o_id, r_id=r_id)
+    rule = Rule(logic="return !PASS", description="cast config cache test rule", rid=rid, o_id=org.o_id, r_id=r_id)
     session.add(rule)
     session.commit()
     RDBRuleEngineConfigProducer(db=session, o_id=org.o_id).save_config(RDBRuleManager(db=session, o_id=org.o_id))

@@ -209,7 +209,7 @@ Runtime settings notes:
 - `GET /api/v2/settings/runtime` returns both stored values and fallback defaults for `rule_quality_lookback_days`, `auto_promote_active_rule_updates`, `main_rule_execution_mode`, and `neutral_outcome`.
 - `auto_promote_active_rule_updates` defaults to `false`.
 - `main_rule_execution_mode` defaults to `all_matches` and can be switched to `first_match` for the main rule lane only.
-- `neutral_outcome` defaults to `RELEASE` and must match an existing configured outcome.
+- `neutral_outcome` defaults to `RELEASE` and must match an existing configured outcome; allowlist rules return it as `!RELEASE`.
 - Runtime settings responses also include `invalid_allowlist_rules`, a list of existing allowlist rules that no longer comply with the selected neutral outcome.
 - Neutral-outcome changes are recorded in outcome audit history with action `neutral_outcome_updated`.
 - When `auto_promote_active_rule_updates=true`, saving edits to an active rule requires both `MODIFY_RULE` and `PROMOTE_RULES`.

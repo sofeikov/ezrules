@@ -110,7 +110,7 @@ test.describe('Rule Create Page', () => {
     test('should allow filling in Logic field', async () => {
       await ruleCreatePage.goto();
 
-      const testLogic = "if $amount > 100:\n\treturn 'HOLD'";
+      const testLogic = "if $amount > 100:\n\treturn !HOLD";
       await ruleCreatePage.fillLogic(testLogic);
 
       const value = await ruleCreatePage.logicTextarea.inputValue();
@@ -141,7 +141,7 @@ test.describe('Rule Create Page', () => {
       await ruleCreatePage.goto();
 
       // Fill in logic with a rule that uses $amount parameter
-      await ruleCreatePage.fillLogic("if $amount > 100:\n\treturn 'HOLD'");
+      await ruleCreatePage.fillLogic("if $amount > 100:\n\treturn !HOLD");
 
       // Wait for the verify API call to complete and populate testJson
       await page.waitForResponse(resp => resp.url().includes('/api/v2/rules/verify'));
@@ -155,7 +155,7 @@ test.describe('Rule Create Page', () => {
       await ruleCreatePage.goto();
 
       // Fill in logic
-      await ruleCreatePage.fillLogic("if $amount > 100:\n\treturn 'HOLD'");
+      await ruleCreatePage.fillLogic("if $amount > 100:\n\treturn !HOLD");
 
       // Wait for params to populate
       await page.waitForResponse(resp => resp.url().includes('/api/v2/rules/verify'));
@@ -189,7 +189,7 @@ test.describe('Rule Create Page', () => {
 
       const uniqueRid = 'E2E_CREATE_' + Date.now();
       const description = 'E2E test rule created at ' + Date.now();
-      const logic = "if $amount > 100:\n\treturn 'HOLD'";
+      const logic = "if $amount > 100:\n\treturn !HOLD";
 
       await ruleCreatePage.fillRuleId(uniqueRid);
       await ruleCreatePage.fillDescription(description);
@@ -235,7 +235,7 @@ test.describe('Rule Create Page', () => {
 
       // Leave Rule ID empty, fill others
       await ruleCreatePage.fillDescription('Test description');
-      await ruleCreatePage.fillLogic("if $amount > 100:\n\treturn 'HOLD'");
+      await ruleCreatePage.fillLogic("if $amount > 100:\n\treturn !HOLD");
 
       await ruleCreatePage.clickSubmit();
 
@@ -259,7 +259,7 @@ test.describe('Rule Create Page', () => {
 
       const uniqueRid = 'E2E_POST_CHECK_' + Date.now();
       const description = 'POST body test';
-      const logic = "if $amount > 50:\n\treturn 'REVIEW'";
+      const logic = "if $amount > 50:\n\treturn !RELEASE";
 
       await ruleCreatePage.fillRuleId(uniqueRid);
       await ruleCreatePage.fillDescription(description);

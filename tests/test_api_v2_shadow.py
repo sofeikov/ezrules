@@ -26,7 +26,7 @@ from ezrules.core.rule_updater import (
     RDBRuleManager,
     deploy_rule_to_shadow,
 )
-from ezrules.models.backend_core import Organisation, Role, Rule as RuleModel
+from ezrules.models.backend_core import AllowedOutcome, Organisation, Role, Rule as RuleModel
 from ezrules.models.backend_core import RuleEngineConfig, ShadowResultsLog, User
 
 
@@ -97,6 +97,17 @@ def shadow_test_client(session):
         session.add(org)
         session.commit()
 
+    shadow_outcomes = ["HOLD", "REVIEW", "DRAFT_OUTCOME", "SHADOW_OUTCOME", "LEAD", "TAIL", "PASS"]
+    for severity_rank, outcome_name in enumerate(shadow_outcomes, start=1):
+        existing_outcome = (
+            session.query(AllowedOutcome)
+            .filter(AllowedOutcome.o_id == int(org.o_id), AllowedOutcome.outcome_name == outcome_name)
+            .first()
+        )
+        if existing_outcome is None:
+            session.add(AllowedOutcome(outcome_name=outcome_name, severity_rank=severity_rank, o_id=int(org.o_id)))
+    session.commit()
+
     shadow_role = session.query(Role).filter(Role.name == "shadow_manager").first()
     if not shadow_role:
         shadow_role = Role(name="shadow_manager", description="Can manage shadow rules")
@@ -161,7 +172,7 @@ def shadow_rule(session):
 
     rule = RuleModel(
         rid="shadow_test_rule",
-        logic="return 'REVIEW'",
+        logic="return !REVIEW",
         description="Rule for shadow testing",
         o_id=org.o_id,
     )
@@ -230,7 +241,7 @@ class TestDeployToShadow:
         token = shadow_test_client.test_data["token"]
         session = shadow_test_client.test_data["session"]
 
-        draft_logic = "return 'DRAFT_OUTCOME'"
+        draft_logic = "return !DRAFT_OUTCOME"
         original_logic = shadow_rule.logic
         assert draft_logic != original_logic
 
@@ -384,7 +395,7 @@ class TestPromoteFromShadow:
         token = shadow_test_client.test_data["token"]
         session = shadow_test_client.test_data["session"]
 
-        shadow_logic = "return 'SHADOW_OUTCOME'"
+        shadow_logic = "return !SHADOW_OUTCOME"
         original_logic = shadow_rule.logic
         assert shadow_logic != original_logic
 
@@ -438,7 +449,7 @@ class TestPromoteFromShadow:
         shadow_rule.status = "active"
         leading_rule = RuleModel(
             rid="shadow_leading_rule",
-            logic="return 'LEAD'",
+            logic="return !LEAD",
             description="Runs first",
             status="active",
             execution_order=1,
@@ -446,7 +457,7 @@ class TestPromoteFromShadow:
         )
         trailing_rule = RuleModel(
             rid="shadow_trailing_rule",
-            logic="return 'TAIL'",
+            logic="return !TAIL",
             description="Runs last",
             status="active",
             execution_order=3,
@@ -458,7 +469,7 @@ class TestPromoteFromShadow:
 
         shadow_test_client.post(
             f"/api/v2/rules/{shadow_rule.r_id}/shadow",
-            json={"logic": "return 'SHADOW_OUTCOME'", "description": "Shadow promoted"},
+            json={"logic": "return !SHADOW_OUTCOME", "description": "Shadow promoted"},
             headers={"Authorization": f"Bearer {token}"},
         )
 
@@ -601,7 +612,7 @@ class TestShadowEvaluation:
             session.commit()
 
         # Create a rule and add to production config
-        rule = RuleModel(logic="return 'HOLD'", description="Shadow eval rule", rid="SHADOW_EVAL:001", o_id=org.o_id)
+        rule = RuleModel(logic="return !HOLD", description="Shadow eval rule", rid="SHADOW_EVAL:001", o_id=org.o_id)
         session.add(rule)
         session.commit()
 
@@ -645,7 +656,7 @@ class TestShadowEvaluation:
             session.add(org)
             session.commit()
 
-        rule = RuleModel(logic="return 'HOLD'", description="Shadow eval rule", rid="SHADOW_EVAL:001", o_id=org.o_id)
+        rule = RuleModel(logic="return !HOLD", description="Shadow eval rule", rid="SHADOW_EVAL:001", o_id=org.o_id)
         session.add(rule)
         session.commit()
 
@@ -688,7 +699,7 @@ class TestShadowEvaluation:
             session.commit()
 
         rule = RuleModel(
-            logic="return 'PASS'",
+            logic="return !PASS",
             description="No shadow config rule",
             rid="SHADOW_EVAL:002",
             o_id=org.o_id,

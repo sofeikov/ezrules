@@ -226,7 +226,7 @@ class TestRuntimeSettings:
                 RuleModel(
                     rid="ALLOWLIST_RELEASE_ONLY",
                     description="Existing allowlist rule",
-                    logic='if $country == "GB":\n\treturn "RELEASE"',
+                    logic='if $country == "GB":\n\treturn !RELEASE',
                     evaluation_lane="allowlist",
                     status=RuleStatus.DRAFT,
                     o_id=int(org.o_id),
@@ -246,7 +246,7 @@ class TestRuntimeSettings:
         assert payload["neutral_outcome"] == "HOLD"
         assert len(payload["invalid_allowlist_rules"]) == 1
         assert payload["invalid_allowlist_rules"][0]["rid"] == "ALLOWLIST_RELEASE_ONLY"
-        assert "configured neutral outcome 'HOLD'" in payload["invalid_allowlist_rules"][0]["error"]
+        assert "configured neutral outcome !HOLD" in payload["invalid_allowlist_rules"][0]["error"]
 
 
 class TestOutcomeHierarchySettings:

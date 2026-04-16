@@ -6,7 +6,7 @@ The usual fix is to cast inside the rule:
 
 ```python
 if int($amount) > 10000:
-    return 'HOLD'
+    return !HOLD
 ```
 
 Which works until the next person writes a rule without the cast. Now you have inconsistent behavior across the rule set with no easy way to audit it.
@@ -32,7 +32,7 @@ After that, the rule stays as written:
 
 ```python
 if $amount > 10000:
-    return 'HOLD'
+    return !HOLD
 ```
 
 The comparison is always numeric. No casts inside rules, no special handling per field.

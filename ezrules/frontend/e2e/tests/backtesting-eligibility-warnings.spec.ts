@@ -73,7 +73,7 @@ test.describe('Backtesting Eligibility Warnings', () => {
       data: {
         rid: `E2E_BT_WARN_${Date.now()}`,
         description: 'backtest eligibility warning test',
-        logic: "if $amount > 100:\n\treturn 'HOLD'",
+        logic: "if $amount > 100:\n\treturn !HOLD",
       },
     });
     const createData = await createResponse.json();
@@ -105,7 +105,7 @@ test.describe('Backtesting Eligibility Warnings', () => {
       await page.getByRole('button', { name: 'Edit Rule' }).click();
 
       const logicEditor = page.locator('textarea[placeholder="Enter rule logic"]').first();
-      await logicEditor.fill('if $amount > 100 and $country == "US":\n\treturn "BLOCK"');
+      await logicEditor.fill('if $amount > 100 and $country == "US":\n\treturn !CANCEL');
 
       await page.getByTestId('backtest-button').click();
       await expect(page.getByTestId('backtest-results-card')).toBeVisible({ timeout: 15000 });

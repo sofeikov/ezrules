@@ -124,7 +124,7 @@ test.describe('Promotion Permissions', () => {
               r_id: 42,
               rid: 'shadow_rule_hidden_promote',
               description: 'Shadow rule',
-              logic: 'return "HOLD"',
+              logic: 'return !HOLD',
             },
           ],
           version: 1,

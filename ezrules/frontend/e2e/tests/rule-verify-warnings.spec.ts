@@ -21,7 +21,7 @@ test.describe('Rule Verify Warnings', () => {
       data: {
         rid: `E2E_VERIFY_WARN_${Date.now()}`,
         description: 'verify warning detail test',
-        logic: "return 'HOLD'",
+        logic: "return !HOLD",
       },
     });
     const createData = await createResponse.json();

@@ -86,7 +86,7 @@ Example rule snippet:
 
 ```python
 if $user_id in @blocked_users:
-    return 'CANCEL'
+    return !CANCEL
 ```
 
 ### Monitor Outcome Trends
@@ -117,7 +117,7 @@ Example:
 
 ```python
 if $user_id in @blocked_users:
-    return 'CANCEL'
+    return !CANCEL
 ```
 
 ### Manage Lists in UI

@@ -68,6 +68,90 @@ class TestRuleVerifyDiagnostics:
             data = response.json()
             assert data["valid"] is True
             assert data["referenced_lists"] == ["VerifyCountries"]
+            assert data["referenced_outcomes"] == []
+            assert data["errors"] == []
+            assert data["params"] == ["amount"]
+        finally:
+            client.close()
+
+    def test_verify_rule_returns_unknown_outcome_location(self, session):
+        client = _build_rules_client(session)
+        try:
+            token = client.test_data["token"]  # type: ignore[attr-defined]
+
+            response = client.post(
+                "/api/v2/rules/verify",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"rule_source": "if $amount > 0:\n\treturn !NEEDS_REVIEW"},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["valid"] is False
+            assert data["referenced_outcomes"] == ["NEEDS_REVIEW"]
+            assert data["errors"]
+            assert "NEEDS_REVIEW" in data["errors"][0]["message"]
+            assert data["errors"][0]["line"] == 2
+            assert data["errors"][0]["column"] is not None
+        finally:
+            client.close()
+
+    def test_verify_rule_rejects_quoted_outcome_returns(self, session):
+        client = _build_rules_client(session)
+        try:
+            token = client.test_data["token"]  # type: ignore[attr-defined]
+
+            response = client.post(
+                "/api/v2/rules/verify",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"rule_source": 'if $amount > 0:\n\treturn "HOLD"'},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["valid"] is False
+            assert data["referenced_outcomes"] == []
+            assert data["errors"]
+            assert "Use return !HOLD" in data["errors"][0]["message"]
+            assert data["errors"][0]["line"] == 2
+            assert data["errors"][0]["column"] is not None
+        finally:
+            client.close()
+
+    def test_verify_rule_ignores_outcome_tokens_inside_comments(self, session):
+        client = _build_rules_client(session)
+        try:
+            token = client.test_data["token"]  # type: ignore[attr-defined]
+
+            response = client.post(
+                "/api/v2/rules/verify",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"rule_source": "# TODO switch to !REVIEW later\nreturn True"},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["valid"] is True
+            assert data["referenced_outcomes"] == []
+            assert data["errors"] == []
+        finally:
+            client.close()
+
+    def test_verify_rule_returns_referenced_outcomes_when_valid(self, session):
+        client = _build_rules_client(session)
+        try:
+            token = client.test_data["token"]  # type: ignore[attr-defined]
+
+            response = client.post(
+                "/api/v2/rules/verify",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"rule_source": "if $amount > 0:\n\treturn !HOLD"},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["valid"] is True
+            assert data["referenced_outcomes"] == ["HOLD"]
             assert data["errors"] == []
             assert data["params"] == ["amount"]
         finally:

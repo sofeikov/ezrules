@@ -8,7 +8,7 @@ def test_production_config_orders_main_rules_by_execution_order(session):
     session.add_all(
         [
             RuleModel(
-                logic='return "RELEASE"',
+                logic="return !RELEASE",
                 description="Runs second",
                 rid="MAIN_SECOND",
                 execution_order=20,
@@ -18,7 +18,7 @@ def test_production_config_orders_main_rules_by_execution_order(session):
                 r_id=9301,
             ),
             RuleModel(
-                logic='return "HOLD"',
+                logic="return !HOLD",
                 description="Runs first",
                 rid="MAIN_FIRST",
                 execution_order=10,

@@ -48,7 +48,7 @@ curl -X POST http://localhost:8888/api/v2/rules/{rule_id}/rollout \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "logic": "if $amount > 7500:\n    return '\''HOLD'\''",
+    "logic": "if $amount > 7500:\n    return !HOLD",
     "description": "Candidate logic",
     "traffic_percent": 20
   }'

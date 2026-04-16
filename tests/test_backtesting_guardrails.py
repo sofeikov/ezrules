@@ -95,14 +95,14 @@ class TestBacktestingGuardrails:
         org, rule = _create_rule(
             session,
             rid="BT_GUARD_001",
-            logic='if $amount > 100:\n\treturn "HOLD"',
+            logic="if $amount > 100:\n\treturn !HOLD",
         )
         session.add(FieldTypeConfig(field_name="amount", configured_type="integer", o_id=org.o_id))
         _insert_record(session, org_id=org.o_id, event_id="cast-1", event={"amount": "150"})
         _insert_record(session, org_id=org.o_id, event_id="cast-2", event={"amount": "50"})
         session.commit()
 
-        result = backtest_rule_change(rule.r_id, 'if $amount > 120:\n\treturn "BLOCK"', int(org.o_id))
+        result = backtest_rule_change(rule.r_id, "if $amount > 120:\n\treturn !BLOCK", int(org.o_id))
 
         assert "error" not in result
         assert result["total_records"] == 2
@@ -116,7 +116,7 @@ class TestBacktestingGuardrails:
         org, rule = _create_rule(
             session,
             rid="BT_GUARD_002",
-            logic='if $amount > 100:\n\treturn "HOLD"',
+            logic="if $amount > 100:\n\treturn !HOLD",
         )
         _insert_record(session, org_id=org.o_id, event_id="subset-1", event={"amount": 150, "country": "US"})
         _insert_record(session, org_id=org.o_id, event_id="subset-2", event={"amount": 150})
@@ -125,7 +125,7 @@ class TestBacktestingGuardrails:
 
         result = backtest_rule_change(
             rule.r_id,
-            'if $amount > 100 and $country == "US":\n\treturn "BLOCK"',
+            'if $amount > 100 and $country == "US":\n\treturn !BLOCK',
             int(org.o_id),
         )
 
@@ -141,14 +141,14 @@ class TestBacktestingGuardrails:
         org, rule = _create_rule(
             session,
             rid="BT_GUARD_003",
-            logic='if $amount > 100:\n\treturn "HOLD"',
+            logic="if $amount > 100:\n\treturn !HOLD",
         )
         session.add(FieldTypeConfig(field_name="merchant_id", configured_type="string", required=True, o_id=org.o_id))
         _insert_record(session, org_id=org.o_id, event_id="required-1", event={"amount": 150})
         _insert_record(session, org_id=org.o_id, event_id="required-2", event={"amount": 200, "merchant_id": "m-1"})
         session.commit()
 
-        result = backtest_rule_change(rule.r_id, 'if $amount > 120:\n\treturn "BLOCK"', int(org.o_id))
+        result = backtest_rule_change(rule.r_id, "if $amount > 120:\n\treturn !BLOCK", int(org.o_id))
 
         assert "error" not in result
         assert result["total_records"] == 1
@@ -161,7 +161,7 @@ class TestBacktestingGuardrails:
         org, rule = _create_rule(
             session,
             rid="BT_GUARD_004",
-            logic='if $amount > 100:\n\treturn "HOLD"',
+            logic="if $amount > 100:\n\treturn !HOLD",
         )
         _insert_record(session, org_id=org.o_id, event_id="api-1", event={"amount": 150, "country": "US"})
         _insert_record(session, org_id=org.o_id, event_id="api-2", event={"amount": 200})
@@ -172,7 +172,7 @@ class TestBacktestingGuardrails:
             headers={"Authorization": f"Bearer {token}"},
             json={
                 "r_id": rule.r_id,
-                "new_rule_logic": 'if $amount > 100 and $country == "US":\n\treturn "BLOCK"',
+                "new_rule_logic": 'if $amount > 100 and $country == "US":\n\treturn !BLOCK',
             },
         )
 

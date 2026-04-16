@@ -47,7 +47,7 @@ def test_evaluate_first_match_uses_main_rule_execution_order(session):
     session.add_all(
         [
             RuleModel(
-                logic='return "RELEASE"',
+                logic="return !RELEASE",
                 description="Runs second",
                 rid="FIRST_MATCH_SECOND",
                 execution_order=2,
@@ -57,7 +57,7 @@ def test_evaluate_first_match_uses_main_rule_execution_order(session):
                 r_id=9401,
             ),
             RuleModel(
-                logic='return "HOLD"',
+                logic="return !HOLD",
                 description="Runs first",
                 rid="FIRST_MATCH_FIRST",
                 execution_order=1,

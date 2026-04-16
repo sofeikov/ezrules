@@ -102,7 +102,7 @@ def test_shadow_results_and_stats_prefer_shared_logs_over_legacy_duplicates(sess
     rule = _create_rule(
         session,
         rid="REVIEW:SHADOW:001",
-        logic="return 'CONTROL'",
+        logic="return !CONTROL",
         description="Rule for shadow regression coverage",
     )
 
@@ -172,7 +172,7 @@ def test_rollout_stats_aggregate_counts_in_sql(session):
     rule = _create_rule(
         session,
         rid="REVIEW:ROLLOUT:001",
-        logic="return 'CONTROL'",
+        logic="return !CONTROL",
         description="Rule for rollout aggregation coverage",
     )
 
@@ -182,7 +182,7 @@ def test_rollout_stats_aggregate_counts_in_sql(session):
         rule_model=rule,
         traffic_percent=40,
         changed_by="test",
-        logic_override="return 'CANDIDATE'",
+        logic_override="return !CANDIDATE",
         description_override="Candidate rollout",
     )
 

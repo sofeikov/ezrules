@@ -86,7 +86,7 @@ def sample_rule_for_bt(session):
 
     rule = RuleModel(
         rid="bt_rule_001",
-        logic='if $amount > 100:\n\treturn "HOLD"',
+        logic="if $amount > 100:\n\treturn !HOLD",
         description="Backtest rule",
         o_id=org.o_id,
     )
@@ -117,7 +117,7 @@ class TestBacktestTaskDirect:
         session.commit()
 
         # Run the task directly
-        result = backtest_rule_change(sample_rule_for_bt.r_id, 'if $amount > 150:\n\treturn "BLOCK"', int(org.o_id))
+        result = backtest_rule_change(sample_rule_for_bt.r_id, "if $amount > 150:\n\treturn !BLOCK", int(org.o_id))
 
         assert "error" not in result
         assert "stored_result" in result
@@ -269,7 +269,7 @@ class TestBacktestChunkedEvaluation:
             session.add(record)
         session.commit()
 
-        result = backtest_rule_change(sample_rule_for_bt.r_id, 'if $amount > 50:\n\treturn "FLAG"', int(org.o_id))
+        result = backtest_rule_change(sample_rule_for_bt.r_id, "if $amount > 50:\n\treturn !FLAG", int(org.o_id))
 
         assert "error" not in result
         assert result["total_records"] == 50

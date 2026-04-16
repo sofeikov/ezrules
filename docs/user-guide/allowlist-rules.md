@@ -43,7 +43,7 @@ This is why allowlist rules are useful. They are not just "rules that return a s
 
 ## The Neutral Outcome
 
-Allowlist rules must return the configured neutral outcome.
+Allowlist rules must return the configured neutral outcome with `!OUTCOME` syntax.
 
 Current implementation:
 
@@ -52,7 +52,7 @@ Current implementation:
 - admins choose it in **Settings** from the existing outcomes catalog
 - the setting is available through `GET /api/v2/settings/runtime` and `PUT /api/v2/settings/runtime`
 
-That means the rule editor and API validation both expect allowlist rules to return the currently configured neutral outcome, not an arbitrary outcome.
+That means the rule editor and API validation both expect allowlist rules to return the currently configured neutral outcome as `!RELEASE`, `!HOLD`, or whatever neutral value your org has configured, not an arbitrary outcome.
 
 ## When To Use Allowlist vs Main Rules
 
@@ -73,16 +73,16 @@ Use **Allowlist rules** when:
 1. Open **Rules**
 2. Click **New Rule**
 3. In **Rule Lane**, choose **Allowlist rules**
-4. Write logic that returns the configured neutral outcome
+4. Write logic that returns the configured neutral outcome with `!OUTCOME`
 
 Example:
 
 ```python
 if $merchant_id in @trusted_merchants:
-    return 'RELEASE'
+    return !RELEASE
 ```
 
-The editor validates allowlist rules more strictly than main rules. If the configured neutral outcome is `RELEASE`, returning `HOLD` or `CANCEL` will fail validation.
+The editor validates allowlist rules more strictly than main rules. If the configured neutral outcome is `RELEASE`, returning `!HOLD` or `!CANCEL` will fail validation.
 
 ## Edit an Existing Rule Into the Allowlist Lane
 
@@ -91,7 +91,7 @@ You can also move a rule into the allowlist lane from the rule detail page:
 1. Open the rule
 2. Click **Edit Rule**
 3. Change **Rule Lane** to **Allowlist rules**
-4. Update logic if needed so it returns the configured neutral outcome
+4. Update logic if needed so it returns the configured neutral outcome with `!OUTCOME`
 5. Save
 
 The rule detail and rules list views show an `Allowlist` / `ALLOWLIST` badge so these rules stand out from the main rule set.

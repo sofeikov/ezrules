@@ -49,7 +49,7 @@ def test_compute_rule_quality_metrics_excludes_unscored_rules_from_rankings(sess
 
     rule = RuleModel(
         rid="quality_unscored_rule",
-        logic="return 'HOLD'",
+        logic="return !HOLD",
         description="Rule with zero predicted positives for the curated pair",
         o_id=org.o_id,
     )

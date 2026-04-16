@@ -3,7 +3,12 @@ from ezrules.settings import Settings
 
 
 def make_settings(**overrides) -> Settings:
-    return Settings(DB_ENDPOINT="postgresql://postgres:root@localhost:5432/test", APP_SECRET="test-secret", **overrides)
+    return Settings(
+        _env_file=None,
+        DB_ENDPOINT="postgresql://postgres:root@localhost:5432/test",
+        APP_SECRET="test-secret",
+        **overrides,
+    )
 
 
 def test_build_cors_defaults_to_same_origin_only() -> None:

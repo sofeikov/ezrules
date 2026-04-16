@@ -57,7 +57,7 @@ If one or more active allowlist rules match an event:
 - the main rule set is skipped for the returned result
 - `rule_results` contains the matching allowlist rules only
 
-Allowlist rules must return the configured neutral outcome. The current runtime setting is `neutral_outcome`, which defaults to `RELEASE`.
+Allowlist rules must return the configured neutral outcome using `!OUTCOME` syntax. The current runtime setting is `neutral_outcome`, which defaults to `RELEASE`, so the canonical allowlist return is `!RELEASE` unless your organisation changes that value.
 
 #### Request Fields
 

@@ -1,8 +1,10 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+SETTINGS_ENV_FILE = "settings.env"
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="EZRULES_", env_file="settings.env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="EZRULES_", extra="ignore")
 
     DB_ENDPOINT: str
     APP_SECRET: str
@@ -45,4 +47,4 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
 
 
-app_settings = Settings()  # type: ignore[missing-argument]
+app_settings = Settings(_env_file=SETTINGS_ENV_FILE)  # type: ignore[missing-argument]

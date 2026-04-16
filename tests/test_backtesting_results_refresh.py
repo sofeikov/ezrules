@@ -18,7 +18,7 @@ def test_get_backtest_results_refreshes_active_rows(backtesting_controls_client,
             r_id=int(rule.r_id),
             task_id="refresh-me",
             stored_logic=rule.logic,
-            proposed_logic='if $amount > 40:\n\treturn "BLOCK"',
+            proposed_logic="if $amount > 40:\n\treturn !BLOCK",
             status="pending",
         )
     )
@@ -67,7 +67,7 @@ def test_get_task_result_recovers_orphaned_pending_backtests(backtesting_control
         r_id=int(rule.r_id),
         task_id="orphaned-task",
         stored_logic=rule.logic,
-        proposed_logic='if $amount > 40:\n\treturn "BLOCK"',
+        proposed_logic="if $amount > 40:\n\treturn !BLOCK",
         status="pending",
         created_at=datetime.now(UTC) - timedelta(seconds=10),
     )

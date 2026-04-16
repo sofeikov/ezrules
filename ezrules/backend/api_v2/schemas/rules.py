@@ -30,7 +30,7 @@ class RuleCreate(BaseModel):
             "example": {
                 "rid": "high_value_transaction",
                 "description": "Flag transactions over $10,000",
-                "logic": "event.amount > 10000",
+                "logic": "if $amount > 10000:\n\treturn !HOLD",
             }
         }
     }
@@ -177,6 +177,9 @@ class RuleVerifyResponse(BaseModel):
     params: list[str] = Field(default_factory=list, description="Parameters extracted from the rule")
     referenced_lists: list[str] = Field(
         default_factory=list, description="User list references extracted from the rule"
+    )
+    referenced_outcomes: list[str] = Field(
+        default_factory=list, description="Outcome references extracted from the rule"
     )
     warnings: list[str] = Field(default_factory=list, description="Advisory warnings about referenced fields")
     errors: list[RuleVerifyError] = Field(default_factory=list, description="Structured validation failures")

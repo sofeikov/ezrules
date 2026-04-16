@@ -31,7 +31,7 @@ def _get_or_create_org(session):
 
 def _setup_rule_engine(session, org, rid, r_id):
     """Persist a minimal rule and build the in-memory executor for the test."""
-    rule = Rule(logic="return 'PASS'", description="cast integration rule", rid=rid, o_id=org.o_id, r_id=r_id)
+    rule = Rule(logic="return !PASS", description="cast integration rule", rid=rid, o_id=org.o_id, r_id=r_id)
     session.add(rule)
     session.commit()
     RDBRuleEngineConfigProducer(db=session, o_id=org.o_id).save_config(RDBRuleManager(db=session, o_id=org.o_id))

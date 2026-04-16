@@ -629,7 +629,7 @@ def _rule_cross_border_cnp_mismatch(variant: int) -> tuple[str, str, str]:
     logic = (
         f"if $card_present == 0 and $amount >= {amount} and $device_age_days <= 2 and $has_3ds == 0 "
         "and ($billing_country != $shipping_country or $billing_country != $ip_country):\n"
-        "    return 'HOLD'"
+        "    return !HOLD"
     )
     description = (
         f"Escalate card-not-present spend above {amount} from fresh devices when billing, shipping, "
@@ -644,7 +644,7 @@ def _rule_disposable_email_velocity(variant: int) -> tuple[str, str, str]:
     logic = (
         "if $merchant_category in @ElevatedRiskMerchantCategories and $email_domain in @DisposableEmailDomains "
         f"and $txn_velocity_10m >= {velocity} and $unique_cards_24h >= {unique_cards}:\n"
-        "    return 'CANCEL'"
+        "    return !CANCEL"
     )
     description = (
         f"Block elevated-risk merchants when a disposable email is used alongside a {velocity}+ burst "
@@ -659,7 +659,7 @@ def _rule_na_to_latam_reship(variant: int) -> tuple[str, str, str]:
     logic = (
         "if $billing_country in @NACountries and $shipping_country in @LatamCountries "
         f"and $account_age_days <= {max_age} and $is_guest_checkout == 1 and $amount >= {amount}:\n"
-        "    return 'HOLD'"
+        "    return !HOLD"
     )
     description = (
         f"Review new-account guest checkouts over {amount} when billing is North America but goods "
@@ -675,7 +675,7 @@ def _rule_showcase_amount_zscore(variant: int) -> tuple[str, str, str]:
         "    amount_zscore = ($amount - $customer_avg_amount_30d) / $customer_std_amount_30d\n"
         f"    if amount_zscore >= {zscore}:\n"
         "        if $card_present == 0 or $billing_country != $shipping_country:\n"
-        "            return 'HOLD'"
+        "            return !HOLD"
     )
     description = (
         f"Showcase rule: compute an amount z-score and escalate when spend is {zscore}+ sigma above the "
@@ -689,7 +689,7 @@ def _rule_ato_password_reset(variant: int) -> tuple[str, str, str]:
     logic = (
         f"if $password_reset_age_hours <= 6 and $account_age_days >= 180 and $amount >= {amount} "
         "and $device_age_days <= 1 and $ip_country != $customer_country:\n"
-        "    return 'HOLD'"
+        "    return !HOLD"
     )
     description = (
         f"Escalate mature accounts spending {amount}+ right after a password reset when the session "
@@ -713,7 +713,7 @@ def _rule_showcase_loop_score(variant: int) -> tuple[str, str, str]:
         "    if signal:\n"
         "        hits += 1\n"
         f"if hits >= {threshold}:\n"
-        "    return 'HOLD'"
+        "    return !HOLD"
     )
     description = (
         f"Showcase rule: count triggered risk signals in a loop and hold when at least {threshold} conditions line up."
@@ -729,10 +729,10 @@ def _rule_showcase_branch_by_txn_type(variant: int) -> tuple[str, str, str]:
         "amount_ratio = $amount / baseline_amount\n"
         "if $txn_type in ['wallet_cashout', 'instant_payout', 'bank_transfer']:\n"
         f"    if amount_ratio >= {payout_ratio} and $beneficiary_age_days <= 2:\n"
-        "        return 'HOLD'\n"
+        "        return !HOLD\n"
         "elif $merchant_category in ['electronics', 'travel', 'luxury']:\n"
         f"    if amount_ratio >= {purchase_ratio} and $card_present == 0:\n"
-        "        return 'HOLD'"
+        "        return !HOLD"
     )
     description = (
         "Showcase rule: branch by transaction type and apply different baseline-multiple thresholds "
@@ -746,7 +746,7 @@ def _rule_sanctioned_cashout(variant: int) -> tuple[str, str, str]:
     logic = (
         "if $txn_type in ['wallet_cashout', 'instant_payout', 'bank_transfer'] and "
         f"$beneficiary_country in @SanctionedCountries and $beneficiary_age_days <= {max_beneficiary_age}:\n"
-        "    return 'CANCEL'"
+        "    return !CANCEL"
     )
     description = (
         "Block payout or transfer attempts to sanctioned destinations when the beneficiary was added "
@@ -761,7 +761,7 @@ def _rule_proxy_high_risk_category(variant: int) -> tuple[str, str, str]:
     logic = (
         "if $merchant_category in @ElevatedRiskMerchantCategories "
         f"and $ip_proxy_score >= {proxy_score} and $has_3ds == 0 and $amount >= {amount}:\n"
-        "    return 'HOLD'"
+        "    return !HOLD"
     )
     description = (
         f"Review elevated-risk merchant traffic above {amount} when the session is masked behind a "
@@ -776,7 +776,7 @@ def _rule_card_testing_on_device(variant: int) -> tuple[str, str, str]:
     logic = (
         f"if $amount <= 25 and $decline_count_24h >= {declines} and $txn_velocity_10m >= {velocity} "
         "and $unique_cards_24h >= 4:\n"
-        "    return 'CANCEL'"
+        "    return !CANCEL"
     )
     description = (
         f"Block classic card-testing bursts: micro-payments with {declines}+ declines, {velocity}+ "
@@ -790,7 +790,7 @@ def _rule_watchlist_merchant_low_trust(variant: int) -> tuple[str, str, str]:
     logic = (
         "if $merchant_id in @WatchlistMerchants and $card_present == 0 "
         f"and $device_trust_score <= {trust_score} and $amount >= 150:\n"
-        "    return 'CANCEL'"
+        "    return !CANCEL"
     )
     description = (
         f"Decline card-not-present traffic hitting watchlist merchants when the device trust score falls "
@@ -804,7 +804,7 @@ def _rule_repeat_chargeback_cnp(variant: int) -> tuple[str, str, str]:
     logic = (
         f"if $prior_chargebacks_180d >= 2 and $card_present == 0 and $amount >= {amount} "
         "and $merchant_category in ['fashion', 'electronics', 'travel', 'luxury']:\n"
-        "    return 'HOLD'"
+        "    return !HOLD"
     )
     description = (
         f"Review repeat-chargeback customers re-entering card-not-present commerce above {amount}, "
@@ -820,7 +820,7 @@ def _rule_night_velocity_payout(variant: int) -> tuple[str, str, str]:
         "if $txn_type in ['wallet_cashout', 'instant_payout', 'bank_transfer'] and "
         f"$beneficiary_age_days <= 3 and $txn_velocity_1h >= {velocity} and $manual_review_hits_30d >= {review_hits} "
         "and $local_hour <= 4:\n"
-        "    return 'HOLD'"
+        "    return !HOLD"
     )
     description = (
         f"Escalate overnight cash-out behavior when a new beneficiary is hit {velocity}+ times per hour "
