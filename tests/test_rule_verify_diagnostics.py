@@ -118,6 +118,25 @@ class TestRuleVerifyDiagnostics:
         finally:
             client.close()
 
+    def test_verify_rule_ignores_outcome_tokens_inside_comments(self, session):
+        client = _build_rules_client(session)
+        try:
+            token = client.test_data["token"]  # type: ignore[attr-defined]
+
+            response = client.post(
+                "/api/v2/rules/verify",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"rule_source": "# TODO switch to !REVIEW later\nreturn True"},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["valid"] is True
+            assert data["referenced_outcomes"] == []
+            assert data["errors"] == []
+        finally:
+            client.close()
+
     def test_verify_rule_returns_referenced_outcomes_when_valid(self, session):
         client = _build_rules_client(session)
         try:

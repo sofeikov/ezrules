@@ -14,7 +14,11 @@ import {
 import { CommonModule } from '@angular/common';
 import type { Completion, CompletionContext } from '@codemirror/autocomplete';
 import type { Diagnostic as CodeMirrorDiagnostic } from '@codemirror/lint';
-import { RuleEditorFieldSuggestion, RuleEditorListSuggestion } from '../services/rule-editor-assist.service';
+import {
+  RuleEditorFieldSuggestion,
+  RuleEditorListSuggestion,
+  RuleEditorOutcomeSuggestion,
+} from '../services/rule-editor-assist.service';
 
 export interface RuleEditorDiagnostic {
   message: string;
@@ -46,7 +50,7 @@ const RULE_KEYWORD_COMPLETIONS: Completion[] = [
     <div class="overflow-hidden rounded-lg border border-slate-200 shadow-sm">
       <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
         <span>{{ readOnly ? 'Read-only rule source' : 'Rule editor' }}</span>
-        <span *ngIf="!readOnly">Type <code>$</code> for fields and <code>&#64;</code> for user lists</span>
+        <span *ngIf="!readOnly">Type <code>$</code> for fields, <code>&#64;</code> for user lists, and <code>!</code> for outcomes</span>
       </div>
       <div #editorHost class="rule-editor-host"></div>
     </div>
@@ -60,6 +64,9 @@ const RULE_KEYWORD_COMPLETIONS: Completion[] = [
       </span>
       <span *ngIf="listSuggestions.length > 0" class="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-700">
         User lists loaded
+      </span>
+      <span *ngIf="outcomeSuggestions.length > 0" class="rounded-full bg-rose-50 px-2.5 py-1 font-medium text-rose-700">
+        Outcomes loaded
       </span>
     </div>
   `,
@@ -155,6 +162,11 @@ const RULE_KEYWORD_COMPLETIONS: Completion[] = [
       font-weight: 600;
     }
 
+    :host ::ng-deep .cm-rule-outcome-token {
+      color: #be123c;
+      font-weight: 700;
+    }
+
     :host ::ng-deep .cm-keyword {
       color: #7c3aed;
     }
@@ -181,6 +193,7 @@ export class RuleLogicEditorComponent implements AfterViewInit, OnChanges, OnDes
   @Input() diagnostics: RuleEditorDiagnostic[] = [];
   @Input() fieldSuggestions: RuleEditorFieldSuggestion[] = [];
   @Input() listSuggestions: RuleEditorListSuggestion[] = [];
+  @Input() outcomeSuggestions: RuleEditorOutcomeSuggestion[] = [];
   @Output() valueChange = new EventEmitter<string>();
 
   @ViewChild('editorHost', { static: true }) private editorHost!: ElementRef<HTMLDivElement>;
@@ -237,9 +250,13 @@ export class RuleLogicEditorComponent implements AfterViewInit, OnChanges, OnDes
 
     const { Decoration, EditorView, keymap, MatchDecorator, placeholder, ViewPlugin } = viewModule;
     const notationTokenDecorator = new MatchDecorator({
-      regexp: /[$@][A-Za-z_][A-Za-z0-9_]*/g,
+      regexp: /[$@!][A-Za-z_][A-Za-z0-9_]*/g,
       decoration: (match: RegExpExecArray) => Decoration.mark({
-        class: match[0].startsWith('$') ? 'cm-rule-field-token' : 'cm-rule-list-token',
+        class: match[0].startsWith('$')
+          ? 'cm-rule-field-token'
+          : match[0].startsWith('@')
+            ? 'cm-rule-list-token'
+            : 'cm-rule-outcome-token',
       }),
     });
     const notationTokenPlugin = ViewPlugin.fromClass(class {
@@ -299,7 +316,7 @@ export class RuleLogicEditorComponent implements AfterViewInit, OnChanges, OnDes
   }
 
   private readonly completeRuleTokens = (context: CompletionContext) => {
-    const triggeredToken = context.matchBefore(/[$@][A-Za-z0-9_]*/);
+    const triggeredToken = context.matchBefore(/[$@!][A-Za-z0-9_]*/);
     if (triggeredToken) {
       if (triggeredToken.from === triggeredToken.to && !context.explicit) {
         return null;
@@ -319,6 +336,23 @@ export class RuleLogicEditorComponent implements AfterViewInit, OnChanges, OnDes
           from: triggeredToken.from,
           options,
           validFor: /^\$[A-Za-z0-9_]*$/,
+        };
+      }
+
+      if (triggeredToken.text.startsWith('!')) {
+        const outcomeQuery = triggeredToken.text.slice(1).toLowerCase();
+        const options = this.outcomeSuggestions
+          .filter((outcome) => outcome.name.toLowerCase().includes(outcomeQuery))
+          .map((outcome) => ({
+            label: `!${outcome.name}`,
+            type: 'constant',
+            detail: `allowed outcome • severity ${outcome.severityRank}`,
+          }));
+
+        return {
+          from: triggeredToken.from,
+          options,
+          validFor: /^![A-Za-z0-9_]*$/,
         };
       }
 

@@ -1,6 +1,6 @@
 import pytest
 
-from ezrules.core.rule import Rule
+from ezrules.core.rule import OutcomeReturnSyntaxError, Rule
 
 
 @pytest.mark.parametrize(
@@ -36,3 +36,16 @@ def test_can_use_custom_lists(session, logic, input, expected_result):
     rule = Rule(rid="1", logic=logic)
     outcome = rule(input)
     assert outcome == expected_result
+
+
+@pytest.mark.parametrize(
+    "logic",
+    [
+        'if True:\n\treturn ("HOLD")',
+        'value = "HOLD"\nreturn value',
+        'return "HOLD" if True else None',
+    ],
+)
+def test_rejects_indirect_or_quoted_outcome_returns(logic):
+    with pytest.raises(OutcomeReturnSyntaxError):
+        Rule(rid="1", logic=logic)

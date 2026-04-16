@@ -17,7 +17,15 @@ from ezrules.backend.api_v2.main import app
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager, save_rule_history
-from ezrules.models.backend_core import Organisation, Role, RuleEngineConfig, RuleHistory, RuleStatus, User
+from ezrules.models.backend_core import (
+    AllowedOutcome,
+    Organisation,
+    Role,
+    RuleEngineConfig,
+    RuleHistory,
+    RuleStatus,
+    User,
+)
 from ezrules.models.backend_core import Rule as RuleModel
 
 
@@ -34,6 +42,16 @@ def rules_test_client(session):
         org = Organisation(o_id=1, name="Test Org")
         session.add(org)
         session.commit()
+
+    for severity_rank, outcome_name in enumerate(("RELEASE", "HOLD", "CANCEL"), start=1):
+        existing_outcome = (
+            session.query(AllowedOutcome)
+            .filter(AllowedOutcome.o_id == int(org.o_id), AllowedOutcome.outcome_name == outcome_name)
+            .first()
+        )
+        if existing_outcome is None:
+            session.add(AllowedOutcome(outcome_name=outcome_name, severity_rank=severity_rank, o_id=int(org.o_id)))
+    session.commit()
 
     # Create role with rule permissions
     rule_role = session.query(Role).filter(Role.name == "rule_manager").first()

@@ -57,7 +57,7 @@ test.describe('Settings Page', () => {
       await page.goto('/rules/create');
       await page.locator('[data-testid="rule-lane-select"]').selectOption('allowlist');
       await expect(page.locator('text=They must return').first()).toContainText(
-        `They must return ${nextNeutralOutcome}.`
+        `They must return !${nextNeutralOutcome}.`
       );
     } finally {
       const restoreResponse = await request.put(`${API_BASE}/api/v2/settings/runtime`, {

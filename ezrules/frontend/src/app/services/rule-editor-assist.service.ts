@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { combineLatest, Observable, of } from 'rxjs';
 import { catchError, map, shareReplay } from 'rxjs/operators';
 import { FieldTypeService } from './field-type.service';
+import { OutcomeService } from './outcome.service';
 import { UserListService } from './user-list.service';
 
 export interface RuleEditorFieldSuggestion {
@@ -14,9 +15,15 @@ export interface RuleEditorListSuggestion {
   entryCount: number;
 }
 
+export interface RuleEditorOutcomeSuggestion {
+  name: string;
+  severityRank: number;
+}
+
 export interface RuleEditorAssistData {
   fields: RuleEditorFieldSuggestion[];
   lists: RuleEditorListSuggestion[];
+  outcomes: RuleEditorOutcomeSuggestion[];
 }
 
 @Injectable({
@@ -27,6 +34,7 @@ export class RuleEditorAssistService {
 
   constructor(
     private fieldTypeService: FieldTypeService,
+    private outcomeService: OutcomeService,
     private userListService: UserListService
   ) { }
 
@@ -34,9 +42,10 @@ export class RuleEditorAssistService {
     if (!this.assistData$) {
       this.assistData$ = combineLatest({
         observations: this.fieldTypeService.getObservations().pipe(catchError(() => of([]))),
+        outcomes: this.outcomeService.getOutcomes().pipe(catchError(() => of({ outcomes: [] }))),
         lists: this.userListService.getUserLists().pipe(catchError(() => of([])))
       }).pipe(
-        map(({ observations, lists }) => ({
+        map(({ observations, outcomes, lists }) => ({
           fields: observations
             .slice()
             .sort((left, right) => {
@@ -56,6 +65,13 @@ export class RuleEditorAssistService {
             .map((list) => ({
               name: list.name,
               entryCount: list.entry_count,
+            })),
+          outcomes: outcomes.outcomes
+            .slice()
+            .sort((left, right) => left.severity_rank - right.severity_rank || left.outcome_name.localeCompare(right.outcome_name))
+            .map((outcome) => ({
+              name: outcome.outcome_name,
+              severityRank: outcome.severity_rank,
             })),
         })),
         shareReplay(1)

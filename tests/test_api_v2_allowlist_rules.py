@@ -15,6 +15,7 @@ from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
 from ezrules.models.backend_core import (
+    AllowedOutcome,
     ApiKey,
     Organisation,
     Role,
@@ -32,6 +33,16 @@ def allowlist_rules_client(session):
     """Create a test client with rule-management permissions."""
     hashed_password = bcrypt.hashpw("allowlistpass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
     org = session.query(Organisation).one()
+
+    for severity_rank, outcome_name in enumerate(("RELEASE", "HOLD", "CANCEL"), start=1):
+        existing_outcome = (
+            session.query(AllowedOutcome)
+            .filter(AllowedOutcome.o_id == int(org.o_id), AllowedOutcome.outcome_name == outcome_name)
+            .first()
+        )
+        if existing_outcome is None:
+            session.add(AllowedOutcome(outcome_name=outcome_name, severity_rank=severity_rank, o_id=int(org.o_id)))
+    session.commit()
 
     role = session.query(Role).filter(Role.name == "allowlist_rule_manager", Role.o_id == org.o_id).first()
     if not role:

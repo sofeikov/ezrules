@@ -5,7 +5,7 @@ from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import FieldObservation, FieldTypeConfig, Organisation, Role, User
+from ezrules.models.backend_core import AllowedOutcome, FieldObservation, FieldTypeConfig, Organisation, Role, User
 
 
 def _build_rules_client(session):
@@ -16,6 +16,16 @@ def _build_rules_client(session):
         org = Organisation(o_id=1, name="Test Org")
         session.add(org)
         session.commit()
+
+    for severity_rank, outcome_name in enumerate(("RELEASE", "HOLD", "CANCEL"), start=1):
+        existing_outcome = (
+            session.query(AllowedOutcome)
+            .filter(AllowedOutcome.o_id == int(org.o_id), AllowedOutcome.outcome_name == outcome_name)
+            .first()
+        )
+        if existing_outcome is None:
+            session.add(AllowedOutcome(outcome_name=outcome_name, severity_rank=severity_rank, o_id=int(org.o_id)))
+    session.commit()
 
     role = session.query(Role).filter(Role.name == "verify_warning_manager").first()
     if not role:
