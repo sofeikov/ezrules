@@ -44,7 +44,7 @@ test.describe('Rule Test JSON Prefill', () => {
 
     await ruleCreatePage.goto();
     await ruleCreatePage.fillLogic(
-      `if $${amountField} > 100 and $${flagField} == False and $${timeField}:\n\treturn 'HOLD'`
+      `if $${amountField} > 100 and $${flagField} == False and $${timeField}:\n\treturn !HOLD`
     );
 
     await page.waitForResponse((response) => response.url().includes('/api/v2/rules/verify'));
@@ -69,7 +69,7 @@ test.describe('Rule Test JSON Prefill', () => {
     await request.post(`${API_BASE}/api/v2/rules/test`, {
       headers: { Authorization: `Bearer ${getAuthToken()}` },
       data: {
-        rule_source: "return 'RELEASE'",
+        rule_source: "return !RELEASE",
         test_json: JSON.stringify({ [observedField]: 7 }),
       },
     });
@@ -79,7 +79,7 @@ test.describe('Rule Test JSON Prefill', () => {
       data: {
         rid: `E2E_PREFILL_${Date.now()}`,
         description: 'Rule used to verify observed field-type prefill',
-        logic: `if $${observedField} > 3:\n\treturn 'HOLD'`,
+        logic: `if $${observedField} > 3:\n\treturn !HOLD`,
       },
     });
     expect(createResponse.ok()).toBeTruthy();

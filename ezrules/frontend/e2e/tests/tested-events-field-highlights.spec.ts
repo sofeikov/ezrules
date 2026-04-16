@@ -25,7 +25,7 @@ test.describe('Tested Events Field Highlights', () => {
       data: {
         rid: `E2E_EVENTS_FIELDS_${Date.now()}_A`,
         description: 'Highlight amount field',
-        logic: "if $amount >= 1000:\n\treturn 'HOLD'",
+        logic: "if $amount >= 1000:\n\treturn !HOLD",
       },
     });
     const holdRuleData = await holdRuleResponse.json();
@@ -43,7 +43,7 @@ test.describe('Tested Events Field Highlights', () => {
       data: {
         rid: `E2E_EVENTS_FIELDS_${Date.now()}_B`,
         description: 'Highlight country field',
-        logic: "if $billing_country == 'GB':\n\treturn 'RELEASE'",
+        logic: "if $billing_country == 'GB':\n\treturn !RELEASE",
       },
     });
     const releaseRuleData = await releaseRuleResponse.json();

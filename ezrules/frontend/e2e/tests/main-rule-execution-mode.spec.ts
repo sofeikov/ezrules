@@ -35,7 +35,7 @@ async function createMainRule(
     {
       rid,
       description,
-      logic: `if $amount > 0:\n\treturn "${rid}"`,
+      logic: 'if $amount > 0:\n\treturn !HOLD',
       execution_order: executionOrder,
       evaluation_lane: 'main',
     },

@@ -21,7 +21,7 @@ test.describe('Rule Allowlist Lane', () => {
     await page.locator('input[placeholder="Enter rule ID"]').fill(`E2E_ALLOWLIST_${Date.now()}`);
     await page.locator('label:has-text("Description") + textarea').fill('Allowlist rule created by e2e');
     await page.locator('[data-testid="rule-lane-select"]').selectOption('allowlist');
-    await page.locator('label:has-text("Logic") + textarea').fill('if $country == "GB":\n\treturn "RELEASE"');
+    await page.locator('label:has-text("Logic") + textarea').fill('if $country == "GB":\n\treturn !RELEASE');
 
     await Promise.all([
       page.waitForResponse(resp => resp.url().endsWith('/api/v2/rules') && resp.request().method() === 'POST'),

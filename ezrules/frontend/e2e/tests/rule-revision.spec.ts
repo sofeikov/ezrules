@@ -24,7 +24,7 @@ test.describe('Rule Revision Navigation', () => {
       data: {
         rid: `E2E_REVISION_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         description: 'E2E test rule for revision tests',
-        logic: "if $amount > 100:\n\treturn 'HOLD'",
+        logic: "if $amount > 100:\n\treturn !HOLD",
       },
     });
     const data = await resp.json();

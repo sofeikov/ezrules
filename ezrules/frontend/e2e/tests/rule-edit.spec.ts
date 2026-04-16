@@ -29,7 +29,7 @@ test.describe('Rule Edit Functionality', () => {
       data: {
         rid: `E2E_EDIT_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         description: 'E2E test rule for rule edit tests',
-        logic: "if $amount > 100:\n\treturn 'HOLD'",
+        logic: "if $amount > 100:\n\treturn !HOLD",
       },
     });
     const data = await resp.json();
@@ -128,7 +128,7 @@ test.describe('Rule Edit Functionality', () => {
 
       await ruleDetailPage.clickEdit();
 
-      const newLogic = "if $amount > 500:\n\treturn 'REVIEW'";
+      const newLogic = "if $amount > 500:\n\treturn !RELEASE";
       await ruleDetailPage.setLogic(newLogic);
 
       const value = await ruleDetailPage.getEditedLogic();
