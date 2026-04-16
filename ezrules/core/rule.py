@@ -4,9 +4,12 @@ from typing import Any, NamedTuple
 
 from ezrules.core.application_context import get_user_list_manager
 from ezrules.core.rule_helpers import (
+    OUTCOME_HELPER_NAME,
     AtNotationConverter,
+    BangNotationConverter,
     DollarNotationConverter,
     RuleParamExtractor,
+    extract_outcome_helper_value,
 )
 from ezrules.core.user_lists import AbstractUserListManager
 from ezrules.models.backend_core import Rule as RuleModel
@@ -71,8 +74,9 @@ class Rule:
     @staticmethod
     def compile_function(code: str) -> tuple[Callable, ast.Module]:
         rule_ast = ast.parse(code)
+        OutcomeReturnSyntaxValidator().visit(rule_ast)
         compiled_code = compile(rule_ast, filename="<string>", mode="exec")
-        namespace = {}
+        namespace = {OUTCOME_HELPER_NAME: lambda outcome: outcome}
         exec(compiled_code, namespace)
         return namespace["rule"], rule_ast
 
@@ -82,6 +86,7 @@ class Rule:
         # Build a fresh converter per compilation to avoid shared parser state
         # across concurrent API requests.
         post_proc_logic = DollarNotationConverter().transform_rule(logic)
+        post_proc_logic = BangNotationConverter().transform_rule(post_proc_logic)
         # Get the list provider from application context
         list_provider = self._list_values_provider or get_user_list_manager()
         at_converter = AtNotationConverter(list_values_provider=list_provider)
@@ -170,3 +175,138 @@ class MissingFieldLookupError(Exception):
         else:
             message = f"Rule '{rule_identifier}' lookup failed: field '{field_name}' is missing from the event"
         super().__init__(message)
+
+
+class OutcomeReturnSyntaxError(SyntaxError):
+    """Raised when a rule returns an outcome without direct !OUTCOME syntax."""
+
+    def __init__(self, outcome_name: str, line: int, column: int, end_column: int):
+        self.outcome_name = outcome_name
+        self.lineno = line
+        self.offset = column
+        self.end_lineno = line
+        self.end_offset = end_column
+        if outcome_name:
+            message = f"Use return !{outcome_name} instead of indirect or quoted outcome returns."
+        else:
+            message = "Outcome returns must use direct `return !OUTCOME` syntax."
+        super().__init__(message)
+
+
+class OutcomeReturnSyntaxValidator(ast.NodeVisitor):
+    _NOT_STRING = object()
+    _UNKNOWN_STRING = object()
+
+    def __init__(self) -> None:
+        self._string_like_bindings: list[dict[str, object]] = []
+
+    @property
+    def _current_bindings(self) -> dict[str, object]:
+        return self._string_like_bindings[-1]
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:
+        self._string_like_bindings.append({})
+        try:
+            for statement in node.body:
+                self.visit(statement)
+        finally:
+            self._string_like_bindings.pop()
+        return node
+
+    def visit_Assign(self, node: ast.Assign) -> Any:
+        inferred_value = self._infer_string_like_value(node.value)
+        for target in node.targets:
+            self._track_assignment(target, inferred_value)
+        self.generic_visit(node)
+        return node
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> Any:
+        if node.value is not None:
+            inferred_value = self._infer_string_like_value(node.value)
+            self._track_assignment(node.target, inferred_value)
+        self.generic_visit(node)
+        return node
+
+    def visit_AugAssign(self, node: ast.AugAssign) -> Any:
+        self._track_assignment(node.target, self._NOT_STRING)
+        self.generic_visit(node)
+        return node
+
+    def visit_Return(self, node: ast.Return) -> Any:
+        if node.value is None:
+            return node
+
+        if extract_outcome_helper_value(node.value) is not None:
+            return node
+
+        if (
+            self._contains_outcome_helper_call(node.value)
+            or self._infer_string_like_value(node.value) is not self._NOT_STRING
+        ):
+            raise OutcomeReturnSyntaxError(
+                outcome_name=self._guess_outcome_name(node.value),
+                line=node.value.lineno,
+                column=node.value.col_offset + 1,
+                end_column=node.value.end_col_offset or (node.value.col_offset + 1),
+            )
+
+        self.generic_visit(node)
+        return node
+
+    def _track_assignment(self, target: ast.AST, inferred_value: object) -> None:
+        if not self._string_like_bindings:
+            return
+        if isinstance(target, ast.Name):
+            if inferred_value is self._NOT_STRING:
+                self._current_bindings.pop(target.id, None)
+            else:
+                self._current_bindings[target.id] = inferred_value
+            return
+        if isinstance(target, (ast.Tuple, ast.List)):
+            for child_target in target.elts:
+                self._track_assignment(child_target, inferred_value)
+
+    def _contains_outcome_helper_call(self, node: ast.AST) -> bool:
+        return any(extract_outcome_helper_value(candidate) is not None for candidate in ast.walk(node))
+
+    def _infer_string_like_value(self, node: ast.AST) -> object:
+        outcome_value = extract_outcome_helper_value(node)
+        if outcome_value is not None:
+            return outcome_value
+
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, str):
+                return node.value
+            return self._NOT_STRING
+
+        if isinstance(node, ast.JoinedStr):
+            return self._UNKNOWN_STRING
+
+        if isinstance(node, ast.Name):
+            return self._current_bindings.get(node.id, self._NOT_STRING)
+
+        if isinstance(node, ast.IfExp):
+            body_value = self._infer_string_like_value(node.body)
+            orelse_value = self._infer_string_like_value(node.orelse)
+            if body_value is self._NOT_STRING and orelse_value is self._NOT_STRING:
+                return self._NOT_STRING
+            if (
+                body_value is not self._NOT_STRING
+                and orelse_value is not self._NOT_STRING
+                and body_value == orelse_value
+            ):
+                return body_value
+            return self._UNKNOWN_STRING
+
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            left_value = self._infer_string_like_value(node.left)
+            right_value = self._infer_string_like_value(node.right)
+            if left_value is self._NOT_STRING and right_value is self._NOT_STRING:
+                return self._NOT_STRING
+            return self._UNKNOWN_STRING
+
+        return self._NOT_STRING
+
+    def _guess_outcome_name(self, node: ast.AST) -> str:
+        inferred_value = self._infer_string_like_value(node)
+        return inferred_value if isinstance(inferred_value, str) else ""
