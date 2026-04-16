@@ -98,12 +98,12 @@ def _validate_allowlist_rule(
     visitor = AllowedOutcomeReturnVisitor()
     visitor.visit(compiled_rule._rule_ast)
     if not visitor.values:
-        return f"Allowlist rules must contain at least one return '{neutral_outcome}' statement."
+        return f"Allowlist rules must contain at least one return !{neutral_outcome} statement."
 
     invalid_values = [value for value in visitor.values if value != neutral_outcome]
     if invalid_values:
         rendered_values = ", ".join(sorted({repr(value) for value in invalid_values}))
-        return f"Allowlist rules must return only the configured neutral outcome '{neutral_outcome}'. Found {rendered_values}."
+        return f"Allowlist rules must return only the configured neutral outcome !{neutral_outcome}. Found {rendered_values}."
     return None
 
 
