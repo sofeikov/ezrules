@@ -1,5 +1,11 @@
 # What's New
 
+## v1.11.0
+
+* **Canonical `!OUTCOME` rule syntax**: Rule returns now use `!OUTCOME` as the standard authoring form, so authors write `return !HOLD` instead of quoted string outcomes.
+* **Outcome-aware editor autocomplete**: The rule editor now autocompletes currently configured outcomes on `!` and surfaces outcome references alongside existing `$field` and `@list` hints.
+* **Validation and docs aligned to configured outcomes**: Rule verification, create/update flows, reset-dev/demo seeds, and rule-authoring documentation now all enforce and teach the bang-prefixed configured-outcome syntax.
+
 ## v1.10.0
 
 * **Documented ECS/Fargate deployment example**: The deployment guide now documents one AWS-oriented topology for `frontend`, `api`, `celery-worker`, `celery-beat`, and the one-shot init/migration task, plus the required Postgres and Redis dependencies.

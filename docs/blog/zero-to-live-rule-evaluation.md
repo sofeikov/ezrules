@@ -35,7 +35,7 @@ Quick checks:
 
 ```python
 if $amount > 10000:
-    return 'HOLD'
+    return !HOLD
 ```
 
 3. Open **Outcomes** and add `HOLD` if it is not there yet.

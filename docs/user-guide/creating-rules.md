@@ -7,7 +7,7 @@ Use this guide when you want to add or tune production rules safely.
 You will:
 
 1. choose the right rule lane
-2. write a rule that returns an allowed outcome
+2. write a rule that returns a configured outcome with `!OUTCOME`
 3. test it with realistic payloads
 4. validate it before rollout
 
@@ -39,18 +39,18 @@ If you plan to run the main lane in strict sequence, see [Ordered Rule Execution
 ## Step 2: Start With a Minimal Rule
 
 Rules are Python-like snippets.
-If a condition is met, return an allowed outcome string.
+If a condition is met, return a configured outcome with `!OUTCOME`.
 
 ```python
 if $amount > 10000:
-    return 'HOLD'
+    return !HOLD
 ```
 
 Notes:
 
 - Use `$field_name` to read event fields (for example `$amount`, `$country`)
 - If no condition matches, return nothing
-- If the rule is in the allowlist lane, it must return the configured neutral outcome
+- If the rule is in the allowlist lane, it must return the configured neutral outcome using `!OUTCOME`
 
 Checkpoint:
 
@@ -103,7 +103,7 @@ Use when one field is enough to make a decision.
 
 ```python
 if $amount > 10000:
-    return 'HOLD'
+    return !HOLD
 ```
 
 ### List-based pattern
@@ -112,7 +112,7 @@ Use when decisioning depends on maintained allow/block lists.
 
 ```python
 if $user_id in @blocked_users:
-    return 'CANCEL'
+    return !CANCEL
 ```
 
 ### Allowlist pattern
@@ -121,7 +121,7 @@ Use when a match should immediately produce the configured neutral outcome and s
 
 ```python
 if $merchant_id in @trusted_merchants:
-    return 'RELEASE'
+    return !RELEASE
 ```
 
 This pattern only makes sense in the **Allowlist rules** lane.
@@ -140,7 +140,7 @@ if $account_age_days < 30:
     risk_score += 1
 
 if risk_score >= 4:
-    return 'HOLD'
+    return !HOLD
 ```
 
 ### Time-window pattern
@@ -149,7 +149,7 @@ Use when behavior is suspicious only in specific periods.
 
 ```python
 if 2 <= $hour <= 5 and $amount > 1000:
-    return 'HOLD'
+    return !HOLD
 ```
 
 ---

@@ -32,11 +32,11 @@ This process is simple, but doing it consistently is what improves model quality
 
 ## Write Rules That Are Easy To Operate
 
-A rule returns an allowed outcome string:
+A rule returns a configured outcome with `!OUTCOME` syntax:
 
 ```python
 if $amount > 10000:
-    return 'HOLD'
+    return !HOLD
 ```
 
 You will usually get better results by combining multiple signals:
@@ -51,7 +51,7 @@ if $account_age_days < 30:
     risk_score += 1
 
 if risk_score >= 4:
-    return 'HOLD'
+    return !HOLD
 ```
 
 ---
@@ -158,7 +158,7 @@ These patterns are good starting points for everyday analyst work.
 # Flag unusual transaction times
 # Flag transactions between 2 AM and 5 AM
 if 2 <= $hour <= 5:
-    return 'HOLD'
+    return !HOLD
 ```
 
 ### User Behavior Rules
@@ -168,7 +168,7 @@ if 2 <= $hour <= 5:
 
 # Flag if 5x normal spending
 if $amount > $user_avg_amount * 5:
-    return 'HOLD'
+    return !HOLD
 ```
 
 ### List-Based Rules
@@ -176,11 +176,11 @@ if $amount > $user_avg_amount * 5:
 ```python
 # Check against blocklists
 if $user_id in @blocked_users:
-    return 'CANCEL'
+    return !CANCEL
 
 # Check against allowlists (inverse)
 if $user_id not in @trusted_users:
-    return 'HOLD'  # Send for manual review
+    return !HOLD  # Send for manual review
 ```
 
 If a trusted list should bypass the rest of the decisioning flow entirely, that is a better fit for an **Allowlist rule** than for an inverse main rule.
