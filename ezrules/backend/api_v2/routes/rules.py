@@ -43,10 +43,11 @@ from ezrules.backend.api_v2.schemas.rules import (
 from ezrules.backend.api_v2.schemas.shadow import ShadowDeployRequest, ShadowDeployResponse
 from ezrules.backend.runtime_settings import get_auto_promote_active_rule_updates, get_neutral_outcome
 from ezrules.backend.utils import load_cast_configs, record_observations
+from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.core.rule import MissingFieldLookupError, Rule, RuleFactory
+from ezrules.core.rule import MissingFieldLookupError, OutcomeReturnSyntaxError, Rule, RuleFactory
 from ezrules.core.rule_checkers import AllowedOutcomeReturnVisitor
-from ezrules.core.rule_helpers import UserListReferenceExtractor
+from ezrules.core.rule_helpers import OutcomeReferenceExtractor, UserListReferenceExtractor
 from ezrules.core.rule_updater import (
     ROLLOUT_CONFIG_LABEL,
     RULE_EVALUATION_LANE_ALLOWLIST,
@@ -96,6 +97,11 @@ def get_list_provider(db: Any, org_id: int) -> PersistentUserListManager:
     return PersistentUserListManager(db_session=db, o_id=org_id)
 
 
+def get_outcome_manager(db: Any, org_id: int) -> DatabaseOutcome:
+    """Get an org-scoped outcome manager for rule validation."""
+    return DatabaseOutcome(db_session=db, o_id=org_id)
+
+
 def build_rule_warnings(db: Any, org_id: int, referenced_fields: list[str]) -> list[str]:
     """Return advisory warnings for fields the rule references but traffic has never observed."""
     if not referenced_fields:
@@ -126,6 +132,11 @@ def unique_preserving_order(items: list[str]) -> list[str]:
 def extract_referenced_lists(rule_source: str) -> list[str]:
     """Extract @ListName references from rule source without compiling it."""
     return unique_preserving_order(UserListReferenceExtractor().extract(rule_source))
+
+
+def extract_referenced_outcomes(rule_source: str) -> list[str]:
+    """Extract !OUTCOME references from rule source without compiling it."""
+    return [outcome.upper() for outcome in unique_preserving_order(OutcomeReferenceExtractor().extract(rule_source))]
 
 
 def find_reference_bounds(rule_source: str, reference: str) -> tuple[int, int, int, int] | None:
@@ -163,6 +174,37 @@ def normalize_rule_source_line(line: int | None) -> int | None:
     if line <= 1:
         return 1
     return line - 1
+
+
+def normalize_rule_source_column(column: int | None) -> int | None:
+    """Map wrapped helper columns back to user source columns."""
+    if column is None:
+        return None
+    return max(1, column - 1)
+
+
+def build_outcome_notation_errors(db: Any, org_id: int, rule_source: str) -> list[RuleVerifyError]:
+    """Return structured errors for unknown !OUTCOME references."""
+    errors: list[RuleVerifyError] = []
+    allowed_outcomes = set(get_outcome_manager(db, org_id).get_allowed_outcomes())
+
+    raw_outcome_references = unique_preserving_order(OutcomeReferenceExtractor().extract(rule_source))
+    for raw_outcome_name in raw_outcome_references:
+        outcome_name = raw_outcome_name.upper()
+        if outcome_name in allowed_outcomes:
+            continue
+        location = find_reference_bounds(rule_source, f"!{raw_outcome_name}")
+        errors.append(
+            build_verify_error(
+                message=f"Outcome '!{outcome_name}' is not configured in Outcomes.",
+                line=location[0] if location else None,
+                column=location[1] if location else None,
+                end_line=location[2] if location else None,
+                end_column=location[3] if location else None,
+            )
+        )
+
+    return errors
 
 
 def is_active(rule: RuleModel) -> bool:
@@ -266,13 +308,13 @@ def validate_allowlist_rule(rule: Rule, allowlist_outcome: str) -> str | None:
     visitor = AllowedOutcomeReturnVisitor()
     visitor.visit(rule._rule_ast)
     if not visitor.values:
-        return f"Allowlist rules must contain at least one return '{allowlist_outcome}' statement."
+        return f"Allowlist rules must contain at least one return !{allowlist_outcome} statement."
 
     invalid_values = [value for value in visitor.values if value != allowlist_outcome]
     if invalid_values:
         rendered_values = ", ".join(sorted({repr(value) for value in invalid_values}))
         return (
-            f"Allowlist rules must return only the configured neutral outcome '{allowlist_outcome}'. "
+            f"Allowlist rules must return only the configured neutral outcome !{allowlist_outcome}. "
             f"Found {rendered_values}."
         )
     return None
@@ -617,6 +659,13 @@ def create_rule(
             error=execution_order_error,
         )
     allowlist_outcome = get_neutral_outcome(db, current_org_id)
+    outcome_errors = build_outcome_notation_errors(db, current_org_id, rule_data.logic)
+    if outcome_errors:
+        return RuleMutationResponse(
+            success=False,
+            message="Rule validation failed",
+            error=outcome_errors[0].message,
+        )
 
     # Validate the rule logic by trying to compile it
     try:
@@ -737,6 +786,13 @@ def update_rule(
     else:
         new_execution_order = int(getattr(rule, "execution_order", 1) or 1)
     allowlist_outcome = get_neutral_outcome(db, current_org_id)
+    outcome_errors = build_outcome_notation_errors(db, current_org_id, new_logic)
+    if outcome_errors:
+        return RuleMutationResponse(
+            success=False,
+            message="Rule validation failed",
+            error=outcome_errors[0].message,
+        )
 
     # Validate the rule logic by trying to compile it
     try:
@@ -1162,6 +1218,17 @@ def verify_rule(
     This does NOT save the rule - it's just for validation.
     """
     referenced_lists = extract_referenced_lists(request.rule_source)
+    referenced_outcomes = extract_referenced_outcomes(request.rule_source)
+    outcome_errors = build_outcome_notation_errors(db, current_org_id, request.rule_source)
+    if outcome_errors:
+        return RuleVerifyResponse(
+            valid=False,
+            params=[],
+            referenced_lists=referenced_lists,
+            referenced_outcomes=referenced_outcomes,
+            warnings=[],
+            errors=outcome_errors,
+        )
     try:
         rule = Rule(
             rid="",
@@ -1173,8 +1240,26 @@ def verify_rule(
             valid=True,
             params=params,
             referenced_lists=referenced_lists,
+            referenced_outcomes=referenced_outcomes,
             warnings=build_rule_warnings(db, current_org_id, params),
             errors=[],
+        )
+    except OutcomeReturnSyntaxError as exc:
+        return RuleVerifyResponse(
+            valid=False,
+            params=[],
+            referenced_lists=referenced_lists,
+            referenced_outcomes=referenced_outcomes,
+            warnings=[],
+            errors=[
+                build_verify_error(
+                    message=str(exc),
+                    line=normalize_rule_source_line(exc.lineno),
+                    column=normalize_rule_source_column(exc.offset),
+                    end_line=normalize_rule_source_line(exc.end_lineno),
+                    end_column=normalize_rule_source_column(exc.end_offset),
+                )
+            ],
         )
     except SyntaxError as exc:
         message = exc.msg or "Rule source is invalid"
@@ -1182,14 +1267,15 @@ def verify_rule(
             valid=False,
             params=[],
             referenced_lists=referenced_lists,
+            referenced_outcomes=referenced_outcomes,
             warnings=[],
             errors=[
                 build_verify_error(
                     message=message,
                     line=normalize_rule_source_line(exc.lineno),
-                    column=exc.offset,
+                    column=normalize_rule_source_column(exc.offset),
                     end_line=normalize_rule_source_line(exc.end_lineno),
-                    end_column=exc.end_offset,
+                    end_column=normalize_rule_source_column(exc.end_offset),
                 )
             ],
         )
@@ -1203,6 +1289,7 @@ def verify_rule(
             valid=False,
             params=[],
             referenced_lists=referenced_lists,
+            referenced_outcomes=referenced_outcomes,
             warnings=[],
             errors=[
                 build_verify_error(
@@ -1219,6 +1306,7 @@ def verify_rule(
             valid=False,
             params=[],
             referenced_lists=referenced_lists,
+            referenced_outcomes=referenced_outcomes,
             warnings=[],
             errors=[build_verify_error(message=str(exc) or "Rule source is invalid")],
         )
@@ -1246,6 +1334,14 @@ def test_rule(
 
     This does NOT save the rule - it's just for testing.
     """
+    outcome_errors = build_outcome_notation_errors(db, current_org_id, request.rule_source)
+    if outcome_errors:
+        return RuleTestResponse(
+            status="error",
+            reason=outcome_errors[0].message,
+            rule_outcome=None,
+        )
+
     # Parse the test JSON
     try:
         test_object = json.loads(request.test_json)
@@ -1276,6 +1372,12 @@ def test_rule(
             rid="",
             logic=request.rule_source,
             list_values_provider=get_list_provider(db, current_org_id),
+        )
+    except OutcomeReturnSyntaxError as exc:
+        return RuleTestResponse(
+            status="error",
+            reason=str(exc),
+            rule_outcome=None,
         )
     except SyntaxError:
         return RuleTestResponse(
@@ -1342,6 +1444,10 @@ def deploy_to_shadow(
         RULE_EVALUATION_LANE_ALLOWLIST
     ):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Allowlist rules cannot be deployed")
+    if request.logic is not None:
+        outcome_errors = build_outcome_notation_errors(db, current_org_id, request.logic)
+        if outcome_errors:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=outcome_errors[0].message)
 
     try:
         deploy_rule_to_shadow(
@@ -1431,6 +1537,10 @@ def deploy_to_rollout(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Allowlist rules cannot be rolled out",
         )
+    if request.logic is not None:
+        outcome_errors = build_outcome_notation_errors(db, current_org_id, request.logic)
+        if outcome_errors:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=outcome_errors[0].message)
 
     try:
         deploy_rule_to_rollout(
