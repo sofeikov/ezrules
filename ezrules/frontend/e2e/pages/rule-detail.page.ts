@@ -20,6 +20,12 @@ export class RuleDetailPage {
   readonly testResultError: Locator;
   readonly backButton: Locator;
   readonly revisionsSection: Locator;
+  readonly performanceCard: Locator;
+  readonly performanceTimeRangeSelect: Locator;
+  readonly performanceChart: Locator;
+  readonly performanceEmptyState: Locator;
+  readonly performanceTotalHits: Locator;
+  readonly performanceOutcomeCount: Locator;
 
   // Revision view locators
   readonly revisionBanner: Locator;
@@ -52,6 +58,12 @@ export class RuleDetailPage {
     this.testResultError = page.locator('.bg-red-50').or(page.locator('text=/Failed to load rule/i'));
     this.backButton = page.locator('button:has-text("Back to Rules")');
     this.revisionsSection = page.locator('text=Other Rule Versions');
+    this.performanceCard = page.getByTestId('rule-performance-card');
+    this.performanceTimeRangeSelect = page.getByTestId('rule-performance-time-range');
+    this.performanceChart = page.getByTestId('rule-performance-chart');
+    this.performanceEmptyState = page.getByTestId('rule-performance-empty');
+    this.performanceTotalHits = page.getByTestId('rule-performance-total-hits');
+    this.performanceOutcomeCount = page.getByTestId('rule-performance-outcome-count');
 
     // Revision view locators
     this.revisionBanner = page.locator('.bg-yellow-50');
@@ -236,5 +248,9 @@ export class RuleDetailPage {
    */
   async clickGoToLatest() {
     await this.goToLatestLink.first().click();
+  }
+
+  async selectPerformanceTimeRange(range: string) {
+    await this.performanceTimeRangeSelect.selectOption(range);
   }
 }

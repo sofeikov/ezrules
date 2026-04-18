@@ -280,6 +280,86 @@ def get_rule_activity(
 
 
 # =============================================================================
+# RULE OUTCOMES DISTRIBUTION
+# =============================================================================
+
+
+@router.get("/rules/{rule_id}/outcomes-distribution", response_model=MultiSeriesResponse)
+def get_rule_outcomes_distribution(
+    rule_id: int,
+    aggregation: str = Query(default=AggregationPeriod.SIX_HOURS.value, description="Aggregation period"),
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> MultiSeriesResponse:
+    """
+    Get outcome hit counts over time for one rule.
+
+    Returns multi-series time-series data showing how often each stored outcome
+    fired for the selected rule in the chosen time window.
+    """
+    aggregation_period, config = validate_aggregation(aggregation)
+    start_time, end_time = get_current_time_bounds(config["delta"])
+
+    rule = db.query(RuleModel.r_id).filter(RuleModel.r_id == rule_id).filter(RuleModel.o_id == current_org_id).first()
+    if rule is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
+
+    bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
+
+    outcomes = (
+        db.query(
+            bucket_expr.label("bucket"),
+            TestingResultsLog.rule_result,
+            sqlalchemy.func.count(TestingResultsLog.tr_id).label("count"),
+        )
+        .join(TestingRecordLog, TestingRecordLog.tl_id == TestingResultsLog.tl_id)
+        .filter(TestingResultsLog.r_id == rule_id)
+        .filter(TestingRecordLog.created_at >= start_time)
+        .filter(TestingRecordLog.created_at <= end_time)
+        .filter(TestingRecordLog.o_id == current_org_id)
+        .filter(TestingResultsLog.rule_result.isnot(None))
+        .group_by("bucket", TestingResultsLog.rule_result)
+        .order_by("bucket")
+        .all()
+    )
+
+    outcome_labels = sorted({outcome for _bucket, outcome, _count in outcomes})
+
+    time_buckets: dict[Any, dict[str, int]] = {}
+    for bucket, outcome, count in outcomes:
+        if bucket not in time_buckets:
+            time_buckets[bucket] = {}
+        time_buckets[bucket][outcome] = count
+
+    labels = []
+    datasets_data: dict[str, list[int]] = {outcome: [] for outcome in outcome_labels}
+
+    sorted_buckets = sorted(time_buckets.keys())
+    for bucket in sorted_buckets:
+        labels.append(format_bucket_label(bucket, config))
+        for outcome in outcome_labels:
+            datasets_data[outcome].append(time_buckets[bucket].get(outcome, 0))
+
+    datasets = []
+    for idx, outcome in enumerate(outcome_labels):
+        color = CHART_COLORS[idx % len(CHART_COLORS)]
+        datasets.append(
+            ChartDataset(
+                label=outcome,
+                data=datasets_data[outcome],
+                borderColor=color["border"],
+                backgroundColor=color["background"],
+                tension=0.3,
+                fill=True,
+            )
+        )
+
+    return MultiSeriesResponse(labels=labels, datasets=datasets, aggregation=aggregation_period)
+
+
+# =============================================================================
 # LABELS DISTRIBUTION
 # =============================================================================
 

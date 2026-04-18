@@ -12,7 +12,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Enterprise Security**: Granular role-based access control with 34 permission types; API key authentication for service-to-service integration
 - **Org-Aware Admin APIs**: Manager access tokens now carry organisation context, and manager APIs resolve rules, users, roles, labels, settings, analytics, tested events, backtesting history, and audit reads against the authenticated user's org
 - **Transaction Labeling**: Comprehensive fraud analytics with API and bulk CSV upload capabilities
-- **Analytics Dashboard**: Real-time transaction volume charts, outcome trends, and ranked most/least firing active rules with configurable time ranges (1h, 6h, 12h, 24h, 30d)
+- **Analytics Dashboard**: Real-time transaction volume charts, outcome trends, ranked most/least firing active rules, and per-rule performance charts on the Rule Detail page with configurable time ranges (1h, 6h, 12h, 24h, 30d)
 - **Scalable Architecture**: Unified API service with integrated rule evaluation
 - **Database Integration**: PostgreSQL backend with SQLAlchemy ORM and full audit history
 - **Audit Trail**: Change tracking for rules, user lists, outcomes, labels, and field type configurations, with per-change user attribution and explicit rule lifecycle actions (`promoted`, `deactivated`, `rolled_back`, `deleted`) plus neutral-outcome setting changes

@@ -1,5 +1,11 @@
 # What's New
 
+## v1.13.0
+
+* **Rule detail performance chart**: The Rule Detail page now includes a **Performance** card with a time-range selector and a per-outcome chart showing how often that rule fired each stored outcome over time.
+* **Per-rule outcome analytics endpoint**: Added `GET /api/v2/analytics/rules/{rule_id}/outcomes-distribution` so the UI and API clients can fetch outcome hit trends for one rule without scanning the full dashboard dataset.
+* **Rule monitoring drill-down**: Dashboard rule-activity views can now be followed by a rule-level trend inspection on the detail page, making it easier to distinguish noisy rules from ones whose outcome mix recently shifted.
+
 ## v1.12.0
 
 * **Canonical dotted nested field lookups**: Rules can now reference nested JSON values end to end with `$field.subfield_1.sub_field_2`, and the compiler/runtime preserve that exact dotted path through verification, execution, and error reporting.
