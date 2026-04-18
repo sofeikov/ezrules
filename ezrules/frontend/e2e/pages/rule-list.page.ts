@@ -104,6 +104,25 @@ export class RuleListPage {
     return -1;
   }
 
+  async getReorderPositionForRule(rid: string): Promise<number> {
+    const rows = await this.page.locator('tbody tr').all();
+    let position = 0;
+
+    for (const row of rows) {
+      const hasReorderControl = (await row.getByRole('button', { name: 'Enter exact position' }).count()) > 0;
+      if (!hasReorderControl) {
+        continue;
+      }
+
+      position += 1;
+      if (await row.filter({ hasText: rid }).count()) {
+        return position;
+      }
+    }
+
+    return -1;
+  }
+
   async enterReorderMode() {
     await this.reorderRulesButton.click();
   }

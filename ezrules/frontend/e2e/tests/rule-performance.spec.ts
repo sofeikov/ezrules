@@ -76,9 +76,25 @@ async function createEvaluatedEvent(
 test.describe('Rule Detail Performance', () => {
   let ruleDetailPage: RuleDetailPage;
   let testRuleId: number;
+  let originalMainRuleExecutionMode: string | null = null;
 
   test.beforeEach(async ({ page, request }) => {
     ruleDetailPage = new RuleDetailPage(page);
+    originalMainRuleExecutionMode = null;
+
+    const settingsResponse = await request.get(`${API_BASE}/api/v2/settings/runtime`, {
+      headers: authHeaders(),
+    });
+    expect(settingsResponse.ok()).toBeTruthy();
+    const settingsPayload = await settingsResponse.json();
+    originalMainRuleExecutionMode = settingsPayload.main_rule_execution_mode as string;
+    if (originalMainRuleExecutionMode !== 'all_matches') {
+      const updateResponse = await request.put(`${API_BASE}/api/v2/settings/runtime`, {
+        headers: authHeaders(),
+        data: { main_rule_execution_mode: 'all_matches' },
+      });
+      expect(updateResponse.ok()).toBeTruthy();
+    }
 
     const response = await request.post(`${API_BASE}/api/v2/rules`, {
       headers: authHeaders(),
@@ -105,6 +121,12 @@ test.describe('Rule Detail Performance', () => {
 
   test.afterEach(async ({ request }) => {
     if (!testRuleId) {
+      if (originalMainRuleExecutionMode && originalMainRuleExecutionMode !== 'all_matches') {
+        await request.put(`${API_BASE}/api/v2/settings/runtime`, {
+          headers: authHeaders(),
+          data: { main_rule_execution_mode: originalMainRuleExecutionMode },
+        });
+      }
       return;
     }
 
@@ -112,6 +134,13 @@ test.describe('Rule Detail Performance', () => {
       headers: authHeaders(),
     });
     testRuleId = 0;
+
+    if (originalMainRuleExecutionMode && originalMainRuleExecutionMode !== 'all_matches') {
+      await request.put(`${API_BASE}/api/v2/settings/runtime`, {
+        headers: authHeaders(),
+        data: { main_rule_execution_mode: originalMainRuleExecutionMode },
+      });
+    }
   });
 
   test('shows an empty state when a rule has no stored hits', async ({ page }) => {
@@ -161,7 +190,9 @@ test.describe('Rule Detail Performance', () => {
 
     expect(initialResponse.ok()).toBeTruthy();
     const initialPayload = await initialResponse.json();
-    expect(initialPayload.datasets.map((dataset: { label: string }) => dataset.label)).toEqual(['HOLD', 'RELEASE']);
+    expect(
+      initialPayload.datasets.map((dataset: { label: string }) => dataset.label).sort()
+    ).toEqual(['HOLD', 'RELEASE']);
 
     await expect(ruleDetailPage.performanceCard).toBeVisible();
     await expect(ruleDetailPage.performanceChart).toBeVisible();
