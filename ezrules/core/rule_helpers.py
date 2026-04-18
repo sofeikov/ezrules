@@ -7,6 +7,7 @@ import pyparsing as pp
 from ezrules.core.user_lists import AbstractUserListManager
 
 OUTCOME_HELPER_NAME = "__ezrules_outcome__"
+FIELD_LOOKUP_HELPER_NAME = "__ezrules_lookup__"
 
 
 class RuleParamExtractor(ast.NodeVisitor):
@@ -14,11 +15,51 @@ class RuleParamExtractor(ast.NodeVisitor):
         self.params = set()
 
     def visit_Subscript(self, node: ast.Subscript) -> Any:
-        super().generic_visit(node)
-        if isinstance(node.value, ast.Name):
-            if node.value.id == "t" and isinstance(node.slice, ast.Constant):
-                self.params.add(node.slice.value)
-        return node
+        path = self._extract_subscript_path(node)
+        if path is not None:
+            self.params.add(path)
+            return node
+        return super().generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> Any:
+        if self._is_compiler_field_lookup_call(node):
+            field_arg = node.args[1]
+            assert isinstance(field_arg, ast.Constant) and isinstance(field_arg.value, str)
+            self.params.add(field_arg.value)
+            return node
+        return super().generic_visit(node)
+
+    def _is_compiler_field_lookup_call(self, node: ast.Call) -> bool:
+        """Return True only for the canonical helper call emitted by `$field.path`.
+
+        Downstream field analysis is used by verify warnings, test JSON prefill,
+        and backtesting missing-field eligibility checks. If we accepted broader
+        helper shapes here, hand-written calls or computed arguments could
+        masquerade as canonical `$...` references and bypass those guardrails.
+        """
+        return (
+            isinstance(node.func, ast.Name)
+            and node.func.id == FIELD_LOOKUP_HELPER_NAME
+            and len(node.args) == 2
+            and isinstance(node.args[0], ast.Name)
+            and node.args[0].id == "t"
+            and isinstance(node.args[1], ast.Constant)
+            and isinstance(node.args[1].value, str)
+        )
+
+    def _extract_subscript_path(self, node: ast.Subscript) -> str | None:
+        segments: list[str] = []
+        current: ast.AST = node
+
+        while isinstance(current, ast.Subscript):
+            if not isinstance(current.slice, ast.Constant) or not isinstance(current.slice.value, str):
+                return None
+            segments.append(current.slice.value)
+            current = current.value
+
+        if isinstance(current, ast.Name) and current.id == "t":
+            return ".".join(reversed(segments))
+        return None
 
 
 class TriggerReferenceExtractor:
@@ -47,10 +88,14 @@ class DollarNotationConverter:
     TRIGGER_CHAR = "$"
 
     def replace_with_matched_text(self, tokens):
-        return f't["{tokens[0][1:]}"]'
+        return f"{FIELD_LOOKUP_HELPER_NAME}(t, {json.dumps(tokens[0][1:])})"
 
     def __init__(self):
-        search_for_word = pp.Combine(self.TRIGGER_CHAR + pp.Word(pp.alphas + "_", pp.alphanums + "_"))
+        identifier = pp.Word(pp.alphas + "_", pp.alphanums + "_")
+        if self.TRIGGER_CHAR == "$":
+            search_for_word = pp.Combine(self.TRIGGER_CHAR + identifier + pp.ZeroOrMore(pp.Literal(".") + identifier))
+        else:
+            search_for_word = pp.Combine(self.TRIGGER_CHAR + identifier)
 
         line_parser = search_for_word
         line_parser.ignore(pp.QuotedString('"'))

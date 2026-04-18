@@ -51,3 +51,10 @@ Use it as the canonical decision log until formal ADR files are introduced.
 - **Why**: same-origin ALB routing removes the need for fragile localhost defaults and keeps browser auth flows simple in production.
 - **Tradeoff**: split-origin deployments must set both the frontend API URL and backend CORS configuration deliberately.
 - **Related docs**: [Deployment Guide](deployment.md), [Configuration](../getting-started/configuration.md).
+
+## ADR-008: Field References Must Stay Canonical Through AST Analysis
+
+- **Decision**: `RuleParamExtractor.visit_Call()` recognizes only the exact helper call shape produced by the `$field.path` compiler rewrite: `__ezrules_lookup__(t, "field.path")`.
+- **Why**: extracted field references drive verify warnings, test JSON prefill, and backtesting missing-field eligibility. If call matching were broader, hand-written helper calls or wrapped arguments could masquerade as canonical `$...` references and create bypasses or misleading metadata.
+- **Tradeoff**: the internal lookup helper is not public syntax. Only canonical `$...` notation is guaranteed to participate in downstream field-reference analysis.
+- **Related docs**: [Creating Rules](../user-guide/creating-rules.md), [Evaluator API](../api-reference/evaluator-api.md), [Complex Entities in Fraud Rules](../blog/complex-entities-in-fraud-rules.md).

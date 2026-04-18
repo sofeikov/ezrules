@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map, shareReplay } from 'rxjs/operators';
+import { dottedPathAlias, fieldPathLeafName, setNestedValue } from '../utils/field-paths';
 import { FieldObservation, FieldTypeConfig, FieldTypeService } from './field-type.service';
 
 type SampleValue = boolean | number | string;
@@ -51,6 +52,21 @@ const EXACT_SAMPLE_VALUES: Record<string, SampleValue> = {
   prior_chargebacks_180d: 2,
   receive_country: 'MX',
   score: 0.92,
+  'customer.id': 'cust_demo_001',
+  'customer.country': 'US',
+  'customer.profile.age': 34,
+  'customer.profile.segment': 'established',
+  'customer.account.age_days': 180,
+  'customer.account.email_age_days': 365,
+  'customer.account.prior_chargebacks_180d': 0,
+  'customer.behavior.avg_amount_30d': 140.0,
+  'customer.behavior.std_amount_30d': 30.0,
+  'sender.id': 'sender_demo_001',
+  'sender.country': 'US',
+  'sender.account.age_days': 90,
+  'sender.origin.country': 'BR',
+  'sender.device.age_days': 1,
+  'sender.device.trust_score': 18,
   send_country: 'US',
   shipping_country: 'MX',
   txn_type: 'wallet_cashout',
@@ -95,12 +111,12 @@ export class RuleTestDataService {
 export function buildRuleTestSamplePayload(
   params: string[],
   metadata: FieldTypeMetadata
-): Record<string, SampleValue> {
-  const samplePayload: Record<string, SampleValue> = {};
+): Record<string, unknown> {
+  const samplePayload: Record<string, unknown> = {};
 
   params.forEach((param) => {
     const fieldType = resolveFieldType(param, metadata);
-    samplePayload[param] = buildSampleValue(param, fieldType);
+    setNestedValue(samplePayload, param, buildSampleValue(param, fieldType));
   });
 
   return samplePayload;
@@ -203,7 +219,10 @@ function inferFieldTypeFromName(fieldName: string): string {
 }
 
 function buildSampleValue(fieldName: string, fieldType: string): SampleValue {
-  const exactValue = EXACT_SAMPLE_VALUES[fieldName];
+  const exactValue =
+    EXACT_SAMPLE_VALUES[fieldName] ??
+    EXACT_SAMPLE_VALUES[dottedPathAlias(fieldName)] ??
+    EXACT_SAMPLE_VALUES[fieldPathLeafName(fieldName)];
   if (exactValue !== undefined) {
     return coerceSampleValue(exactValue, fieldType, fieldName);
   }
@@ -287,6 +306,7 @@ function integerSampleForField(fieldName: string): number {
 
 function stringSampleForField(fieldName: string): string {
   const normalized = fieldName.toLowerCase();
+  const fieldLeaf = fieldPathLeafName(fieldName);
 
   if (normalized.endsWith('_country') || normalized.includes('country')) {
     if (normalized.includes('shipping')) {
@@ -318,8 +338,8 @@ function stringSampleForField(fieldName: string): string {
   }
 
   if (normalized.endsWith('_id') || normalized.includes('reference')) {
-    return `demo_${fieldName}`;
+    return `demo_${fieldLeaf}`;
   }
 
-  return `sample_${fieldName}`;
+  return `sample_${fieldLeaf}`;
 }

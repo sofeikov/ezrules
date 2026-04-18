@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
+
+from ezrules.core.field_paths import get_field_value, set_field_value
 
 
 class FieldType(StrEnum):
@@ -95,17 +98,31 @@ def cast_event(event: dict[str, Any], configs: list[FieldCastConfig]) -> dict[st
     Fields not present in configs pass through unchanged (compare-as-is default).
     Raises CastError if a configured field value cannot be cast to the configured type.
     """
-    config_map = {c.field_name: c for c in configs}
-    return {
-        key: _cast_value(value, config_map[key]) if key in config_map and value is not None else value
-        for key, value in event.items()
-    }
+    normalized_event = deepcopy(event)
+
+    for config in configs:
+        try:
+            current_value = get_field_value(normalized_event, config.field_name)
+        except KeyError:
+            continue
+        if current_value is None:
+            continue
+        set_field_value(normalized_event, config.field_name, _cast_value(current_value, config))
+
+    return normalized_event
 
 
 def find_missing_fields(event: dict[str, Any], field_names: list[str] | set[str] | tuple[str, ...]) -> list[str]:
     """Return referenced fields that are either absent or explicitly null."""
     ordered_fields = sorted(set(field_names))
-    return [field_name for field_name in ordered_fields if field_name not in event or event[field_name] is None]
+    missing_fields: list[str] = []
+    for field_name in ordered_fields:
+        try:
+            if get_field_value(event, field_name) is None:
+                missing_fields.append(field_name)
+        except KeyError:
+            missing_fields.append(field_name)
+    return missing_fields
 
 
 def validate_required_fields(event: dict[str, Any], configs: list[FieldCastConfig]) -> None:

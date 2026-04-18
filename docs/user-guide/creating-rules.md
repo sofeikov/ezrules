@@ -49,6 +49,7 @@ if $amount > 10000:
 Notes:
 
 - Use `$field_name` to read event fields (for example `$amount`, `$country`)
+- Use dotted paths for nested JSON values (for example `$customer.profile.age`, `$device.location.country`)
 - If no condition matches, return nothing
 - If the rule is in the allowlist lane, it must return the configured neutral outcome using `!OUTCOME`
 
@@ -83,7 +84,12 @@ Example payload:
   "event_timestamp": 1700000000,
   "event_data": {
     "amount": 15000,
-    "user_id": "user_42"
+    "user_id": "user_42",
+    "customer": {
+      "profile": {
+        "age": 34
+      }
+    }
   }
 }
 ```

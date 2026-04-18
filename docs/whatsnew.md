@@ -1,5 +1,12 @@
 # What's New
 
+## v1.12.0
+
+* **Canonical dotted nested field lookups**: Rules can now reference nested JSON values end to end with `$field.subfield_1.sub_field_2`, and the compiler/runtime preserve that exact dotted path through verification, execution, and error reporting.
+* **Nested-path-aware observations and field typing**: Observed fields, field type configuration, rule-test example JSON, and evaluation normalization now all understand canonical dotted paths, including nested required/cast rules such as `customer.profile.age`.
+* **Nested payload support in backtesting and Tested Events**: Backtests now apply nested-path eligibility and normalization rules consistently, while the Tested Events payload viewer highlights nested referenced paths inline inside the JSON tree.
+* **Nested demo payloads for reset-dev**: Seeded demo traffic now includes nested `customer` and `sender` objects plus a showcase rule that references those paths, so nested-path prefill and Tested Events highlighting can be exercised immediately after `reset-dev`.
+
 ## v1.11.0
 
 * **Canonical `!OUTCOME` rule syntax**: Rule returns now use `!OUTCOME` as the standard authoring form, so authors write `return !HOLD` instead of quoted string outcomes.

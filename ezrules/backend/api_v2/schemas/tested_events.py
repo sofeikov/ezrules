@@ -14,7 +14,7 @@ class TriggeredRuleItem(BaseModel):
     outcome: str = Field(..., description="Outcome returned by the rule")
     referenced_fields: list[str] | None = Field(
         default=None,
-        description="Top-level event fields referenced by the rule logic",
+        description="Canonical dotted event fields referenced by the rule logic",
     )
 
 

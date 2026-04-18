@@ -3,7 +3,9 @@ from collections.abc import Callable
 from typing import Any, NamedTuple
 
 from ezrules.core.application_context import get_user_list_manager
+from ezrules.core.field_paths import get_field_value
 from ezrules.core.rule_helpers import (
+    FIELD_LOOKUP_HELPER_NAME,
     OUTCOME_HELPER_NAME,
     AtNotationConverter,
     BangNotationConverter,
@@ -76,7 +78,10 @@ class Rule:
         rule_ast = ast.parse(code)
         OutcomeReturnSyntaxValidator().visit(rule_ast)
         compiled_code = compile(rule_ast, filename="<string>", mode="exec")
-        namespace = {OUTCOME_HELPER_NAME: lambda outcome: outcome}
+        namespace = {
+            FIELD_LOOKUP_HELPER_NAME: get_field_value,
+            OUTCOME_HELPER_NAME: lambda outcome: outcome,
+        }
         exec(compiled_code, namespace)
         return namespace["rule"], rule_ast
 

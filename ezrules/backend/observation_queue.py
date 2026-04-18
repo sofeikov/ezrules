@@ -6,6 +6,7 @@ from functools import lru_cache
 from redis import Redis
 
 from ezrules.backend.utils import upsert_field_observations
+from ezrules.core.field_paths import iter_field_paths
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
@@ -30,7 +31,7 @@ def _build_observation_entries(event_data: dict) -> list[dict[str, str]]:
             "field_name": field_name,
             "observed_json_type": type(value).__name__,
         }
-        for field_name, value in event_data.items()
+        for field_name, value in iter_field_paths(event_data)
     ]
 
 
