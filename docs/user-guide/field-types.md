@@ -12,7 +12,7 @@ Field type management lets you declare the intended type for each field. ezrules
 
 ## How It Works
 
-1. **Observation** — every event that passes through `/api/v2/evaluate` or the **Test Rule** panel records the JSON types it sees for each field. This happens automatically with no configuration.
+1. **Observation** — every event that passes through `/api/v2/evaluate` or the **Test Rule** panel records the JSON types it sees for each field. Nested objects are flattened into canonical dotted paths such as `customer.profile.age`. This happens automatically with no configuration.
 2. **Configuration** — once you see which types a field carries, you declare its canonical type in **Settings → Field Types** and optionally mark it as **required and non-null**.
 3. **Validation + Casting** — at evaluation time, required fields are checked first. Then each configured non-null field value is cast before rule execution. Unconfigured fields pass through unchanged.
 4. **Audit** — every create, update, and delete of a field type configuration is recorded in the audit trail.
@@ -58,7 +58,7 @@ The fastest way to configure a field is from the **Observed Fields** table, whic
 
 ### Manually
 
-1. Enter the field name in **Field Name** (must match the exact key used in event payloads).
+1. Enter the field name in **Field Name** (must match the exact key or dotted nested path used in event payloads).
 2. Select the target type.
 3. If the field is mandatory for live traffic, enable **Required and non-null**.
 4. For `datetime`, fill in the **Datetime Format** field.
@@ -72,11 +72,11 @@ If a configuration already exists for that field name, it will be updated in pla
 
 | Column | Description |
 |---|---|
-| Field Name | The JSON key from event payloads |
+| Field Name | The JSON key or canonical dotted nested path from event payloads |
 | Observed Type | The Python type name (`int`, `float`, `str`, `bool`) |
 | Configured | Badge shown when a type configuration already exists for this field |
 
-A field may appear in multiple rows if it has been seen with different types (for example `amount: int` and `amount: str`). This indicates data quality issues upstream worth investigating.
+A field may appear in multiple rows if it has been seen with different types (for example `amount: int` and `amount: str`). The same applies to nested paths such as `customer.profile.age`. This indicates data quality issues upstream worth investigating.
 
 !!! tip "Observations from Test Rule"
     Fields observed in the **Test Rule** panel on the Rules page are also recorded. This allows you to build up observations without requiring live traffic.

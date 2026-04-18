@@ -3,6 +3,7 @@ from typing import Any
 from sqlalchemy.dialects.postgresql import insert
 
 from ezrules.backend.cast_config_cache import load_cast_configs as load_cached_cast_configs
+from ezrules.core.field_paths import iter_field_paths
 from ezrules.models.backend_core import FieldObservation
 
 
@@ -16,7 +17,7 @@ def conditional_decorator(condition, decorator):
 
 
 def build_observation_rows(event_data: dict, o_id: int) -> list[dict[str, Any]]:
-    observation_keys = {(o_id, field_name, type(value).__name__) for field_name, value in event_data.items()}
+    observation_keys = {(o_id, field_name, type(value).__name__) for field_name, value in iter_field_paths(event_data)}
     return [
         {
             "o_id": current_o_id,

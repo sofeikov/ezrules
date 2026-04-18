@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { SidebarComponent } from '../components/sidebar.component';
 import { TestedEvent, TestedEventService } from '../services/tested-event.service';
+import { buildHighlightedFieldPaths } from '../utils/field-paths';
 
 interface PayloadLine {
   fieldName: string | null;
@@ -149,41 +150,13 @@ export class TestedEventsComponent implements OnInit {
   }
 
   payloadLines(event: TestedEvent): PayloadLine[] {
-    const highlightedFields = this.highlightedFields(event);
-    const entries = Object.entries(event.event_data);
-    const lines: PayloadLine[] = [{ text: '{', fieldName: null, highlighted: false }];
-
-    entries.forEach(([key, value], index) => {
-      const valueLines = this.stringifyJsonValue(value).split('\n');
-      const highlighted = highlightedFields.has(key);
-      const trailingComma = index < entries.length - 1 ? ',' : '';
-
-      lines.push({
-        fieldName: key,
-        highlighted,
-        prefix: '  "',
-        suffix: `": ${valueLines[0]}${valueLines.length === 1 ? trailingComma : ''}`,
-      });
-
-      valueLines.slice(1, -1).forEach((line) => {
-        lines.push({
-          text: `  ${line}`,
-          fieldName: key,
-          highlighted,
-        });
-      });
-
-      if (valueLines.length > 1) {
-        lines.push({
-          text: `  ${valueLines[valueLines.length - 1]}${trailingComma}`,
-          fieldName: key,
-          highlighted,
-        });
-      }
-    });
-
-    lines.push({ text: '}', fieldName: null, highlighted: false });
-    return lines;
+    return this.buildObjectPayloadLines(
+      event.event_data,
+      buildHighlightedFieldPaths([...this.highlightedFields(event)]),
+      0,
+      null,
+      true
+    );
   }
 
   referencedFieldSummary(fields: string[]): string {
@@ -230,5 +203,101 @@ export class TestedEventsComponent implements OnInit {
     } catch {
       return '"[unserializable]"';
     }
+  }
+
+  private buildObjectPayloadLines(
+    value: Record<string, unknown>,
+    highlightedPaths: Set<string>,
+    indentLevel: number,
+    parentPath: string | null,
+    includeBraces: boolean
+  ): PayloadLine[] {
+    const indent = '  '.repeat(indentLevel);
+    const lines: PayloadLine[] = [];
+
+    if (includeBraces) {
+      lines.push({ text: `${indent}{`, fieldName: null, highlighted: false });
+    }
+
+    Object.entries(value).forEach(([key, childValue], index, entries) => {
+      const fieldPath = parentPath ? `${parentPath}.${key}` : key;
+      const highlighted = highlightedPaths.has(fieldPath);
+      const trailingComma = index < entries.length - 1 ? ',' : '';
+
+      if (this.isPlainObject(childValue)) {
+        const nestedEntries = Object.entries(childValue);
+        if (nestedEntries.length === 0) {
+          lines.push({
+            fieldName: fieldPath,
+            highlighted,
+            prefix: `${indent}  "`,
+            suffix: `": {}${trailingComma}`,
+          });
+          return;
+        }
+
+        lines.push({
+          fieldName: fieldPath,
+          highlighted,
+          prefix: `${indent}  "`,
+          suffix: '": {',
+        });
+        lines.push(...this.buildObjectPayloadLines(childValue, highlightedPaths, indentLevel + 1, fieldPath, false));
+        lines.push({ text: `${indent}  }${trailingComma}`, fieldName: null, highlighted: false });
+        return;
+      }
+
+      lines.push(...this.buildValuePayloadLines(fieldPath, childValue, `${indent}  `, highlighted, trailingComma));
+    });
+
+    if (includeBraces) {
+      lines.push({ text: `${indent}}`, fieldName: null, highlighted: false });
+    }
+
+    return lines;
+  }
+
+  private buildValuePayloadLines(
+    fieldPath: string,
+    value: unknown,
+    linePrefix: string,
+    highlighted: boolean,
+    trailingComma: string
+  ): PayloadLine[] {
+    const valueLines = this.stringifyJsonValue(value).split('\n');
+
+    if (valueLines.length === 1) {
+      return [
+        {
+          fieldName: fieldPath,
+          highlighted,
+          prefix: `${linePrefix}"`,
+          suffix: `": ${valueLines[0]}${trailingComma}`,
+        }
+      ];
+    }
+
+    return [
+      {
+        fieldName: fieldPath,
+        highlighted,
+        prefix: `${linePrefix}"`,
+        suffix: `": ${valueLines[0]}`,
+      },
+      ...valueLines.slice(1, -1).map((line) => ({
+        text: `${linePrefix}${line}`,
+        fieldName: fieldPath,
+        highlighted,
+      })),
+      {
+        text: `${linePrefix}${valueLines[valueLines.length - 1]}${trailingComma}`,
+        fieldName: fieldPath,
+        highlighted,
+      },
+    ];
+  }
+
+  private isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 }

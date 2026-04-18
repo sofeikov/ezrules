@@ -107,7 +107,7 @@ When allowlist rules match, `resolved_outcome` is derived from the allowlist res
 
 #### Field Normalization
 
-Before rules are executed, ezrules validates configured required fields and then casts present non-null values to their configured types (see [Field Type Management](../user-guide/field-types.md)). Unconfigured fields pass through unchanged.
+Before rules are executed, ezrules validates configured required fields and then casts present non-null values to their configured types (see [Field Type Management](../user-guide/field-types.md)). Both casting and strict lookups understand canonical dotted nested paths such as `customer.profile.age`. Unconfigured fields pass through unchanged.
 
 If a field is configured with `required=true`, the event is rejected when that field is missing or explicitly `null`:
 
@@ -133,7 +133,15 @@ If rule logic references a field that is absent from `event_data`, the request i
 }
 ```
 
-Field observations are also recorded on each successful call, contributing to the **Observed Fields** data visible in the UI. Live evaluation now buffers those observation writes through Redis and a periodic Celery drain, so observation listings are eventually consistent rather than immediate.
+Nested lookups return the full dotted path in the same format:
+
+```json
+{
+  "detail": "Rule 'RULE_123' lookup failed: field 'customer.profile.age' is missing from the event"
+}
+```
+
+Field observations are also recorded on each successful call, contributing to the **Observed Fields** data visible in the UI. Observations include canonical dotted nested paths as well as parent objects. Live evaluation now buffers those observation writes through Redis and a periodic Celery drain, so observation listings are eventually consistent rather than immediate.
 
 #### Status Codes
 

@@ -52,6 +52,7 @@ nav:
       - From Zero to Live Rule Evaluation: blog/zero-to-live-rule-evaluation.md
       - Rule Lifecycle Management: blog/rule-lifecycle-management.md
       - Automatic Field Type Management: blog/field-type-management.md
+      - Complex Entities in Fraud Rules: blog/complex-entities-in-fraud-rules.md
       - Shipping Rule Changes with Less Guesswork: blog/shadow-deployment.md
       - Rule Quality Precision & Recall: blog/rule-quality-precision-recall.md
       - Ordered Rule Execution: blog/rule-ordering-first-match.md

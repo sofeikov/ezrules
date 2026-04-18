@@ -4,11 +4,13 @@ import random
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from ezrules.core.field_paths import get_field_value
 from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import UserList, UserListEntry
 
 type DemoScalar = str | int | float
-type DemoEventData = dict[str, DemoScalar]
+type DemoValue = DemoScalar | dict[str, object]
+type DemoEventData = dict[str, DemoValue]
 
 
 SAFE_COUNTRIES = ["US", "GB", "CA", "DE", "FR", "NL", "AU", "SG", "SE", "ES"]
@@ -95,6 +97,8 @@ class CustomerProfile:
     customer_id: str
     customer_country: str
     email_domain: str
+    customer_age_years: int
+    customer_segment: str
     account_age_days: int
     email_age_days: int
     prior_chargebacks_180d: int
@@ -250,18 +254,21 @@ def _build_customer_profiles(count: int, rng: random.Random) -> list[CustomerPro
         customer_country = _weighted_pick(rng, countries, country_weights)
 
         if segment == "established":
+            customer_age_years = rng.randint(32, 74)
             account_age_days = rng.randint(240, 2200)
             email_age_days = rng.randint(180, account_age_days + 120)
             prior_chargebacks_180d = 0 if rng.random() < 0.92 else 1
             manual_review_hits_30d = 0 if rng.random() < 0.86 else rng.randint(1, 2)
             typical_amount = rng.randint(45, 480)
         elif segment == "growing":
+            customer_age_years = rng.randint(24, 58)
             account_age_days = rng.randint(45, 540)
             email_age_days = rng.randint(30, account_age_days + 45)
             prior_chargebacks_180d = 0 if rng.random() < 0.8 else rng.randint(1, 2)
             manual_review_hits_30d = rng.randint(0, 2)
             typical_amount = rng.randint(35, 360)
         else:
+            customer_age_years = rng.randint(18, 46)
             account_age_days = rng.randint(2, 45)
             email_age_days = rng.randint(1, account_age_days + 7)
             prior_chargebacks_180d = 0 if rng.random() < 0.7 else 1
@@ -273,6 +280,8 @@ def _build_customer_profiles(count: int, rng: random.Random) -> list[CustomerPro
                 customer_id=f"cust_{index + 1:05d}",
                 customer_country=customer_country,
                 email_domain=_pick(rng, COMMON_EMAIL_DOMAINS),
+                customer_age_years=customer_age_years,
+                customer_segment=segment,
                 account_age_days=account_age_days,
                 email_age_days=email_age_days,
                 prior_chargebacks_180d=prior_chargebacks_180d,
@@ -307,7 +316,7 @@ def _generate_event_payload(rng: random.Random, customers: list[CustomerProfile]
         event_data["local_hour"] = rng.randint(8, 21)
         event_data["card_present"] = 1 if merchant.merchant_category in {"groceries", "fuel", "health"} else 0
         event_data["has_3ds"] = 0 if int(event_data["card_present"]) == 1 else 1
-        return event_data
+        return _attach_nested_demo_entities(event_data, customer)
 
     if scenario == "trusted_big_ticket":
         merchant = _pick_matching_merchants(rng, ["electronics", "travel", "luxury"])
@@ -319,7 +328,7 @@ def _generate_event_payload(rng: random.Random, customers: list[CustomerProfile]
         event_data["card_present"] = 0
         event_data["local_hour"] = rng.randint(9, 20)
         event_data["distance_from_home_km"] = rng.randint(0, 80)
-        return event_data
+        return _attach_nested_demo_entities(event_data, customer)
 
     if scenario == "cross_border_reship":
         merchant = _pick_matching_merchants(rng, ["electronics", "fashion", "luxury"])
@@ -343,7 +352,7 @@ def _generate_event_payload(rng: random.Random, customers: list[CustomerProfile]
         event_data["unique_cards_24h"] = rng.randint(1, 3)
         event_data["distance_from_home_km"] = rng.randint(1400, 9200)
         event_data["local_hour"] = _pick(rng, [0, 1, 2, 3, 4, 22, 23])
-        return event_data
+        return _attach_nested_demo_entities(event_data, customer)
 
     if scenario == "card_testing_burst":
         merchant = _pick_matching_merchants(rng, ["digital_goods", "gift_cards"])
@@ -364,7 +373,7 @@ def _generate_event_payload(rng: random.Random, customers: list[CustomerProfile]
         event_data["ip_proxy_score"] = rng.randint(72, 99)
         event_data["distance_from_home_km"] = rng.randint(900, 9800)
         event_data["local_hour"] = rng.randint(0, 4)
-        return event_data
+        return _attach_nested_demo_entities(event_data, customer)
 
     if scenario == "account_takeover":
         merchant = _pick_matching_merchants(rng, ["electronics", "travel", "luxury"])
@@ -384,7 +393,7 @@ def _generate_event_payload(rng: random.Random, customers: list[CustomerProfile]
         )
         event_data["distance_from_home_km"] = rng.randint(1800, 9800)
         event_data["local_hour"] = _pick(rng, [0, 1, 2, 3, 4, 5, 22, 23])
-        return event_data
+        return _attach_nested_demo_entities(event_data, customer)
 
     if scenario == "wallet_cashout":
         merchant = _pick_matching_merchants(rng, ["money_transfer", "crypto"])
@@ -408,7 +417,7 @@ def _generate_event_payload(rng: random.Random, customers: list[CustomerProfile]
         event_data["ip_proxy_score"] = rng.randint(35, 95)
         event_data["distance_from_home_km"] = rng.randint(500, 9500)
         event_data["local_hour"] = _pick(rng, [0, 1, 2, 3, 4, 5, 20, 21, 22, 23])
-        return event_data
+        return _attach_nested_demo_entities(event_data, customer)
 
     merchant = _pick_matching_merchants(rng, ["travel", "digital_goods", "fashion", "electronics"])
     event_data = _base_event_data(rng, customer, merchant, txn_type="card_purchase")
@@ -428,7 +437,7 @@ def _generate_event_payload(rng: random.Random, customers: list[CustomerProfile]
     )
     event_data["ip_country"] = str(event_data["billing_country"])
     event_data["local_hour"] = rng.randint(9, 22)
-    return event_data
+    return _attach_nested_demo_entities(event_data, customer)
 
 
 def _base_event_data(
@@ -476,6 +485,41 @@ def _base_event_data(
         "beneficiary_age_days": rng.randint(45, 720),
         "local_hour": local_hour,
     }
+
+
+def _attach_nested_demo_entities(event_data: DemoEventData, customer: CustomerProfile) -> DemoEventData:
+    event_data["customer"] = {
+        "id": customer.customer_id,
+        "country": _str_value(event_data, "customer_country"),
+        "profile": {
+            "age": customer.customer_age_years,
+            "segment": customer.customer_segment,
+        },
+        "account": {
+            "age_days": _int_value(event_data, "account_age_days"),
+            "email_age_days": _int_value(event_data, "email_age_days"),
+            "prior_chargebacks_180d": _int_value(event_data, "prior_chargebacks_180d"),
+        },
+        "behavior": {
+            "avg_amount_30d": _float_value(event_data, "customer_avg_amount_30d"),
+            "std_amount_30d": _float_value(event_data, "customer_std_amount_30d"),
+        },
+    }
+    event_data["sender"] = {
+        "id": customer.customer_id,
+        "country": _str_value(event_data, "billing_country"),
+        "account": {
+            "age_days": _int_value(event_data, "account_age_days"),
+        },
+        "origin": {
+            "country": _str_value(event_data, "ip_country"),
+        },
+        "device": {
+            "age_days": _int_value(event_data, "device_age_days"),
+            "trust_score": _int_value(event_data, "device_trust_score"),
+        },
+    }
+    return event_data
 
 
 def _pick_matching_merchants(rng: random.Random, categories: list[str]) -> MerchantProfile:
@@ -595,17 +639,26 @@ def _random_recent_timestamp(rng: random.Random) -> int:
 
 
 def _int_value(event_data: DemoEventData, field_name: str) -> int:
-    value = event_data.get(field_name, 0)
+    try:
+        value = get_field_value(event_data, field_name)
+    except KeyError:
+        return 0
     return int(value) if isinstance(value, int | float) else 0
 
 
 def _float_value(event_data: DemoEventData, field_name: str) -> float:
-    value = event_data.get(field_name, 0.0)
+    try:
+        value = get_field_value(event_data, field_name)
+    except KeyError:
+        return 0.0
     return float(value) if isinstance(value, int | float) else 0.0
 
 
 def _str_value(event_data: DemoEventData, field_name: str) -> str:
-    value = event_data.get(field_name, "")
+    try:
+        value = get_field_value(event_data, field_name)
+    except KeyError:
+        return ""
     return value if isinstance(value, str) else str(value)
 
 
@@ -682,6 +735,23 @@ def _rule_showcase_amount_zscore(variant: int) -> tuple[str, str, str]:
         "customer baseline plus card-not-present or geo-mismatch context."
     )
     return logic, description, "ShowcaseAmountZscore"
+
+
+def _rule_nested_customer_sender_showcase(variant: int) -> tuple[str, str, str]:
+    amount = 520 + (variant * 100)
+    trust_score = 38 + (variant * 4)
+    logic = (
+        "if 'profile' in t.get('customer', {}) and 'country' in t.get('customer', {}) and "
+        "'device' in t.get('sender', {}) and 'origin' in t.get('sender', {}) and "
+        f"$customer.profile.age >= 21 and $sender.device.trust_score <= {trust_score} "
+        f"and $sender.origin.country != $customer.country and $amount >= {amount}:\n"
+        "    return !HOLD"
+    )
+    description = (
+        f"Showcase nested-path rule: escalate transactions above {amount} when the sender device trust score "
+        f"falls to {trust_score} or below and the sender origin country diverges from the customer country."
+    )
+    return logic, description, "ShowcaseNestedCustomerSender"
 
 
 def _rule_ato_password_reset(variant: int) -> tuple[str, str, str]:
@@ -834,6 +904,7 @@ _RULE_BUILDERS = [
     _rule_disposable_email_velocity,
     _rule_na_to_latam_reship,
     _rule_showcase_amount_zscore,
+    _rule_nested_customer_sender_showcase,
     _rule_ato_password_reset,
     _rule_showcase_loop_score,
     _rule_showcase_branch_by_txn_type,
