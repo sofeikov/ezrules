@@ -20,6 +20,7 @@ Open **Dashboard** in the sidebar and verify:
 - Transaction volume chart has data in the selected window
 - Most-firing and least-firing rule cards look plausible for the selected window
 - Outcome charts move as you submit test or live events
+- Opening a ranked rule lets you inspect that rule's own **Performance** card and confirm which outcomes are firing over time
 
 Use aggregation windows: `1h`, `6h`, `12h`, `24h`, `30d`.
 
@@ -28,6 +29,7 @@ Healthy signal:
 - transaction volume is non-zero when your integration is sending events
 - least-firing rules include active zero-hit rules instead of dropping them from the ranking
 - outcome lines change after rule updates or test submissions
+- the rule-detail performance chart shows the same rule generating plausible outcome counts in the time window you selected
 
 ---
 
@@ -108,6 +110,7 @@ Healthy signal:
 - `GET /api/v2/tested-events?limit=50`
 - `GET /api/v2/analytics/transaction-volume?aggregation=6h`
 - `GET /api/v2/analytics/outcomes-distribution?aggregation=24h`
+- `GET /api/v2/analytics/rules/{rule_id}/outcomes-distribution?aggregation=6h`
 - `GET /api/v2/analytics/rule-activity?aggregation=6h&limit=5`
 - `GET /api/v2/analytics/labels-summary`
 - `GET /api/v2/analytics/labels-distribution?aggregation=6h`

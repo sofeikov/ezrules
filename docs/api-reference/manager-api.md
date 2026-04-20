@@ -168,6 +168,7 @@ Rule lifecycle fields on rule responses:
 |---|---|---|---|
 | `GET` | `/api/v2/analytics/transaction-volume` | Bearer + permission | Time-series event volume |
 | `GET` | `/api/v2/analytics/outcomes-distribution` | Bearer + permission | Outcome trends |
+| `GET` | `/api/v2/analytics/rules/{rule_id}/outcomes-distribution` | Bearer + `VIEW_RULES` | Per-rule outcome hit trends for the caller's org |
 | `GET` | `/api/v2/analytics/rule-activity` | Bearer + `VIEW_RULES` | Most/least firing active rules for the caller's org; counts stored non-null outcomes and includes zero-hit active rules in the least-firing ranking |
 | `GET` | `/api/v2/analytics/labels-summary` | Bearer + permission | Total labeled summary for the caller's org |
 | `GET` | `/api/v2/analytics/labels-distribution` | Bearer + permission | Label trends for the caller's org |
@@ -186,6 +187,10 @@ Rule quality query params:
 Rule activity query params:
 - `aggregation` (default `6h`; valid values `1h`, `6h`, `12h`, `24h`, `30d`)
 - `limit` (default `5`; maximum rules returned per ranking)
+
+Per-rule outcome distribution query params:
+- `aggregation` (default `6h`; valid values `1h`, `6h`, `12h`, `24h`, `30d`)
+- `rule_id` path param must resolve to a rule in the caller's organisation or the endpoint returns `404`
 
 ### Settings
 

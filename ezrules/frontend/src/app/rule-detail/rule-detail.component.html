@@ -371,6 +371,68 @@
 
         <!-- Right Column - Testing -->
         <div class="space-y-6">
+          <!-- Performance Card -->
+          <div *ngIf="!isRevisionView" class="bg-white border border-gray-200 rounded-lg p-6" data-testid="rule-performance-card">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 class="text-xl font-semibold text-gray-900">Performance</h2>
+                <p class="text-sm text-gray-500 mt-1">Stored outcome hits for this rule over time in the selected window.</p>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <label class="text-sm text-gray-600">Time Range:</label>
+                <select
+                  data-testid="rule-performance-time-range"
+                  class="border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  [(ngModel)]="selectedPerformanceAggregation"
+                  (ngModelChange)="onPerformanceAggregationChange()"
+                >
+                  <option *ngFor="let agg of performanceAggregations" [value]="agg.value">{{ agg.label }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div *ngIf="performanceError" class="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+              <p class="text-sm font-medium text-red-800">{{ performanceError }}</p>
+            </div>
+
+            <div *ngIf="performanceLoading" class="flex justify-center py-12">
+              <div class="animate-pulse rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+
+            <div
+              *ngIf="!performanceLoading && !performanceError && performanceOutcomeDatasets.length === 0"
+              class="text-center py-12 text-gray-500"
+              data-testid="rule-performance-empty"
+            >
+              No stored outcome hits for this rule in the selected time range.
+            </div>
+
+            <div *ngIf="!performanceLoading && performanceOutcomeDatasets.length > 0" class="mt-6">
+              <div class="grid gap-3 md:grid-cols-2 mb-6">
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <p class="text-xs uppercase tracking-wide text-gray-500">Hits In Window</p>
+                  <p class="mt-2 text-3xl font-semibold text-gray-900" data-testid="rule-performance-total-hits">
+                    {{ getPerformanceHitCount() }}
+                  </p>
+                </div>
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <p class="text-xs uppercase tracking-wide text-gray-500">Outcomes Seen</p>
+                  <p class="mt-2 text-3xl font-semibold text-gray-900" data-testid="rule-performance-outcome-count">
+                    {{ performanceOutcomeDatasets.length }}
+                  </p>
+                </div>
+              </div>
+
+              <canvas
+                id="rulePerformanceChart"
+                data-testid="rule-performance-chart"
+                style="max-height: 360px;"
+              ></canvas>
+              <p class="mt-4 text-xs text-gray-500">Hit counts reflect stored non-null outcomes persisted for this rule.</p>
+            </div>
+          </div>
+
           <!-- Test Rule Card -->
           <div class="bg-white border border-gray-200 rounded-lg p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Test Rule</h2>

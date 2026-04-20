@@ -1,7 +1,8 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { Chart, registerables } from 'chart.js';
 import { diffLines, Change } from 'diff';
 import { of, Subscription } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
@@ -16,6 +17,7 @@ import {
   ShadowRuleItem,
   UpdateRuleRequest
 } from '../services/rule.service';
+import { ChartDataset, DashboardService } from '../services/dashboard.service';
 import {
   BacktestingService,
   BacktestQualityMetric,
@@ -36,14 +38,23 @@ import {
 import { RuntimeSettingsService } from '../services/runtime-settings.service';
 import { SidebarComponent } from '../components/sidebar.component';
 
+Chart.register(...registerables);
+
 @Component({
   selector: 'app-rule-detail',
   standalone: true,
   imports: [CommonModule, RouterModule, FormsModule, SidebarComponent, RuleLogicEditorComponent],
   templateUrl: './rule-detail.component.html'
 })
-export class RuleDetailComponent implements OnInit, OnDestroy {
+export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly mainLaneDescription = 'Main rules run during standard evaluation and participate in the normal outcome resolution flow.';
+  readonly performanceAggregations = [
+    { value: '1h', label: 'Last 1 Hour' },
+    { value: '6h', label: 'Last 6 Hours' },
+    { value: '12h', label: 'Last 12 Hours' },
+    { value: '24h', label: 'Last 24 Hours' },
+    { value: '30d', label: 'Last 30 Days' }
+  ];
   rule: RuleDetail | null = null;
   loading: boolean = true;
   error: string | null = null;
@@ -61,6 +72,11 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   listSuggestions: RuleEditorListSuggestion[] = [];
   outcomeSuggestions: RuleEditorOutcomeSuggestion[] = [];
   testing: boolean = false;
+  performanceLoading: boolean = false;
+  performanceError: string | null = null;
+  selectedPerformanceAggregation: string = '6h';
+  performanceOutcomeDatasets: ChartDataset[] = [];
+  performanceTimeLabels: string[] = [];
 
   // Revision view properties
   isRevisionView: boolean = false;
@@ -107,16 +123,20 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   private verifyDebounceHandle: ReturnType<typeof setTimeout> | null = null;
   private verifyRequestSequence: number = 0;
   private verifySubscription: Subscription | null = null;
+  private performanceChart: Chart | null = null;
+  private performanceCanvasReady: boolean = false;
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private ruleService: RuleService,
+    private dashboardService: DashboardService,
     private backtestingService: BacktestingService,
     private ruleTestDataService: RuleTestDataService,
     private ruleEditorAssistService: RuleEditorAssistService,
     private authService: AuthService,
     private runtimeSettingsService: RuntimeSettingsService,
+    private cdr: ChangeDetectorRef,
   ) { }
 
   ngOnInit(): void {
@@ -160,11 +180,20 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  ngAfterViewInit(): void {
+    this.performanceCanvasReady = true;
+    if (!this.performanceLoading && this.performanceOutcomeDatasets.length > 0) {
+      this.cdr.detectChanges();
+      setTimeout(() => this.renderPerformanceChart(), 0);
+    }
+  }
+
   ngOnDestroy(): void {
     this.assistSubscription?.unsubscribe();
     this.cancelPendingVerify();
     this.pollingIntervals.forEach(interval => clearInterval(interval));
     this.pollingIntervals.clear();
+    this.destroyPerformanceChart();
   }
 
   loadPermissions(): void {
@@ -189,6 +218,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   loadRule(ruleId: number): void {
     this.loading = true;
     this.error = null;
+    this.resetRulePerformance();
 
     this.ruleService.getRule(ruleId).subscribe({
       next: (rule) => {
@@ -199,6 +229,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
         this.loadShadowEntry(rule.r_id);
         this.loadRolloutEntry(rule.r_id);
         this.loadBacktestResults(rule.r_id);
+        this.loadRulePerformance(rule.r_id);
       },
       error: (error) => {
         this.rule = null;
@@ -213,6 +244,7 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
   loadRevision(ruleId: number, revisionNumber: number): void {
     this.loading = true;
     this.error = null;
+    this.resetRulePerformance();
 
     this.ruleService.getRuleRevision(ruleId, revisionNumber).subscribe({
       next: (revision: RuleRevisionDetail) => {
@@ -229,6 +261,112 @@ export class RuleDetailComponent implements OnInit, OnDestroy {
         console.error('Error loading rule revision:', error);
       }
     });
+  }
+
+  onPerformanceAggregationChange(): void {
+    if (!this.rule || this.isRevisionView) {
+      return;
+    }
+    this.loadRulePerformance(this.rule.r_id);
+  }
+
+  getPerformanceHitCount(): number {
+    return this.performanceOutcomeDatasets.reduce(
+      (total, dataset) => total + dataset.data.reduce((sum, count) => sum + count, 0),
+      0,
+    );
+  }
+
+  private loadRulePerformance(ruleId: number): void {
+    if (this.isRevisionView) {
+      return;
+    }
+
+    this.performanceLoading = true;
+    this.performanceError = null;
+    this.performanceOutcomeDatasets = [];
+    this.performanceTimeLabels = [];
+    this.destroyPerformanceChart();
+
+    this.dashboardService.getRuleOutcomesDistribution(ruleId, this.selectedPerformanceAggregation).subscribe({
+      next: (response) => {
+        this.performanceTimeLabels = response.labels;
+        this.performanceOutcomeDatasets = response.datasets;
+        this.performanceLoading = false;
+
+        if (this.performanceCanvasReady && this.performanceOutcomeDatasets.length > 0) {
+          this.cdr.detectChanges();
+          setTimeout(() => this.renderPerformanceChart(), 0);
+        }
+      },
+      error: (error) => {
+        this.performanceLoading = false;
+        this.performanceError = 'Failed to load rule performance data.';
+        this.destroyPerformanceChart();
+        console.error('Error loading rule performance:', error);
+      }
+    });
+  }
+
+  private renderPerformanceChart(): void {
+    this.destroyPerformanceChart();
+    if (!this.performanceOutcomeDatasets.length) {
+      return;
+    }
+
+    const canvas = document.getElementById('rulePerformanceChart') as HTMLCanvasElement | null;
+    const context = canvas?.getContext('2d');
+    if (!context) {
+      return;
+    }
+
+    this.performanceChart = new Chart(context, {
+      type: 'line',
+      data: {
+        labels: this.performanceTimeLabels,
+        datasets: this.performanceOutcomeDatasets.map((dataset) => ({
+          label: dataset.label,
+          data: dataset.data,
+          borderColor: dataset.borderColor,
+          backgroundColor: dataset.backgroundColor,
+          tension: 0.3,
+          fill: false,
+        }))
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'bottom',
+          },
+          title: { display: false }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0 }
+          },
+          x: {
+            ticks: { maxRotation: 45, minRotation: 45 }
+          }
+        }
+      }
+    });
+  }
+
+  private destroyPerformanceChart(): void {
+    this.performanceChart?.destroy();
+    this.performanceChart = null;
+  }
+
+  private resetRulePerformance(): void {
+    this.performanceLoading = false;
+    this.performanceError = null;
+    this.performanceOutcomeDatasets = [];
+    this.performanceTimeLabels = [];
+    this.destroyPerformanceChart();
   }
 
   fillInExampleParams(ruleSource?: string): void {

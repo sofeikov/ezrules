@@ -169,11 +169,28 @@ test.describe('Main Rule Execution Mode', () => {
       await expect(rulePage.getOrderForRule(ruleTwoRid)).resolves.toBe('998');
 
       await rulePage.enterReorderMode();
-      await rulePage.rowByRid(ruleThreeRid).getByRole('button', { name: 'Enter exact position' }).click();
-      await expect(rulePage.rowByRid(ruleThreeRid).locator('input[type="number"]')).toBeVisible();
+      const ruleThreeRow = rulePage.rowByRid(ruleThreeRid);
+      await ruleThreeRow.getByRole('button', { name: 'Enter exact position' }).click();
+      const directPositionInput = ruleThreeRow.locator('input[type="number"]');
+      await expect(directPositionInput).toBeVisible();
+      const targetPosition = await rulePage.getReorderPositionForRule(ruleTwoRid);
+      expect(targetPosition).toBeGreaterThan(0);
+      await directPositionInput.fill(String(targetPosition));
+      await ruleThreeRow.getByRole('button', { name: 'Go' }).click();
+      await expect(rulePage.saveOrderButton).toBeEnabled();
 
-      await rulePage.moveRuleUp(ruleThreeRid);
+      const reorderedRowIndexes = await Promise.all([
+        rulePage.getRowIndexForRule(ruleTwoRid),
+        rulePage.getRowIndexForRule(ruleThreeRid),
+      ]);
+      expect(reorderedRowIndexes[1]).toBeLessThan(reorderedRowIndexes[0]);
+
+      const saveResponsePromise = page.waitForResponse(
+        resp => resp.url().endsWith('/api/v2/rules/main-order') && resp.request().method() === 'PUT'
+      );
       await rulePage.saveOrderButton.click();
+      const saveResponse = await saveResponsePromise;
+      expect(saveResponse.ok()).toBeTruthy();
       await expect(rulePage.saveOrderButton).toHaveCount(0);
 
       await page.reload();

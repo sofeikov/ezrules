@@ -106,6 +106,22 @@ export class DashboardService {
     );
   }
 
+  getRuleOutcomesDistribution(ruleId: number, aggregation: string): Observable<MultiSeriesResponse> {
+    return this.http.get<MultiSeriesResponseV2>(`${this.analyticsUrl}/rules/${ruleId}/outcomes-distribution`, {
+      params: { aggregation }
+    }).pipe(
+      map(response => ({
+        labels: response.labels,
+        datasets: response.datasets.map(ds => ({
+          label: ds.label,
+          data: ds.data,
+          borderColor: ds.borderColor,
+          backgroundColor: ds.backgroundColor
+        }))
+      }))
+    );
+  }
+
   getRuleActivity(aggregation: string, limit: number = 5): Observable<RuleActivityResponse> {
     return this.http.get<RuleActivityResponse>(`${this.analyticsUrl}/rule-activity`, {
       params: { aggregation, limit }
