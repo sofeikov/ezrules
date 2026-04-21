@@ -6,6 +6,7 @@ import { AuthService } from '../services/auth.service';
 import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { SidebarComponent } from '../components/sidebar.component';
 import {
+  AIAuthoringSettings,
   InvalidAllowlistRule,
   OutcomeHierarchyItem,
   RuleQualityPair,
@@ -22,6 +23,11 @@ export class SettingsComponent implements OnInit {
   readonly mainRuleExecutionModeOptions = [
     { value: 'all_matches', label: 'Collect all matches' },
     { value: 'first_match', label: 'Stop on first match' },
+  ] as const;
+  readonly aiAuthoringModelOptions = [
+    { value: 'gpt-4.1-mini', label: 'Default' },
+    { value: 'gpt-4.1', label: 'Higher quality' },
+    { value: 'gpt-4o-mini', label: 'Lower cost' },
   ] as const;
   autoPromoteActiveRuleUpdates: boolean = false;
   defaultAutoPromoteActiveRuleUpdates: boolean = false;
@@ -40,6 +46,12 @@ export class SettingsComponent implements OnInit {
   neutralOutcome: string = '';
   defaultNeutralOutcome: string = '';
   invalidAllowlistRules: InvalidAllowlistRule[] = [];
+  aiAuthoringSettings: AIAuthoringSettings | null = null;
+  aiAuthoringProvider: string = 'openai';
+  aiAuthoringEnabled: boolean = false;
+  aiAuthoringModel: string = '';
+  aiAuthoringApiKey: string = '';
+  aiAuthoringSaving: boolean = false;
   availableOutcomes: string[] = [];
   availableLabels: string[] = [];
   hierarchyOutcomes: OutcomeHierarchyItem[] = [];
@@ -83,11 +95,12 @@ export class SettingsComponent implements OnInit {
 
     forkJoin({
       settings: this.runtimeSettingsService.getRuntimeSettings(),
+      aiAuthoring: this.runtimeSettingsService.getAIAuthoringSettings(),
       hierarchy: this.runtimeSettingsService.getOutcomeHierarchy(),
       options: this.runtimeSettingsService.getRuleQualityPairOptions(),
       pairs: this.runtimeSettingsService.getRuleQualityPairs(),
     }).subscribe({
-      next: ({ settings, hierarchy, options, pairs }) => {
+      next: ({ settings, aiAuthoring, hierarchy, options, pairs }) => {
         this.autoPromoteActiveRuleUpdates = settings.autoPromoteActiveRuleUpdates;
         this.defaultAutoPromoteActiveRuleUpdates = settings.defaultAutoPromoteActiveRuleUpdates;
         this.mainRuleExecutionMode = settings.mainRuleExecutionMode;
@@ -97,6 +110,11 @@ export class SettingsComponent implements OnInit {
         this.neutralOutcome = settings.neutralOutcome;
         this.defaultNeutralOutcome = settings.defaultNeutralOutcome;
         this.invalidAllowlistRules = settings.invalidAllowlistRules;
+        this.aiAuthoringSettings = aiAuthoring;
+        this.aiAuthoringProvider = aiAuthoring.provider;
+        this.aiAuthoringEnabled = aiAuthoring.enabled;
+        this.aiAuthoringModel = aiAuthoring.model || this.aiAuthoringModelOptions[0].value;
+        this.aiAuthoringApiKey = '';
         this.hierarchyOutcomes = hierarchy;
         this.availableOutcomes = options.outcomes;
         this.availableLabels = options.labels;
@@ -113,6 +131,101 @@ export class SettingsComponent implements OnInit {
           this.error = 'Failed to load settings data.';
         }
         this.loading = false;
+      }
+    });
+  }
+
+  saveAIAuthoringSettings(): void {
+    if (!this.canManagePermissions) {
+      return;
+    }
+
+    this.error = null;
+    this.success = null;
+
+    if (!this.aiAuthoringProvider) {
+      this.error = 'Select an AI provider before saving.';
+      return;
+    }
+    if (!this.aiAuthoringModel.trim()) {
+      this.aiAuthoringModel = this.aiAuthoringModelOptions[0].value;
+    }
+    if (this.aiAuthoringEnabled && !this.aiAuthoringModel.trim()) {
+      this.error = 'Enter an OpenAI model before enabling AI authoring.';
+      return;
+    }
+    if (
+      this.aiAuthoringEnabled
+      && !this.aiAuthoringApiKey.trim()
+      && !this.aiAuthoringSettings?.apiKeyConfigured
+    ) {
+      this.error = 'Add an OpenAI API key before enabling AI authoring.';
+      return;
+    }
+
+    this.aiAuthoringSaving = true;
+    const trimmedApiKey = this.aiAuthoringApiKey.trim();
+    this.runtimeSettingsService.updateAIAuthoringSettings({
+      provider: this.aiAuthoringProvider,
+      enabled: this.aiAuthoringEnabled,
+      model: this.aiAuthoringModel.trim(),
+      apiKey: trimmedApiKey ? trimmedApiKey : undefined,
+    }).subscribe({
+      next: (settings) => {
+        this.aiAuthoringSettings = settings;
+        this.aiAuthoringProvider = settings.provider;
+        this.aiAuthoringEnabled = settings.enabled;
+        this.aiAuthoringModel = settings.model;
+        this.aiAuthoringApiKey = '';
+        this.success = 'AI authoring settings saved successfully.';
+        this.aiAuthoringSaving = false;
+      },
+      error: (err) => {
+        this.error = err?.error?.detail || 'Failed to save AI authoring settings.';
+        this.aiAuthoringSaving = false;
+      }
+    });
+  }
+
+  useAiAuthoringModelOption(model: string): void {
+    this.aiAuthoringModel = model;
+  }
+
+  clearStoredAiAuthoringApiKey(): void {
+    if (!this.canManagePermissions || !this.aiAuthoringSettings?.apiKeyConfigured || this.aiAuthoringSaving) {
+      return;
+    }
+
+    const willDisableAiAuthoring = this.aiAuthoringEnabled && !this.aiAuthoringApiKey.trim();
+    const confirmed = window.confirm(
+      willDisableAiAuthoring
+        ? 'Clear the stored OpenAI API key? AI authoring will also be disabled until you save a new key.'
+        : 'Clear the stored OpenAI API key?'
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    this.error = null;
+    this.success = null;
+    this.aiAuthoringSaving = true;
+
+    this.runtimeSettingsService.updateAIAuthoringSettings({
+      clearApiKey: true,
+      enabled: willDisableAiAuthoring ? false : undefined,
+    }).subscribe({
+      next: (settings) => {
+        this.aiAuthoringSettings = settings;
+        this.aiAuthoringProvider = settings.provider;
+        this.aiAuthoringEnabled = settings.enabled;
+        this.aiAuthoringModel = settings.model || this.aiAuthoringModelOptions[0].value;
+        this.aiAuthoringApiKey = '';
+        this.success = 'Stored API key cleared successfully.';
+        this.aiAuthoringSaving = false;
+      },
+      error: (err) => {
+        this.error = err?.error?.detail || 'Failed to clear the stored API key.';
+        this.aiAuthoringSaving = false;
       }
     });
   }

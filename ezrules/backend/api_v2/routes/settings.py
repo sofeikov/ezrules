@@ -13,6 +13,8 @@ from ezrules.backend.api_v2.auth.dependencies import (
     require_permission,
 )
 from ezrules.backend.api_v2.schemas.settings import (
+    AIAuthoringSettingsResponse,
+    AIAuthoringSettingsUpdateRequest,
     InvalidAllowlistRule,
     OutcomeHierarchyItem,
     OutcomeHierarchyResponse,
@@ -26,13 +28,22 @@ from ezrules.backend.api_v2.schemas.settings import (
     RuntimeSettingsUpdateRequest,
 )
 from ezrules.backend.runtime_settings import (
+    AI_AUTHORING_PROVIDER_DEFAULT,
     AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
     MAIN_RULE_EXECUTION_MODE_DEFAULT,
     NEUTRAL_OUTCOME_DEFAULT,
+    get_ai_authoring_enabled,
+    get_ai_authoring_model,
+    get_ai_authoring_provider,
     get_auto_promote_active_rule_updates,
     get_main_rule_execution_mode,
     get_neutral_outcome,
     get_rule_quality_lookback_days,
+    has_ai_authoring_api_key,
+    set_ai_authoring_api_key,
+    set_ai_authoring_enabled,
+    set_ai_authoring_model,
+    set_ai_authoring_provider,
     set_auto_promote_active_rule_updates,
     set_main_rule_execution_mode,
     set_neutral_outcome,
@@ -49,6 +60,8 @@ from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/settings", tags=["Settings"])
+
+SUPPORTED_AI_AUTHORING_PROVIDERS = [AI_AUTHORING_PROVIDER_DEFAULT]
 
 
 def _serialize_rule_quality_pair(pair: RuleQualityPair) -> RuleQualityPairResponse:
@@ -256,6 +269,96 @@ def update_runtime_settings(
         neutral_outcome=neutral_outcome,
         default_neutral_outcome=NEUTRAL_OUTCOME_DEFAULT,
         invalid_allowlist_rules=_list_invalid_allowlist_rules(db, current_org_id, neutral_outcome),
+    )
+
+
+@router.get("/ai-authoring", response_model=AIAuthoringSettingsResponse)
+def get_ai_authoring_settings(
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> AIAuthoringSettingsResponse:
+    """Return current AI rule authoring settings for the organisation."""
+    return AIAuthoringSettingsResponse(
+        provider=get_ai_authoring_provider(db, current_org_id),
+        supported_providers=SUPPORTED_AI_AUTHORING_PROVIDERS,
+        enabled=get_ai_authoring_enabled(db, current_org_id),
+        model=get_ai_authoring_model(db, current_org_id),
+        api_key_configured=has_ai_authoring_api_key(db, current_org_id),
+    )
+
+
+@router.put("/ai-authoring", response_model=AIAuthoringSettingsResponse)
+def update_ai_authoring_settings(
+    request_data: AIAuthoringSettingsUpdateRequest,
+    user: User = Depends(get_current_active_user),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> AIAuthoringSettingsResponse:
+    """Update AI rule authoring provider settings."""
+    updates_requested = (
+        request_data.provider is not None
+        or request_data.enabled is not None
+        or request_data.model is not None
+        or request_data.api_key is not None
+        or request_data.clear_api_key is not None
+    )
+    if not updates_requested:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No AI authoring setting changes requested")
+
+    if not _user_has_permission(db, user, PermissionAction.MANAGE_PERMISSIONS):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="MANAGE_PERMISSIONS permission is required to update AI authoring settings",
+        )
+
+    if request_data.provider is not None:
+        normalized_provider = request_data.provider.strip().lower()
+        if normalized_provider not in SUPPORTED_AI_AUTHORING_PROVIDERS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="OpenAI is the only supported AI authoring provider right now",
+            )
+        set_ai_authoring_provider(db, normalized_provider, current_org_id)
+
+    if request_data.enabled is not None:
+        set_ai_authoring_enabled(db, request_data.enabled, current_org_id)
+
+    if request_data.model is not None:
+        set_ai_authoring_model(db, request_data.model, current_org_id)
+
+    if request_data.clear_api_key:
+        set_ai_authoring_api_key(db, "", current_org_id)
+    elif request_data.api_key is not None:
+        set_ai_authoring_api_key(db, request_data.api_key.strip(), current_org_id)
+
+    db.flush()
+
+    next_enabled = (
+        request_data.enabled if request_data.enabled is not None else get_ai_authoring_enabled(db, current_org_id)
+    )
+    next_model = (
+        request_data.model.strip() if request_data.model is not None else get_ai_authoring_model(db, current_org_id)
+    )
+    next_has_api_key = has_ai_authoring_api_key(db, current_org_id)
+    if next_enabled and not next_model:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="An OpenAI model is required when AI authoring is enabled"
+        )
+    if next_enabled and not next_has_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="An OpenAI API key is required when AI authoring is enabled"
+        )
+
+    db.commit()
+
+    return AIAuthoringSettingsResponse(
+        provider=get_ai_authoring_provider(db, current_org_id),
+        supported_providers=SUPPORTED_AI_AUTHORING_PROVIDERS,
+        enabled=get_ai_authoring_enabled(db, current_org_id),
+        model=get_ai_authoring_model(db, current_org_id),
+        api_key_configured=has_ai_authoring_api_key(db, current_org_id),
     )
 
 

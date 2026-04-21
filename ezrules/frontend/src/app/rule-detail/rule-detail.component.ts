@@ -27,6 +27,7 @@ import {
 } from '../services/backtesting.service';
 import { AuthService } from '../services/auth.service';
 import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
+import { AiRuleAuthoringPanelComponent } from '../components/ai-rule-authoring-panel.component';
 import { RuleLogicEditorComponent, RuleEditorDiagnostic } from '../components/rule-logic-editor.component';
 import { RuleTestDataService } from '../services/rule-test-data.service';
 import {
@@ -43,7 +44,7 @@ Chart.register(...registerables);
 @Component({
   selector: 'app-rule-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, SidebarComponent, RuleLogicEditorComponent],
+  imports: [CommonModule, RouterModule, FormsModule, SidebarComponent, RuleLogicEditorComponent, AiRuleAuthoringPanelComponent],
   templateUrl: './rule-detail.component.html'
 })
 export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -87,6 +88,7 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   editedDescription: string = '';
   editedLogic: string = '';
   editedEvaluationLane: RuleEvaluationLane = 'main';
+  pendingAIDraft: boolean = false;
   saving: boolean = false;
   saveError: string | null = null;
   saveSuccess: boolean = false;
@@ -464,6 +466,15 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     this.handleEditedLogicChange();
   }
 
+  handleAIDraftApplied(draftLogic: string): void {
+    this.editedLogic = draftLogic;
+    this.handleEditedLogicChange();
+  }
+
+  handlePendingAIDraftChange(pending: boolean): void {
+    this.pendingAIDraft = pending;
+  }
+
   private cancelPendingVerify(): number {
     if (this.verifyDebounceHandle) {
       clearTimeout(this.verifyDebounceHandle);
@@ -540,6 +551,7 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
       this.rolloutTrafficPercent = this.rolloutEntry?.traffic_percent ?? 10;
       this.saveError = null;
       this.saveSuccess = false;
+      this.pendingAIDraft = false;
       this.saveSuccessMessage = 'Rule saved successfully!';
       this.rolloutDeployError = null;
       this.rolloutDeploySuccess = false;
@@ -552,6 +564,7 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isEditMode = false;
     this.saveError = null;
     this.saveSuccess = false;
+    this.pendingAIDraft = false;
     this.saveSuccessMessage = 'Rule saved successfully!';
     if (this.rule) {
       this.editedDescription = this.rule.description;

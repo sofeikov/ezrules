@@ -22,6 +22,14 @@ FIELD_TYPE_CONFIG_VERSION_KEY = "field_type_config_version"
 FIELD_TYPE_CONFIG_VERSION_DEFAULT = 0
 API_KEY_CACHE_VERSION_KEY = "api_key_cache_version"
 API_KEY_CACHE_VERSION_DEFAULT = 0
+AI_AUTHORING_PROVIDER_KEY = "ai_authoring_provider"
+AI_AUTHORING_PROVIDER_DEFAULT = "openai"
+AI_AUTHORING_ENABLED_KEY = "ai_authoring_enabled"
+AI_AUTHORING_ENABLED_DEFAULT = bool(app_settings.AI_AUTHORING_MODEL)
+AI_AUTHORING_MODEL_KEY = "ai_authoring_model"
+AI_AUTHORING_MODEL_DEFAULT = app_settings.AI_AUTHORING_MODEL or ""
+AI_AUTHORING_API_KEY_KEY = "ai_authoring_api_key"
+AI_AUTHORING_API_KEY_DEFAULT = app_settings.AI_AUTHORING_API_KEY or ""
 
 _RUNTIME_VALUE_TYPE_INT = "int"
 _RUNTIME_VALUE_TYPE_FLOAT = "float"
@@ -75,6 +83,27 @@ _RUNTIME_SETTING_SPECS: dict[str, RuntimeSettingSpec] = {
         value_type=_RUNTIME_VALUE_TYPE_INT,
         default=API_KEY_CACHE_VERSION_DEFAULT,
         min_value=0,
+    ),
+    AI_AUTHORING_PROVIDER_KEY: RuntimeSettingSpec(
+        key=AI_AUTHORING_PROVIDER_KEY,
+        value_type=_RUNTIME_VALUE_TYPE_STRING,
+        default=AI_AUTHORING_PROVIDER_DEFAULT,
+        allowed_values=(AI_AUTHORING_PROVIDER_DEFAULT,),
+    ),
+    AI_AUTHORING_ENABLED_KEY: RuntimeSettingSpec(
+        key=AI_AUTHORING_ENABLED_KEY,
+        value_type=_RUNTIME_VALUE_TYPE_BOOL,
+        default=AI_AUTHORING_ENABLED_DEFAULT,
+    ),
+    AI_AUTHORING_MODEL_KEY: RuntimeSettingSpec(
+        key=AI_AUTHORING_MODEL_KEY,
+        value_type=_RUNTIME_VALUE_TYPE_STRING,
+        default=AI_AUTHORING_MODEL_DEFAULT,
+    ),
+    AI_AUTHORING_API_KEY_KEY: RuntimeSettingSpec(
+        key=AI_AUTHORING_API_KEY_KEY,
+        value_type=_RUNTIME_VALUE_TYPE_STRING,
+        default=AI_AUTHORING_API_KEY_DEFAULT,
     ),
 }
 
@@ -236,3 +265,39 @@ def bump_api_key_cache_version(db: Any, org_id: int) -> int:
     next_version = get_api_key_cache_version(db, org_id) + 1
     set_runtime_setting(db, API_KEY_CACHE_VERSION_KEY, next_version, org_id)
     return next_version
+
+
+def get_ai_authoring_provider(db: Any, org_id: int) -> str:
+    return str(get_runtime_setting(db, AI_AUTHORING_PROVIDER_KEY, org_id)).strip().lower()
+
+
+def get_ai_authoring_enabled(db: Any, org_id: int) -> bool:
+    return bool(get_runtime_setting(db, AI_AUTHORING_ENABLED_KEY, org_id))
+
+
+def get_ai_authoring_model(db: Any, org_id: int) -> str:
+    return str(get_runtime_setting(db, AI_AUTHORING_MODEL_KEY, org_id)).strip()
+
+
+def get_ai_authoring_api_key(db: Any, org_id: int) -> str:
+    return str(get_runtime_setting(db, AI_AUTHORING_API_KEY_KEY, org_id))
+
+
+def has_ai_authoring_api_key(db: Any, org_id: int) -> bool:
+    return bool(get_ai_authoring_api_key(db, org_id).strip())
+
+
+def set_ai_authoring_provider(db: Any, value: str, org_id: int) -> None:
+    set_runtime_setting(db, AI_AUTHORING_PROVIDER_KEY, value.strip().lower(), org_id)
+
+
+def set_ai_authoring_enabled(db: Any, value: bool, org_id: int) -> None:
+    set_runtime_setting(db, AI_AUTHORING_ENABLED_KEY, value, org_id)
+
+
+def set_ai_authoring_model(db: Any, value: str, org_id: int) -> None:
+    set_runtime_setting(db, AI_AUTHORING_MODEL_KEY, value.strip(), org_id)
+
+
+def set_ai_authoring_api_key(db: Any, value: str, org_id: int) -> None:
+    set_runtime_setting(db, AI_AUTHORING_API_KEY_KEY, value, org_id)

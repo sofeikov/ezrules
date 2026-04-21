@@ -9,6 +9,7 @@ or after the mutation, depending on the action type.
 import datetime
 
 from ezrules.models.backend_core import (
+    AIRuleAuthoringHistory,
     ApiKeyHistory,
     FieldTypeHistory,
     LabelHistory,
@@ -144,6 +145,44 @@ def save_api_key_history(
         api_key_gid=api_key_gid,
         label=label,
         action=action,
+        o_id=o_id,
+        changed=datetime.datetime.now(datetime.UTC),
+        changed_by=changed_by,
+    )
+    db.add(history)
+
+
+def save_ai_rule_authoring_history(
+    db,
+    generation_id: str,
+    action: str,
+    mode: str,
+    evaluation_lane: str,
+    provider: str,
+    model: str,
+    prompt_hash: str,
+    validation_status: str,
+    repair_attempted: bool,
+    applyable: bool,
+    o_id: int,
+    r_id: int | None = None,
+    prompt_excerpt: str | None = None,
+    changed_by: str | None = None,
+) -> None:
+    """Record an audit entry for AI-assisted rule authoring activity."""
+    history = AIRuleAuthoringHistory(
+        generation_id=generation_id,
+        r_id=r_id,
+        action=action,
+        mode=mode,
+        evaluation_lane=evaluation_lane,
+        provider=provider,
+        model=model,
+        prompt_excerpt=prompt_excerpt,
+        prompt_hash=prompt_hash,
+        validation_status=validation_status,
+        repair_attempted=repair_attempted,
+        applyable=applyable,
         o_id=o_id,
         changed=datetime.datetime.now(datetime.UTC),
         changed_by=changed_by,

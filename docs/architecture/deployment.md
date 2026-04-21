@@ -76,6 +76,7 @@ Minimum environment inputs:
 - `EZRULES_CELERY_BROKER_URL`
 - `EZRULES_APP_BASE_URL`
 - optional SMTP settings if invite/reset emails should leave the environment
+- optional `EZRULES_AI_AUTHORING_MODEL`, `EZRULES_AI_AUTHORING_BASE_URL`, and `EZRULES_AI_AUTHORING_API_KEY` if the AI-assisted rule authoring UI should be enabled
 - optional `EZRULES_CORS_ALLOWED_ORIGINS` / `EZRULES_CORS_ALLOW_ORIGIN_REGEX` only for split-origin deployments
 
 Recommended production rollout sequence:

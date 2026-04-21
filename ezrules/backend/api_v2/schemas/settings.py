@@ -37,6 +37,26 @@ class RuntimeSettingsUpdateRequest(BaseModel):
     neutral_outcome: str | None = Field(default=None, min_length=1, max_length=255)
 
 
+class AIAuthoringSettingsResponse(BaseModel):
+    """Current AI authoring settings managed through the Settings page."""
+
+    provider: str = Field(..., description="Configured AI provider")
+    supported_providers: list[str] = Field(default_factory=list, description="Providers currently supported by the app")
+    enabled: bool = Field(..., description="Whether AI rule authoring is enabled")
+    model: str = Field(..., description="Configured model name")
+    api_key_configured: bool = Field(..., description="Whether an API key is currently stored")
+
+
+class AIAuthoringSettingsUpdateRequest(BaseModel):
+    """Update request for AI authoring settings."""
+
+    provider: str | None = Field(default=None, min_length=1, max_length=64)
+    enabled: bool | None = Field(default=None)
+    model: str | None = Field(default=None, max_length=255)
+    api_key: str | None = Field(default=None, max_length=2048)
+    clear_api_key: bool | None = Field(default=None)
+
+
 class InvalidAllowlistRule(BaseModel):
     """Existing allowlist rule that no longer matches the configured neutral outcome."""
 

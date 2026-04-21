@@ -104,6 +104,8 @@ EZRULES_SMTP_HOST=localhost
 EZRULES_SMTP_PORT=1025
 EZRULES_FROM_EMAIL=no-reply@ezrules.local
 EZRULES_APP_BASE_URL=http://localhost:4200
+EZRULES_AI_AUTHORING_MODEL=gpt-4.1-mini
+EZRULES_AI_AUTHORING_API_KEY=provider-api-key
 ```
 
 ### 4) Initialize database and bootstrap the first organisation

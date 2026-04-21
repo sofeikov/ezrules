@@ -6,7 +6,6 @@ All endpoints require authentication and appropriate permissions.
 """
 
 import json
-import re
 from datetime import UTC, datetime
 from json import JSONDecodeError
 from typing import Any
@@ -14,6 +13,11 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import NoResultFound
 
+from ezrules.backend.ai_rule_authoring import (
+    AIRuleAuthoringProviderError,
+    AIRuleAuthoringUnavailableError,
+    generate_rule_draft,
+)
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
     get_current_org_id,
@@ -23,6 +27,10 @@ from ezrules.backend.api_v2.auth.dependencies import (
 from ezrules.backend.api_v2.schemas.rollouts import RolloutDeployRequest, RolloutDeployResponse
 from ezrules.backend.api_v2.schemas.rules import (
     MainRuleOrderUpdateRequest,
+    RuleAIDraftApplyRequest,
+    RuleAIDraftApplyResponse,
+    RuleAIDraftRequest,
+    RuleAIDraftResponse,
     RuleCreate,
     RuleHistoryEntry,
     RuleHistoryResponse,
@@ -36,18 +44,20 @@ from ezrules.backend.api_v2.schemas.rules import (
     RuleTestRequest,
     RuleTestResponse,
     RuleUpdate,
-    RuleVerifyError,
     RuleVerifyRequest,
     RuleVerifyResponse,
 )
 from ezrules.backend.api_v2.schemas.shadow import ShadowDeployRequest, ShadowDeployResponse
-from ezrules.backend.runtime_settings import get_auto_promote_active_rule_updates, get_neutral_outcome
+from ezrules.backend.rule_validation import (
+    build_outcome_notation_errors,
+    get_list_provider,
+    validate_rule_source,
+)
+from ezrules.backend.runtime_settings import get_auto_promote_active_rule_updates
 from ezrules.backend.utils import load_cast_configs, record_observations
-from ezrules.core.outcomes import DatabaseOutcome
+from ezrules.core.audit_helpers import save_ai_rule_authoring_history
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import MissingFieldLookupError, OutcomeReturnSyntaxError, Rule, RuleFactory
-from ezrules.core.rule_checkers import AllowedOutcomeReturnVisitor
-from ezrules.core.rule_helpers import OutcomeReferenceExtractor, UserListReferenceExtractor
 from ezrules.core.rule_updater import (
     ROLLOUT_CONFIG_LABEL,
     RULE_EVALUATION_LANE_ALLOWLIST,
@@ -66,8 +76,7 @@ from ezrules.core.rule_updater import (
     save_rule_history,
 )
 from ezrules.core.type_casting import CastError, RequiredFieldError, normalize_event
-from ezrules.core.user_lists import PersistentUserListManager
-from ezrules.models.backend_core import Action, FieldObservation, RoleActions, RuleHistory, RuleStatus, User
+from ezrules.models.backend_core import Action, AIRuleAuthoringHistory, RoleActions, RuleHistory, RuleStatus, User
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.settings import app_settings
 
@@ -90,121 +99,6 @@ def get_rule_manager(db: Any, org_id: int) -> RDBRuleManager:
 def get_config_producer(db: Any, org_id: int) -> RDBRuleEngineConfigProducer:
     """Get a config producer instance for updating rule engine config."""
     return RDBRuleEngineConfigProducer(db=db, o_id=org_id)
-
-
-def get_list_provider(db: Any, org_id: int) -> PersistentUserListManager:
-    """Get an org-scoped user-list provider for rule compilation/execution."""
-    return PersistentUserListManager(db_session=db, o_id=org_id)
-
-
-def get_outcome_manager(db: Any, org_id: int) -> DatabaseOutcome:
-    """Get an org-scoped outcome manager for rule validation."""
-    return DatabaseOutcome(db_session=db, o_id=org_id)
-
-
-def build_rule_warnings(db: Any, org_id: int, referenced_fields: list[str]) -> list[str]:
-    """Return advisory warnings for fields the rule references but traffic has never observed."""
-    if not referenced_fields:
-        return []
-
-    observed_fields = {
-        str(field_name)
-        for (field_name,) in db.query(FieldObservation.field_name)
-        .filter(FieldObservation.o_id == org_id, FieldObservation.field_name.in_(referenced_fields))
-        .distinct()
-        .all()
-    }
-    unseen_fields = [field_name for field_name in referenced_fields if field_name not in observed_fields]
-    return [
-        (
-            f"Field '{field_name}' has not been observed in traffic or test payloads yet. "
-            "Backtests will skip historical events where it is missing or null."
-        )
-        for field_name in unseen_fields
-    ]
-
-
-def unique_preserving_order(items: list[str]) -> list[str]:
-    """Return the first occurrence of each item while preserving source order."""
-    return list(dict.fromkeys(items))
-
-
-def extract_referenced_lists(rule_source: str) -> list[str]:
-    """Extract @ListName references from rule source without compiling it."""
-    return unique_preserving_order(UserListReferenceExtractor().extract(rule_source))
-
-
-def extract_referenced_outcomes(rule_source: str) -> list[str]:
-    """Extract !OUTCOME references from rule source without compiling it."""
-    return [outcome.upper() for outcome in unique_preserving_order(OutcomeReferenceExtractor().extract(rule_source))]
-
-
-def find_reference_bounds(rule_source: str, reference: str) -> tuple[int, int, int, int] | None:
-    """Return 1-based line/column bounds for the first matching reference."""
-    for line_number, line_text in enumerate(rule_source.splitlines(), start=1):
-        start = line_text.find(reference)
-        if start == -1:
-            continue
-        column = start + 1
-        end_column = column + len(reference)
-        return (line_number, column, line_number, end_column)
-    return None
-
-
-def build_verify_error(
-    message: str,
-    line: int | None = None,
-    column: int | None = None,
-    end_line: int | None = None,
-    end_column: int | None = None,
-) -> RuleVerifyError:
-    return RuleVerifyError(
-        message=message,
-        line=line,
-        column=column,
-        end_line=end_line,
-        end_column=end_column,
-    )
-
-
-def normalize_rule_source_line(line: int | None) -> int | None:
-    """Map syntax errors from the wrapped helper function back to user source lines."""
-    if line is None:
-        return None
-    if line <= 1:
-        return 1
-    return line - 1
-
-
-def normalize_rule_source_column(column: int | None) -> int | None:
-    """Map wrapped helper columns back to user source columns."""
-    if column is None:
-        return None
-    return max(1, column - 1)
-
-
-def build_outcome_notation_errors(db: Any, org_id: int, rule_source: str) -> list[RuleVerifyError]:
-    """Return structured errors for unknown !OUTCOME references."""
-    errors: list[RuleVerifyError] = []
-    allowed_outcomes = set(get_outcome_manager(db, org_id).get_allowed_outcomes())
-
-    raw_outcome_references = unique_preserving_order(OutcomeReferenceExtractor().extract(rule_source))
-    for raw_outcome_name in raw_outcome_references:
-        outcome_name = raw_outcome_name.upper()
-        if outcome_name in allowed_outcomes:
-            continue
-        location = find_reference_bounds(rule_source, f"!{raw_outcome_name}")
-        errors.append(
-            build_verify_error(
-                message=f"Outcome '!{outcome_name}' is not configured in Outcomes.",
-                line=location[0] if location else None,
-                column=location[1] if location else None,
-                end_line=location[2] if location else None,
-                end_column=location[3] if location else None,
-            )
-        )
-
-    return errors
 
 
 def is_active(rule: RuleModel) -> bool:
@@ -278,6 +172,16 @@ def normalize_evaluation_lane(value: str | None) -> str:
     return lane
 
 
+def normalize_ai_authoring_mode(value: str | None) -> str:
+    mode = str(value or "create").strip().lower()
+    if mode not in {"create", "edit"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="mode must be either 'create' or 'edit'",
+        )
+    return mode
+
+
 def _next_execution_order(db: Any, org_id: int, lane: str) -> int:
     max_order = (
         db.query(RuleModel.execution_order)
@@ -302,22 +206,6 @@ def _list_main_rules_in_execution_order(db: Any, org_id: int) -> list[RuleModel]
         .order_by(RuleModel.execution_order.asc(), RuleModel.r_id.asc())
         .all()
     )
-
-
-def validate_allowlist_rule(rule: Rule, allowlist_outcome: str) -> str | None:
-    visitor = AllowedOutcomeReturnVisitor()
-    visitor.visit(rule._rule_ast)
-    if not visitor.values:
-        return f"Allowlist rules must contain at least one return !{allowlist_outcome} statement."
-
-    invalid_values = [value for value in visitor.values if value != allowlist_outcome]
-    if invalid_values:
-        rendered_values = ", ".join(sorted({repr(value) for value in invalid_values}))
-        return (
-            f"Allowlist rules must return only the configured neutral outcome !{allowlist_outcome}. "
-            f"Found {rendered_values}."
-        )
-    return None
 
 
 def validate_execution_order_for_lane(evaluation_lane: str, execution_order: int | None) -> str | None:
@@ -658,38 +546,20 @@ def create_rule(
             message="Rule validation failed",
             error=execution_order_error,
         )
-    allowlist_outcome = get_neutral_outcome(db, current_org_id)
-    outcome_errors = build_outcome_notation_errors(db, current_org_id, rule_data.logic)
-    if outcome_errors:
+    validation = validate_rule_source(
+        db,
+        current_org_id,
+        rule_data.logic,
+        evaluation_lane=evaluation_lane,
+        rid=rule_data.rid,
+        description=rule_data.description,
+    )
+    if not validation.response.valid or validation.response.errors:
         return RuleMutationResponse(
             success=False,
             message="Rule validation failed",
-            error=outcome_errors[0].message,
+            error=validation.response.errors[0].message if validation.response.errors else "Invalid rule logic",
         )
-
-    # Validate the rule logic by trying to compile it
-    try:
-        rule_config = {
-            "rid": rule_data.rid,
-            "logic": rule_data.logic,
-            "description": rule_data.description,
-        }
-        compiled_rule = RuleFactory.from_json(rule_config, list_values_provider=get_list_provider(db, current_org_id))
-    except Exception as e:
-        return RuleMutationResponse(
-            success=False,
-            message="Rule validation failed",
-            error=f"Invalid rule logic: {e!s}",
-        )
-
-    if evaluation_lane == RULE_EVALUATION_LANE_ALLOWLIST:
-        validation_error = validate_allowlist_rule(compiled_rule, allowlist_outcome)
-        if validation_error is not None:
-            return RuleMutationResponse(
-                success=False,
-                message="Rule validation failed",
-                error=validation_error,
-            )
 
     # Create and persist the new rule
     rule_manager = get_rule_manager(db, current_org_id)
@@ -785,38 +655,20 @@ def update_rule(
         new_execution_order = _next_execution_order(db, current_org_id, new_evaluation_lane)
     else:
         new_execution_order = int(getattr(rule, "execution_order", 1) or 1)
-    allowlist_outcome = get_neutral_outcome(db, current_org_id)
-    outcome_errors = build_outcome_notation_errors(db, current_org_id, new_logic)
-    if outcome_errors:
+    validation = validate_rule_source(
+        db,
+        current_org_id,
+        new_logic,
+        evaluation_lane=new_evaluation_lane,
+        rid=str(rule.rid),
+        description=str(new_description),
+    )
+    if not validation.response.valid or validation.response.errors:
         return RuleMutationResponse(
             success=False,
             message="Rule validation failed",
-            error=outcome_errors[0].message,
+            error=validation.response.errors[0].message if validation.response.errors else "Invalid rule logic",
         )
-
-    # Validate the rule logic by trying to compile it
-    try:
-        rule_config = {
-            "rid": rule.rid,
-            "logic": new_logic,
-            "description": new_description,
-        }
-        compiled_rule = RuleFactory.from_json(rule_config, list_values_provider=get_list_provider(db, current_org_id))
-    except Exception as e:
-        return RuleMutationResponse(
-            success=False,
-            message="Rule validation failed",
-            error=f"Invalid rule logic: {e!s}",
-        )
-
-    if new_evaluation_lane == RULE_EVALUATION_LANE_ALLOWLIST:
-        validation_error = validate_allowlist_rule(compiled_rule, allowlist_outcome)
-        if validation_error is not None:
-            return RuleMutationResponse(
-                success=False,
-                message="Rule validation failed",
-                error=validation_error,
-            )
 
     promoted_at = datetime.now(UTC) if auto_promote_active_updates else None
     next_status = (
@@ -1217,99 +1069,139 @@ def verify_rule(
 
     This does NOT save the rule - it's just for validation.
     """
-    referenced_lists = extract_referenced_lists(request.rule_source)
-    referenced_outcomes = extract_referenced_outcomes(request.rule_source)
-    outcome_errors = build_outcome_notation_errors(db, current_org_id, request.rule_source)
-    if outcome_errors:
-        return RuleVerifyResponse(
-            valid=False,
-            params=[],
-            referenced_lists=referenced_lists,
-            referenced_outcomes=referenced_outcomes,
-            warnings=[],
-            errors=outcome_errors,
+    return validate_rule_source(db, current_org_id, request.rule_source).response
+
+
+@router.post("/ai/draft", response_model=RuleAIDraftResponse)
+def generate_ai_rule_draft(
+    request: RuleAIDraftRequest,
+    user: User = Depends(get_current_active_user),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> RuleAIDraftResponse:
+    mode = normalize_ai_authoring_mode(request.mode)
+    required_permission = PermissionAction.CREATE_RULE if mode == "create" else PermissionAction.MODIFY_RULE
+    if not user_has_permission(db, user, required_permission):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"{required_permission.value.upper()} permission is required for AI rule authoring in {mode} mode",
         )
+
+    if request.rule_id is not None:
+        existing_rule = get_rule_manager(db, current_org_id).load_rule(request.rule_id)  # type: ignore[arg-type]
+        if existing_rule is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
+
+    evaluation_lane = normalize_evaluation_lane(request.evaluation_lane)
     try:
-        rule = Rule(
-            rid="",
-            logic=request.rule_source,
-            list_values_provider=get_list_provider(db, current_org_id),
+        result = generate_rule_draft(
+            db,
+            current_org_id,
+            prompt=request.prompt,
+            mode=mode,
+            evaluation_lane=evaluation_lane,
+            current_logic=request.current_logic,
+            current_description=request.current_description,
         )
-        params = sorted(rule.get_rule_params(), key=str)
-        return RuleVerifyResponse(
-            valid=True,
-            params=params,
-            referenced_lists=referenced_lists,
-            referenced_outcomes=referenced_outcomes,
-            warnings=build_rule_warnings(db, current_org_id, params),
-            errors=[],
+    except AIRuleAuthoringUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except AIRuleAuthoringProviderError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    save_ai_rule_authoring_history(
+        db,
+        generation_id=result.generation_id,
+        r_id=request.rule_id,
+        action="draft_generated",
+        mode=mode,
+        evaluation_lane=evaluation_lane,
+        provider=result.provider,
+        model=result.model,
+        prompt_excerpt=result.prompt_excerpt,
+        prompt_hash=result.prompt_hash,
+        validation_status="valid" if result.applyable else "invalid",
+        repair_attempted=result.repair_attempted,
+        applyable=result.applyable,
+        o_id=current_org_id,
+        changed_by=str(user.email) if user.email else None,
+    )
+    db.commit()
+
+    return RuleAIDraftResponse(
+        generation_id=result.generation_id,
+        draft_logic=result.draft_logic,
+        line_explanations=[
+            {
+                "line_number": explanation.line_number,
+                "source": explanation.source,
+                "explanation": explanation.explanation,
+            }
+            for explanation in result.line_explanations
+        ],
+        validation=result.validation,
+        repair_attempted=result.repair_attempted,
+        applyable=result.applyable,
+        provider=result.provider,
+    )
+
+
+@router.post("/ai/apply", response_model=RuleAIDraftApplyResponse)
+def record_ai_rule_draft_applied(
+    request: RuleAIDraftApplyRequest,
+    user: User = Depends(get_current_active_user),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> RuleAIDraftApplyResponse:
+    generation = (
+        db.query(AIRuleAuthoringHistory)
+        .filter(
+            AIRuleAuthoringHistory.o_id == current_org_id,
+            AIRuleAuthoringHistory.generation_id == request.generation_id,
+            AIRuleAuthoringHistory.action == "draft_generated",
         )
-    except OutcomeReturnSyntaxError as exc:
-        return RuleVerifyResponse(
-            valid=False,
-            params=[],
-            referenced_lists=referenced_lists,
-            referenced_outcomes=referenced_outcomes,
-            warnings=[],
-            errors=[
-                build_verify_error(
-                    message=str(exc),
-                    line=normalize_rule_source_line(exc.lineno),
-                    column=normalize_rule_source_column(exc.offset),
-                    end_line=normalize_rule_source_line(exc.end_lineno),
-                    end_column=normalize_rule_source_column(exc.end_offset),
-                )
-            ],
+        .order_by(AIRuleAuthoringHistory.changed.desc(), AIRuleAuthoringHistory.id.desc())
+        .first()
+    )
+    if generation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Generated AI draft not found")
+    if not bool(generation.applyable):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only applyable AI drafts can be applied")
+
+    required_permission = PermissionAction.CREATE_RULE if generation.mode == "create" else PermissionAction.MODIFY_RULE
+    if not user_has_permission(db, user, required_permission):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"{required_permission.value.upper()} permission is required to apply this AI draft",
         )
-    except SyntaxError as exc:
-        message = exc.msg or "Rule source is invalid"
-        return RuleVerifyResponse(
-            valid=False,
-            params=[],
-            referenced_lists=referenced_lists,
-            referenced_outcomes=referenced_outcomes,
-            warnings=[],
-            errors=[
-                build_verify_error(
-                    message=message,
-                    line=normalize_rule_source_line(exc.lineno),
-                    column=normalize_rule_source_column(exc.offset),
-                    end_line=normalize_rule_source_line(exc.end_lineno),
-                    end_column=normalize_rule_source_column(exc.end_offset),
-                )
-            ],
-        )
-    except KeyError as exc:
-        message = str(exc.args[0]) if exc.args else "Rule source is invalid"
-        missing_list_match = re.search(r"List '([^']+)' not found", message)
-        location = None
-        if missing_list_match:
-            location = find_reference_bounds(request.rule_source, f"@{missing_list_match.group(1)}")
-        return RuleVerifyResponse(
-            valid=False,
-            params=[],
-            referenced_lists=referenced_lists,
-            referenced_outcomes=referenced_outcomes,
-            warnings=[],
-            errors=[
-                build_verify_error(
-                    message=message,
-                    line=location[0] if location else None,
-                    column=location[1] if location else None,
-                    end_line=location[2] if location else None,
-                    end_column=location[3] if location else None,
-                )
-            ],
-        )
-    except Exception as exc:
-        return RuleVerifyResponse(
-            valid=False,
-            params=[],
-            referenced_lists=referenced_lists,
-            referenced_outcomes=referenced_outcomes,
-            warnings=[],
-            errors=[build_verify_error(message=str(exc) or "Rule source is invalid")],
-        )
+
+    resolved_rule_id = (
+        int(request.rule_id) if request.rule_id is not None else int(generation.r_id) if generation.r_id else None
+    )
+    if resolved_rule_id is not None:
+        existing_rule = get_rule_manager(db, current_org_id).load_rule(resolved_rule_id)  # type: ignore[arg-type]
+        if existing_rule is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
+
+    save_ai_rule_authoring_history(
+        db,
+        generation_id=str(generation.generation_id),
+        r_id=resolved_rule_id,
+        action="draft_applied",
+        mode=str(generation.mode),
+        evaluation_lane=str(generation.evaluation_lane),
+        provider=str(generation.provider),
+        model=str(generation.model),
+        prompt_excerpt=str(generation.prompt_excerpt) if generation.prompt_excerpt else None,
+        prompt_hash=str(generation.prompt_hash),
+        validation_status=str(generation.validation_status),
+        repair_attempted=bool(generation.repair_attempted),
+        applyable=bool(generation.applyable),
+        o_id=current_org_id,
+        changed_by=str(user.email) if user.email else None,
+    )
+    db.commit()
+
+    return RuleAIDraftApplyResponse(success=True, message="AI draft applied to the editor")
 
 
 # =============================================================================

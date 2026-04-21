@@ -27,6 +27,8 @@ EZRULES_SMTP_USER=mailer-user
 EZRULES_SMTP_PASSWORD=mailer-password
 EZRULES_FROM_EMAIL=no-reply@example.com
 EZRULES_RULE_QUALITY_LOOKBACK_DAYS=30
+EZRULES_AI_AUTHORING_MODEL=gpt-4.1-mini
+EZRULES_AI_AUTHORING_API_KEY=provider-api-key
 EZRULES_SHADOW_EVALUATION_QUEUE_REDIS_URL=redis://localhost:6379/0
 EZRULES_SHADOW_EVALUATION_QUEUE_DRAIN_INTERVAL_SECONDS=5
 EZRULES_SHADOW_EVALUATION_QUEUE_DRAIN_BATCH_SIZE=100
@@ -73,6 +75,11 @@ Manager requests and API-key evaluation derive org context from the authenticate
 | `EZRULES_APP_BASE_URL` | No | `http://localhost:4200` | `https://app.company.com` | Base UI URL used to build invite/reset links |
 | `EZRULES_INVITE_TOKEN_EXPIRY_HOURS` | No | `72` | `24` | Invitation token lifetime in hours |
 | `EZRULES_PASSWORD_RESET_TOKEN_EXPIRY_HOURS` | No | `1` | `1` | Password reset token lifetime in hours |
+| `EZRULES_AI_AUTHORING_PROVIDER` | No | `openai` | `openai` | Default provider used when an org has not overridden AI authoring settings in the UI |
+| `EZRULES_AI_AUTHORING_BASE_URL` | No | `https://api.openai.com/v1` | `https://api.openai.com/v1` | Base URL used by the backend OpenAI client |
+| `EZRULES_AI_AUTHORING_MODEL` | No | None | `gpt-4.1-mini` | Default model used when an org has not configured AI authoring settings in the UI |
+| `EZRULES_AI_AUTHORING_API_KEY` | No | None | provider API key | Default OpenAI API key used when an org has not configured one in the UI |
+| `EZRULES_AI_AUTHORING_TIMEOUT_SECONDS` | No | `45` | `45` | Timeout for one AI authoring request |
 
 ---
 
@@ -97,6 +104,8 @@ export EZRULES_SMTP_PASSWORD="mailer-password"
 export EZRULES_FROM_EMAIL="no-reply@example.com"
 export EZRULES_RULE_QUALITY_LOOKBACK_DAYS="30"
 export EZRULES_RULE_QUALITY_REPORT_SYNC_FALLBACK="true"
+export EZRULES_AI_AUTHORING_MODEL="gpt-4.1-mini"
+export EZRULES_AI_AUTHORING_API_KEY="provider-api-key"
 export EZRULES_SHADOW_EVALUATION_QUEUE_REDIS_URL="redis://localhost:6379/0"
 export EZRULES_SHADOW_EVALUATION_QUEUE_DRAIN_INTERVAL_SECONDS="5"
 export EZRULES_SHADOW_EVALUATION_QUEUE_DRAIN_BATCH_SIZE="100"
@@ -158,6 +167,12 @@ If you use async field-observation buffering or async shadow evaluation:
 - leave `EZRULES_OBSERVATION_QUEUE_REDIS_URL` / `EZRULES_SHADOW_EVALUATION_QUEUE_REDIS_URL` unset to reuse the main broker, or point them at dedicated Redis instances
 - keep Celery beat running so queue drain tasks execute on schedule
 - tune the `*_DRAIN_INTERVAL_SECONDS`, `*_DRAIN_BATCH_SIZE`, and `*_MAX_BATCHES_PER_DRAIN` settings only if you need different throughput or lag tradeoffs
+
+If you want AI-assisted rule authoring in the create/edit UI:
+
+- set `EZRULES_AI_AUTHORING_BASE_URL` if you need a non-default OpenAI endpoint
+- optionally set default `EZRULES_AI_AUTHORING_MODEL` and `EZRULES_AI_AUTHORING_API_KEY`
+- then choose the provider, model, and per-org API key under **Settings → AI Rule Authoring**
 
 ### Browser Routing And CORS
 

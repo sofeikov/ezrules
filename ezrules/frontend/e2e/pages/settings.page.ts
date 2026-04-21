@@ -14,6 +14,11 @@ export class SettingsPage {
   readonly pairLabelSelect: Locator;
   readonly addPairButton: Locator;
   readonly pairsTable: Locator;
+  readonly aiProviderSelect: Locator;
+  readonly aiModelInput: Locator;
+  readonly aiApiKeyInput: Locator;
+  readonly aiEnabledCheckbox: Locator;
+  readonly saveAiSettingsButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -29,6 +34,11 @@ export class SettingsPage {
     this.pairLabelSelect = page.locator('#settings-pairLabel');
     this.addPairButton = page.locator('#settings-addPair');
     this.pairsTable = page.locator('#settings-pairsTable');
+    this.aiProviderSelect = page.locator('#settings-aiProvider');
+    this.aiModelInput = page.locator('#settings-aiModel');
+    this.aiApiKeyInput = page.locator('#settings-aiApiKey');
+    this.aiEnabledCheckbox = page.locator('#settings-aiEnabled');
+    this.saveAiSettingsButton = page.locator('#settings-saveAiAuthoring');
   }
 
   async goto() {
@@ -42,6 +52,7 @@ export class SettingsPage {
     await this.neutralOutcomeSelect.waitFor({ state: 'visible' });
     await this.outcomeHierarchySaveButton.waitFor({ state: 'visible' });
     await this.pairsTable.waitFor({ state: 'visible' });
+    await this.aiProviderSelect.waitFor({ state: 'visible' });
   }
 
   async getLookbackDays(): Promise<number> {
@@ -74,6 +85,37 @@ export class SettingsPage {
 
   async save() {
     await this.saveButton.click();
+  }
+
+  async setAiProvider(value: string) {
+    await this.aiProviderSelect.selectOption(value);
+  }
+
+  async getAiProvider(): Promise<string> {
+    return this.aiProviderSelect.inputValue();
+  }
+
+  async setAiModel(value: string) {
+    await this.aiModelInput.fill(value);
+  }
+
+  async getAiModel(): Promise<string> {
+    return this.aiModelInput.inputValue();
+  }
+
+  async setAiApiKey(value: string) {
+    await this.aiApiKeyInput.fill(value);
+  }
+
+  async setAiEnabled(value: boolean) {
+    const currentValue = await this.aiEnabledCheckbox.isChecked();
+    if (currentValue !== value) {
+      await this.aiEnabledCheckbox.click();
+    }
+  }
+
+  async saveAiSettings() {
+    await this.saveAiSettingsButton.click();
   }
 
   async addPair(outcome: string, label: string) {

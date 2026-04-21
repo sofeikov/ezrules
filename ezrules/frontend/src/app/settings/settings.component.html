@@ -253,6 +253,140 @@
 
         <div class="bg-white rounded-lg shadow border border-gray-200">
           <div class="p-6 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">AI Rule Authoring</h2>
+            <p class="text-sm text-gray-500 mt-1">Configure the provider and model used by the AI assistant in the rule editor.</p>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label for="settings-aiProvider" class="block text-sm font-medium text-gray-700 mb-2">
+                  Provider
+                </label>
+                <select
+                  id="settings-aiProvider"
+                  class="border border-gray-300 rounded-md px-3 py-2 text-sm w-full disabled:bg-gray-100"
+                  [(ngModel)]="aiAuthoringProvider"
+                  [disabled]="!canManagePermissions || aiAuthoringSaving"
+                >
+                  <option *ngFor="let provider of aiAuthoringSettings?.supportedProviders || []" [value]="provider">
+                    {{ provider === 'openai' ? 'OpenAI' : provider }}
+                  </option>
+                </select>
+                <p class="text-xs text-gray-500 mt-2">
+                  OpenAI is the only supported provider right now. The select is here so future providers can slot into the same workflow.
+                </p>
+              </div>
+
+              <div>
+                <label for="settings-aiModel" class="block text-sm font-medium text-gray-700 mb-2">
+                  Model
+                </label>
+                <input
+                  id="settings-aiModel"
+                  type="text"
+                  list="settings-aiModelOptions"
+                  class="border border-gray-300 rounded-md px-3 py-2 text-sm w-full disabled:bg-gray-100"
+                  [(ngModel)]="aiAuthoringModel"
+                  [disabled]="!canManagePermissions || aiAuthoringSaving"
+                  placeholder="{{ aiAuthoringModelOptions[0].value }}"
+                />
+                <datalist id="settings-aiModelOptions">
+                  <option *ngFor="let option of aiAuthoringModelOptions" [value]="option.value"></option>
+                </datalist>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <button
+                    *ngFor="let option of aiAuthoringModelOptions"
+                    type="button"
+                    class="rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    [disabled]="!canManagePermissions || aiAuthoringSaving"
+                    (click)="useAiAuthoringModelOption(option.value)"
+                  >
+                    {{ option.value }}
+                    <span class="text-gray-400">· {{ option.label }}</span>
+                  </button>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">
+                  Default: <span class="font-medium text-gray-700">{{ aiAuthoringModelOptions[0].value }}</span>.
+                  You can keep one of these presets or type any OpenAI model id.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label for="settings-aiApiKey" class="block text-sm font-medium text-gray-700 mb-2">
+                OpenAI API key
+              </label>
+              <input
+                id="settings-aiApiKey"
+                type="password"
+                class="border border-gray-300 rounded-md px-3 py-2 text-sm w-full disabled:bg-gray-100"
+                [(ngModel)]="aiAuthoringApiKey"
+                [disabled]="!canManagePermissions || aiAuthoringSaving"
+                placeholder="{{ aiAuthoringSettings?.apiKeyConfigured ? 'Leave blank to keep current key' : 'sk-...' }}"
+              />
+              <p class="text-xs text-gray-500 mt-2">
+                Stored key: {{ aiAuthoringSettings?.apiKeyConfigured ? 'configured' : 'not configured' }}.
+                Leave this blank to keep the current key.
+              </p>
+            </div>
+
+            <div
+              *ngIf="aiAuthoringSettings?.apiKeyConfigured"
+              class="rounded-lg border border-red-200 bg-red-50 px-4 py-3"
+            >
+              <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p class="text-sm font-medium text-red-900">Stored API key is configured</p>
+                  <p class="mt-1 text-sm text-red-800">
+                    Clear it only if you want to remove the current OpenAI key for this organisation.
+                  </p>
+                </div>
+                <button
+                  id="settings-clearAiApiKey"
+                  type="button"
+                  class="inline-flex items-center rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                  [disabled]="!canManagePermissions || aiAuthoringSaving"
+                  (click)="clearStoredAiAuthoringApiKey()"
+                >
+                  Clear Stored API Key
+                </button>
+              </div>
+            </div>
+
+            <label for="settings-aiEnabled" class="flex items-start gap-3">
+              <input
+                id="settings-aiEnabled"
+                type="checkbox"
+                class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                [(ngModel)]="aiAuthoringEnabled"
+                [disabled]="!canManagePermissions || aiAuthoringSaving"
+              />
+              <div>
+                <p class="text-sm font-medium text-gray-900">Enable AI rule authoring</p>
+                <p class="text-sm text-gray-500 mt-1">
+                  When enabled, the rule editor can request AI-generated rule drafts using the configured OpenAI model.
+                </p>
+              </div>
+            </label>
+
+            <div class="pt-2">
+              <button
+                *ngIf="canManagePermissions"
+                id="settings-saveAiAuthoring"
+                type="button"
+                class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                [disabled]="aiAuthoringSaving"
+                (click)="saveAIAuthoringSettings()"
+              >
+                {{ aiAuthoringSaving ? 'Saving...' : 'Save AI Settings' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow border border-gray-200">
+          <div class="p-6 border-b border-gray-200">
             <h2 class="text-lg font-semibold text-gray-900">Curated Rule Quality Pairs</h2>
             <p class="text-sm text-gray-500 mt-1">Only configured active outcome→label pairs are used by Rule Quality reports.</p>
           </div>

@@ -257,6 +257,37 @@ class ApiKeyAuditListResponse(BaseModel):
     offset: int = Field(..., description="Current offset")
 
 
+class AIRuleAuthoringHistoryEntry(BaseModel):
+    """A single entry in AI-assisted rule authoring history."""
+
+    id: int = Field(..., description="History entry ID")
+    generation_id: str = Field(..., description="Generation identifier shared across generation/apply events")
+    r_id: int | None = Field(default=None, description="Rule ID when associated with an existing rule")
+    action: str = Field(..., description="Action type (draft_generated, draft_applied)")
+    mode: str = Field(..., description="Authoring mode (create or edit)")
+    evaluation_lane: str = Field(..., description="Evaluation lane for the generated draft")
+    provider: str = Field(..., description="Configured AI backend provider")
+    model: str = Field(..., description="Configured model name")
+    prompt_excerpt: str | None = Field(default=None, description="Trimmed prompt excerpt for traceability")
+    prompt_hash: str = Field(..., description="SHA-256 hash of the original prompt")
+    validation_status: str = Field(..., description="Validation status recorded for the generated draft")
+    repair_attempted: bool = Field(..., description="Whether automatic repair was attempted")
+    applyable: bool = Field(..., description="Whether the draft was applyable when generated")
+    changed: datetime | None = Field(default=None, description="When this action occurred")
+    changed_by: str | None = Field(default=None, description="Who performed this action")
+
+    model_config = {"from_attributes": True}
+
+
+class AIRuleAuthoringAuditListResponse(BaseModel):
+    """Paginated list of AI-assisted rule authoring history entries."""
+
+    total: int = Field(..., description="Total number of history entries")
+    items: list[AIRuleAuthoringHistoryEntry] = Field(default_factory=list)
+    limit: int = Field(..., description="Page size")
+    offset: int = Field(..., description="Current offset")
+
+
 class AuditSummaryResponse(BaseModel):
     """Summary of audit trail data."""
 
@@ -271,3 +302,4 @@ class AuditSummaryResponse(BaseModel):
     total_role_permission_actions: int = Field(default=0, description="Total role permission history entries")
     total_field_type_actions: int = Field(default=0, description="Total field type config history entries")
     total_api_key_actions: int = Field(default=0, description="Total API key history entries")
+    total_ai_rule_authoring_actions: int = Field(default=0, description="Total AI rule authoring history entries")

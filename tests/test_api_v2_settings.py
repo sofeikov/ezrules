@@ -159,6 +159,45 @@ class TestRuntimeSettings:
 
             assert response.status_code == 403
 
+    def test_update_ai_authoring_settings_without_manage_permission(self, session):
+        hashed_password = bcrypt.hashpw("settingsreadpass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        org = _get_org(session)
+
+        role = Role(name="ai_settings_read_only", description="Can only view settings", o_id=int(org.o_id))
+        session.add(role)
+        session.commit()
+
+        user = User(
+            email="ai_settings_read_only@example.com",
+            password=hashed_password,
+            active=True,
+            fs_uniquifier="ai_settings_read_only@example.com",
+            o_id=int(org.o_id),
+        )
+        user.roles.append(role)
+        session.add(user)
+        session.commit()
+
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+        PermissionManager.grant_permission(role.id, PermissionAction.VIEW_ROLES)
+
+        token = create_access_token(
+            user_id=int(user.id),
+            email=str(user.email),
+            roles=[role.name],
+            org_id=int(user.o_id),
+        )
+
+        with TestClient(app) as client:
+            response = client.put(
+                "/api/v2/settings/ai-authoring",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"provider": "openai"},
+            )
+
+            assert response.status_code == 403
+
     def test_update_runtime_settings_accepts_neutral_outcome_from_catalog(self, settings_test_client):
         token = settings_test_client.test_data["token"]
         session = settings_test_client.test_data["session"]
@@ -247,6 +286,121 @@ class TestRuntimeSettings:
         assert len(payload["invalid_allowlist_rules"]) == 1
         assert payload["invalid_allowlist_rules"][0]["rid"] == "ALLOWLIST_RELEASE_ONLY"
         assert "configured neutral outcome !HOLD" in payload["invalid_allowlist_rules"][0]["error"]
+
+
+class TestAIAuthoringSettings:
+    def test_get_ai_authoring_settings_defaults(self, settings_test_client):
+        token = settings_test_client.test_data["token"]
+
+        response = settings_test_client.get(
+            "/api/v2/settings/ai-authoring",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["provider"] == "openai"
+        assert payload["supported_providers"] == ["openai"]
+        assert payload["enabled"] is bool(app_settings.AI_AUTHORING_MODEL)
+        assert payload["model"] == (app_settings.AI_AUTHORING_MODEL or "")
+        assert payload["api_key_configured"] is bool(app_settings.AI_AUTHORING_API_KEY)
+
+    def test_update_ai_authoring_settings(self, settings_test_client):
+        token = settings_test_client.test_data["token"]
+        session = settings_test_client.test_data["session"]
+        org = _get_org(session)
+
+        response = settings_test_client.put(
+            "/api/v2/settings/ai-authoring",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "provider": "openai",
+                "enabled": True,
+                "model": "gpt-4.1-mini",
+                "api_key": "sk-test-openai-key",
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["provider"] == "openai"
+        assert payload["enabled"] is True
+        assert payload["model"] == "gpt-4.1-mini"
+        assert payload["api_key_configured"] is True
+
+        stored_provider = (
+            session.query(RuntimeSetting)
+            .filter(RuntimeSetting.key == "ai_authoring_provider", RuntimeSetting.o_id == int(org.o_id))
+            .one()
+        )
+        stored_model = (
+            session.query(RuntimeSetting)
+            .filter(RuntimeSetting.key == "ai_authoring_model", RuntimeSetting.o_id == int(org.o_id))
+            .one()
+        )
+        stored_key = (
+            session.query(RuntimeSetting)
+            .filter(RuntimeSetting.key == "ai_authoring_api_key", RuntimeSetting.o_id == int(org.o_id))
+            .one()
+        )
+        assert stored_provider.value == "openai"
+        assert stored_model.value == "gpt-4.1-mini"
+        assert stored_key.value == "sk-test-openai-key"
+
+    def test_update_ai_authoring_settings_can_clear_api_key(self, settings_test_client):
+        token = settings_test_client.test_data["token"]
+
+        create_response = settings_test_client.put(
+            "/api/v2/settings/ai-authoring",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "provider": "openai",
+                "enabled": True,
+                "model": "gpt-4.1-mini",
+                "api_key": "sk-test-openai-key",
+            },
+        )
+        assert create_response.status_code == 200
+
+        clear_response = settings_test_client.put(
+            "/api/v2/settings/ai-authoring",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"enabled": False, "clear_api_key": True},
+        )
+
+        assert clear_response.status_code == 200
+        assert clear_response.json()["api_key_configured"] is False
+
+    def test_update_ai_authoring_settings_rejects_unsupported_provider(self, settings_test_client):
+        token = settings_test_client.test_data["token"]
+
+        response = settings_test_client.put(
+            "/api/v2/settings/ai-authoring",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"provider": "anthropic"},
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "OpenAI is the only supported AI authoring provider right now"
+
+    def test_update_ai_authoring_settings_requires_model_and_key_when_enabled(self, settings_test_client):
+        token = settings_test_client.test_data["token"]
+
+        missing_model = settings_test_client.put(
+            "/api/v2/settings/ai-authoring",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"enabled": True},
+        )
+        assert missing_model.status_code == 400
+        assert missing_model.json()["detail"] == "An OpenAI model is required when AI authoring is enabled"
+
+        missing_key = settings_test_client.put(
+            "/api/v2/settings/ai-authoring",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"enabled": True, "model": "gpt-4.1-mini"},
+        )
+        assert missing_key.status_code == 400
+        assert missing_key.json()["detail"] == "An OpenAI API key is required when AI authoring is enabled"
 
 
 class TestOutcomeHierarchySettings:

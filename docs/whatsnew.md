@@ -1,5 +1,22 @@
 # What's New
 
+## v1.15.1
+
+* **Clearer AI model selection in Settings**: The AI Rule Authoring settings now prefill a default OpenAI model, expose a few built-in model suggestions, and still allow free-text entry for any valid OpenAI model id.
+* **Less confusing AI settings save flow**: Saving AI settings no longer fails just because the model field was left blank in the UI; the default model is applied automatically instead.
+
+## v1.15.0
+
+* **Collapsible AI authoring in edit mode**: The AI assistant inside Rule Detail edit mode now starts collapsed so it does not dominate the editor layout until the user explicitly opens it.
+* **Settings-managed OpenAI configuration**: Added **Settings → AI Rule Authoring** so each organisation can enable AI drafting, choose the OpenAI provider, set the model, and manage the API key without editing environment files.
+* **OpenAI-only provider stance for now**: The backend/provider shape still stays extensible, but the product now intentionally exposes only OpenAI in the settings UI until additional providers are implemented end to end.
+
+## v1.14.0
+
+* **AI-assisted rule authoring**: The rule create flow and rule detail edit mode now include an inline AI assistant that can turn a natural-language request into ezrules draft logic without auto-saving or auto-activating anything.
+* **Draft explanation and bounded auto-repair**: AI-generated drafts now come back with line-by-line explanations, are automatically revalidated against ezrules syntax/list/outcome/lane constraints, and attempt bounded repair before the UI allows the user to apply the draft.
+* **AI authoring audit trail**: Added backend audit history for `draft_generated` and `draft_applied` events plus dedicated audit API coverage, recording provider/model metadata and prompt hashes without storing full prompts or raw completions.
+
 ## v1.13.0
 
 * **Rule detail performance chart**: The Rule Detail page now includes a **Performance** card with a time-range selector and a per-outcome chart showing how often that rule fired each stored outcome over time.

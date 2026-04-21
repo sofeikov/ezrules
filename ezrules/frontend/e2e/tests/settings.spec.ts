@@ -113,4 +113,39 @@ test.describe('Settings Page', () => {
     const updatedHierarchy = (await settingsPage.getOutcomeHierarchy()).map(item => item.trim());
     expect(updatedHierarchy[1]).toBe(targetOutcome);
   });
+
+  test('should allow configuring OpenAI AI authoring settings', async ({ request, page }) => {
+    const authHeaders = { Authorization: `Bearer ${getAuthToken()}` };
+    const currentSettingsResponse = await request.get(`${API_BASE}/api/v2/settings/ai-authoring`, { headers: authHeaders });
+    expect(currentSettingsResponse.ok()).toBeTruthy();
+    const currentSettings = await currentSettingsResponse.json();
+
+    try {
+      await settingsPage.goto();
+      await settingsPage.waitForPageToLoad();
+
+      await settingsPage.setAiProvider('openai');
+      await settingsPage.setAiModel('gpt-4.1-mini');
+      if (!currentSettings.api_key_configured) {
+        await settingsPage.setAiApiKey('sk-demo-settings-key');
+      }
+      await settingsPage.setAiEnabled(true);
+      await settingsPage.saveAiSettings();
+
+      await expect(page.locator('text=AI authoring settings saved successfully.')).toBeVisible();
+      await expect(settingsPage.aiProviderSelect).toHaveValue('openai');
+      await expect(settingsPage.aiModelInput).toHaveValue('gpt-4.1-mini');
+    } finally {
+      const restoreResponse = await request.put(`${API_BASE}/api/v2/settings/ai-authoring`, {
+        headers: authHeaders,
+        data: {
+          provider: currentSettings.provider,
+          enabled: currentSettings.enabled,
+          model: currentSettings.model,
+          clear_api_key: currentSettings.api_key_configured ? undefined : true,
+        },
+      });
+      expect(restoreResponse.ok()).toBeTruthy();
+    }
+  });
 });

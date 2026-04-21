@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { of, Subscription } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { CreateRuleRequest, RuleService } from '../services/rule.service';
+import { AiRuleAuthoringPanelComponent } from '../components/ai-rule-authoring-panel.component';
 import { RuleLogicEditorComponent, RuleEditorDiagnostic } from '../components/rule-logic-editor.component';
 import { RuleTestDataService } from '../services/rule-test-data.service';
 import {
@@ -19,7 +20,7 @@ import { SidebarComponent } from '../components/sidebar.component';
 @Component({
   selector: 'app-rule-create',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, SidebarComponent, RuleLogicEditorComponent],
+  imports: [CommonModule, RouterModule, FormsModule, SidebarComponent, RuleLogicEditorComponent, AiRuleAuthoringPanelComponent],
   templateUrl: './rule-create.component.html'
 })
 export class RuleCreateComponent implements OnInit, OnDestroy {
@@ -46,6 +47,7 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
   outcomeSuggestions: RuleEditorOutcomeSuggestion[] = [];
   testing: boolean = false;
   saving: boolean = false;
+  pendingAIDraft: boolean = false;
   saveError: string | null = null;
   private assistSubscription: Subscription | null = null;
   private verifyDebounceHandle: ReturnType<typeof setTimeout> | null = null;
@@ -112,6 +114,15 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
   handleLogicProxyInput(event: Event): void {
     this.logic = (event.target as HTMLTextAreaElement).value;
     this.handleLogicChange();
+  }
+
+  handleAIDraftApplied(draftLogic: string): void {
+    this.logic = draftLogic;
+    this.handleLogicChange();
+  }
+
+  handlePendingAIDraftChange(pending: boolean): void {
+    this.pendingAIDraft = pending;
   }
 
   fillInExampleParams(): void {
