@@ -289,6 +289,9 @@ def _build_generation_system_prompt() -> str:
         - Use ezrules notation exactly: $field.path, @UserListName, !OUTCOME.
         - Prefer only fields, lists, and outcomes provided in context.
         - Keep logic concise and valid Python-style rule code using if/elif/else and return statements.
+        - Assume referenced fields are normally present in the event payload unless the analyst explicitly asks for null/missing-field handling.
+        - Do NOT add defensive guards such as `is not None`, `is None`, fallback existence checks, or outer wrappers that only protect against missing data unless the analyst explicitly requests that behavior.
+        - When the analyst asks to add another condition to an existing rule, prefer tightening the existing business condition instead of wrapping it in separate data-availability checks.
         - line_explanations must explain each non-empty line of draft_logic in order.
         """
     ).strip()
@@ -300,6 +303,10 @@ def _build_generation_user_prompt(prompt: str, context: RuleAuthoringContext) ->
         "mode": context.mode,
         "evaluation_lane": context.evaluation_lane,
         "lane_constraint": _summarize_lane_constraint(context.evaluation_lane, context.neutral_outcome),
+        "field_handling_policy": (
+            "Assume fields referenced in the rule are available in the JSON payload. "
+            "Only add explicit null or missing-field checks if the analyst directly asks for them."
+        ),
         "neutral_outcome": context.neutral_outcome,
         "available_outcomes": [
             {"name": outcome.name, "severity_rank": outcome.severity_rank} for outcome in context.outcomes
@@ -338,6 +345,10 @@ def _build_repair_user_prompt(
         "mode": context.mode,
         "evaluation_lane": context.evaluation_lane,
         "lane_constraint": _summarize_lane_constraint(context.evaluation_lane, context.neutral_outcome),
+        "field_handling_policy": (
+            "Assume fields referenced in the rule are available in the JSON payload. "
+            "Do not fix validation issues by adding defensive null/missing-field checks unless the analyst explicitly asked for them."
+        ),
         "previous_model_output": previous_output,
         "current_draft_logic": current_draft,
         "issues_to_fix": issues,

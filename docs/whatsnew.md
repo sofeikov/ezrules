@@ -1,5 +1,10 @@
 # What's New
 
+## v1.15.2
+
+* **Less defensive AI-authored rule logic**: AI rule authoring now tells the model to assume referenced fields are normally present in the event payload, instead of inventing `is not None` / missing-field wrappers unless the analyst explicitly asks for defensive handling.
+* **Better edit intent preservation**: When the user asks to tighten an existing rule, the prompt now steers the model toward modifying the actual business condition rather than wrapping the whole rule in data-availability guards.
+
 ## v1.15.1
 
 * **Clearer AI model selection in Settings**: The AI Rule Authoring settings now prefill a default OpenAI model, expose a few built-in model suggestions, and still allow free-text entry for any valid OpenAI model id.
