@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnDestroy, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { type Change, diffChars } from 'diff';
 
 import { RuleLogicEditorComponent } from './rule-logic-editor.component';
 import {
@@ -256,6 +257,35 @@ import {
           ></app-rule-logic-editor>
         </div>
 
+        <div *ngIf="hasDiffPreview()" class="rounded-lg border border-slate-200 bg-white">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+            (click)="toggleDiffExpanded()"
+            data-testid="ai-rule-authoring-diff-toggle"
+          >
+            <div>
+              <p class="text-sm font-semibold text-slate-900">Diff vs current editor</p>
+              <p class="mt-1 text-sm text-slate-600">Green text is added. Red text is removed.</p>
+            </div>
+            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              {{ diffExpanded ? 'Hide' : 'Show' }}
+            </span>
+          </button>
+          <div *ngIf="diffExpanded" class="border-t border-slate-200 px-4 py-4">
+            <div class="overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
+              <pre class="overflow-x-auto whitespace-pre-wrap break-words px-4 py-4 text-sm leading-6 text-slate-100"><span
+                *ngFor="let part of draftDiffParts()"
+                [ngClass]="{
+                  'bg-emerald-600/25 text-emerald-200': part.added,
+                  'bg-rose-600/25 text-rose-200 line-through': part.removed,
+                  'text-slate-100': !part.added && !part.removed
+                }"
+              >{{ part.value }}</span></pre>
+            </div>
+          </div>
+        </div>
+
         <div *ngIf="result.validation.warnings.length > 0" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
           <p class="font-medium">Validation warnings</p>
           <ul class="mt-2 list-disc space-y-1 pl-5">
@@ -272,19 +302,36 @@ import {
           </ul>
         </div>
 
-        <div>
-          <p class="text-sm font-semibold text-slate-900">Line-by-line explanation</p>
-          <div class="mt-3 space-y-3">
-            <div
-              *ngFor="let line of result.line_explanations"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-3"
-              data-testid="ai-rule-authoring-explanation"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <code class="rounded bg-slate-100 px-2 py-1 text-xs text-slate-700">Line {{ line.line_number }}</code>
-                <code class="flex-1 whitespace-pre-wrap break-words text-xs text-slate-700">{{ line.source }}</code>
+        <div *ngIf="hasLineExplanations()" class="rounded-lg border border-slate-200 bg-white">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+            (click)="toggleExplanationsExpanded()"
+            data-testid="ai-rule-authoring-explanations-toggle"
+          >
+            <div>
+              <p class="text-sm font-semibold text-slate-900">Line-by-line explanation</p>
+              <p class="mt-1 text-sm text-slate-600">
+                {{ result.line_explanations.length }} explained line{{ result.line_explanations.length === 1 ? '' : 's' }}.
+              </p>
+            </div>
+            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              {{ explanationsExpanded ? 'Hide' : 'Show' }}
+            </span>
+          </button>
+          <div *ngIf="explanationsExpanded" class="border-t border-slate-200 px-4 py-4">
+            <div class="space-y-3">
+              <div
+                *ngFor="let line of result.line_explanations"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-3"
+                data-testid="ai-rule-authoring-explanation"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <code class="rounded bg-slate-100 px-2 py-1 text-xs text-slate-700">Line {{ line.line_number }}</code>
+                  <code class="flex-1 whitespace-pre-wrap break-words text-xs text-slate-700">{{ line.source }}</code>
+                </div>
+                <p class="mt-2 text-sm text-slate-700">{{ line.explanation }}</p>
               </div>
-              <p class="mt-2 text-sm text-slate-700">{{ line.explanation }}</p>
             </div>
           </div>
         </div>
@@ -310,7 +357,9 @@ export class AiRuleAuthoringPanelComponent {
   generating = false;
   applying = false;
   expanded = false;
+  diffExpanded = true;
   draftAppliedToEditor = false;
+  explanationsExpanded = false;
   generationPhase: 'idle' | 'preparing' | 'generating' | 'validating' | 'done' | 'error' = 'idle';
   error: string | null = null;
   appliedMessage: string | null = null;
@@ -333,6 +382,29 @@ export class AiRuleAuthoringPanelComponent {
 
   previewOutcomes(): RuleEditorOutcomeSuggestion[] {
     return this.outcomeSuggestions.slice(0, 6);
+  }
+
+  hasDiffPreview(): boolean {
+    return !!this.result && !!this.currentLogic.trim();
+  }
+
+  hasLineExplanations(): boolean {
+    return !!this.result?.line_explanations.length;
+  }
+
+  draftDiffParts(): Change[] {
+    if (!this.result) {
+      return [];
+    }
+    return diffChars(this.currentLogic || '', this.result.draft_logic);
+  }
+
+  toggleDiffExpanded(): void {
+    this.diffExpanded = !this.diffExpanded;
+  }
+
+  toggleExplanationsExpanded(): void {
+    this.explanationsExpanded = !this.explanationsExpanded;
   }
 
   toggleExpanded(): void {
@@ -448,6 +520,8 @@ export class AiRuleAuthoringPanelComponent {
         this.generating = false;
         this.clearGenerationProgress();
         this.generationPhase = 'done';
+        this.diffExpanded = false;
+        this.explanationsExpanded = false;
         this.emitPendingDraftState();
       },
       error: (error) => {
