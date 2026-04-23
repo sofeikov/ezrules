@@ -137,6 +137,24 @@ test.describe('AI Rule Authoring', () => {
     });
     const createData = await createResponse.json();
     testRuleId = createData.rule.r_id;
+    let backtestRequested = false;
+    const largeStoredLogic = 'if $amount > 100:\n\treturn !HOLD\n'.repeat(1800);
+    const largeProposedLogic = 'if $amount > 500:\n\treturn !HOLD\n'.repeat(1800);
+    const labelCounts = Object.fromEntries(
+      Array.from({ length: 120 }, (_, index) => [`LABEL_${index.toString().padStart(3, '0')}`, 1])
+    );
+    const qualityMetrics = Object.keys(labelCounts).map((label, index) => ({
+      outcome: 'HOLD',
+      label,
+      true_positive: index === 0 ? 1 : 0,
+      false_positive: index === 0 ? 0 : 1,
+      false_negative: 0,
+      predicted_positives: 1,
+      actual_positives: 1,
+      precision: index === 0 ? 1 : 0,
+      recall: index === 0 ? 1 : 0,
+      f1: index === 0 ? 1 : 0,
+    }));
 
     await page.route('**/api/v2/rules/ai/draft', async route => {
       const body = route.request().postDataJSON();
@@ -172,6 +190,82 @@ test.describe('AI Rule Authoring', () => {
       });
     });
 
+    await page.route('**/api/v2/backtesting', async route => {
+      const body = route.request().postDataJSON();
+      expect(body.r_id).toBe(testRuleId);
+      expect(body.new_rule_logic).toBe("if $amount > 500:\n\treturn !HOLD");
+      backtestRequested = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          task_id: 'ai-preview-task',
+          message: 'Backtest started',
+          queue_status: 'pending',
+        }),
+      });
+    });
+
+    await page.route(`**/api/v2/backtesting/${testRuleId}**`, async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          results: backtestRequested ? [
+            {
+              task_id: 'ai-preview-task',
+              created_at: new Date().toISOString(),
+              completed_at: new Date().toISOString(),
+              stored_logic: largeStoredLogic,
+              proposed_logic: largeProposedLogic,
+              status: 'SUCCESS',
+              queue_status: 'done',
+            },
+          ] : [],
+        }),
+      });
+    });
+
+    await page.route('**/api/v2/backtesting/task/ai-preview-task**', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'SUCCESS',
+          queue_status: 'done',
+          stored_result: { HOLD: 3, RELEASE: 1 },
+          proposed_result: { HOLD: 1, RELEASE: 3 },
+          stored_result_rate: { HOLD: 75, RELEASE: 25 },
+          proposed_result_rate: { HOLD: 25, RELEASE: 75 },
+          total_records: 4,
+          eligible_records: 4,
+          skipped_records: 1,
+          labeled_records: 120,
+          label_counts: labelCounts,
+          stored_quality_summary: {
+            pair_count: 1,
+            average_precision: 0.5,
+            average_recall: 1,
+            average_f1: 0.6667,
+            best_pair: 'HOLD -> FRAUD',
+            worst_pair: 'HOLD -> FRAUD',
+          },
+          proposed_quality_summary: {
+            pair_count: 1,
+            average_precision: 1,
+            average_recall: 1,
+            average_f1: 1,
+            best_pair: 'HOLD -> FRAUD',
+            worst_pair: 'HOLD -> FRAUD',
+          },
+          stored_quality_metrics: qualityMetrics,
+          proposed_quality_metrics: qualityMetrics,
+          warnings: ['Records missing or null for referenced fields were excluded: amount (1).'],
+        }),
+      });
+    });
+
     await page.route('**/api/v2/rules/ai/apply', async route => {
       await route.fulfill({
         status: 200,
@@ -193,6 +287,23 @@ test.describe('AI Rule Authoring', () => {
     await aiPanel.clickGenerate();
 
     await expect(aiPanel.result).toBeVisible();
+    await expect(aiPanel.runBacktestButton).toBeVisible();
+    expect(backtestRequested).toBe(false);
+
+    await aiPanel.clickRunBacktest();
+
+    await expect(page.getByTestId('backtest-results-card')).toBeVisible();
+    await page.getByTestId('backtest-toggle-button').first().click();
+    await expect(page.getByTestId('backtest-diff-skipped')).toBeVisible();
+    await expect(page.getByTestId('backtest-outcome-table')).toContainText('HOLD');
+    await expect(page.getByTestId('backtest-outcome-table')).toContainText('-2');
+    await expect(page.getByTestId('backtest-quality-summary')).toContainText('Proposed Quality');
+    await expect(page.getByTestId('backtest-quality-summary')).toContainText('100.0%');
+    await expect(page.getByTestId('backtest-skipped-summary')).toContainText('amount (1)');
+    await expect(page.getByText('20 additional labels omitted')).toBeVisible();
+    await expect(page.getByText('20 additional pairs omitted')).toBeVisible();
+    expect(backtestRequested).toBe(true);
+
     await aiPanel.clickApply();
 
     await expect(aiPanel.appliedBanner).toBeVisible();

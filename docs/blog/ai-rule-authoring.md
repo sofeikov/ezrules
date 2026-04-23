@@ -28,6 +28,7 @@ A user can describe the rule they want in plain English, and ezrules will:
 - attempt bounded repair for obvious issues
 - explain the generated rule line by line
 - show a diff against the current rule when editing
+- offer a manual backtest action for valid edit-mode drafts
 - require an explicit copy step into the real editor before save
 
 This is important: the assistant does **not** auto-save and does **not** auto-activate anything.
@@ -107,7 +108,19 @@ This is useful when a reviewer wants to understand:
 - which condition maps to which business idea
 - whether the generated logic matches the original analyst request
 
-### 5. Copy into the main editor is a deliberate action
+### 5. Manual backtests show likely impact before save
+
+When a valid draft is generated while editing an existing rule, ezrules shows a **Run Backtest** action under the proposed logic change.
+
+The action uses the same Backtest Results section as the rest of the rule detail page. It compares the stored rule and proposed draft before the user copies or saves anything, and shows:
+
+- outcome distribution deltas between the stored and proposed logic
+- skipped-record counts and missing-field warnings
+- label-aware precision, recall, and F1 when historical labels exist
+
+This keeps the expensive comparison user-triggered while preserving the normal save, promote, rollout, and shadow workflows.
+
+### 6. Copy into the main editor is a deliberate action
 
 The preview becomes real rule content only when the user chooses:
 

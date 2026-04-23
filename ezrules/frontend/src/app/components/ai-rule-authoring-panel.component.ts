@@ -139,6 +139,9 @@ import {
               <span class="rounded-full px-2.5 py-1 font-medium" [ngClass]="generationStepClass('validating')">
                 3. Validate
               </span>
+              <span class="rounded-full px-2.5 py-1 font-medium" [ngClass]="generationStepClass('review')">
+                4. Review
+              </span>
             </div>
             <p class="mt-3 text-sm text-slate-700">{{ generationStatusMessage() }}</p>
           </div>
@@ -250,11 +253,30 @@ import {
         </div>
 
         <div>
-          <p class="mb-2 text-sm font-semibold text-slate-900">Generated draft</p>
+          <p class="mb-2 text-sm font-semibold text-slate-900">Proposed logic change</p>
           <app-rule-logic-editor
             [value]="result.draft_logic"
             [readOnly]="true"
           ></app-rule-logic-editor>
+          <div *ngIf="canRequestBacktest()" class="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              (click)="requestBacktest()"
+              [disabled]="backtestRunning || !result.applyable"
+              class="inline-flex items-center rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              data-testid="ai-rule-authoring-run-backtest"
+            >
+              {{ backtestRunning ? 'Starting Backtest…' : 'Run Backtest' }}
+            </button>
+            <p class="text-sm text-slate-600">The run will appear in the Backtest Results section with the other backtests.</p>
+          </div>
+        </div>
+
+        <div *ngIf="laneGuidanceMessages().length > 0" class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3" data-testid="ai-rule-authoring-lane-guidance">
+          <p class="text-sm font-semibold text-slate-900">Lane guidance</p>
+          <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+            <li *ngFor="let message of laneGuidanceMessages()">{{ message }}</li>
+          </ul>
         </div>
 
         <div *ngIf="hasDiffPreview()" class="rounded-lg border border-slate-200 bg-white">
@@ -339,7 +361,7 @@ import {
     </section>
   `,
 })
-export class AiRuleAuthoringPanelComponent {
+export class AiRuleAuthoringPanelComponent implements OnDestroy {
   @Input() collapsible = false;
   @Input() mode: 'create' | 'edit' = 'create';
   @Input() evaluationLane: RuleEvaluationLane = 'main';
@@ -350,8 +372,10 @@ export class AiRuleAuthoringPanelComponent {
   @Input() fieldSuggestions: RuleEditorFieldSuggestion[] = [];
   @Input() listSuggestions: RuleEditorListSuggestion[] = [];
   @Input() outcomeSuggestions: RuleEditorOutcomeSuggestion[] = [];
+  @Input() backtestRunning = false;
   @Output() draftApplied = new EventEmitter<string>();
   @Output() pendingDraftChange = new EventEmitter<boolean>();
+  @Output() backtestRequested = new EventEmitter<string>();
 
   prompt = '';
   generating = false;
@@ -399,6 +423,42 @@ export class AiRuleAuthoringPanelComponent {
     return diffChars(this.currentLogic || '', this.result.draft_logic);
   }
 
+  canRequestBacktest(): boolean {
+    return this.mode === 'edit' && this.ruleId !== null && !!this.result?.applyable;
+  }
+
+  requestBacktest(): void {
+    if (!this.canRequestBacktest() || !this.result?.draft_logic) {
+      return;
+    }
+    this.backtestRequested.emit(this.result.draft_logic);
+  }
+
+  laneGuidanceMessages(): string[] {
+    if (!this.result) {
+      return [];
+    }
+
+    const messages: string[] = [];
+    const referencedOutcomes = new Set(this.result.validation.referenced_outcomes || []);
+    const usesNeutralOutcome = referencedOutcomes.has(this.neutralOutcomeLabel);
+
+    if (this.evaluationLane === 'allowlist') {
+      messages.push(`Allowlist drafts should return !${this.neutralOutcomeLabel} only when the trusted condition matches.`);
+      return messages;
+    }
+
+    if (usesNeutralOutcome) {
+      messages.push(`This main-lane draft returns !${this.neutralOutcomeLabel}; if it is intended to exempt trusted traffic, review whether the allowlist lane is a better fit.`);
+    }
+
+    if ((this.result.validation.referenced_lists || []).length > 0 && usesNeutralOutcome) {
+      messages.push('List-based neutral outcomes are usually easier to operate as allowlist rules because they short-circuit before main-rule alerting.');
+    }
+
+    return messages;
+  }
+
   toggleDiffExpanded(): void {
     this.diffExpanded = !this.diffExpanded;
   }
@@ -414,8 +474,8 @@ export class AiRuleAuthoringPanelComponent {
     this.expanded = !this.expanded;
   }
 
-  generationStepClass(step: 'preparing' | 'generating' | 'validating'): string {
-    const order = ['preparing', 'generating', 'validating'];
+  generationStepClass(step: 'preparing' | 'generating' | 'validating' | 'review'): string {
+    const order = ['preparing', 'generating', 'validating', 'review'];
     const currentIndex = order.indexOf(this.generationPhase);
     const stepIndex = order.indexOf(step);
 
@@ -450,10 +510,10 @@ export class AiRuleAuthoringPanelComponent {
       return 'Draft copied into the main editor. You can now use the normal save flow.';
     }
     if (this.result?.applyable) {
-      return 'Preview is ready. The main editor below is still unchanged until you copy this draft into it.';
+      return 'Draft is ready. The main editor below is still unchanged until you copy this draft into it.';
     }
     if (this.result) {
-      return 'Preview is ready for review, but it still needs manual fixes before it can be copied into the main editor.';
+      return 'Draft is ready for review, but it still needs manual fixes before it can be copied into the main editor.';
     }
     return 'Ready to generate a draft.';
   }

@@ -13,6 +13,8 @@ export class AiRuleAuthoringPanel {
   readonly errorBanner: Locator;
   readonly appliedBanner: Locator;
   readonly explanations: Locator;
+  readonly runBacktestButton: Locator;
+  readonly laneGuidance: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -27,6 +29,8 @@ export class AiRuleAuthoringPanel {
     this.errorBanner = page.getByTestId('ai-rule-authoring-error');
     this.appliedBanner = page.getByTestId('ai-rule-authoring-applied');
     this.explanations = page.getByTestId('ai-rule-authoring-explanation');
+    this.runBacktestButton = page.getByTestId('ai-rule-authoring-run-backtest');
+    this.laneGuidance = page.getByTestId('ai-rule-authoring-lane-guidance');
   }
 
   async fillPrompt(value: string) {
@@ -47,5 +51,9 @@ export class AiRuleAuthoringPanel {
 
   async toggleExplanations() {
     await this.explanationsToggle.click();
+  }
+
+  async clickRunBacktest() {
+    await this.runBacktestButton.click();
   }
 }

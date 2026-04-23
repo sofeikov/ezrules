@@ -235,8 +235,10 @@
                 [fieldSuggestions]="fieldSuggestions"
                 [listSuggestions]="listSuggestions"
                 [outcomeSuggestions]="outcomeSuggestions"
+                [backtestRunning]="backtesting"
                 (draftApplied)="handleAIDraftApplied($event)"
                 (pendingDraftChange)="handlePendingAIDraftChange($event)"
+                (backtestRequested)="triggerAIDraftBacktest($event)"
               ></app-ai-rule-authoring-panel>
 
               <!-- Logic -->
@@ -640,182 +642,193 @@
                   <!-- SUCCESS state -->
                   <div *ngIf="getTaskResult(bt.task_id) as taskResult">
                     <div *ngIf="taskResult.status === 'SUCCESS'">
-                      <!-- Logic Diff -->
-                      <div *ngIf="bt.stored_logic || bt.proposed_logic" class="mb-4">
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">Logic Changes</h4>
-                        <div class="border border-gray-200 rounded-lg overflow-hidden">
-                          <pre class="text-sm font-mono whitespace-pre-wrap break-all p-3" data-testid="backtest-diff"><span *ngFor="let change of computeBacktestDiff(bt.stored_logic, bt.proposed_logic)"
-                            [ngClass]="{
-                              'bg-green-100 text-green-900': change.added,
-                              'bg-red-100 text-red-900 line-through': change.removed
-                            }"
-                          >{{ change.value }}</span></pre>
-                        </div>
-                      </div>
-
-                      <!-- Results Table -->
-                      <div class="mb-4">
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">Outcome Comparison</h4>
-                        <table class="w-full text-sm" data-testid="backtest-outcome-table">
-                          <thead>
-                            <tr class="border-b border-gray-200">
-                              <th class="text-left py-2 pr-3 font-medium text-gray-700">Outcome</th>
-                              <th class="text-right py-2 px-3 font-medium text-gray-700">Current</th>
-                              <th class="text-right py-2 px-3 font-medium text-gray-700">Proposed</th>
-                              <th class="text-right py-2 pl-3 font-medium text-gray-700">Delta</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr *ngFor="let outcome of getOutcomeKeys(taskResult)" class="border-b border-gray-100">
-                              <td class="py-2 pr-3 font-medium text-gray-900">{{ outcome }}</td>
-                              <td class="text-right py-2 px-3 text-gray-700">
-                                {{ taskResult.stored_result?.[outcome] || 0 }}
-                                <span class="text-gray-400 ml-1">({{ (taskResult.stored_result_rate?.[outcome] || 0) | number:'1.1-1' }}%)</span>
-                              </td>
-                              <td class="text-right py-2 px-3 text-gray-700">
-                                {{ taskResult.proposed_result?.[outcome] || 0 }}
-                                <span class="text-gray-400 ml-1">({{ (taskResult.proposed_result_rate?.[outcome] || 0) | number:'1.1-1' }}%)</span>
-                              </td>
-                              <td class="text-right py-2 pl-3" [ngClass]="{
-                                'text-green-600': (taskResult.proposed_result?.[outcome] || 0) - (taskResult.stored_result?.[outcome] || 0) > 0,
-                                'text-red-600': (taskResult.proposed_result?.[outcome] || 0) - (taskResult.stored_result?.[outcome] || 0) < 0,
-                                'text-gray-500': (taskResult.proposed_result?.[outcome] || 0) - (taskResult.stored_result?.[outcome] || 0) === 0
-                              }">
-                                {{ (taskResult.proposed_result?.[outcome] || 0) - (taskResult.stored_result?.[outcome] || 0) > 0 ? '+' : '' }}{{ (taskResult.proposed_result?.[outcome] || 0) - (taskResult.stored_result?.[outcome] || 0) }}
-                              </td>
-                            </tr>
-                          </tbody>
-                          <tfoot>
-                            <tr class="border-t border-gray-300">
-                              <td class="py-2 pr-3 font-medium text-gray-900" colspan="3">Total records evaluated</td>
-                              <td class="text-right py-2 pl-3 font-medium text-gray-900">{{ taskResult.total_records }}</td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-
-                      <div *ngIf="(taskResult.skipped_records || 0) > 0" class="mb-4 p-4 rounded-lg border border-amber-200 bg-amber-50" data-testid="backtest-skipped-summary">
-                        <p class="text-sm font-medium text-amber-900">
-                          Evaluated {{ taskResult.eligible_records || taskResult.total_records || 0 }} records and skipped {{ taskResult.skipped_records }} older records that were not eligible for the common comparison set.
-                        </p>
-                        <ul *ngIf="taskResult.warnings?.length" class="mt-2 text-sm text-amber-900 list-disc pl-5 space-y-1">
-                          <li *ngFor="let warning of taskResult.warnings">{{ warning }}</li>
-                        </ul>
-                      </div>
-
-                      <div class="grid gap-3 md:grid-cols-3 mb-4" data-testid="backtest-quality-summary">
-                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                          <h4 class="text-sm font-medium text-gray-700 mb-2">Historical Labels</h4>
-                          <div class="text-sm text-gray-700 space-y-1">
-                            <p>Total records: <span class="font-semibold text-gray-900">{{ taskResult.total_records || 0 }}</span></p>
-                            <p>Labeled records: <span class="font-semibold text-gray-900">{{ taskResult.labeled_records || 0 }}</span></p>
-                            <p>Coverage: <span class="font-semibold text-gray-900">{{ getLabeledShare(taskResult) | number:'1.1-1' }}%</span></p>
+                      <ng-container *ngIf="getBacktestViewModel(bt.task_id) as backtestView">
+                        <!-- Logic Diff -->
+                        <div *ngIf="bt.stored_logic || bt.proposed_logic" class="mb-4">
+                          <h4 class="text-sm font-medium text-gray-700 mb-2">Logic Changes</h4>
+                          <div class="border border-gray-200 rounded-lg overflow-hidden">
+                            <pre *ngIf="!isBacktestDiffTooLarge(bt); else backtestDiffTooLarge" class="text-sm font-mono whitespace-pre-wrap break-all p-3" data-testid="backtest-diff"><span *ngFor="let change of getBacktestDiffParts(bt)"
+                              [ngClass]="{
+                                'bg-green-100 text-green-900': change.added,
+                                'bg-red-100 text-red-900 line-through': change.removed
+                              }"
+                            >{{ change.value }}</span></pre>
+                            <ng-template #backtestDiffTooLarge>
+                              <div class="p-3 text-sm text-amber-900 bg-amber-50" data-testid="backtest-diff-skipped">
+                                Logic diff is larger than {{ backtestDiffCharLimitLabel }} characters, so it is not rendered inline.
+                              </div>
+                            </ng-template>
                           </div>
                         </div>
 
-                        <div class="border border-gray-200 rounded-lg p-4">
-                          <h4 class="text-sm font-medium text-gray-700 mb-2">Current Quality</h4>
-                          <div class="text-sm text-gray-700 space-y-1">
-                            <p>Pairs scored: <span class="font-semibold text-gray-900">{{ getQualitySummary(taskResult, 'stored')?.pair_count || 0 }}</span></p>
-                            <p>Avg precision: <span class="font-semibold text-gray-900">{{ formatQualityMetric(getQualitySummary(taskResult, 'stored')?.average_precision) }}</span></p>
-                            <p>Avg recall: <span class="font-semibold text-gray-900">{{ formatQualityMetric(getQualitySummary(taskResult, 'stored')?.average_recall) }}</span></p>
-                            <p>Avg F1: <span class="font-semibold text-gray-900">{{ formatQualityMetric(getQualitySummary(taskResult, 'stored')?.average_f1) }}</span></p>
-                            <p>Best pair: <span class="font-semibold text-gray-900">{{ getQualitySummary(taskResult, 'stored')?.best_pair || '—' }}</span></p>
+                        <!-- Results Table -->
+                        <div class="mb-4">
+                          <h4 class="text-sm font-medium text-gray-700 mb-2">Outcome Comparison</h4>
+                          <table class="w-full text-sm" data-testid="backtest-outcome-table">
+                            <thead>
+                              <tr class="border-b border-gray-200">
+                                <th class="text-left py-2 pr-3 font-medium text-gray-700">Outcome</th>
+                                <th class="text-right py-2 px-3 font-medium text-gray-700">Current</th>
+                                <th class="text-right py-2 px-3 font-medium text-gray-700">Proposed</th>
+                                <th class="text-right py-2 pl-3 font-medium text-gray-700">Delta</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr *ngFor="let row of backtestView.outcomeRows" class="border-b border-gray-100">
+                                <td class="py-2 pr-3 font-medium text-gray-900">{{ row.outcome }}</td>
+                                <td class="text-right py-2 px-3 text-gray-700">
+                                  {{ row.storedCount }}
+                                  <span class="text-gray-400 ml-1">({{ row.storedRate | number:'1.1-1' }}%)</span>
+                                </td>
+                                <td class="text-right py-2 px-3 text-gray-700">
+                                  {{ row.proposedCount }}
+                                  <span class="text-gray-400 ml-1">({{ row.proposedRate | number:'1.1-1' }}%)</span>
+                                </td>
+                                <td class="text-right py-2 pl-3" [ngClass]="{
+                                  'text-green-600': row.delta > 0,
+                                  'text-red-600': row.delta < 0,
+                                  'text-gray-500': row.delta === 0
+                                }">
+                                  {{ row.delta > 0 ? '+' : '' }}{{ row.delta }}
+                                </td>
+                              </tr>
+                            </tbody>
+                            <tfoot>
+                              <tr class="border-t border-gray-300">
+                                <td class="py-2 pr-3 font-medium text-gray-900" colspan="3">Total records evaluated</td>
+                                <td class="text-right py-2 pl-3 font-medium text-gray-900">{{ taskResult.total_records }}</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+
+                        <div *ngIf="(taskResult.skipped_records || 0) > 0" class="mb-4 p-4 rounded-lg border border-amber-200 bg-amber-50" data-testid="backtest-skipped-summary">
+                          <p class="text-sm font-medium text-amber-900">
+                            Evaluated {{ taskResult.eligible_records || taskResult.total_records || 0 }} records and skipped {{ taskResult.skipped_records }} older records that were not eligible for the common comparison set.
+                          </p>
+                          <ul *ngIf="taskResult.warnings?.length" class="mt-2 text-sm text-amber-900 list-disc pl-5 space-y-1">
+                            <li *ngFor="let warning of taskResult.warnings">{{ warning }}</li>
+                          </ul>
+                        </div>
+
+                        <div class="grid gap-3 md:grid-cols-3 mb-4" data-testid="backtest-quality-summary">
+                          <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Historical Labels</h4>
+                            <div class="text-sm text-gray-700 space-y-1">
+                              <p>Total records: <span class="font-semibold text-gray-900">{{ taskResult.total_records || 0 }}</span></p>
+                              <p>Labeled records: <span class="font-semibold text-gray-900">{{ taskResult.labeled_records || 0 }}</span></p>
+                              <p>Coverage: <span class="font-semibold text-gray-900">{{ backtestView.labeledShare | number:'1.1-1' }}%</span></p>
+                            </div>
+                          </div>
+
+                          <div class="border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Current Quality</h4>
+                            <div class="text-sm text-gray-700 space-y-1">
+                              <p>Pairs scored: <span class="font-semibold text-gray-900">{{ backtestView.storedQualitySummary?.pair_count || 0 }}</span></p>
+                              <p>Avg precision: <span class="font-semibold text-gray-900">{{ formatQualityMetric(backtestView.storedQualitySummary?.average_precision) }}</span></p>
+                              <p>Avg recall: <span class="font-semibold text-gray-900">{{ formatQualityMetric(backtestView.storedQualitySummary?.average_recall) }}</span></p>
+                              <p>Avg F1: <span class="font-semibold text-gray-900">{{ formatQualityMetric(backtestView.storedQualitySummary?.average_f1) }}</span></p>
+                              <p>Best pair: <span class="font-semibold text-gray-900">{{ backtestView.storedQualitySummary?.best_pair || '—' }}</span></p>
+                            </div>
+                          </div>
+
+                          <div class="border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Proposed Quality</h4>
+                            <div class="text-sm text-gray-700 space-y-1">
+                              <p>Pairs scored: <span class="font-semibold text-gray-900">{{ backtestView.proposedQualitySummary?.pair_count || 0 }}</span></p>
+                              <p>Avg precision: <span class="font-semibold text-gray-900">{{ formatQualityMetric(backtestView.proposedQualitySummary?.average_precision) }}</span></p>
+                              <p>Avg recall: <span class="font-semibold text-gray-900">{{ formatQualityMetric(backtestView.proposedQualitySummary?.average_recall) }}</span></p>
+                              <p>Avg F1: <span class="font-semibold text-gray-900">{{ formatQualityMetric(backtestView.proposedQualitySummary?.average_f1) }}</span></p>
+                              <p>Best pair: <span class="font-semibold text-gray-900">{{ backtestView.proposedQualitySummary?.best_pair || '—' }}</span></p>
+                            </div>
                           </div>
                         </div>
 
-                        <div class="border border-gray-200 rounded-lg p-4">
-                          <h4 class="text-sm font-medium text-gray-700 mb-2">Proposed Quality</h4>
-                          <div class="text-sm text-gray-700 space-y-1">
-                            <p>Pairs scored: <span class="font-semibold text-gray-900">{{ getQualitySummary(taskResult, 'proposed')?.pair_count || 0 }}</span></p>
-                            <p>Avg precision: <span class="font-semibold text-gray-900">{{ formatQualityMetric(getQualitySummary(taskResult, 'proposed')?.average_precision) }}</span></p>
-                            <p>Avg recall: <span class="font-semibold text-gray-900">{{ formatQualityMetric(getQualitySummary(taskResult, 'proposed')?.average_recall) }}</span></p>
-                            <p>Avg F1: <span class="font-semibold text-gray-900">{{ formatQualityMetric(getQualitySummary(taskResult, 'proposed')?.average_f1) }}</span></p>
-                            <p>Best pair: <span class="font-semibold text-gray-900">{{ getQualitySummary(taskResult, 'proposed')?.best_pair || '—' }}</span></p>
+                        <div *ngIf="(taskResult.labeled_records || 0) > 0; else unlabeledBacktestNotice" class="space-y-4">
+                          <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Ground Truth Labels</h4>
+                            <div class="border border-gray-200 rounded-lg overflow-x-auto">
+                              <table class="min-w-full text-sm" data-testid="backtest-label-table">
+                                <thead>
+                                  <tr class="border-b border-gray-200">
+                                    <th class="text-left py-2 px-3 font-medium text-gray-700">Label</th>
+                                    <th class="text-right py-2 px-3 font-medium text-gray-700">Count</th>
+                                    <th class="text-right py-2 px-3 font-medium text-gray-700">Share of labeled</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr *ngFor="let row of backtestView.labelRows" class="border-b border-gray-100">
+                                    <td class="py-2 px-3 font-medium text-gray-900">{{ row.label }}</td>
+                                    <td class="text-right py-2 px-3 text-gray-700">{{ row.count }}</td>
+                                    <td class="text-right py-2 px-3 text-gray-700">{{ row.share | number:'1.1-1' }}%</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                              <p *ngIf="backtestView.hiddenLabelRowCount > 0" class="border-t border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                                Showing first {{ getBacktestRenderRowLimit() }} labels; {{ backtestView.hiddenLabelRowCount }} additional label{{ backtestView.hiddenLabelRowCount === 1 ? '' : 's' }} omitted from inline rendering.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Outcome vs Label Quality</h4>
+                            <p class="text-xs text-gray-500 mb-2">Support columns show TP / FP / FN for each outcome→label pair.</p>
+                            <div class="border border-gray-200 rounded-lg overflow-x-auto">
+                              <table class="min-w-full text-sm" data-testid="backtest-quality-table">
+                                <thead>
+                                  <tr class="border-b border-gray-200">
+                                    <th class="text-left py-2 px-3 font-medium text-gray-700">Outcome</th>
+                                    <th class="text-left py-2 px-3 font-medium text-gray-700">Label</th>
+                                    <th class="text-right py-2 px-3 font-medium text-gray-700">Current P</th>
+                                    <th class="text-right py-2 px-3 font-medium text-gray-700">Current R</th>
+                                    <th class="text-right py-2 px-3 font-medium text-gray-700">Current F1</th>
+                                    <th class="text-right py-2 px-3 font-medium text-gray-700">Current TP / FP / FN</th>
+                                    <th class="text-right py-2 px-3 font-medium text-gray-700">Proposed P</th>
+                                    <th class="text-right py-2 px-3 font-medium text-gray-700">Proposed R</th>
+                                    <th class="text-right py-2 px-3 font-medium text-gray-700">Proposed F1</th>
+                                    <th class="text-right py-2 px-3 font-medium text-gray-700">Proposed TP / FP / FN</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr *ngFor="let row of backtestView.qualityRows" class="border-b border-gray-100">
+                                    <td class="py-2 px-3 font-medium text-gray-900">{{ row.outcome }}</td>
+                                    <td class="py-2 px-3 text-gray-700">{{ row.label }}</td>
+                                    <td class="text-right py-2 px-3 text-gray-700">{{ formatQualityMetric(row.stored?.precision) }}</td>
+                                    <td class="text-right py-2 px-3 text-gray-700">{{ formatQualityMetric(row.stored?.recall) }}</td>
+                                    <td class="text-right py-2 px-3 text-gray-700">{{ formatQualityMetric(row.stored?.f1) }}</td>
+                                    <td class="text-right py-2 px-3 text-gray-700">
+                                      {{ row.stored?.true_positive || 0 }}
+                                      /
+                                      {{ row.stored?.false_positive || 0 }}
+                                      /
+                                      {{ row.stored?.false_negative || 0 }}
+                                    </td>
+                                    <td class="text-right py-2 px-3 text-gray-700">{{ formatQualityMetric(row.proposed?.precision) }}</td>
+                                    <td class="text-right py-2 px-3 text-gray-700">{{ formatQualityMetric(row.proposed?.recall) }}</td>
+                                    <td class="text-right py-2 px-3 text-gray-700">{{ formatQualityMetric(row.proposed?.f1) }}</td>
+                                    <td class="text-right py-2 px-3 text-gray-700">
+                                      {{ row.proposed?.true_positive || 0 }}
+                                      /
+                                      {{ row.proposed?.false_positive || 0 }}
+                                      /
+                                      {{ row.proposed?.false_negative || 0 }}
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                              <p *ngIf="backtestView.hiddenQualityRowCount > 0" class="border-t border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                                Showing first {{ getBacktestRenderRowLimit() }} outcome-label pairs; {{ backtestView.hiddenQualityRowCount }} additional pair{{ backtestView.hiddenQualityRowCount === 1 ? '' : 's' }} omitted from inline rendering.
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div *ngIf="(taskResult.labeled_records || 0) > 0; else unlabeledBacktestNotice" class="space-y-4">
-                        <div>
-                          <h4 class="text-sm font-medium text-gray-700 mb-2">Ground Truth Labels</h4>
-                          <div class="border border-gray-200 rounded-lg overflow-x-auto">
-                            <table class="min-w-full text-sm" data-testid="backtest-label-table">
-                              <thead>
-                                <tr class="border-b border-gray-200">
-                                  <th class="text-left py-2 px-3 font-medium text-gray-700">Label</th>
-                                  <th class="text-right py-2 px-3 font-medium text-gray-700">Count</th>
-                                  <th class="text-right py-2 px-3 font-medium text-gray-700">Share of labeled</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr *ngFor="let label of getLabelKeys(taskResult)" class="border-b border-gray-100">
-                                  <td class="py-2 px-3 font-medium text-gray-900">{{ label }}</td>
-                                  <td class="text-right py-2 px-3 text-gray-700">{{ taskResult.label_counts?.[label] || 0 }}</td>
-                                  <td class="text-right py-2 px-3 text-gray-700">
-                                    {{ (((taskResult.label_counts?.[label] || 0) * 100) / (taskResult.labeled_records || 1)) | number:'1.1-1' }}%
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
+                        <ng-template #unlabeledBacktestNotice>
+                          <div class="p-4 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-900">
+                            No labeled events were found in the backtest window, so precision and recall are unavailable for this run.
                           </div>
-                        </div>
-
-                        <div>
-                          <h4 class="text-sm font-medium text-gray-700 mb-2">Outcome vs Label Quality</h4>
-                          <p class="text-xs text-gray-500 mb-2">Support columns show TP / FP / FN for each outcome→label pair.</p>
-                          <div class="border border-gray-200 rounded-lg overflow-x-auto">
-                            <table class="min-w-full text-sm" data-testid="backtest-quality-table">
-                              <thead>
-                                <tr class="border-b border-gray-200">
-                                  <th class="text-left py-2 px-3 font-medium text-gray-700">Outcome</th>
-                                  <th class="text-left py-2 px-3 font-medium text-gray-700">Label</th>
-                                  <th class="text-right py-2 px-3 font-medium text-gray-700">Current P</th>
-                                  <th class="text-right py-2 px-3 font-medium text-gray-700">Current R</th>
-                                  <th class="text-right py-2 px-3 font-medium text-gray-700">Current F1</th>
-                                  <th class="text-right py-2 px-3 font-medium text-gray-700">Current TP / FP / FN</th>
-                                  <th class="text-right py-2 px-3 font-medium text-gray-700">Proposed P</th>
-                                  <th class="text-right py-2 px-3 font-medium text-gray-700">Proposed R</th>
-                                  <th class="text-right py-2 px-3 font-medium text-gray-700">Proposed F1</th>
-                                  <th class="text-right py-2 px-3 font-medium text-gray-700">Proposed TP / FP / FN</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr *ngFor="let pair of getQualityMetricPairs(taskResult)" class="border-b border-gray-100">
-                                  <td class="py-2 px-3 font-medium text-gray-900">{{ pair.outcome }}</td>
-                                  <td class="py-2 px-3 text-gray-700">{{ pair.label }}</td>
-                                  <td class="text-right py-2 px-3 text-gray-700">{{ formatQualityMetric(getQualityMetric(taskResult, 'stored', pair.outcome, pair.label)?.precision) }}</td>
-                                  <td class="text-right py-2 px-3 text-gray-700">{{ formatQualityMetric(getQualityMetric(taskResult, 'stored', pair.outcome, pair.label)?.recall) }}</td>
-                                  <td class="text-right py-2 px-3 text-gray-700">{{ formatQualityMetric(getQualityMetric(taskResult, 'stored', pair.outcome, pair.label)?.f1) }}</td>
-                                  <td class="text-right py-2 px-3 text-gray-700">
-                                    {{ getQualityMetric(taskResult, 'stored', pair.outcome, pair.label)?.true_positive || 0 }}
-                                    /
-                                    {{ getQualityMetric(taskResult, 'stored', pair.outcome, pair.label)?.false_positive || 0 }}
-                                    /
-                                    {{ getQualityMetric(taskResult, 'stored', pair.outcome, pair.label)?.false_negative || 0 }}
-                                  </td>
-                                  <td class="text-right py-2 px-3 text-gray-700">{{ formatQualityMetric(getQualityMetric(taskResult, 'proposed', pair.outcome, pair.label)?.precision) }}</td>
-                                  <td class="text-right py-2 px-3 text-gray-700">{{ formatQualityMetric(getQualityMetric(taskResult, 'proposed', pair.outcome, pair.label)?.recall) }}</td>
-                                  <td class="text-right py-2 px-3 text-gray-700">{{ formatQualityMetric(getQualityMetric(taskResult, 'proposed', pair.outcome, pair.label)?.f1) }}</td>
-                                  <td class="text-right py-2 px-3 text-gray-700">
-                                    {{ getQualityMetric(taskResult, 'proposed', pair.outcome, pair.label)?.true_positive || 0 }}
-                                    /
-                                    {{ getQualityMetric(taskResult, 'proposed', pair.outcome, pair.label)?.false_positive || 0 }}
-                                    /
-                                    {{ getQualityMetric(taskResult, 'proposed', pair.outcome, pair.label)?.false_negative || 0 }}
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      </div>
-
-                      <ng-template #unlabeledBacktestNotice>
-                        <div class="p-4 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-900">
-                          No labeled events were found in the backtest window, so precision and recall are unavailable for this run.
-                        </div>
-                      </ng-template>
+                        </ng-template>
+                      </ng-container>
                     </div>
                   </div>
                 </div>
