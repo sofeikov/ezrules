@@ -301,7 +301,7 @@ class TestAIAuthoringSettings:
         payload = response.json()
         assert payload["provider"] == "openai"
         assert payload["supported_providers"] == ["openai"]
-        assert payload["enabled"] is bool(app_settings.AI_AUTHORING_MODEL)
+        assert payload["enabled"] is True
         assert payload["model"] == (app_settings.AI_AUTHORING_MODEL or "")
         assert payload["api_key_configured"] is bool(app_settings.AI_AUTHORING_API_KEY)
 
