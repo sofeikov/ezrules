@@ -743,3 +743,16 @@ class AIRuleAuthoringHistory(Base):
     o_id = Column(Integer, nullable=False)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
+
+
+class StrictModeHistory(Base):
+    __tablename__ = "strict_mode_history"
+    __table_args__ = (Index("ix_strict_mode_history_o_id_changed", "o_id", "changed"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    enabled = Column(Boolean, nullable=False)
+    action = Column(String, nullable=False)  # enabled, disabled
+    details = Column(String, nullable=True)
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)

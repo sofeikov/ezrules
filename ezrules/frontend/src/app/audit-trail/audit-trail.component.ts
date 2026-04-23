@@ -6,6 +6,7 @@ import {
   AuditService,
   RuleHistoryEntry,
   ConfigHistoryEntry,
+  StrictModeHistoryEntry,
   UserListHistoryEntry,
   OutcomeHistoryEntry,
   LabelHistoryEntry,
@@ -24,6 +25,7 @@ import {
 export class AuditTrailComponent implements OnInit {
   ruleHistory: RuleHistoryEntry[] = [];
   configHistory: ConfigHistoryEntry[] = [];
+  strictModeHistory: StrictModeHistoryEntry[] = [];
   userListHistory: UserListHistoryEntry[] = [];
   outcomeHistory: OutcomeHistoryEntry[] = [];
   labelHistory: LabelHistoryEntry[] = [];
@@ -34,6 +36,7 @@ export class AuditTrailComponent implements OnInit {
 
   ruleTotal: number = 0;
   configTotal: number = 0;
+  strictModeTotal: number = 0;
   userListTotal: number = 0;
   outcomeTotal: number = 0;
   labelTotal: number = 0;
@@ -49,6 +52,7 @@ export class AuditTrailComponent implements OnInit {
   sections: Record<string, boolean> = {
     rules: false,
     config: false,
+    strictMode: false,
     userLists: false,
     outcomes: false,
     labels: false,
@@ -61,6 +65,9 @@ export class AuditTrailComponent implements OnInit {
   constructor(private auditService: AuditService) {}
 
   ngOnInit(): void {
+    if (typeof window !== 'undefined' && window.location.hash === '#strict-mode') {
+      this.sections['strictMode'] = true;
+    }
     this.loadData();
   }
 
@@ -73,7 +80,7 @@ export class AuditTrailComponent implements OnInit {
     this.error = null;
 
     let loadCount = 0;
-    const totalLoads = 9;
+    const totalLoads = 10;
 
     const checkDone = () => {
       loadCount++;
@@ -102,6 +109,18 @@ export class AuditTrailComponent implements OnInit {
       },
       error: () => {
         this.error = 'Failed to load configuration history.';
+        this.loading = false;
+      }
+    });
+
+    this.auditService.getStrictModeHistory(100, 0).subscribe({
+      next: (response) => {
+        this.strictModeHistory = response.items;
+        this.strictModeTotal = response.total;
+        checkDone();
+      },
+      error: () => {
+        this.error = 'Failed to load strict mode history.';
         this.loading = false;
       }
     });
@@ -229,6 +248,12 @@ export class AuditTrailComponent implements OnInit {
     if (action === 'created') return 'bg-green-100 text-green-800';
     if (action === 'deleted') return 'bg-red-100 text-red-800';
     if (action === 'assigned' || action === 'assigned_via_csv') return 'bg-blue-100 text-blue-800';
+    return 'bg-gray-100 text-gray-800';
+  }
+
+  strictModeActionClass(action: string): string {
+    if (action === 'enabled') return 'bg-green-100 text-green-800';
+    if (action === 'disabled') return 'bg-red-100 text-red-800';
     return 'bg-gray-100 text-gray-800';
   }
 }

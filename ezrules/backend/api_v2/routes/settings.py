@@ -32,6 +32,7 @@ from ezrules.backend.runtime_settings import (
     AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
     MAIN_RULE_EXECUTION_MODE_DEFAULT,
     NEUTRAL_OUTCOME_DEFAULT,
+    STRICT_MODE_ENABLED_DEFAULT,
     get_ai_authoring_enabled,
     get_ai_authoring_model,
     get_ai_authoring_provider,
@@ -39,6 +40,7 @@ from ezrules.backend.runtime_settings import (
     get_main_rule_execution_mode,
     get_neutral_outcome,
     get_rule_quality_lookback_days,
+    get_strict_mode_enabled,
     has_ai_authoring_api_key,
     set_ai_authoring_api_key,
     set_ai_authoring_enabled,
@@ -48,8 +50,9 @@ from ezrules.backend.runtime_settings import (
     set_main_rule_execution_mode,
     set_neutral_outcome,
     set_rule_quality_lookback_days,
+    set_strict_mode_enabled,
 )
-from ezrules.core.audit_helpers import save_outcome_history
+from ezrules.core.audit_helpers import save_outcome_history, save_strict_mode_history
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import RuleFactory
 from ezrules.core.rule_checkers import AllowedOutcomeReturnVisitor
@@ -193,6 +196,8 @@ def get_runtime_settings(
     return RuntimeSettingsResponse(
         auto_promote_active_rule_updates=get_auto_promote_active_rule_updates(db, current_org_id),
         default_auto_promote_active_rule_updates=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
+        strict_mode_enabled=get_strict_mode_enabled(db, current_org_id),
+        default_strict_mode_enabled=STRICT_MODE_ENABLED_DEFAULT,
         main_rule_execution_mode=get_main_rule_execution_mode(db, current_org_id),
         default_main_rule_execution_mode=MAIN_RULE_EXECUTION_MODE_DEFAULT,
         rule_quality_lookback_days=get_rule_quality_lookback_days(db, current_org_id),
@@ -216,6 +221,7 @@ def update_runtime_settings(
     updates_requested = (
         request_data.rule_quality_lookback_days is not None
         or request_data.auto_promote_active_rule_updates is not None
+        or request_data.strict_mode_enabled is not None
         or request_data.main_rule_execution_mode is not None
         or request_data.neutral_outcome is not None
     )
@@ -225,6 +231,7 @@ def update_runtime_settings(
     if (
         request_data.rule_quality_lookback_days is not None
         or request_data.auto_promote_active_rule_updates is not None
+        or request_data.strict_mode_enabled is not None
         or request_data.main_rule_execution_mode is not None
     ) and not _user_has_permission(db, user, PermissionAction.MANAGE_PERMISSIONS):
         raise HTTPException(
@@ -236,6 +243,19 @@ def update_runtime_settings(
         set_rule_quality_lookback_days(db, request_data.rule_quality_lookback_days, current_org_id)
     if request_data.auto_promote_active_rule_updates is not None:
         set_auto_promote_active_rule_updates(db, request_data.auto_promote_active_rule_updates, current_org_id)
+    if request_data.strict_mode_enabled is not None:
+        previous_strict_mode_enabled = get_strict_mode_enabled(db, current_org_id)
+        next_strict_mode_enabled = bool(request_data.strict_mode_enabled)
+        set_strict_mode_enabled(db, next_strict_mode_enabled, current_org_id)
+        if next_strict_mode_enabled != previous_strict_mode_enabled:
+            save_strict_mode_history(
+                db,
+                enabled=next_strict_mode_enabled,
+                action="enabled" if next_strict_mode_enabled else "disabled",
+                details=f"strict_mode_enabled: {str(previous_strict_mode_enabled).lower()} -> {str(next_strict_mode_enabled).lower()}",
+                o_id=current_org_id,
+                changed_by=str(user.email) if user.email else None,
+            )
     if request_data.main_rule_execution_mode is not None:
         set_main_rule_execution_mode(db, request_data.main_rule_execution_mode, current_org_id)
     if request_data.neutral_outcome is not None:
@@ -262,6 +282,8 @@ def update_runtime_settings(
     return RuntimeSettingsResponse(
         auto_promote_active_rule_updates=get_auto_promote_active_rule_updates(db, current_org_id),
         default_auto_promote_active_rule_updates=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
+        strict_mode_enabled=get_strict_mode_enabled(db, current_org_id),
+        default_strict_mode_enabled=STRICT_MODE_ENABLED_DEFAULT,
         main_rule_execution_mode=get_main_rule_execution_mode(db, current_org_id),
         default_main_rule_execution_mode=MAIN_RULE_EXECUTION_MODE_DEFAULT,
         rule_quality_lookback_days=get_rule_quality_lookback_days(db, current_org_id),

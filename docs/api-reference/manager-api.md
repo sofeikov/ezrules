@@ -231,12 +231,14 @@ Outcome hierarchy notes:
 - `POST /api/v2/evaluate` uses this hierarchy to compute the single `resolved_outcome` stored for each event.
 
 Runtime settings notes:
-- `GET /api/v2/settings/runtime` returns both stored values and fallback defaults for `rule_quality_lookback_days`, `auto_promote_active_rule_updates`, `main_rule_execution_mode`, and `neutral_outcome`.
+- `GET /api/v2/settings/runtime` returns both stored values and fallback defaults for `rule_quality_lookback_days`, `auto_promote_active_rule_updates`, `strict_mode_enabled`, `main_rule_execution_mode`, and `neutral_outcome`.
 - `auto_promote_active_rule_updates` defaults to `false`.
+- `strict_mode_enabled` defaults to `false`, is org-scoped, and is guarded by `MANAGE_PERMISSIONS`.
 - `main_rule_execution_mode` defaults to `all_matches` and can be switched to `first_match` for the main rule lane only.
 - `neutral_outcome` defaults to `RELEASE` and must match an existing configured outcome; allowlist rules return it as `!RELEASE`.
 - Runtime settings responses also include `invalid_allowlist_rules`, a list of existing allowlist rules that no longer comply with the selected neutral outcome.
 - Neutral-outcome changes are recorded in outcome audit history with action `neutral_outcome_updated`.
+- Strict-mode changes are recorded in dedicated strict-mode audit history with actions `enabled` and `disabled`.
 - When `auto_promote_active_rule_updates=true`, saving edits to an active rule requires both `MODIFY_RULE` and `PROMOTE_RULES`.
 
 AI authoring settings notes:
@@ -308,6 +310,7 @@ Field type config note:
 | `GET` | `/api/v2/audit/field-types` | Bearer + permission | Field type config history (`limit`, `offset`, `field_name` filter) |
 | `GET` | `/api/v2/audit/api-keys` | Bearer + permission | API key create/revoke history for the caller's org (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/ai-rule-authoring` | Bearer + permission | AI rule draft generation/application history for the caller's org (`limit`, `offset`, filters) |
+| `GET` | `/api/v2/audit/strict-mode` | Bearer + permission | Strict mode enable/disable history for the caller's org (`limit`, `offset`, filters) |
 
 ### Backtesting
 

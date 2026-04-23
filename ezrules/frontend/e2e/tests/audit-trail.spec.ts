@@ -41,16 +41,19 @@ test.describe('Audit Trail Page', () => {
   });
 
   test.describe('Accordion Sections', () => {
-    test('should display all seven accordion sections', async () => {
+    test('should display all audit accordion sections including strict mode', async () => {
       await auditTrailPage.goto();
       await auditTrailPage.waitForPageToLoad();
       await expect(auditTrailPage.ruleHistoryHeading).toBeVisible();
       await expect(auditTrailPage.configHistoryHeading).toBeVisible();
+      await expect(auditTrailPage.strictModeHeading).toBeVisible();
       await expect(auditTrailPage.userListHistoryHeading).toBeVisible();
       await expect(auditTrailPage.outcomeHistoryHeading).toBeVisible();
       await expect(auditTrailPage.labelHistoryHeading).toBeVisible();
       await expect(auditTrailPage.userAccountHistoryHeading).toBeVisible();
       await expect(auditTrailPage.rolePermissionHistoryHeading).toBeVisible();
+      await expect(auditTrailPage.fieldTypeHistoryHeading).toBeVisible();
+      await expect(auditTrailPage.apiKeyHistoryHeading).toBeVisible();
     });
 
     test('should toggle Rule History section on click', async () => {
@@ -72,6 +75,21 @@ test.describe('Audit Trail Page', () => {
       await auditTrailPage.expandSection('config');
       const configContent = auditTrailPage.configHistoryAccordion.locator('..').locator('div').last();
       await expect(configContent).toBeVisible();
+    });
+
+    test('should render the strict mode section with either history rows or an empty state', async () => {
+      await auditTrailPage.goto();
+      await auditTrailPage.waitForPageToLoad();
+      await expect(auditTrailPage.strictModeTable).not.toBeVisible();
+      await auditTrailPage.expandSection('strictMode');
+      const rowCount = await auditTrailPage.getStrictModeHistoryRowCount();
+      if (rowCount === 0) {
+        await expect(auditTrailPage.strictModeEmptyState).toBeVisible();
+      } else {
+        await expect(auditTrailPage.strictModeTable).toBeVisible();
+        const headers = await auditTrailPage.getStrictModeColumnHeaders();
+        expect(headers).toEqual(['Action', 'Details', 'Changed By', 'Changed']);
+      }
     });
 
     test('should toggle User List History section on click', async () => {

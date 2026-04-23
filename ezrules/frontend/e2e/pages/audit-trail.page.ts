@@ -15,32 +15,39 @@ export class AuditTrailPage {
   // Accordion section buttons
   readonly ruleHistoryAccordion: Locator;
   readonly configHistoryAccordion: Locator;
+  readonly strictModeAccordion: Locator;
   readonly userListHistoryAccordion: Locator;
   readonly outcomeHistoryAccordion: Locator;
   readonly labelHistoryAccordion: Locator;
   readonly userAccountHistoryAccordion: Locator;
   readonly rolePermissionHistoryAccordion: Locator;
   readonly fieldTypeHistoryAccordion: Locator;
+  readonly apiKeyHistoryAccordion: Locator;
 
   // Section headings (inside accordion buttons)
   readonly ruleHistoryHeading: Locator;
   readonly configHistoryHeading: Locator;
+  readonly strictModeHeading: Locator;
   readonly userListHistoryHeading: Locator;
   readonly outcomeHistoryHeading: Locator;
   readonly labelHistoryHeading: Locator;
   readonly userAccountHistoryHeading: Locator;
   readonly rolePermissionHistoryHeading: Locator;
   readonly fieldTypeHistoryHeading: Locator;
+  readonly apiKeyHistoryHeading: Locator;
 
   // Tables (visible only when sections are expanded)
   readonly ruleHistoryTable: Locator;
   readonly configHistoryTable: Locator;
+  readonly strictModeTable: Locator;
+  readonly strictModeEmptyState: Locator;
   readonly userListHistoryTable: Locator;
   readonly outcomeHistoryTable: Locator;
   readonly labelHistoryTable: Locator;
   readonly userAccountHistoryTable: Locator;
   readonly rolePermissionHistoryTable: Locator;
   readonly fieldTypeHistoryTable: Locator;
+  readonly apiKeyHistoryTable: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -52,32 +59,39 @@ export class AuditTrailPage {
     // Accordion buttons
     this.ruleHistoryAccordion = page.locator('[data-testid="accordion-rules"]');
     this.configHistoryAccordion = page.locator('[data-testid="accordion-config"]');
+    this.strictModeAccordion = page.locator('[data-testid="accordion-strict-mode"]');
     this.userListHistoryAccordion = page.locator('[data-testid="accordion-user-lists"]');
     this.outcomeHistoryAccordion = page.locator('[data-testid="accordion-outcomes"]');
     this.labelHistoryAccordion = page.locator('[data-testid="accordion-labels"]');
     this.userAccountHistoryAccordion = page.locator('[data-testid="accordion-user-accounts"]');
     this.rolePermissionHistoryAccordion = page.locator('[data-testid="accordion-role-permissions"]');
     this.fieldTypeHistoryAccordion = page.locator('[data-testid="accordion-field-types"]');
+    this.apiKeyHistoryAccordion = page.locator('[data-testid="accordion-api-keys"]');
 
     // Section headings
     this.ruleHistoryHeading = page.locator('h2:has-text("Rule History")');
     this.configHistoryHeading = page.locator('h2:has-text("Configuration History")');
+    this.strictModeHeading = page.locator('h2:has-text("Strict Mode")');
     this.userListHistoryHeading = page.locator('h2:has-text("User List History")');
     this.outcomeHistoryHeading = page.locator('h2:has-text("Outcome History")');
     this.labelHistoryHeading = page.locator('h2:has-text("Label History")');
     this.userAccountHistoryHeading = page.locator('h2:has-text("User Account History")');
     this.rolePermissionHistoryHeading = page.locator('h2:has-text("Role & Permission History")');
     this.fieldTypeHistoryHeading = page.locator('h2:has-text("Field Type History")');
+    this.apiKeyHistoryHeading = page.locator('h2:has-text("API Key History")');
 
     // Tables - scoped to parent sections via data-testid
     this.ruleHistoryTable = this.ruleHistoryAccordion.locator('..').locator('table');
     this.configHistoryTable = this.configHistoryAccordion.locator('..').locator('table');
+    this.strictModeTable = this.strictModeAccordion.locator('..').locator('#audit-strictModeTable');
+    this.strictModeEmptyState = this.strictModeAccordion.locator('..').locator('#audit-strictModeEmptyState');
     this.userListHistoryTable = this.userListHistoryAccordion.locator('..').locator('table');
     this.outcomeHistoryTable = this.outcomeHistoryAccordion.locator('..').locator('table');
     this.labelHistoryTable = this.labelHistoryAccordion.locator('..').locator('table');
     this.userAccountHistoryTable = this.userAccountHistoryAccordion.locator('..').locator('table');
     this.rolePermissionHistoryTable = this.rolePermissionHistoryAccordion.locator('..').locator('table');
     this.fieldTypeHistoryTable = this.fieldTypeHistoryAccordion.locator('..').locator('table');
+    this.apiKeyHistoryTable = this.apiKeyHistoryAccordion.locator('..').locator('table');
   }
 
   async goto() {
@@ -87,19 +101,23 @@ export class AuditTrailPage {
   async waitForPageToLoad() {
     await this.heading.waitFor({ state: 'visible' });
     await this.ruleHistoryAccordion.waitFor({ state: 'visible', timeout: 10000 });
-    await this.fieldTypeHistoryAccordion.waitFor({ state: 'visible', timeout: 10000 });
+    await this.apiKeyHistoryAccordion.waitFor({ state: 'visible', timeout: 10000 });
   }
 
-  async expandSection(section: 'rules' | 'config' | 'userLists' | 'outcomes' | 'labels' | 'userAccounts' | 'rolePermissions' | 'fieldTypes') {
+  async expandSection(
+    section: 'rules' | 'config' | 'strictMode' | 'userLists' | 'outcomes' | 'labels' | 'userAccounts' | 'rolePermissions' | 'fieldTypes' | 'apiKeys'
+  ) {
     const accordionMap = {
       rules: this.ruleHistoryAccordion,
       config: this.configHistoryAccordion,
+      strictMode: this.strictModeAccordion,
       userLists: this.userListHistoryAccordion,
       outcomes: this.outcomeHistoryAccordion,
       labels: this.labelHistoryAccordion,
       userAccounts: this.userAccountHistoryAccordion,
       rolePermissions: this.rolePermissionHistoryAccordion,
       fieldTypes: this.fieldTypeHistoryAccordion,
+      apiKeys: this.apiKeyHistoryAccordion,
     };
     await accordionMap[section].click();
   }
@@ -110,6 +128,20 @@ export class AuditTrailPage {
 
   async getConfigHistoryRowCount(): Promise<number> {
     return await this.configHistoryTable.locator('tbody tr').count();
+  }
+
+  async getStrictModeHistoryRowCount(): Promise<number> {
+    const section = this.strictModeAccordion.locator('..');
+    await Promise.race([
+      this.strictModeEmptyState.waitFor({ state: 'visible', timeout: 10000 }),
+      this.strictModeTable.waitFor({ state: 'visible', timeout: 10000 }),
+    ]).catch(() => {});
+
+    if (await this.strictModeTable.count() === 0 || !(await this.strictModeTable.isVisible().catch(() => false))) {
+      return 0;
+    }
+
+    return await section.locator('#audit-strictModeTable tbody tr').count();
   }
 
   async getUserListHistoryRowCount(): Promise<number> {
@@ -137,6 +169,17 @@ export class AuditTrailPage {
 
   async getConfigHistoryColumnHeaders(): Promise<string[]> {
     const headers = this.configHistoryTable.locator('thead th');
+    const count = await headers.count();
+    const result: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const text = await headers.nth(i).textContent();
+      if (text) result.push(text.trim());
+    }
+    return result;
+  }
+
+  async getStrictModeColumnHeaders(): Promise<string[]> {
+    const headers = this.strictModeTable.locator('thead th');
     const count = await headers.count();
     const result: string[] = [];
     for (let i = 0; i < count; i++) {

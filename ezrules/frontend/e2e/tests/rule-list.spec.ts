@@ -153,6 +153,8 @@ test.describe('Rule List Page', () => {
           body: JSON.stringify({
             auto_promote_active_rule_updates: false,
             default_auto_promote_active_rule_updates: false,
+            strict_mode_enabled: false,
+            default_strict_mode_enabled: false,
             main_rule_execution_mode: 'all_matches',
             default_main_rule_execution_mode: 'all_matches',
             rule_quality_lookback_days: 30,

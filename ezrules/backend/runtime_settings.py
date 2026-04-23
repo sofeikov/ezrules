@@ -11,6 +11,8 @@ from ezrules.settings import app_settings
 
 AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY = "auto_promote_active_rule_updates"
 AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT = False
+STRICT_MODE_ENABLED_KEY = "strict_mode_enabled"
+STRICT_MODE_ENABLED_DEFAULT = False
 MAIN_RULE_EXECUTION_MODE_KEY = "main_rule_execution_mode"
 MAIN_RULE_EXECUTION_MODE_ALL_MATCHES = "all_matches"
 MAIN_RULE_EXECUTION_MODE_FIRST_MATCH = "first_match"
@@ -53,6 +55,11 @@ _RUNTIME_SETTING_SPECS: dict[str, RuntimeSettingSpec] = {
         key=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY,
         value_type=_RUNTIME_VALUE_TYPE_BOOL,
         default=AUTO_PROMOTE_ACTIVE_RULE_UPDATES_DEFAULT,
+    ),
+    STRICT_MODE_ENABLED_KEY: RuntimeSettingSpec(
+        key=STRICT_MODE_ENABLED_KEY,
+        value_type=_RUNTIME_VALUE_TYPE_BOOL,
+        default=STRICT_MODE_ENABLED_DEFAULT,
     ),
     MAIN_RULE_EXECUTION_MODE_KEY: RuntimeSettingSpec(
         key=MAIN_RULE_EXECUTION_MODE_KEY,
@@ -223,6 +230,10 @@ def get_auto_promote_active_rule_updates(db: Any, org_id: int) -> bool:
     return bool(get_runtime_setting(db, AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY, org_id))
 
 
+def get_strict_mode_enabled(db: Any, org_id: int) -> bool:
+    return bool(get_runtime_setting(db, STRICT_MODE_ENABLED_KEY, org_id))
+
+
 def get_main_rule_execution_mode(db: Any, org_id: int) -> str:
     return str(get_runtime_setting(db, MAIN_RULE_EXECUTION_MODE_KEY, org_id)).strip()
 
@@ -237,6 +248,10 @@ def set_rule_quality_lookback_days(db: Any, value: int, org_id: int) -> None:
 
 def set_auto_promote_active_rule_updates(db: Any, value: bool, org_id: int) -> None:
     set_runtime_setting(db, AUTO_PROMOTE_ACTIVE_RULE_UPDATES_KEY, value, org_id)
+
+
+def set_strict_mode_enabled(db: Any, value: bool, org_id: int) -> None:
+    set_runtime_setting(db, STRICT_MODE_ENABLED_KEY, value, org_id)
 
 
 def set_main_rule_execution_mode(db: Any, value: str, org_id: int) -> None:

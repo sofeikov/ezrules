@@ -279,11 +279,33 @@ class AIRuleAuthoringHistoryEntry(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class StrictModeHistoryEntry(BaseModel):
+    """A single entry in strict mode history."""
+
+    id: int = Field(..., description="History entry ID")
+    enabled: bool = Field(..., description="Whether strict mode was enabled after this action")
+    action: str = Field(..., description="Action type (enabled, disabled)")
+    details: str | None = Field(default=None, description="Additional details about the action")
+    changed: datetime | None = Field(default=None, description="When this action occurred")
+    changed_by: str | None = Field(default=None, description="Who performed this action")
+
+    model_config = {"from_attributes": True}
+
+
 class AIRuleAuthoringAuditListResponse(BaseModel):
     """Paginated list of AI-assisted rule authoring history entries."""
 
     total: int = Field(..., description="Total number of history entries")
     items: list[AIRuleAuthoringHistoryEntry] = Field(default_factory=list)
+    limit: int = Field(..., description="Page size")
+    offset: int = Field(..., description="Current offset")
+
+
+class StrictModeAuditListResponse(BaseModel):
+    """Paginated list of strict mode audit entries."""
+
+    total: int = Field(..., description="Total number of history entries")
+    items: list[StrictModeHistoryEntry] = Field(default_factory=list)
     limit: int = Field(..., description="Page size")
     offset: int = Field(..., description="Current offset")
 
@@ -303,3 +325,4 @@ class AuditSummaryResponse(BaseModel):
     total_field_type_actions: int = Field(default=0, description="Total field type config history entries")
     total_api_key_actions: int = Field(default=0, description="Total API key history entries")
     total_ai_rule_authoring_actions: int = Field(default=0, description="Total AI rule authoring history entries")
+    total_strict_mode_actions: int = Field(default=0, description="Total strict mode history entries")
