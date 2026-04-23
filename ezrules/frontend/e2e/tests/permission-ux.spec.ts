@@ -1,5 +1,6 @@
 import { expect, Page, test } from '@playwright/test';
 import { AccessDeniedPage } from '../pages/access-denied.page';
+import { SettingsPage } from '../pages/settings.page';
 import { UserManagementPage } from '../pages/user-management.page';
 
 function mockAuthMe(page: Page, permissions: string[]) {
@@ -84,5 +85,70 @@ test.describe('Permission-Aware UX', () => {
     await expect(page.locator('button:has-text("Reset Password")')).toHaveCount(0);
     await expect(page.locator('button:has-text("Delete")')).toHaveCount(0);
     await expect(page.locator('text=+ Add role')).toHaveCount(0);
+  });
+
+  test('renders the strict mode settings card without an active mutation path for a read-only settings viewer', async ({ page }) => {
+    const settingsPage = new SettingsPage(page);
+
+    await mockAuthMe(page, ['view_roles']);
+    await page.route('**/api/v2/settings/runtime', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          auto_promote_active_rule_updates: false,
+          default_auto_promote_active_rule_updates: false,
+          strict_mode_enabled: false,
+          default_strict_mode_enabled: false,
+          main_rule_execution_mode: 'all_matches',
+          default_main_rule_execution_mode: 'all_matches',
+          rule_quality_lookback_days: 30,
+          default_rule_quality_lookback_days: 30,
+          neutral_outcome: 'RELEASE',
+          default_neutral_outcome: 'RELEASE',
+          invalid_allowlist_rules: [],
+        }),
+      });
+    });
+    await page.route('**/api/v2/settings/outcome-hierarchy', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          outcomes: [
+            { ao_id: 1, outcome_name: 'HOLD', severity_rank: 1 },
+            { ao_id: 2, outcome_name: 'RELEASE', severity_rank: 2 },
+          ],
+        }),
+      });
+    });
+    await page.route('**/api/v2/settings/rule-quality-pairs/options', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          outcomes: ['HOLD', 'RELEASE'],
+          labels: ['fraud'],
+        }),
+      });
+    });
+    await page.route('**/api/v2/settings/rule-quality-pairs', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          pairs: [],
+        }),
+      });
+    });
+
+    await settingsPage.goto();
+    await settingsPage.waitForPageToLoad();
+
+    await expect(settingsPage.strictModeCard).toBeVisible();
+    await expect(settingsPage.strictModeCheckbox).toBeDisabled();
+    await expect(settingsPage.strictModeSaveButton).toHaveCount(0);
+    await expect(settingsPage.strictModeAuditLink).toHaveCount(0);
+    await expect(settingsPage.strictModeCard).toContainText('are recorded in the dedicated audit trail');
   });
 });

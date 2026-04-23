@@ -1,6 +1,11 @@
 # What's New
 
-## v1.14.0
+## v1.15.1
+
+* **Strict mode UI de-emphasis**: The Strict Mode card now sits at the bottom of Settings instead of leading the page.
+* **Strict mode audit ordering**: The dedicated Strict Mode audit accordion now appears at the bottom of the Audit Trail page instead of near the top.
+
+## v1.15.0
 
 * **AI-assisted rule authoring in the editor**: The rule create flow and rule detail edit mode now include an inline AI assistant that turns natural-language requests into ezrules draft logic without auto-saving or auto-activating anything.
 * **Safer AI review workflow**: Generated drafts are validated and auto-repaired before review, can be compared against the current rule with a char-level diff, include a line-by-line explainer, surface clearer generation status, and require an explicit copy step into the main editor before normal save/create actions can use them.
@@ -8,6 +13,9 @@
 * **Less defensive AI-generated rule logic**: The AI prompt now assumes referenced fields are normally present unless the analyst explicitly asks for null/missing-field handling, so tightening an existing rule is more likely to update the business condition directly instead of wrapping it in defensive guards.
 * **AI authoring audit and API support**: Added backend draft-generation and draft-apply endpoints, org-scoped AI settings endpoints, and AI authoring audit history for `draft_generated` and `draft_applied`, including provider/model metadata and prompt hashes without storing full prompts or raw completions.
 * **Frontend CI startup alignment**: Increased the Angular production bundle budget slightly so the current frontend bundle clears the GitHub Actions Playwright frontend-start step again.
+* **Persisted strict mode runtime setting**: Settings now exposes a real org-level `strict_mode_enabled` toggle backed by the shared runtime settings storage, so the UI reflects persisted state instead of a placeholder badge.
+* **Typed-confirm disable flow**: Turning strict mode off now requires typed confirmation in the Settings UI rather than a casual unchecked save.
+* **Dedicated strict-mode audit history**: Audit Trail now reads real `enabled` / `disabled` entries from a dedicated Strict Mode history endpoint instead of showing a static placeholder section.
 
 ## v1.13.0
 

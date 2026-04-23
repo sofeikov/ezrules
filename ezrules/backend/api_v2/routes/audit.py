@@ -35,6 +35,8 @@ from ezrules.backend.api_v2.schemas.audit import (
     RuleEngineConfigHistoryEntry,
     RuleHistoryEntry,
     RulesAuditListResponse,
+    StrictModeAuditListResponse,
+    StrictModeHistoryEntry,
     UserAccountAuditListResponse,
     UserAccountHistoryEntry,
     UserListAuditListResponse,
@@ -51,6 +53,7 @@ from ezrules.models.backend_core import (
     Rule,
     RuleEngineConfigHistory,
     RuleHistory,
+    StrictModeHistory,
     User,
     UserAccountHistory,
     UserListHistory,
@@ -212,6 +215,18 @@ def role_permission_history_to_response(history: RolePermissionHistory) -> RoleP
     )
 
 
+def strict_mode_history_to_response(history: StrictModeHistory) -> StrictModeHistoryEntry:
+    """Convert a strict mode history record to API response."""
+    return StrictModeHistoryEntry(
+        id=int(history.id),
+        enabled=bool(history.enabled),
+        action=str(history.action),
+        details=str(history.details) if history.details else None,
+        changed=history.changed if history.changed is not None else None,  # type: ignore[arg-type]
+        changed_by=str(history.changed_by) if history.changed_by else None,
+    )
+
+
 # =============================================================================
 # AUDIT SUMMARY
 # =============================================================================
@@ -256,6 +271,7 @@ def get_audit_summary(
     total_ai_rule_authoring_actions = (
         db.query(AIRuleAuthoringHistory).filter(AIRuleAuthoringHistory.o_id == current_org_id).count()
     )
+    total_strict_mode_actions = db.query(StrictModeHistory).filter(StrictModeHistory.o_id == current_org_id).count()
 
     return AuditSummaryResponse(
         total_rule_versions=total_rule_versions,
@@ -270,6 +286,7 @@ def get_audit_summary(
         total_field_type_actions=total_field_type_actions,
         total_api_key_actions=total_api_key_actions,
         total_ai_rule_authoring_actions=total_ai_rule_authoring_actions,
+        total_strict_mode_actions=total_strict_mode_actions,
     )
 
 
@@ -401,6 +418,43 @@ def list_config_history(
     return ConfigAuditListResponse(
         total=total,
         items=[config_history_to_response(h) for h in items],
+        limit=limit,
+        offset=offset,
+    )
+
+
+# =============================================================================
+# STRICT MODE HISTORY
+# =============================================================================
+
+
+@router.get("/strict-mode", response_model=StrictModeAuditListResponse)
+def list_strict_mode_history(
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+    start_date: datetime | None = Query(default=None, description="Filter by start date"),
+    end_date: datetime | None = Query(default=None, description="Filter by end date"),
+    limit: int = Query(default=50, ge=1, le=100, description="Page size"),
+    offset: int = Query(default=0, ge=0, description="Offset"),
+) -> StrictModeAuditListResponse:
+    """Get paginated strict mode action history for the caller's organization."""
+    query = db.query(StrictModeHistory).filter(StrictModeHistory.o_id == current_org_id)
+
+    if start_date:
+        query = query.filter(StrictModeHistory.changed >= start_date)
+    if end_date:
+        query = query.filter(StrictModeHistory.changed <= end_date)
+
+    total = query.count()
+    items = (
+        query.order_by(StrictModeHistory.changed.desc(), StrictModeHistory.id.desc()).offset(offset).limit(limit).all()
+    )
+
+    return StrictModeAuditListResponse(
+        total=total,
+        items=[strict_mode_history_to_response(h) for h in items],
         limit=limit,
         offset=offset,
     )

@@ -1,22 +1,24 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { AuthService } from '../services/auth.service';
-import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
+import { ACTION_PERMISSION_REQUIREMENTS, ROUTE_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { SidebarComponent } from '../components/sidebar.component';
 import {
   AIAuthoringSettings,
   InvalidAllowlistRule,
   OutcomeHierarchyItem,
   RuleQualityPair,
+  RuntimeSettings,
   RuntimeSettingsService,
 } from '../services/runtime-settings.service';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent],
   templateUrl: './settings.component.html'
 })
 export class SettingsComponent implements OnInit {
@@ -31,10 +33,14 @@ export class SettingsComponent implements OnInit {
   ] as const;
   autoPromoteActiveRuleUpdates: boolean = false;
   defaultAutoPromoteActiveRuleUpdates: boolean = false;
+  strictModeEnabled: boolean = false;
+  persistedStrictModeEnabled: boolean = false;
+  defaultStrictModeEnabled: boolean = false;
   mainRuleExecutionMode: string = 'all_matches';
   defaultMainRuleExecutionMode: string = 'all_matches';
   loading: boolean = true;
   saving: boolean = false;
+  strictModeSaving: boolean = false;
   hierarchySaving: boolean = false;
   pairSaving: boolean = false;
   pairBusyIds: Set<number> = new Set<number>();
@@ -61,6 +67,10 @@ export class SettingsComponent implements OnInit {
   hierarchyDirty: boolean = false;
   canManagePermissions: boolean = false;
   canManageNeutralOutcome: boolean = false;
+  canAccessAuditTrail: boolean = false;
+  showStrictModeDisableDialog: boolean = false;
+  strictModeDisableConfirmationText: string = '';
+  readonly strictModeDisablePhrase: string = 'DISABLE STRICT MODE';
 
   constructor(
     private runtimeSettingsService: RuntimeSettingsService,
@@ -80,10 +90,12 @@ export class SettingsComponent implements OnInit {
           user.permissions,
           ACTION_PERMISSION_REQUIREMENTS.manageNeutralOutcome,
         );
+        this.canAccessAuditTrail = hasPermissionRequirement(user.permissions, ROUTE_PERMISSION_REQUIREMENTS.audit);
       },
       error: () => {
         this.canManagePermissions = false;
         this.canManageNeutralOutcome = false;
+        this.canAccessAuditTrail = false;
       }
     });
   }
@@ -101,15 +113,7 @@ export class SettingsComponent implements OnInit {
       pairs: this.runtimeSettingsService.getRuleQualityPairs(),
     }).subscribe({
       next: ({ settings, aiAuthoring, hierarchy, options, pairs }) => {
-        this.autoPromoteActiveRuleUpdates = settings.autoPromoteActiveRuleUpdates;
-        this.defaultAutoPromoteActiveRuleUpdates = settings.defaultAutoPromoteActiveRuleUpdates;
-        this.mainRuleExecutionMode = settings.mainRuleExecutionMode;
-        this.defaultMainRuleExecutionMode = settings.defaultMainRuleExecutionMode;
-        this.ruleQualityLookbackDays = settings.ruleQualityLookbackDays;
-        this.defaultRuleQualityLookbackDays = settings.defaultRuleQualityLookbackDays;
-        this.neutralOutcome = settings.neutralOutcome;
-        this.defaultNeutralOutcome = settings.defaultNeutralOutcome;
-        this.invalidAllowlistRules = settings.invalidAllowlistRules;
+        this.applySettings(settings);
         this.aiAuthoringSettings = aiAuthoring;
         this.aiAuthoringProvider = aiAuthoring.provider;
         this.aiAuthoringEnabled = aiAuthoring.enabled;
@@ -254,17 +258,14 @@ export class SettingsComponent implements OnInit {
       ruleQualityLookbackDays: this.canManagePermissions ? Math.floor(this.ruleQualityLookbackDays) : undefined,
       neutralOutcome: this.canManageNeutralOutcome ? this.neutralOutcome : undefined,
     };
+    const pendingStrictModeEnabled = this.strictModeEnabled;
+    const strictModeWasDirty = this.strictModeDirty();
     this.runtimeSettingsService.updateRuntimeSettings(updateRequest).subscribe({
       next: (settings) => {
-        this.autoPromoteActiveRuleUpdates = settings.autoPromoteActiveRuleUpdates;
-        this.defaultAutoPromoteActiveRuleUpdates = settings.defaultAutoPromoteActiveRuleUpdates;
-        this.mainRuleExecutionMode = settings.mainRuleExecutionMode;
-        this.defaultMainRuleExecutionMode = settings.defaultMainRuleExecutionMode;
-        this.ruleQualityLookbackDays = settings.ruleQualityLookbackDays;
-        this.defaultRuleQualityLookbackDays = settings.defaultRuleQualityLookbackDays;
-        this.neutralOutcome = settings.neutralOutcome;
-        this.defaultNeutralOutcome = settings.defaultNeutralOutcome;
-        this.invalidAllowlistRules = settings.invalidAllowlistRules;
+        this.applySettings(settings);
+        if (strictModeWasDirty) {
+          this.strictModeEnabled = pendingStrictModeEnabled;
+        }
         this.success = 'Settings saved successfully.';
         this.saving = false;
       },
@@ -413,5 +414,86 @@ export class SettingsComponent implements OnInit {
 
   canSaveNeutralOutcome(): boolean {
     return this.canManageNeutralOutcome;
+  }
+
+  strictModePermissionLabel(): string {
+    return 'Manage permissions';
+  }
+
+  applySettings(settings: RuntimeSettings): void {
+    this.autoPromoteActiveRuleUpdates = settings.autoPromoteActiveRuleUpdates;
+    this.defaultAutoPromoteActiveRuleUpdates = settings.defaultAutoPromoteActiveRuleUpdates;
+    this.strictModeEnabled = settings.strictModeEnabled;
+    this.persistedStrictModeEnabled = settings.strictModeEnabled;
+    this.defaultStrictModeEnabled = settings.defaultStrictModeEnabled;
+    this.mainRuleExecutionMode = settings.mainRuleExecutionMode;
+    this.defaultMainRuleExecutionMode = settings.defaultMainRuleExecutionMode;
+    this.ruleQualityLookbackDays = settings.ruleQualityLookbackDays;
+    this.defaultRuleQualityLookbackDays = settings.defaultRuleQualityLookbackDays;
+    this.neutralOutcome = settings.neutralOutcome;
+    this.defaultNeutralOutcome = settings.defaultNeutralOutcome;
+    this.invalidAllowlistRules = settings.invalidAllowlistRules;
+  }
+
+  strictModeDirty(): boolean {
+    return this.strictModeEnabled !== this.persistedStrictModeEnabled;
+  }
+
+  strictModeStatusLabel(): string {
+    if (this.strictModeDirty()) {
+      return this.strictModeEnabled ? 'Enable Pending' : 'Disable Pending';
+    }
+    return this.strictModeEnabled ? 'Enabled' : 'Not Enabled';
+  }
+
+  saveStrictMode(): void {
+    if (!this.canManagePermissions || this.strictModeSaving || !this.strictModeDirty()) {
+      return;
+    }
+
+    this.error = null;
+    this.success = null;
+
+    if (this.persistedStrictModeEnabled && !this.strictModeEnabled) {
+      this.showStrictModeDisableDialog = true;
+      return;
+    }
+
+    this.persistStrictMode();
+  }
+
+  closeStrictModeDisableDialog(): void {
+    this.showStrictModeDisableDialog = false;
+    this.strictModeDisableConfirmationText = '';
+  }
+
+  confirmDisableStrictMode(): void {
+    if (this.strictModeDisableConfirmationText.trim() !== this.strictModeDisablePhrase) {
+      return;
+    }
+
+    this.showStrictModeDisableDialog = false;
+    this.persistStrictMode();
+  }
+
+  strictModeDisablePhraseMatches(): boolean {
+    return this.strictModeDisableConfirmationText.trim() === this.strictModeDisablePhrase;
+  }
+
+  private persistStrictMode(): void {
+    this.strictModeSaving = true;
+    this.runtimeSettingsService.updateRuntimeSettings({ strictModeEnabled: this.strictModeEnabled }).subscribe({
+      next: (settings) => {
+        const strictModeEnabled = settings.strictModeEnabled;
+        this.applySettings(settings);
+        this.success = strictModeEnabled ? 'Strict mode enabled successfully.' : 'Strict mode disabled successfully.';
+        this.strictModeSaving = false;
+        this.strictModeDisableConfirmationText = '';
+      },
+      error: (err) => {
+        this.error = err?.error?.detail || 'Failed to update strict mode.';
+        this.strictModeSaving = false;
+      }
+    });
   }
 }

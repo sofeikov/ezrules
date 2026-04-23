@@ -15,6 +15,7 @@ from ezrules.models.backend_core import (
     LabelHistory,
     OutcomeHistory,
     RolePermissionHistory,
+    StrictModeHistory,
     UserAccountHistory,
     UserListHistory,
 )
@@ -203,6 +204,26 @@ def save_role_history(
     history = RolePermissionHistory(
         role_id=role_id,
         role_name=role_name,
+        action=action,
+        details=details,
+        o_id=o_id,
+        changed=datetime.datetime.now(datetime.UTC),
+        changed_by=changed_by,
+    )
+    db.add(history)
+
+
+def save_strict_mode_history(
+    db,
+    enabled: bool,
+    action: str,
+    o_id: int,
+    changed_by: str | None = None,
+    details: str | None = None,
+) -> None:
+    """Record an audit entry for a strict mode state change."""
+    history = StrictModeHistory(
+        enabled=enabled,
         action=action,
         details=details,
         o_id=o_id,

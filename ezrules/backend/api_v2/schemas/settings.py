@@ -14,6 +14,8 @@ class RuntimeSettingsResponse(BaseModel):
     default_auto_promote_active_rule_updates: bool = Field(
         ..., description="Fallback default for active-rule auto-promotion"
     )
+    strict_mode_enabled: bool = Field(..., description="Whether strict mode is enabled for this organization")
+    default_strict_mode_enabled: bool = Field(..., description="Fallback default for strict mode")
     main_rule_execution_mode: str = Field(..., description="How main rules are evaluated: all matches or first match")
     default_main_rule_execution_mode: str = Field(..., description="Fallback execution mode for main rules")
     rule_quality_lookback_days: int = Field(..., ge=1, description="Default lookback (days) for rule-quality analytics")
@@ -32,6 +34,7 @@ class RuntimeSettingsUpdateRequest(BaseModel):
     """Request payload for runtime settings updates."""
 
     auto_promote_active_rule_updates: bool | None = Field(default=None)
+    strict_mode_enabled: bool | None = Field(default=None)
     main_rule_execution_mode: str | None = Field(default=None, min_length=1, max_length=64)
     rule_quality_lookback_days: int | None = Field(default=None, ge=1, le=3650)
     neutral_outcome: str | None = Field(default=None, min_length=1, max_length=255)

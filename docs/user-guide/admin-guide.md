@@ -122,6 +122,7 @@ Use audit endpoints during incident review or compliance checks:
 - `GET /api/v2/audit/roles`
 - `GET /api/v2/audit/field-types`
 - `GET /api/v2/audit/api-keys`
+- `GET /api/v2/audit/strict-mode`
 
 Operational tips:
 

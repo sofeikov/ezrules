@@ -6,6 +6,14 @@ export class SettingsPage {
   readonly heading: Locator;
   readonly lookbackDaysInput: Locator;
   readonly neutralOutcomeSelect: Locator;
+  readonly strictModeCard: Locator;
+  readonly strictModeStatus: Locator;
+  readonly strictModeCheckbox: Locator;
+  readonly strictModeSaveButton: Locator;
+  readonly strictModeAuditLink: Locator;
+  readonly strictModeDisableDialog: Locator;
+  readonly strictModeDisableConfirmationInput: Locator;
+  readonly strictModeDisableConfirmButton: Locator;
   readonly saveButton: Locator;
   readonly outcomeHierarchySaveButton: Locator;
   readonly successMessage: Locator;
@@ -26,6 +34,14 @@ export class SettingsPage {
     this.autoPromoteActiveRuleUpdatesCheckbox = page.locator('#settings-autoPromoteActiveRuleUpdates');
     this.lookbackDaysInput = page.locator('#settings-ruleQualityLookbackDays');
     this.neutralOutcomeSelect = page.locator('#settings-neutralOutcome');
+    this.strictModeCard = page.locator('#settings-strictModeCard');
+    this.strictModeStatus = page.locator('#settings-strictModeStatus');
+    this.strictModeCheckbox = page.locator('#settings-strictModeEnabled');
+    this.strictModeSaveButton = page.locator('#settings-saveStrictMode');
+    this.strictModeAuditLink = page.locator('#settings-strictModeAuditLink');
+    this.strictModeDisableDialog = page.locator('[data-testid="strict-mode-disable-dialog"]');
+    this.strictModeDisableConfirmationInput = page.locator('#settings-strictModeDisableConfirmation');
+    this.strictModeDisableConfirmButton = page.locator('#settings-confirmDisableStrictMode');
     this.saveButton = page.locator('#settings-saveRuntimeSettings');
     this.outcomeHierarchySaveButton = page.locator('#settings-saveOutcomeHierarchy');
     this.successMessage = page.locator('text=Settings saved successfully.');
@@ -47,10 +63,11 @@ export class SettingsPage {
 
   async waitForPageToLoad() {
     await this.heading.waitFor({ state: 'visible' });
+    await this.strictModeCard.waitFor({ state: 'visible' });
     await this.autoPromoteActiveRuleUpdatesCheckbox.waitFor({ state: 'visible' });
     await this.lookbackDaysInput.waitFor({ state: 'visible' });
     await this.neutralOutcomeSelect.waitFor({ state: 'visible' });
-    await this.outcomeHierarchySaveButton.waitFor({ state: 'visible' });
+    await this.page.locator('[id^="settings-outcome-row-"]').first().waitFor({ state: 'visible' });
     await this.pairsTable.waitFor({ state: 'visible' });
     await this.aiProviderSelect.waitFor({ state: 'visible' });
   }
@@ -116,6 +133,21 @@ export class SettingsPage {
 
   async saveAiSettings() {
     await this.saveAiSettingsButton.click();
+  }
+
+  async isStrictModeEnabled(): Promise<boolean> {
+    return this.strictModeCheckbox.isChecked();
+  }
+
+  async setStrictModeEnabled(value: boolean) {
+    const currentValue = await this.strictModeCheckbox.isChecked();
+    if (currentValue !== value) {
+      await this.strictModeCheckbox.click();
+    }
+  }
+
+  async saveStrictMode() {
+    await this.strictModeSaveButton.click();
   }
 
   async addPair(outcome: string, label: string) {
