@@ -25,109 +25,6 @@
           Settings are in read-only mode. Changing the neutral outcome requires neutral-outcome access, and other settings changes require permission-management access.
         </div>
 
-        <div
-          id="settings-strictModeCard"
-          data-testid="settings-strict-mode-card"
-          class="bg-white rounded-lg shadow border border-amber-300 overflow-hidden"
-        >
-          <div class="p-6 border-b border-amber-200 bg-amber-50">
-            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div class="flex flex-wrap items-center gap-3">
-                  <h2 class="text-lg font-semibold text-gray-900">Strict Mode</h2>
-                  <span
-                    id="settings-strictModeStatus"
-                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide"
-                    [ngClass]="{
-                      'bg-emerald-100 text-emerald-900': strictModeEnabled && !strictModeDirty(),
-                      'bg-amber-100 text-amber-900': !strictModeEnabled && !strictModeDirty(),
-                      'bg-blue-100 text-blue-900': strictModeDirty()
-                    }"
-                  >
-                    {{ strictModeStatusLabel() }}
-                  </span>
-                </div>
-                <p class="text-sm text-gray-600 mt-2">
-                  Strict mode is an org-level persistence setting. When enabled, served evaluation traffic is treated as the stronger canonical source of truth for downstream analysis, replay, and inspection workflows.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div class="p-6 space-y-4">
-            <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <label for="settings-strictModeEnabled" class="flex items-start gap-3">
-                  <input
-                    id="settings-strictModeEnabled"
-                    data-testid="settings-strict-mode-checkbox"
-                    type="checkbox"
-                    class="mt-1 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                    [(ngModel)]="strictModeEnabled"
-                    [disabled]="!canManagePermissions || strictModeSaving"
-                  />
-                  <div>
-                    <p class="text-sm font-medium text-gray-900">Enable strict mode for this organization</p>
-                    <p class="text-sm text-gray-600 mt-2">
-                      This value is persisted in org-scoped runtime settings and applied independently of any individual operator session.
-                    </p>
-                  </div>
-                </label>
-              </div>
-
-              <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <p class="text-sm font-medium text-gray-900">Change controls</p>
-                <p class="text-sm text-gray-600 mt-2">
-                  Future enable and disable actions will be reserved for operators with
-                  <span class="font-medium text-gray-900">{{ strictModePermissionLabel() }}</span>
-                  access.
-                </p>
-              </div>
-            </div>
-
-            <div class="rounded-lg border border-red-200 bg-red-50 p-4">
-              <p class="text-sm font-medium text-red-900">Disable flow will be intentionally high-friction.</p>
-              <p class="text-sm text-red-800 mt-2">
-                Disabling strict mode requires typed confirmation rather than a casual toggle, and the action is reflected in the dedicated strict-mode audit log.
-              </p>
-            </div>
-
-            <p class="text-xs text-gray-500">
-              Default fallback: {{ defaultStrictModeEnabled ? 'Enabled' : 'Disabled' }}.
-            </p>
-
-            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div class="flex flex-col gap-2">
-                <p *ngIf="!canManagePermissions" class="text-sm text-gray-500">
-                  You can view the current strict mode state, but only operators with {{ strictModePermissionLabel() }} access can change it.
-                </p>
-                <a
-                  *ngIf="canAccessAuditTrail"
-                  id="settings-strictModeAuditLink"
-                  [routerLink]="['/audit']"
-                  fragment="strict-mode"
-                  class="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                >
-                  View Strict Mode audit section
-                </a>
-                <p *ngIf="!canAccessAuditTrail" class="text-sm text-gray-500">
-                  Strict mode changes are recorded in the dedicated audit trail.
-                </p>
-              </div>
-              <button
-                *ngIf="canManagePermissions"
-                id="settings-saveStrictMode"
-                type="button"
-                class="inline-flex items-center justify-center rounded-md bg-amber-600 px-4 py-2 font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
-                [disabled]="strictModeSaving || !strictModeDirty()"
-                (click)="saveStrictMode()"
-              >
-                {{ strictModeSaving ? 'Saving...' : 'Save Strict Mode' }}
-              </button>
-            </div>
-          </div>
-        </div>
-
         <div class="bg-white rounded-lg shadow border border-gray-200">
           <div class="p-6 border-b border-gray-200">
             <h2 class="text-lg font-semibold text-gray-900">Outcome Resolution</h2>
@@ -572,6 +469,109 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+
+        <div
+          id="settings-strictModeCard"
+          data-testid="settings-strict-mode-card"
+          class="bg-white rounded-lg shadow border border-amber-300 overflow-hidden"
+        >
+          <div class="p-6 border-b border-amber-200 bg-amber-50">
+            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div class="flex flex-wrap items-center gap-3">
+                  <h2 class="text-lg font-semibold text-gray-900">Strict Mode</h2>
+                  <span
+                    id="settings-strictModeStatus"
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide"
+                    [ngClass]="{
+                      'bg-emerald-100 text-emerald-900': strictModeEnabled && !strictModeDirty(),
+                      'bg-amber-100 text-amber-900': !strictModeEnabled && !strictModeDirty(),
+                      'bg-blue-100 text-blue-900': strictModeDirty()
+                    }"
+                  >
+                    {{ strictModeStatusLabel() }}
+                  </span>
+                </div>
+                <p class="text-sm text-gray-600 mt-2">
+                  Strict mode is an org-level persistence setting. When enabled, served evaluation traffic is treated as the stronger canonical source of truth for downstream analysis, replay, and inspection workflows.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <label for="settings-strictModeEnabled" class="flex items-start gap-3">
+                  <input
+                    id="settings-strictModeEnabled"
+                    data-testid="settings-strict-mode-checkbox"
+                    type="checkbox"
+                    class="mt-1 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                    [(ngModel)]="strictModeEnabled"
+                    [disabled]="!canManagePermissions || strictModeSaving"
+                  />
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">Enable strict mode for this organization</p>
+                    <p class="text-sm text-gray-600 mt-2">
+                      This value is persisted in org-scoped runtime settings and applied independently of any individual operator session.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <p class="text-sm font-medium text-gray-900">Change controls</p>
+                <p class="text-sm text-gray-600 mt-2">
+                  Future enable and disable actions will be reserved for operators with
+                  <span class="font-medium text-gray-900">{{ strictModePermissionLabel() }}</span>
+                  access.
+                </p>
+              </div>
+            </div>
+
+            <div class="rounded-lg border border-red-200 bg-red-50 p-4">
+              <p class="text-sm font-medium text-red-900">Disable flow will be intentionally high-friction.</p>
+              <p class="text-sm text-red-800 mt-2">
+                Disabling strict mode requires typed confirmation rather than a casual toggle, and the action is reflected in the dedicated strict-mode audit log.
+              </p>
+            </div>
+
+            <p class="text-xs text-gray-500">
+              Default fallback: {{ defaultStrictModeEnabled ? 'Enabled' : 'Disabled' }}.
+            </p>
+
+            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div class="flex flex-col gap-2">
+                <p *ngIf="!canManagePermissions" class="text-sm text-gray-500">
+                  You can view the current strict mode state, but only operators with {{ strictModePermissionLabel() }} access can change it.
+                </p>
+                <a
+                  *ngIf="canAccessAuditTrail"
+                  id="settings-strictModeAuditLink"
+                  [routerLink]="['/audit']"
+                  fragment="strict-mode"
+                  class="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  View Strict Mode audit section
+                </a>
+                <p *ngIf="!canAccessAuditTrail" class="text-sm text-gray-500">
+                  Strict mode changes are recorded in the dedicated audit trail.
+                </p>
+              </div>
+              <button
+                *ngIf="canManagePermissions"
+                id="settings-saveStrictMode"
+                type="button"
+                class="inline-flex items-center justify-center rounded-md bg-amber-600 px-4 py-2 font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                [disabled]="strictModeSaving || !strictModeDirty()"
+                (click)="saveStrictMode()"
+              >
+                {{ strictModeSaving ? 'Saving...' : 'Save Strict Mode' }}
+              </button>
             </div>
           </div>
         </div>

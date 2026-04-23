@@ -61,7 +61,7 @@ test.describe('Settings Page', () => {
       await expect(settingsPage.strictModeStatus).toHaveText('Not Enabled');
       await expect(settingsPage.strictModeAuditLink).toBeVisible();
       await expect(settingsPage.strictModeAuditLink).toHaveAttribute('href', /\/audit#strict-mode$/);
-      await expect(cards.first()).toHaveAttribute('id', 'settings-strictModeCard');
+      await expect(cards.last()).toHaveAttribute('id', 'settings-strictModeCard');
       await expect(settingsPage.strictModeCheckbox).not.toBeChecked();
 
       await settingsPage.setStrictModeEnabled(true);

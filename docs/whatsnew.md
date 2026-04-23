@@ -1,5 +1,10 @@
 # What's New
 
+## v1.15.1
+
+* **Strict mode UI de-emphasis**: The Strict Mode card now sits at the bottom of Settings instead of leading the page.
+* **Strict mode audit ordering**: The dedicated Strict Mode audit accordion now appears at the bottom of the Audit Trail page instead of near the top.
+
 ## v1.15.0
 
 * **AI-assisted rule authoring in the editor**: The rule create flow and rule detail edit mode now include an inline AI assistant that turns natural-language requests into ezrules draft logic without auto-saving or auto-activating anything.

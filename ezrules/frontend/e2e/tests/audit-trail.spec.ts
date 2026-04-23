@@ -54,6 +54,10 @@ test.describe('Audit Trail Page', () => {
       await expect(auditTrailPage.rolePermissionHistoryHeading).toBeVisible();
       await expect(auditTrailPage.fieldTypeHistoryHeading).toBeVisible();
       await expect(auditTrailPage.apiKeyHistoryHeading).toBeVisible();
+      await expect(auditTrailPage.page.locator('[data-testid^="accordion-"]').last()).toHaveAttribute(
+        'data-testid',
+        'accordion-strict-mode'
+      );
     });
 
     test('should toggle Rule History section on click', async () => {
