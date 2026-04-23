@@ -718,3 +718,28 @@ class ApiKeyHistory(Base):
     o_id = Column(Integer, nullable=False)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
+
+
+class AIRuleAuthoringHistory(Base):
+    __tablename__ = "ai_rule_authoring_history"
+    __table_args__ = (
+        Index("ix_ai_rule_authoring_history_o_id_changed", "o_id", "changed"),
+        Index("ix_ai_rule_authoring_history_generation_id", "generation_id"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    generation_id = Column(String(36), nullable=False)
+    r_id = Column(Integer, nullable=True, index=True)
+    action = Column(String, nullable=False)  # draft_generated, draft_applied
+    mode = Column(String(16), nullable=False)  # create, edit
+    evaluation_lane = Column(String(32), nullable=False, default="main")
+    provider = Column(String(128), nullable=False)
+    model = Column(String(255), nullable=False)
+    prompt_excerpt = Column(String(255), nullable=True)
+    prompt_hash = Column(String(64), nullable=False)
+    validation_status = Column(String(32), nullable=False)  # valid, invalid
+    repair_attempted = Column(Boolean, nullable=False, default=False)
+    applyable = Column(Boolean, nullable=False, default=False)
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)

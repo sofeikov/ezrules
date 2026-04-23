@@ -54,6 +54,36 @@ export interface RuleVerifyError {
   end_column: number | null;
 }
 
+export interface RuleAIDraftRequest {
+  prompt: string;
+  evaluation_lane: RuleEvaluationLane;
+  mode: 'create' | 'edit';
+  current_logic?: string | null;
+  current_description?: string | null;
+  rule_id?: number | null;
+}
+
+export interface RuleAILineExplanation {
+  line_number: number;
+  source: string;
+  explanation: string;
+}
+
+export interface RuleAIDraftResponse {
+  generation_id: string;
+  draft_logic: string;
+  line_explanations: RuleAILineExplanation[];
+  validation: VerifyRuleResponse;
+  repair_attempted: boolean;
+  applyable: boolean;
+  provider: string;
+}
+
+export interface RuleAIDraftApplyResponse {
+  success: boolean;
+  message: string;
+}
+
 export interface TestRuleResponse {
   rule_outcome: any;
   status: string;
@@ -248,6 +278,17 @@ export class RuleService {
   verifyRule(ruleSource: string): Observable<VerifyRuleResponse> {
     return this.http.post<VerifyRuleResponse>(`${this.apiUrl}/verify`, {
       rule_source: ruleSource
+    });
+  }
+
+  generateAIDraft(request: RuleAIDraftRequest): Observable<RuleAIDraftResponse> {
+    return this.http.post<RuleAIDraftResponse>(`${this.apiUrl}/ai/draft`, request);
+  }
+
+  applyAIDraft(generationId: string, ruleId?: number | null): Observable<RuleAIDraftApplyResponse> {
+    return this.http.post<RuleAIDraftApplyResponse>(`${this.apiUrl}/ai/apply`, {
+      generation_id: generationId,
+      rule_id: ruleId ?? null,
     });
   }
 

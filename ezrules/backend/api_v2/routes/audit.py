@@ -17,6 +17,8 @@ from ezrules.backend.api_v2.auth.dependencies import (
     require_permission,
 )
 from ezrules.backend.api_v2.schemas.audit import (
+    AIRuleAuthoringAuditListResponse,
+    AIRuleAuthoringHistoryEntry,
     ApiKeyAuditListResponse,
     ApiKeyHistoryEntry,
     AuditSummaryResponse,
@@ -40,6 +42,7 @@ from ezrules.backend.api_v2.schemas.audit import (
 )
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
+    AIRuleAuthoringHistory,
     ApiKeyHistory,
     FieldTypeHistory,
     LabelHistory,
@@ -175,6 +178,27 @@ def api_key_history_to_response(history: ApiKeyHistory) -> ApiKeyHistoryEntry:
     )
 
 
+def ai_rule_authoring_history_to_response(history: AIRuleAuthoringHistory) -> AIRuleAuthoringHistoryEntry:
+    """Convert an AI rule authoring history record to API response."""
+    return AIRuleAuthoringHistoryEntry(
+        id=int(history.id),
+        generation_id=str(history.generation_id),
+        r_id=int(history.r_id) if history.r_id is not None else None,
+        action=str(history.action),
+        mode=str(history.mode),
+        evaluation_lane=str(history.evaluation_lane),
+        provider=str(history.provider),
+        model=str(history.model),
+        prompt_excerpt=str(history.prompt_excerpt) if history.prompt_excerpt else None,
+        prompt_hash=str(history.prompt_hash),
+        validation_status=str(history.validation_status),
+        repair_attempted=bool(history.repair_attempted),
+        applyable=bool(history.applyable),
+        changed=history.changed if history.changed is not None else None,  # type: ignore[arg-type]
+        changed_by=str(history.changed_by) if history.changed_by else None,
+    )
+
+
 def role_permission_history_to_response(history: RolePermissionHistory) -> RolePermissionHistoryEntry:
     """Convert a role permission history record to API response."""
     return RolePermissionHistoryEntry(
@@ -229,6 +253,9 @@ def get_audit_summary(
     )
     total_field_type_actions = db.query(FieldTypeHistory).filter(FieldTypeHistory.o_id == current_org_id).count()
     total_api_key_actions = db.query(ApiKeyHistory).filter(ApiKeyHistory.o_id == current_org_id).count()
+    total_ai_rule_authoring_actions = (
+        db.query(AIRuleAuthoringHistory).filter(AIRuleAuthoringHistory.o_id == current_org_id).count()
+    )
 
     return AuditSummaryResponse(
         total_rule_versions=total_rule_versions,
@@ -242,6 +269,7 @@ def get_audit_summary(
         total_role_permission_actions=total_role_permission_actions,
         total_field_type_actions=total_field_type_actions,
         total_api_key_actions=total_api_key_actions,
+        total_ai_rule_authoring_actions=total_ai_rule_authoring_actions,
     )
 
 
@@ -665,6 +693,44 @@ def list_api_key_history(
     return ApiKeyAuditListResponse(
         total=total,
         items=[api_key_history_to_response(h) for h in items],
+        limit=limit,
+        offset=offset,
+    )
+
+
+# =============================================================================
+# AI RULE AUTHORING HISTORY
+# =============================================================================
+
+
+@router.get("/ai-rule-authoring", response_model=AIRuleAuthoringAuditListResponse)
+def list_ai_rule_authoring_history(
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+    start_date: datetime | None = Query(default=None, description="Filter by start date"),
+    end_date: datetime | None = Query(default=None, description="Filter by end date"),
+    action: str | None = Query(default=None, description="Filter by action type"),
+    limit: int = Query(default=50, ge=1, le=100, description="Page size"),
+    offset: int = Query(default=0, ge=0, description="Offset"),
+) -> AIRuleAuthoringAuditListResponse:
+    """Get paginated AI rule authoring history."""
+    query = db.query(AIRuleAuthoringHistory).filter(AIRuleAuthoringHistory.o_id == current_org_id)
+
+    if start_date:
+        query = query.filter(AIRuleAuthoringHistory.changed >= start_date)
+    if end_date:
+        query = query.filter(AIRuleAuthoringHistory.changed <= end_date)
+    if action is not None:
+        query = query.filter(AIRuleAuthoringHistory.action == action)
+
+    total = query.count()
+    items = query.order_by(AIRuleAuthoringHistory.changed.desc()).offset(offset).limit(limit).all()
+
+    return AIRuleAuthoringAuditListResponse(
+        total=total,
+        items=[ai_rule_authoring_history_to_response(h) for h in items],
         limit=limit,
         offset=offset,
     )

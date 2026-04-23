@@ -16,6 +16,14 @@ export interface RuntimeSettings {
   invalidAllowlistRules: InvalidAllowlistRule[];
 }
 
+export interface AIAuthoringSettings {
+  provider: string;
+  supportedProviders: string[];
+  enabled: boolean;
+  model: string;
+  apiKeyConfigured: boolean;
+}
+
 export interface InvalidAllowlistRule {
   rId: number;
   rid: string;
@@ -51,6 +59,14 @@ export interface RuntimeSettingsUpdateRequest {
   neutralOutcome?: string;
 }
 
+export interface AIAuthoringSettingsUpdateRequest {
+  provider?: string;
+  enabled?: boolean;
+  model?: string;
+  apiKey?: string | null;
+  clearApiKey?: boolean;
+}
+
 interface RuntimeSettingsV2 {
   auto_promote_active_rule_updates: boolean;
   default_auto_promote_active_rule_updates: boolean;
@@ -61,6 +77,14 @@ interface RuntimeSettingsV2 {
   neutral_outcome: string;
   default_neutral_outcome: string;
   invalid_allowlist_rules: InvalidAllowlistRuleV2[];
+}
+
+interface AIAuthoringSettingsV2 {
+  provider: string;
+  supported_providers: string[];
+  enabled: boolean;
+  model: string;
+  api_key_configured: boolean;
 }
 
 interface InvalidAllowlistRuleV2 {
@@ -104,6 +128,7 @@ interface OutcomeHierarchyResponseV2 {
 })
 export class RuntimeSettingsService {
   private settingsUrl = `${environment.apiUrl}/api/v2/settings/runtime`;
+  private aiAuthoringSettingsUrl = `${environment.apiUrl}/api/v2/settings/ai-authoring`;
   private ruleQualityPairsUrl = `${environment.apiUrl}/api/v2/settings/rule-quality-pairs`;
   private outcomeHierarchyUrl = `${environment.apiUrl}/api/v2/settings/outcome-hierarchy`;
 
@@ -123,6 +148,36 @@ export class RuntimeSettingsService {
       neutral_outcome: request.neutralOutcome,
     }).pipe(
       map(response => this.mapRuntimeSettings(response))
+    );
+  }
+
+  getAIAuthoringSettings(): Observable<AIAuthoringSettings> {
+    return this.http.get<AIAuthoringSettingsV2>(this.aiAuthoringSettingsUrl).pipe(
+      map(response => ({
+        provider: response.provider,
+        supportedProviders: response.supported_providers,
+        enabled: response.enabled,
+        model: response.model,
+        apiKeyConfigured: response.api_key_configured,
+      }))
+    );
+  }
+
+  updateAIAuthoringSettings(request: AIAuthoringSettingsUpdateRequest): Observable<AIAuthoringSettings> {
+    return this.http.put<AIAuthoringSettingsV2>(this.aiAuthoringSettingsUrl, {
+      provider: request.provider,
+      enabled: request.enabled,
+      model: request.model,
+      api_key: request.apiKey,
+      clear_api_key: request.clearApiKey,
+    }).pipe(
+      map(response => ({
+        provider: response.provider,
+        supportedProviders: response.supported_providers,
+        enabled: response.enabled,
+        model: response.model,
+        apiKeyConfigured: response.api_key_configured,
+      }))
     );
   }
 

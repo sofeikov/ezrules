@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     SHADOW_EVALUATION_QUEUE_MAX_BATCHES_PER_DRAIN: int = 10
     SHADOW_EVALUATION_QUEUE_LOCK_TIMEOUT_SECONDS: int = 30
     SHADOW_EVALUATION_QUEUE_DRAIN_INTERVAL_SECONDS: int = 5
+    AI_AUTHORING_PROVIDER: str = "openai"
+    AI_AUTHORING_BASE_URL: str = "https://api.openai.com/v1"
+    AI_AUTHORING_MODEL: str | None = None
+    AI_AUTHORING_API_KEY: str | None = None
+    AI_AUTHORING_TIMEOUT_SECONDS: int = 45
 
     @property
     def cors_allowed_origins(self) -> list[str]:

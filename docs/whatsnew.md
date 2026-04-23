@@ -1,5 +1,14 @@
 # What's New
 
+## v1.14.0
+
+* **AI-assisted rule authoring in the editor**: The rule create flow and rule detail edit mode now include an inline AI assistant that turns natural-language requests into ezrules draft logic without auto-saving or auto-activating anything.
+* **Safer AI review workflow**: Generated drafts are validated and auto-repaired before review, can be compared against the current rule with a char-level diff, include a line-by-line explainer, surface clearer generation status, and require an explicit copy step into the main editor before normal save/create actions can use them.
+* **Settings-managed OpenAI configuration**: Added **Settings → AI Rule Authoring** so each organisation can enable AI drafting, choose the OpenAI provider, set the model, and manage the API key from the product UI. OpenAI is the only supported provider for now, but the backend/provider shape remains extensible.
+* **Less defensive AI-generated rule logic**: The AI prompt now assumes referenced fields are normally present unless the analyst explicitly asks for null/missing-field handling, so tightening an existing rule is more likely to update the business condition directly instead of wrapping it in defensive guards.
+* **AI authoring audit and API support**: Added backend draft-generation and draft-apply endpoints, org-scoped AI settings endpoints, and AI authoring audit history for `draft_generated` and `draft_applied`, including provider/model metadata and prompt hashes without storing full prompts or raw completions.
+* **Frontend CI startup alignment**: Increased the Angular production bundle budget slightly so the current frontend bundle clears the GitHub Actions Playwright frontend-start step again.
+
 ## v1.13.0
 
 * **Rule detail performance chart**: The Rule Detail page now includes a **Performance** card with a time-range selector and a per-outcome chart showing how often that rule fired each stored outcome over time.

@@ -9,6 +9,7 @@ ezrules provides a Python-based framework for defining, managing, and executing 
 - **Rule Engine**: Flexible Python-based rule execution with custom logic support, including org-scoped ordered first-match serving for the main rule lane when enabled
 - **Management Interface**: Modern web UI for creating and managing rules
 - **Rule Authoring UX**: CodeMirror-powered rule editor with Python-aware highlighting, inline validation diagnostics, autocomplete for observed `$fields`, `@userLists`, and configured `!OUTCOMES`, plus detected-reference chips while you write
+- **AI Rule Authoring**: Create and edit rules with an inline AI assistant that uses observed fields, field types, user lists, configured outcomes, and lane constraints to generate a draft, explain it line by line, auto-repair obvious validation issues, and require explicit human apply/save approval. OpenAI provider/model credentials can be managed per organisation in Settings.
 - **Enterprise Security**: Granular role-based access control with 34 permission types; API key authentication for service-to-service integration
 - **Org-Aware Admin APIs**: Manager access tokens now carry organisation context, and manager APIs resolve rules, users, roles, labels, settings, analytics, tested events, backtesting history, and audit reads against the authenticated user's org
 - **Transaction Labeling**: Comprehensive fraud analytics with API and bulk CSV upload capabilities
@@ -143,6 +144,8 @@ EZRULES_SMTP_HOST=localhost
 EZRULES_SMTP_PORT=1025
 EZRULES_FROM_EMAIL=no-reply@ezrules.local
 EZRULES_APP_BASE_URL=http://localhost:4200
+EZRULES_AI_AUTHORING_MODEL=gpt-4.1-mini
+EZRULES_AI_AUTHORING_API_KEY=your-provider-api-key
 EOF
 
 # Initialise DB and bootstrap the first organisation/admin

@@ -96,12 +96,14 @@ const RULE_KEYWORD_COMPLETIONS: Completion[] = [
     :host ::ng-deep .cm-scroller {
       min-height: 18rem;
       line-height: 1.6;
+      scroll-padding-top: 1.5rem;
+      scroll-padding-bottom: 1.5rem;
     }
 
     :host ::ng-deep .cm-content,
     :host ::ng-deep .cm-gutter {
-      padding-top: 0.75rem;
-      padding-bottom: 0.75rem;
+      padding-top: 1.5rem;
+      padding-bottom: 1.5rem;
     }
 
     :host ::ng-deep .cm-gutters {

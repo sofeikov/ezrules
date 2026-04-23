@@ -61,6 +61,24 @@ class RuleTestRequest(BaseModel):
     test_json: str = Field(..., description="JSON string of test event data")
 
 
+class RuleAIDraftRequest(BaseModel):
+    """Schema for AI-assisted rule draft generation."""
+
+    prompt: str = Field(..., min_length=1, description="Natural-language request describing the desired rule")
+    evaluation_lane: str = Field(default="main", description="Evaluation lane: main or allowlist")
+    mode: str = Field(..., description="Authoring mode: create or edit")
+    current_logic: str | None = Field(default=None, description="Existing rule logic used as edit context")
+    current_description: str | None = Field(default=None, description="Existing rule description used as edit context")
+    rule_id: int | None = Field(default=None, description="Existing rule ID when generating from the edit flow")
+
+
+class RuleAIDraftApplyRequest(BaseModel):
+    """Schema for recording that an AI draft was explicitly applied in the editor."""
+
+    generation_id: str = Field(..., min_length=1, description="Generation identifier returned from /ai/draft")
+    rule_id: int | None = Field(default=None, description="Rule ID when applying from the rule detail edit flow")
+
+
 class RuleRollbackRequest(BaseModel):
     """Schema for rolling a rule back to a historical revision."""
 
@@ -183,6 +201,36 @@ class RuleVerifyResponse(BaseModel):
     )
     warnings: list[str] = Field(default_factory=list, description="Advisory warnings about referenced fields")
     errors: list[RuleVerifyError] = Field(default_factory=list, description="Structured validation failures")
+
+
+class RuleAILineExplanation(BaseModel):
+    """Explanation for a single generated rule line."""
+
+    line_number: int = Field(..., ge=1, description="1-based line number in draft_logic")
+    source: str = Field(..., description="Exact rule source line")
+    explanation: str = Field(..., description="Human-readable explanation for the line")
+
+
+class RuleAIDraftResponse(BaseModel):
+    """Response for AI-assisted draft generation."""
+
+    generation_id: str = Field(..., description="Identifier for this generated draft, used when applying it")
+    draft_logic: str = Field(..., description="Generated ezrules draft logic")
+    line_explanations: list[RuleAILineExplanation] = Field(
+        default_factory=list,
+        description="Line-by-line explanations for the generated draft",
+    )
+    validation: RuleVerifyResponse = Field(..., description="Validation result after generation and repair attempts")
+    repair_attempted: bool = Field(default=False, description="Whether automatic repair was attempted")
+    applyable: bool = Field(default=False, description="Whether the draft is valid enough to apply to the editor")
+    provider: str = Field(..., description="Configured backend provider name")
+
+
+class RuleAIDraftApplyResponse(BaseModel):
+    """Response for explicit AI draft application tracking."""
+
+    success: bool = Field(..., description="Whether the application event was recorded")
+    message: str = Field(..., description="Human-readable result message")
 
 
 class RuleTestResponse(BaseModel):

@@ -87,6 +87,8 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 | `POST` | `/api/v2/rules/{rule_id}/archive` | Bearer + `MODIFY_RULE` | Archive rule |
 | `POST` | `/api/v2/rules/{rule_id}/rollback` | Bearer + `MODIFY_RULE` | Create a new draft version from a historical revision (`revision_number` in body) |
 | `POST` | `/api/v2/rules/verify` | Bearer + permission | Verify rule source, extracted params, and advisory warnings for unseen fields |
+| `POST` | `/api/v2/rules/ai/draft` | Bearer + `CREATE_RULE` or `MODIFY_RULE` | Generate an AI-assisted rule draft (`mode=create|edit`) |
+| `POST` | `/api/v2/rules/ai/apply` | Bearer + `CREATE_RULE` or `MODIFY_RULE` | Record that an AI draft was explicitly applied in the editor |
 | `POST` | `/api/v2/rules/test` | Bearer + permission | Test rule payload |
 | `GET` | `/api/v2/rules/{rule_id}/history` | Bearer + permission | Revision list |
 | `POST` | `/api/v2/rules/{rule_id}/shadow` | Bearer + `MODIFY_RULE` | Deploy rule to shadow |
@@ -120,6 +122,22 @@ Rule lifecycle fields on rule responses:
 - `warnings`: advisory messages for referenced fields that have not yet been observed in traffic or rule-test payloads.
 - `referenced_lists`: detected `@user_list` names, even when validation fails.
 - `errors`: structured validation failures with `message`, `line`, `column`, `end_line`, and `end_column`.
+
+`POST /api/v2/rules/ai/draft` request fields:
+- `prompt`: natural-language rule request from the analyst.
+- `evaluation_lane`: `main` or `allowlist`.
+- `mode`: `create` or `edit`; controls the required permission.
+- `current_logic` / `current_description`: optional existing rule context, typically sent from edit mode.
+- `rule_id`: optional current rule id for edit-mode audit attribution.
+
+`POST /api/v2/rules/ai/draft` response fields:
+- `generation_id`: identifier for the generated draft, used when the UI later records explicit draft application.
+- `draft_logic`: generated ezrules source.
+- `line_explanations`: explanation objects with `line_number`, `source`, and `explanation`.
+- `validation`: the same structured validation shape returned by `POST /api/v2/rules/verify`.
+- `repair_attempted`: whether automatic repair was attempted after the initial generation.
+- `applyable`: `true` only when the generated draft passed validation after bounded repair attempts.
+- `provider`: configured AI backend provider name.
 
 ### Shadow
 
@@ -198,6 +216,8 @@ Per-rule outcome distribution query params:
 |---|---|---|---|
 | `GET` | `/api/v2/settings/runtime` | Bearer + `VIEW_ROLES` | Read runtime settings |
 | `PUT` | `/api/v2/settings/runtime` | Bearer + field-specific permission | Update runtime settings. `MANAGE_PERMISSIONS` covers general runtime settings; `MANAGE_NEUTRAL_OUTCOME` is required when changing `neutral_outcome`. |
+| `GET` | `/api/v2/settings/ai-authoring` | Bearer + `VIEW_ROLES` | Read AI authoring provider settings for the caller's org |
+| `PUT` | `/api/v2/settings/ai-authoring` | Bearer + `MANAGE_PERMISSIONS` | Update AI authoring provider/model/key settings for the caller's org |
 | `GET` | `/api/v2/settings/outcome-hierarchy` | Bearer + `VIEW_ROLES` | Read ordered outcome severity hierarchy |
 | `PUT` | `/api/v2/settings/outcome-hierarchy` | Bearer + `MANAGE_PERMISSIONS` | Replace ordered outcome severity hierarchy |
 | `GET` | `/api/v2/settings/rule-quality-pairs` | Bearer + `VIEW_ROLES` | List configured curated outcome→label pairs |
@@ -218,6 +238,11 @@ Runtime settings notes:
 - Runtime settings responses also include `invalid_allowlist_rules`, a list of existing allowlist rules that no longer comply with the selected neutral outcome.
 - Neutral-outcome changes are recorded in outcome audit history with action `neutral_outcome_updated`.
 - When `auto_promote_active_rule_updates=true`, saving edits to an active rule requires both `MODIFY_RULE` and `PROMOTE_RULES`.
+
+AI authoring settings notes:
+- Only `openai` is supported right now.
+- `GET /api/v2/settings/ai-authoring` returns `provider`, `supported_providers`, `enabled`, `model`, and `api_key_configured`.
+- `PUT /api/v2/settings/ai-authoring` accepts `provider`, `enabled`, `model`, optional `api_key`, and `clear_api_key`.
 
 ### Users and Roles
 
@@ -282,6 +307,7 @@ Field type config note:
 | `GET` | `/api/v2/audit/roles` | Bearer + permission | Role/permission history for the caller's org (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/field-types` | Bearer + permission | Field type config history (`limit`, `offset`, `field_name` filter) |
 | `GET` | `/api/v2/audit/api-keys` | Bearer + permission | API key create/revoke history for the caller's org (`limit`, `offset`, filters) |
+| `GET` | `/api/v2/audit/ai-rule-authoring` | Bearer + permission | AI rule draft generation/application history for the caller's org (`limit`, `offset`, filters) |
 
 ### Backtesting
 
