@@ -1,26 +1,13 @@
 # What's New
 
-## v1.15.2
-
-* **Less defensive AI-authored rule logic**: AI rule authoring now tells the model to assume referenced fields are normally present in the event payload, instead of inventing `is not None` / missing-field wrappers unless the analyst explicitly asks for defensive handling.
-* **Better edit intent preservation**: When the user asks to tighten an existing rule, the prompt now steers the model toward modifying the actual business condition rather than wrapping the whole rule in data-availability guards.
-
-## v1.15.1
-
-* **Clearer AI model selection in Settings**: The AI Rule Authoring settings now prefill a default OpenAI model, expose a few built-in model suggestions, and still allow free-text entry for any valid OpenAI model id.
-* **Less confusing AI settings save flow**: Saving AI settings no longer fails just because the model field was left blank in the UI; the default model is applied automatically instead.
-
-## v1.15.0
-
-* **Collapsible AI authoring in edit mode**: The AI assistant inside Rule Detail edit mode now starts collapsed so it does not dominate the editor layout until the user explicitly opens it.
-* **Settings-managed OpenAI configuration**: Added **Settings → AI Rule Authoring** so each organisation can enable AI drafting, choose the OpenAI provider, set the model, and manage the API key without editing environment files.
-* **OpenAI-only provider stance for now**: The backend/provider shape still stays extensible, but the product now intentionally exposes only OpenAI in the settings UI until additional providers are implemented end to end.
-
 ## v1.14.0
 
-* **AI-assisted rule authoring**: The rule create flow and rule detail edit mode now include an inline AI assistant that can turn a natural-language request into ezrules draft logic without auto-saving or auto-activating anything.
-* **Draft explanation and bounded auto-repair**: AI-generated drafts now come back with line-by-line explanations, are automatically revalidated against ezrules syntax/list/outcome/lane constraints, and attempt bounded repair before the UI allows the user to apply the draft.
-* **AI authoring audit trail**: Added backend audit history for `draft_generated` and `draft_applied` events plus dedicated audit API coverage, recording provider/model metadata and prompt hashes without storing full prompts or raw completions.
+* **AI-assisted rule authoring in the editor**: The rule create flow and rule detail edit mode now include an inline AI assistant that turns natural-language requests into ezrules draft logic without auto-saving or auto-activating anything.
+* **Safer AI review workflow**: Generated drafts are validated and auto-repaired before review, can be compared against the current rule with a char-level diff, include a line-by-line explainer, surface clearer generation status, and require an explicit copy step into the main editor before normal save/create actions can use them.
+* **Settings-managed OpenAI configuration**: Added **Settings → AI Rule Authoring** so each organisation can enable AI drafting, choose the OpenAI provider, set the model, and manage the API key from the product UI. OpenAI is the only supported provider for now, but the backend/provider shape remains extensible.
+* **Less defensive AI-generated rule logic**: The AI prompt now assumes referenced fields are normally present unless the analyst explicitly asks for null/missing-field handling, so tightening an existing rule is more likely to update the business condition directly instead of wrapping it in defensive guards.
+* **AI authoring audit and API support**: Added backend draft-generation and draft-apply endpoints, org-scoped AI settings endpoints, and AI authoring audit history for `draft_generated` and `draft_applied`, including provider/model metadata and prompt hashes without storing full prompts or raw completions.
+* **Frontend CI startup alignment**: Increased the Angular production bundle budget slightly so the current frontend bundle clears the GitHub Actions Playwright frontend-start step again.
 
 ## v1.13.0
 
