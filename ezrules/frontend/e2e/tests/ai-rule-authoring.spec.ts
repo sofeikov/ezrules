@@ -81,6 +81,7 @@ test.describe('AI Rule Authoring', () => {
 
     await expect(aiPanel.result).toBeVisible();
     await expect(aiPanel.statusBadge).toHaveText('Validated draft');
+    await aiPanel.toggleExplanations();
     await expect(aiPanel.explanations).toHaveCount(2);
     await expect(ruleCreatePage.logicTextarea).toHaveValue('');
 

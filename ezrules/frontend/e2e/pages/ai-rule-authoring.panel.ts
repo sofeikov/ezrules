@@ -7,6 +7,7 @@ export class AiRuleAuthoringPanel {
   readonly toggleButton: Locator;
   readonly generateButton: Locator;
   readonly applyButton: Locator;
+  readonly explanationsToggle: Locator;
   readonly result: Locator;
   readonly statusBadge: Locator;
   readonly errorBanner: Locator;
@@ -20,6 +21,7 @@ export class AiRuleAuthoringPanel {
     this.toggleButton = page.getByTestId('ai-rule-authoring-toggle');
     this.generateButton = page.getByTestId('ai-rule-authoring-generate');
     this.applyButton = page.getByTestId('ai-rule-authoring-apply');
+    this.explanationsToggle = page.getByTestId('ai-rule-authoring-explanations-toggle');
     this.result = page.getByTestId('ai-rule-authoring-result');
     this.statusBadge = page.getByTestId('ai-rule-authoring-status');
     this.errorBanner = page.getByTestId('ai-rule-authoring-error');
@@ -41,5 +43,9 @@ export class AiRuleAuthoringPanel {
 
   async clickApply() {
     await this.applyButton.click();
+  }
+
+  async toggleExplanations() {
+    await this.explanationsToggle.click();
   }
 }
