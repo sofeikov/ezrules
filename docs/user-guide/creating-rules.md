@@ -99,6 +99,8 @@ Checkpoint:
 - Triggering cases produce expected outcome
 - Non-triggering cases produce no outcome
 
+![Rule test panel with a successful rule result](../assets/readme/rule-test-panel.png)
+
 ---
 
 ## Step 4: Pick the Right Pattern
@@ -184,6 +186,10 @@ Before enabling major rule changes:
 5. Confirm observability:
    - outcome trends visible in **Dashboard**
    - label feedback visible in **Analytics**
+
+![30-day rule performance chart](../assets/readme/rule-detail-performance-30d.png)
+
+![30-day outcome trend charts](../assets/readme/dashboard-30d-outcomes.png)
 
 For higher-stakes changes, add a shadow validation step before promoting to production:
 

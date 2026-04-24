@@ -81,11 +81,14 @@ curl -X POST http://localhost:8888/api/v2/labels/upload \
 ## Step 4: Validate Analytics
 
 ```bash
-curl "http://localhost:8888/api/v2/analytics/transaction-volume?aggregation=24h" \
+curl "http://localhost:8888/api/v2/analytics/transaction-volume?aggregation=30d" \
   -H "Authorization: Bearer <access_token>"
 ```
 
 Use `aggregation` values: `1h`, `6h`, `12h`, `24h`, `30d`.
+When you validate in the UI, start with **Last 30 Days** so the chart shows a useful trend line.
+
+![30-day transaction volume chart](../assets/readme/dashboard-30d-volume.png)
 
 ---
 

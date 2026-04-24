@@ -16,6 +16,10 @@ Those vocabularies are intentionally separate, so quality analysis must evaluate
 
 Each pair can have different precision/recall behavior.
 
+Before ranking rules, analysts can confirm that labels are flowing over a useful window in Analytics.
+
+![30-day label analytics charts](../assets/readme/label-analytics-30d.png)
+
 ## What the page shows
 
 Open **Rule Quality** from the sidebar.
@@ -37,6 +41,8 @@ This helps analysts answer:
 - Which rules are missing confirmed cases (low recall)?
 - Which mapping actually represents this rule best?
 
+![Rule quality report with ranked rules and pair metrics](../assets/readme/rule-quality-report.png)
+
 ## Support filtering matters
 
 Low-volume pairs can create noisy rankings. The page includes a **Min support** filter.
@@ -46,6 +52,10 @@ Under the hood, this maps to:
 - `GET /api/v2/analytics/rule-quality?min_support=<n>`
 
 Raise the threshold when you want stable operational ranking; lower it for exploratory analysis.
+
+Configured outcome-label pairs keep the report focused on mappings the team actually reviews.
+
+![Curated rule quality pair settings](../assets/readme/rule-quality-pairs-settings.png)
 
 ## Feeding data quickly: bombardment fraud labels
 

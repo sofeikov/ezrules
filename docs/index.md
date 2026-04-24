@@ -8,6 +8,10 @@ ezrules provides building blocks to define rule-based decisions, evaluate live e
 [Integrate via API](getting-started/integration-quickstart.md){ .md-button }
 [Install locally](getting-started/installation.md){ .md-button }
 
+![30-day transaction volume dashboard](assets/readme/dashboard-30d-volume.png)
+
+![30-day outcome trend charts](assets/readme/dashboard-30d-outcomes.png)
+
 ---
 
 ## Start Here by Goal

@@ -90,6 +90,8 @@ Open **Shadow Rules** in the sidebar to see:
 - A summary of recent shadow outcomes per rule
 - Per-rule **Promote to Production** and **Remove** actions
 
+![Shadow comparison for production versus candidate outcomes](../assets/readme/shadow-comparison.png)
+
 ### Current Shadow Config (API)
 
 ```bash

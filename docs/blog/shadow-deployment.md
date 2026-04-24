@@ -18,6 +18,10 @@ From the caller's perspective, nothing has changed. From your perspective, you'r
 
 There is no traffic splitting, no separate service to deploy, no routing configuration. You hit the Deploy to Shadow button (or the API equivalent), and from that point forward every event is evaluated against the shadow config in parallel with production.
 
+The Shadow Rules page shows the candidate rule, its current shadow status, and the live comparison surface operators use before promotion.
+
+![Active shadow rule card with comparison controls](../assets/readme/shadow-active-rule.png)
+
 ```mermaid
 flowchart LR
     A[Incoming event] --> B[POST /api/v2/evaluate]
@@ -32,6 +36,8 @@ flowchart LR
 The stats endpoint (`GET /api/v2/shadow/stats`) shows outcome distributions for each shadow rule alongside the production outcomes for the same events. If you're tightening a threshold — a rule that should fire more often than the current version — you expect more `HOLD` decisions in the shadow column than in the production column. If they're close, your change has less bite than you expected. If they diverge significantly, you know the magnitude before it matters.
 
 This doesn't tell you whether the decisions would have been *correct*, only how different they are from current production behavior. Whether that difference is acceptable is a judgment call that depends on your situation. But you're making that call with data from today's traffic rather than from a historical window that may or may not be representative.
+
+![Shadow comparison for production versus candidate outcomes](../assets/readme/shadow-comparison.png)
 
 ## The draft-logic path
 

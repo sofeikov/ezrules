@@ -188,6 +188,10 @@ This is not just parser-level syntax support. ezrules now handles canonical dott
 - backtesting applies the same nested-path normalization and eligibility logic
 - the **Tested Events** page highlights nested referenced fields inside the JSON payload
 
+![Observed nested fields available for configuration](../assets/readme/field-type-observed-fields.png)
+
+![Tested event payload with nested referenced fields highlighted](../assets/readme/tested-event-inspector.png)
+
 That end-to-end consistency matters. It is not enough to let authors type nested paths if every downstream tool still assumes flat fields.
 
 ## Why this matters for fraud detection quality

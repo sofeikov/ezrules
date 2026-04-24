@@ -115,12 +115,18 @@ Use **Dashboard** and **Analytics** (sidebar label) together for full context:
 - outcome trends
 - label distribution and label trends
 
+Start with the 30-day view when you are looking for useful trend shape rather than just confirming that the latest events arrived.
+
+![30-day outcome trend charts](../assets/readme/dashboard-30d-outcomes.png)
+
+![30-day label analytics charts](../assets/readme/label-analytics-30d.png)
+
 Relevant endpoints:
 
-- `GET /api/v2/analytics/transaction-volume`
-- `GET /api/v2/analytics/outcomes-distribution`
+- `GET /api/v2/analytics/transaction-volume?aggregation=30d`
+- `GET /api/v2/analytics/outcomes-distribution?aggregation=30d`
 - `GET /api/v2/analytics/labels-summary`
-- `GET /api/v2/analytics/labels-distribution`
+- `GET /api/v2/analytics/labels-distribution?aggregation=30d`
 
 ---
 

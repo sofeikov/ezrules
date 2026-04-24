@@ -26,7 +26,13 @@ amount    str
 
 Two rows for `amount` means it arrived with two different types. That's a data quality signal worth investigating, but you don't have to wait — configure `amount` as `float` and both variants are handled correctly from that point on.
 
+![Observed field types with configure actions](../assets/readme/field-type-observed-fields.png)
+
 From the same page, click **Configure** next to any observation, pick the type, save. For datetime fields you also provide a format string (`%Y-%m-%dT%H:%M:%S`), and the value will be parsed into a proper `datetime` object before rules run.
+
+![Field type configuration form](../assets/readme/field-type-config-form.png)
+
+![Configured field type table](../assets/readme/field-type-configured-fields.png)
 
 After that, the rule stays as written:
 

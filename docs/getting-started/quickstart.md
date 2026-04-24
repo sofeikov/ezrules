@@ -84,6 +84,8 @@ Checkpoint:
 - Rule appears in rules list
 - Rule detail page opens with **Test Rule** panel
 
+![Rule test panel with successful HOLD result](../assets/readme/rule-test-panel.png)
+
 ---
 
 ## Step 4: Ensure Outcome Exists
@@ -124,11 +126,15 @@ Checkpoint:
 2. Create the labels you want to use operationally (for example `FRAUD`, `NORMAL`, `CHARGEBACK`)
 3. Mark events or upload a small CSV from the Labels page
 4. Open **Analytics**
-5. Check total labeled count and trend charts
+5. Set the time range to **Last 30 Days** and check total labeled count and trend charts
 6. Open **Settings → General**, add curated outcome→label pairs to track
 7. Open **Rule Quality** and confirm pair metrics load for curated pairs
 
 You can also upload a small `event_id,label_name` CSV in **Labels** and recheck the charts.
+
+![30-day label analytics charts](../assets/readme/label-analytics-30d.png)
+
+![Rule quality report with ranked rules and pair metrics](../assets/readme/rule-quality-report.png)
 
 ---
 
