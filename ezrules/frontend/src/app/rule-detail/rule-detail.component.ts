@@ -41,6 +41,42 @@ import { SidebarComponent } from '../components/sidebar.component';
 
 Chart.register(...registerables);
 
+const BACKTEST_RENDER_ROW_LIMIT = 100;
+const BACKTEST_DIFF_CHAR_LIMIT = 50000;
+
+interface BacktestOutcomeRow {
+  outcome: string;
+  storedCount: number;
+  proposedCount: number;
+  storedRate: number;
+  proposedRate: number;
+  delta: number;
+}
+
+interface BacktestLabelRow {
+  label: string;
+  count: number;
+  share: number;
+}
+
+interface BacktestQualityRow {
+  outcome: string;
+  label: string;
+  stored?: BacktestQualityMetric;
+  proposed?: BacktestQualityMetric;
+}
+
+interface BacktestViewModel {
+  outcomeRows: BacktestOutcomeRow[];
+  labelRows: BacktestLabelRow[];
+  hiddenLabelRowCount: number;
+  qualityRows: BacktestQualityRow[];
+  hiddenQualityRowCount: number;
+  labeledShare: number;
+  storedQualitySummary: BacktestQualitySummary | null;
+  proposedQualitySummary: BacktestQualitySummary | null;
+}
+
 @Component({
   selector: 'app-rule-detail',
   standalone: true,
@@ -49,6 +85,9 @@ Chart.register(...registerables);
 })
 export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly mainLaneDescription = 'Main rules run during standard evaluation and participate in the normal outcome resolution flow.';
+  readonly backtestDiffCharLimitLabel = new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 0,
+  }).format(BACKTEST_DIFF_CHAR_LIMIT);
   readonly performanceAggregations = [
     { value: '1h', label: 'Last 1 Hour' },
     { value: '6h', label: 'Last 6 Hours' },
@@ -120,6 +159,7 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   backtesting: boolean = false;
   backtestError: string | null = null;
   backtestDiffs: Map<string, Change[]> = new Map();
+  private backtestViewModels: Map<string, BacktestViewModel> = new Map();
   private pollingIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
   private assistSubscription: Subscription | null = null;
   private verifyDebounceHandle: ReturnType<typeof setTimeout> | null = null;
@@ -788,17 +828,26 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   // Backtesting methods
 
   triggerBacktest(): void {
+    this.triggerBacktestForLogic(this.editedLogic);
+  }
+
+  triggerAIDraftBacktest(draftLogic: string): void {
+    this.triggerBacktestForLogic(draftLogic);
+  }
+
+  private triggerBacktestForLogic(logic: string): void {
     if (!this.canModifyRules) return;
-    if (!this.rule || !this.editedLogic) return;
+    if (!this.rule || !logic) return;
 
     this.backtesting = true;
     this.backtestError = null;
 
-    this.backtestingService.triggerBacktest(this.rule.r_id, this.editedLogic).subscribe({
+    this.backtestingService.triggerBacktest(this.rule.r_id, logic).subscribe({
       next: (response) => {
         this.backtesting = false;
         if (response.success) {
           this.loadBacktestResults(this.rule!.r_id);
+          window.setTimeout(() => this.scrollToBacktestResults(), 150);
         } else {
           this.backtestError = response.error || 'Failed to start backtest';
         }
@@ -811,6 +860,13 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  private scrollToBacktestResults(): void {
+    const target = document.querySelector('[data-testid="backtest-results-card"]');
+    if (target instanceof HTMLElement) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
   loadBacktestResults(ruleId: number): void {
     this.backtestingService.getBacktestResults(ruleId).subscribe({
       next: (response) => {
@@ -821,6 +877,8 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
           if (!currentTaskIds.has(taskId)) {
             this.removeBacktestTaskResult(taskId);
             this.stopPolling(taskId);
+            this.backtestDiffs.delete(taskId);
+            this.backtestViewModels.delete(taskId);
           }
         }
 
@@ -890,12 +948,20 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  computeBacktestDiff(stored: string | null, proposed: string | null): Change[] {
-    const key = `${stored}|||${proposed}`;
-    if (!this.backtestDiffs.has(key)) {
-      this.backtestDiffs.set(key, diffLines(stored || '', proposed || ''));
+  isBacktestDiffTooLarge(item: BacktestResultItem): boolean {
+    const storedLength = item.stored_logic?.length || 0;
+    const proposedLength = item.proposed_logic?.length || 0;
+    return storedLength + proposedLength > BACKTEST_DIFF_CHAR_LIMIT;
+  }
+
+  getBacktestDiffParts(item: BacktestResultItem): Change[] {
+    if (this.isBacktestDiffTooLarge(item)) {
+      return [];
     }
-    return this.backtestDiffs.get(key)!;
+    if (!this.backtestDiffs.has(item.task_id)) {
+      this.backtestDiffs.set(item.task_id, diffLines(item.stored_logic || '', item.proposed_logic || ''));
+    }
+    return this.backtestDiffs.get(item.task_id)!;
   }
 
   getBacktestStatus(taskId: string, item?: BacktestResultItem): string {
@@ -1000,6 +1066,26 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     return metrics.find(metric => metric.outcome === outcome && metric.label === label);
   }
 
+  getBacktestViewModel(taskId: string): BacktestViewModel | null {
+    const existing = this.backtestViewModels.get(taskId);
+    if (existing) {
+      return existing;
+    }
+
+    const taskResult = this.backtestTaskResults.get(taskId);
+    if (!taskResult) {
+      return null;
+    }
+
+    const viewModel = this.buildBacktestViewModel(taskResult);
+    this.backtestViewModels.set(taskId, viewModel);
+    return viewModel;
+  }
+
+  getBacktestRenderRowLimit(): number {
+    return BACKTEST_RENDER_ROW_LIMIT;
+  }
+
   cancelBacktest(taskId: string, event?: Event): void {
     event?.stopPropagation();
     if (!this.rule || this.isBacktestActionPending(taskId, 'cancel')) {
@@ -1073,12 +1159,80 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     const nextResults = new Map(this.backtestTaskResults);
     nextResults.set(taskId, result);
     this.backtestTaskResults = nextResults;
+    this.backtestViewModels.delete(taskId);
   }
 
   private removeBacktestTaskResult(taskId: string): void {
     const nextResults = new Map(this.backtestTaskResults);
     nextResults.delete(taskId);
     this.backtestTaskResults = nextResults;
+    this.backtestViewModels.delete(taskId);
+  }
+
+  private buildBacktestViewModel(taskResult: BacktestTaskResult): BacktestViewModel {
+    const storedResult = taskResult.stored_result || {};
+    const proposedResult = taskResult.proposed_result || {};
+    const storedRates = taskResult.stored_result_rate || {};
+    const proposedRates = taskResult.proposed_result_rate || {};
+    const outcomeKeys = new Set([...Object.keys(storedResult), ...Object.keys(proposedResult)]);
+    const outcomeRows = Array.from(outcomeKeys).sort().map((outcome) => {
+      const storedCount = storedResult[outcome] || 0;
+      const proposedCount = proposedResult[outcome] || 0;
+      return {
+        outcome,
+        storedCount,
+        proposedCount,
+        storedRate: storedRates[outcome] || 0,
+        proposedRate: proposedRates[outcome] || 0,
+        delta: proposedCount - storedCount,
+      };
+    });
+
+    const labelEntries = Object.entries(taskResult.label_counts || {});
+    const labeledRecords = taskResult.labeled_records || 0;
+    const labelRows = labelEntries.slice(0, BACKTEST_RENDER_ROW_LIMIT).map(([label, count]) => ({
+      label,
+      count,
+      share: labeledRecords > 0 ? (Number(count) * 100) / labeledRecords : 0,
+    }));
+
+    const qualityRows = this.buildBacktestQualityRows(taskResult);
+    const totalQualityRows = Math.max(
+      taskResult.stored_quality_metrics?.length || 0,
+      taskResult.proposed_quality_metrics?.length || 0,
+    );
+    const totalRecords = taskResult.total_records || 0;
+
+    return {
+      outcomeRows,
+      labelRows,
+      hiddenLabelRowCount: Math.max(0, labelEntries.length - labelRows.length),
+      qualityRows,
+      hiddenQualityRowCount: Math.max(0, totalQualityRows - qualityRows.length),
+      labeledShare: totalRecords > 0 ? (labeledRecords * 100) / totalRecords : 0,
+      storedQualitySummary: taskResult.stored_quality_summary || null,
+      proposedQualitySummary: taskResult.proposed_quality_summary || null,
+    };
+  }
+
+  private buildBacktestQualityRows(taskResult: BacktestTaskResult): BacktestQualityRow[] {
+    const storedMetrics = taskResult.stored_quality_metrics || [];
+    const proposedMetrics = taskResult.proposed_quality_metrics || [];
+    const rowCount = Math.min(
+      BACKTEST_RENDER_ROW_LIMIT,
+      Math.max(storedMetrics.length, proposedMetrics.length),
+    );
+    const rows: BacktestQualityRow[] = [];
+
+    for (let index = 0; index < rowCount; index += 1) {
+      const stored = storedMetrics[index];
+      const proposed = proposedMetrics[index];
+      const outcome = stored?.outcome || proposed?.outcome || '';
+      const label = stored?.label || proposed?.label || '';
+      rows.push({ outcome, label, stored, proposed });
+    }
+
+    return rows;
   }
 
   private isBacktestActive(taskId: string): boolean {

@@ -1,5 +1,13 @@
 # What's New
 
+## v1.16.0
+
+* **Default-on AI authoring setting**: New orgs now see AI Rule Authoring enabled in Settings by default, while explicit per-org disable choices remain respected.
+* **Manual AI draft backtests**: Valid AI-generated drafts in the rule edit flow now expose a **Run Backtest** action under the proposed logic change instead of starting an automatic preview.
+* **Draft impact signals in Backtest Results**: AI draft backtests now flow into the existing right-side Backtest Results section with stored-vs-proposed outcome deltas, skipped-record and missing-field warnings, and label-aware precision/recall/F1 when labeled history exists.
+* **Backtest rendering guardrails**: Backtest results now stay collapsed until opened, skip oversized inline logic diffs, and cap large label/quality tables so the browser stays responsive during backtest polling.
+* **Lane guidance during AI review**: Drafts that touch the neutral outcome now call out when the allowlist lane may be a better fit, while allowlist drafts remind reviewers to keep neutral-outcome behavior constrained.
+
 ## v1.15.1
 
 * **Strict mode UI de-emphasis**: The Strict Mode card now sits at the bottom of Settings instead of leading the page.
