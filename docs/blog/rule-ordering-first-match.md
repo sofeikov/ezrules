@@ -70,6 +70,10 @@ The operator flow is now:
    - `#` to jump a rule to an exact position
 6. Click **Save Order**
 
+![Main rule execution mode setting](../assets/readme/settings-execution-mode.png)
+
+![Rule ordering controls in first-match mode](../assets/readme/rule-order-controls.png)
+
 When first-match mode is not enabled, the ordering UI is intentionally hidden:
 
 - no `Order` column

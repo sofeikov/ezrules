@@ -55,6 +55,10 @@ Open **Analytics** (sidebar label) to view:
 - Label trends over time
 - Aggregation windows (`1h`, `6h`, `12h`, `24h`, `30d`)
 
+For a useful first read, set the time range to **Last 30 Days** so sparse label uploads still form visible trend lines.
+
+![30-day label analytics charts](../assets/readme/label-analytics-30d.png)
+
 ---
 
 ## Outcomes
@@ -91,13 +95,15 @@ if $user_id in @blocked_users:
 
 ### Monitor Outcome Trends
 
-Use the Dashboard to track outcome volume over time.
+Use the Dashboard to track outcome volume over time. Start with the `30d` aggregation when you want to see whether a decision is trending upward or fading out.
 
 Key analytics endpoint:
 
-- `GET /api/v2/analytics/outcomes-distribution?aggregation=24h`
+- `GET /api/v2/analytics/outcomes-distribution?aggregation=30d`
 
 Supported `aggregation` values: `1h`, `6h`, `12h`, `24h`, `30d`.
+
+![30-day outcome trend charts](../assets/readme/dashboard-30d-outcomes.png)
 
 ### Outcome Best Practices
 
@@ -150,7 +156,7 @@ This loop is where most quality improvement happens.
 - `POST /api/v2/labels/upload`
 - `GET /api/v2/labels`
 - `GET /api/v2/analytics/labels-summary`
-- `GET /api/v2/analytics/labels-distribution?aggregation=24h`
+- `GET /api/v2/analytics/labels-distribution?aggregation=30d`
 - `GET /api/v2/user-lists`
 - `GET /api/v2/outcomes`
 - `POST /api/v2/outcomes`

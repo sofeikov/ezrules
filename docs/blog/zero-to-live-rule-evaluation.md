@@ -71,6 +71,16 @@ You should get JSON with:
 1. Open **Dashboard** to confirm transaction activity.
 2. Open the rule detail page and use **Test Rule** to try a low amount (for example, `500`) and compare results.
 
+Use the 30-day Dashboard window for demos so the chart shows the traffic shape clearly, then zoom into the rule's own test panel for the concrete decision result.
+
+![30-day transaction volume dashboard](../assets/readme/dashboard-30d-volume.png)
+
+![Rule test panel with successful HOLD result](../assets/readme/rule-test-panel.png)
+
+After the live call, the Tested Events view gives analysts the concrete event record, outcome, and highlighted payload fields that explain why the rule fired.
+
+![Tested event payload with referenced fields highlighted](../assets/readme/tested-event-inspector.png)
+
 ## Minute 9-10: Tune and rerun
 
 Change the threshold, save, and call `/api/v2/evaluate` again. This quick edit-test-evaluate loop is the core workflow teams use to iterate on fraud and compliance logic without redeploying application code.

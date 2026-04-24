@@ -22,7 +22,7 @@ Open **Dashboard** in the sidebar and verify:
 - Outcome charts move as you submit test or live events
 - Opening a ranked rule lets you inspect that rule's own **Performance** card and confirm which outcomes are firing over time
 
-Use aggregation windows: `1h`, `6h`, `12h`, `24h`, `30d`.
+Use aggregation windows: `1h`, `6h`, `12h`, `24h`, `30d`. For the first operational review, start with `30d` so volume and outcome lines show trend shape rather than just recent activity.
 
 Healthy signal:
 
@@ -30,6 +30,14 @@ Healthy signal:
 - least-firing rules include active zero-hit rules instead of dropping them from the ranking
 - outcome lines change after rule updates or test submissions
 - the rule-detail performance chart shows the same rule generating plausible outcome counts in the time window you selected
+
+![30-day transaction volume chart](../assets/readme/dashboard-30d-volume.png)
+
+![30-day outcome trend charts](../assets/readme/dashboard-30d-outcomes.png)
+
+![Dashboard rule activity cards](../assets/readme/dashboard-rule-activity.png)
+
+![30-day rule detail performance chart](../assets/readme/rule-detail-performance-30d.png)
 
 ---
 
@@ -59,6 +67,8 @@ Healthy signal:
 - recent traffic appears quickly after calls to `POST /api/v2/evaluate`
 - triggered rules match the rule logic you expect from the payload
 
+![Highlighted event payload fields](../assets/readme/tested-event-inspector.png)
+
 ---
 
 ## 3) Check Label Feedback (Analytics)
@@ -77,6 +87,8 @@ If charts are empty, feed labels through:
 Healthy signal:
 
 - `total labeled` increases after marking/uploading labels
+
+![30-day label analytics charts](../assets/readme/label-analytics-30d.png)
 
 ---
 
@@ -103,17 +115,19 @@ Healthy signal:
 - high precision on fraud-related mappings (few false positives)
 - high recall on critical labels (few missed fraud labels)
 
+![Rule quality report with ranked rules and pair metrics](../assets/readme/rule-quality-report.png)
+
 ---
 
 ## 5) Drill Down via API
 
 - `GET /api/v2/tested-events?limit=50`
-- `GET /api/v2/analytics/transaction-volume?aggregation=6h`
-- `GET /api/v2/analytics/outcomes-distribution?aggregation=24h`
-- `GET /api/v2/analytics/rules/{rule_id}/outcomes-distribution?aggregation=6h`
-- `GET /api/v2/analytics/rule-activity?aggregation=6h&limit=5`
+- `GET /api/v2/analytics/transaction-volume?aggregation=30d`
+- `GET /api/v2/analytics/outcomes-distribution?aggregation=30d`
+- `GET /api/v2/analytics/rules/{rule_id}/outcomes-distribution?aggregation=30d`
+- `GET /api/v2/analytics/rule-activity?aggregation=30d&limit=5`
 - `GET /api/v2/analytics/labels-summary`
-- `GET /api/v2/analytics/labels-distribution?aggregation=6h`
+- `GET /api/v2/analytics/labels-distribution?aggregation=30d`
 - `GET /api/v2/analytics/rule-quality?min_support=5&lookback_days=30`
 - `POST /api/v2/analytics/rule-quality/reports` then `GET /api/v2/analytics/rule-quality/reports/{report_id}`
 
@@ -148,7 +162,7 @@ GROUP BY el.label;
 | Symptom | Likely Cause | Fix |
 |---|---|---|
 | Tested Events page is empty | No events have been persisted yet | Send traffic to `POST /api/v2/evaluate` or seed demo/test data |
-| Dashboard charts are empty | No recent events in selected window | Submit new events and switch aggregation to `24h` |
+| Dashboard charts are empty | No recent events in selected window | Submit new events and switch aggregation to `30d` |
 | Outcome charts empty but volume exists | Rules return no allowed outcomes | Verify rule returns valid outcomes and outcome exists in **Outcomes** |
 | Label charts empty | No labels marked/uploaded | Add labels via UI workflow or `POST /api/v2/labels/mark-event` |
 | Rule quality page empty | No labeled events or support threshold too high | Label events first, then reduce **Min support** |

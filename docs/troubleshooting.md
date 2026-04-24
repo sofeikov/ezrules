@@ -141,8 +141,8 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 **Diagnose**
 
 ```bash
-curl "http://localhost:8888/api/v2/analytics/transaction-volume?aggregation=24h"
-curl "http://localhost:8888/api/v2/analytics/outcomes-distribution?aggregation=24h"
+curl "http://localhost:8888/api/v2/analytics/transaction-volume?aggregation=30d"
+curl "http://localhost:8888/api/v2/analytics/outcomes-distribution?aggregation=30d"
 curl "http://localhost:8888/api/v2/analytics/labels-summary"
 ```
 

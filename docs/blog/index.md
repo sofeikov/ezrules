@@ -2,6 +2,8 @@
 
 Short practical writeups on using ezrules in real workflows.
 
+![30-day transaction volume dashboard](../assets/readme/dashboard-30d-volume.png)
+
 ## Posts
 
 - [From Zero to Live Rule Evaluation in 10 Minutes with ezrules](zero-to-live-rule-evaluation.md)

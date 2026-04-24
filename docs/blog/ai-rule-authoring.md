@@ -67,6 +67,8 @@ The safest part of the feature is not the generation. It is the review flow arou
 
 The assistant now makes the generated draft easier to inspect before it affects the real rule body.
 
+![AI rule authoring panel with prompt and context](../assets/readme/ai-authoring-panel.png)
+
 ### 1. Validation and repair happen before the user copies anything
 
 Generated rules are checked against the same validation path used by the rule API.
@@ -156,6 +158,8 @@ An organisation can now:
 - select the OpenAI provider
 - choose the model
 - manage the provider API key
+
+![AI rule authoring settings](../assets/readme/ai-authoring-settings.png)
 
 At the moment, the product UI intentionally supports **OpenAI only**.
 

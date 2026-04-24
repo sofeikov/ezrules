@@ -4,7 +4,7 @@ Open-source transaction monitoring for teams that need clear rule control, audit
 
 ezrules gives fraud, risk, and compliance administrators a web workspace for managing decision rules without turning every policy update into an engineering project. Rules can be drafted, tested, reviewed, promoted, paused, rolled out, and audited from one place, while your systems keep sending events to a simple evaluation API.
 
-![ezrules dashboard](docs/assets/readme/dashboard.png)
+![30-day ezrules transaction volume dashboard](docs/assets/readme/dashboard-30d-volume.png)
 
 ## Why Teams Use It
 
@@ -52,23 +52,37 @@ Create and maintain the rule set from a reviewable UI. Active rules, drafts, ord
 
 ![Rules list](docs/assets/readme/rules.png)
 
+### Monitor 30-Day Activity
+
+Switch the dashboard to the 30-day window to review sustained traffic and outcome patterns instead of a single point-in-time snapshot.
+
+![30-day outcome trends](docs/assets/readme/dashboard-30d-outcomes.png)
+
 ### Inspect Rule Logic And Performance
 
 Each rule has its own detail view with source logic, test payloads, historical revisions, backtesting, and hit/outcome performance.
 
-![Rule detail](docs/assets/readme/rule-detail.png)
+![30-day rule performance chart](docs/assets/readme/rule-detail-performance-30d.png)
 
 ### Review Tested Events
 
 The Tested Events view connects decisions back to the raw payload, triggered rules, labels, and resolved outcomes. Referenced fields are highlighted so an admin can see why a rule fired.
 
-![Tested events](docs/assets/readme/tested-events.png)
+![Tested event payload with referenced fields highlighted](docs/assets/readme/tested-event-inspector.png)
 
 ### Measure Rule Quality
 
 When events are labeled, ezrules can compare outcomes to ground truth and rank rules by precision, recall, F1, true positives, false positives, and false negatives.
 
-![Rule quality](docs/assets/readme/rule-quality.png)
+![Rule quality report](docs/assets/readme/rule-quality-report.png)
+
+### Validate Candidate Changes Safely
+
+Use shadow mode when you want observe-only comparison, and use rollouts when a candidate rule should serve a controlled share of live traffic.
+
+![Shadow comparison](docs/assets/readme/shadow-comparison.png)
+
+![Rollout comparison](docs/assets/readme/rollout-comparison.png)
 
 ## How It Fits Into Your System
 

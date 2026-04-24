@@ -48,6 +48,8 @@ Production evaluation config now includes only `active` rules.
 
 An org can opt into `auto_promote_active_rule_updates` through the runtime settings API or **Settings → General**. When that setting is enabled, editing an already active rule keeps it active and rewrites the production config immediately, but the caller still needs `PROMOTE_RULES` in addition to `MODIFY_RULE`.
 
+![Rule lifecycle setting for active-rule edits](../assets/readme/rule-lifecycle-setting.png)
+
 ```mermaid
 flowchart LR
     A[Create rule] --> B[draft]
@@ -66,6 +68,10 @@ flowchart LR
     G --> K
     K --> L[archived]
 ```
+
+In the rule list, the lifecycle state stays visible next to the rule, alongside the actions that are available for that state.
+
+![Rule list with draft, active, and shadow lifecycle badges](../assets/readme/rule-lifecycle-statuses.png)
 
 ## Promotion is a first-class approval step
 
@@ -107,6 +113,10 @@ Rollback does not rewind the database in place and it does not remove newer revi
 - the rollback action itself is recorded in audit history
 
 This is the safer operational model: you recover known-good logic quickly without destroying evidence of what changed.
+
+![Rule history timeline with rollback action](../assets/readme/rule-history-timeline.png)
+
+![Rollback confirmation with current versus target diff](../assets/readme/rule-history-rollback-dialog.png)
 
 ## Example: promote and archive
 

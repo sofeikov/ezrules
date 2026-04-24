@@ -67,6 +67,10 @@ Open **Rule Rollouts** in the sidebar to see:
 - control outcomes for the compared events
 - candidate outcomes for the same events
 
+![Active rollout rule with traffic split summary](../assets/readme/rollout-active-rule.png)
+
+![Rollout comparison for served split and candidate outcomes](../assets/readme/rollout-comparison.png)
+
 API endpoints:
 
 - `GET /api/v2/rollouts`
