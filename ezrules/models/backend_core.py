@@ -296,6 +296,70 @@ class Label(Base):
     org: Mapped["Organisation"] = relationship(back_populates="labels")
 
 
+class EventVersion(Base):
+    __tablename__ = "event_versions"
+    __table_args__ = (
+        UniqueConstraint("o_id", "event_id", "event_version", name="uq_event_versions_org_event_version"),
+        Index("ix_event_versions_o_id_event_id_version", "o_id", "event_id", "event_version"),
+        Index("ix_event_versions_o_id_ingested_at", "o_id", "ingested_at"),
+        Index("ix_event_versions_o_id_event_timestamp", "o_id", "event_timestamp"),
+    )
+
+    ev_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    event_id = Column(String, nullable=False)
+    event_version = Column(Integer, nullable=False)
+    event_timestamp = Column(Integer, nullable=False)
+    event_data = Column(JSON, nullable=False)
+    payload_hash = Column(String(64), nullable=False)
+    source = Column(String(32), nullable=False, default="evaluate")
+    supersedes_ev_id: Mapped[int | None] = mapped_column(ForeignKey("event_versions.ev_id"), nullable=True)
+    ingested_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+
+
+class EvaluationDecision(Base):
+    __tablename__ = "evaluation_decisions"
+    __table_args__ = (
+        UniqueConstraint("o_id", "idempotency_key", name="uq_evaluation_decisions_org_idempotency_key"),
+        Index("ix_evaluation_decisions_o_id_evaluated_at", "o_id", "evaluated_at"),
+        Index("ix_evaluation_decisions_o_id_event_id_version", "o_id", "event_id", "event_version"),
+        Index("ix_evaluation_decisions_o_id_served", "o_id", "served"),
+    )
+
+    ed_id = Column(Integer, unique=True, primary_key=True)
+    ev_id: Mapped[int] = mapped_column(ForeignKey("event_versions.ev_id", ondelete="CASCADE"), nullable=False)
+    tl_id: Mapped[int | None] = mapped_column(
+        ForeignKey("testing_record_log.tl_id", ondelete="SET NULL"), nullable=True
+    )
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    event_id = Column(String, nullable=False)
+    event_version = Column(Integer, nullable=False)
+    event_timestamp = Column(Integer, nullable=False)
+    decision_type = Column(String(32), nullable=False, default="served")
+    served = Column(Boolean, nullable=False, default=True)
+    idempotency_key = Column(String(128), nullable=True)
+    rule_config_label = Column(String(64), nullable=False, default="production")
+    rule_config_version = Column(Integer, nullable=True)
+    runtime_config = Column(JSON, nullable=True)
+    outcome_counters = Column(JSON, nullable=True)
+    resolved_outcome = Column(String, nullable=True)
+    all_rule_results = Column(JSON, nullable=True)
+    evaluated_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+
+
+class EvaluationRuleResult(Base):
+    __tablename__ = "evaluation_rule_results"
+    __table_args__ = (
+        Index("ix_evaluation_rule_results_ed_id_r_id", "ed_id", "r_id"),
+        Index("ix_evaluation_rule_results_r_id", "r_id"),
+    )
+
+    err_id = Column(Integer, unique=True, primary_key=True)
+    ed_id: Mapped[int] = mapped_column(ForeignKey("evaluation_decisions.ed_id", ondelete="CASCADE"), nullable=False)
+    r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"), nullable=False)
+    rule_result = Column(String, nullable=False)
+
+
 class TestingRecordLog(Base):
     __tablename__ = "testing_record_log"
     __table_args__ = (
@@ -349,6 +413,9 @@ class ShadowResultsLog(Base):
 
     sr_id = Column(Integer, unique=True, primary_key=True)
     tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id", ondelete="CASCADE"))
+    ed_id: Mapped[int | None] = mapped_column(
+        ForeignKey("evaluation_decisions.ed_id", ondelete="SET NULL"), nullable=True
+    )
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
     rule_result = Column(String, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
@@ -359,10 +426,14 @@ class RuleDeploymentResultsLog(Base):
     __table_args__ = (
         Index("ix_rule_deployment_results_log_o_id_mode_dr_id", "o_id", "mode", "dr_id"),
         Index("ix_rule_deployment_results_log_o_id_r_id", "o_id", "r_id"),
+        Index("ix_rule_deployment_results_log_ed_id", "ed_id"),
     )
 
     dr_id = Column(Integer, unique=True, primary_key=True)
     tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id", ondelete="CASCADE"))
+    ed_id: Mapped[int | None] = mapped_column(
+        ForeignKey("evaluation_decisions.ed_id", ondelete="SET NULL"), nullable=True
+    )
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
     mode = Column(String(20), nullable=False)

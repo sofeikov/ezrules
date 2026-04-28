@@ -40,6 +40,8 @@ def _serialize_shadow_payload(
     event_id: str,
     event_data: dict[str, Any],
     production_all_rule_results: dict[Any, Any],
+    evaluation_decision_id: int | None,
+    event_version_id: int | None,
     shadow_config: list[dict[str, Any]],
     shadow_config_version: int,
     main_rule_execution_mode: str,
@@ -50,6 +52,8 @@ def _serialize_shadow_payload(
             "o_id": o_id,
             "event_id": event_id,
             "event_data": event_data,
+            "evaluation_decision_id": evaluation_decision_id,
+            "event_version_id": event_version_id,
             "production_all_rule_results": {str(r_id): result for r_id, result in production_all_rule_results.items()},
             "shadow_config": shadow_config,
             "shadow_config_version": shadow_config_version,
@@ -69,6 +73,8 @@ def enqueue_shadow_evaluation(
     event_id: str,
     event_data: dict[str, Any],
     production_all_rule_results: dict[Any, Any],
+    evaluation_decision_id: int | None = None,
+    event_version_id: int | None = None,
 ) -> bool:
     config_obj = get_deployment_config(db, o_id=o_id, label=SHADOW_CONFIG_LABEL)
     if config_obj is None or not config_obj.config:
@@ -83,6 +89,8 @@ def enqueue_shadow_evaluation(
         event_id=event_id,
         event_data=event_data,
         production_all_rule_results=production_all_rule_results,
+        evaluation_decision_id=evaluation_decision_id,
+        event_version_id=event_version_id,
         shadow_config=shadow_config,
         shadow_config_version=int(config_obj.version),
         main_rule_execution_mode=get_main_rule_execution_mode(db, o_id),
@@ -121,6 +129,7 @@ def _parse_enqueued_at(raw_value: Any) -> datetime | None:
 def _persist_shadow_results(payload: dict[str, Any]) -> int:
     o_id = int(payload["o_id"])
     tl_id = int(payload["tl_id"])
+    evaluation_decision_id = payload.get("evaluation_decision_id")
     event_id = str(payload.get("event_id") or "")
     event_data = dict(payload.get("event_data") or {})
     production_all_rule_results = {
@@ -146,10 +155,18 @@ def _persist_shadow_results(payload: dict[str, Any]) -> int:
     persisted_logs = 0
     try:
         for r_id, rule_result in shadow_result.get("all_rule_results", {}).items():
-            db_session.add(ShadowResultsLog(tl_id=tl_id, r_id=int(r_id), rule_result=str(rule_result)))
+            db_session.add(
+                ShadowResultsLog(
+                    tl_id=tl_id,
+                    ed_id=int(evaluation_decision_id) if evaluation_decision_id is not None else None,
+                    r_id=int(r_id),
+                    rule_result=str(rule_result),
+                )
+            )
             db_session.add(
                 RuleDeploymentResultsLog(
                     tl_id=tl_id,
+                    ed_id=int(evaluation_decision_id) if evaluation_decision_id is not None else None,
                     r_id=int(r_id),
                     o_id=o_id,
                     mode=DEPLOYMENT_MODE_SHADOW,

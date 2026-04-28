@@ -16,7 +16,16 @@ from ezrules.backend.api_v2.auth.dependencies import (
 from ezrules.backend.api_v2.schemas.tested_events import TestedEventItem, TestedEventsResponse, TriggeredRuleItem
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import Rule as ParsedRule
-from ezrules.models.backend_core import Label, Rule, TestingRecordLog, TestingResultsLog, User
+from ezrules.models.backend_core import (
+    EvaluationDecision,
+    EvaluationRuleResult,
+    EventVersion,
+    Label,
+    Rule,
+    TestingRecordLog,
+    TestingResultsLog,
+    User,
+)
 
 router = APIRouter(prefix="/api/v2/tested-events", tags=["Tested Events"])
 
@@ -43,6 +52,86 @@ def list_tested_events(
     db: Any = Depends(get_db),
 ) -> TestedEventsResponse:
     """Return the most recently stored event evaluations with triggered rules."""
+    records = (
+        db.query(EvaluationDecision, EventVersion, TestingRecordLog.el_id)
+        .join(EventVersion, EventVersion.ev_id == EvaluationDecision.ev_id)
+        .outerjoin(TestingRecordLog, TestingRecordLog.tl_id == EvaluationDecision.tl_id)
+        .filter(EvaluationDecision.o_id == current_org_id, EvaluationDecision.served.is_(True))
+        .order_by(EvaluationDecision.ed_id.desc())
+        .limit(limit)
+        .all()
+    )
+    total = (
+        db.query(EvaluationDecision)
+        .filter(EvaluationDecision.o_id == current_org_id, EvaluationDecision.served.is_(True))
+        .count()
+    )
+    if total == 0:
+        return _list_legacy_tested_events(db, current_org_id, limit, include_referenced_fields)
+
+    triggered_rules_by_tl: dict[int, list[TriggeredRuleItem]] = defaultdict(list)
+    referenced_fields_by_rule_id: dict[int, list[str]] = {}
+    decision_ids = [int(decision.ed_id) for decision, _event_version, _label_id in records]
+    label_names_by_id: dict[int, str] = {}
+
+    label_rows = db.query(Label.el_id, Label.label).filter(Label.o_id == current_org_id).all()
+    label_names_by_id = {int(el_id): str(label_name) for el_id, label_name in label_rows}
+
+    if decision_ids:
+        rule_rows = (
+            db.query(
+                EvaluationDecision.tl_id,
+                Rule.r_id,
+                Rule.rid,
+                Rule.description,
+                Rule.logic,
+                EvaluationRuleResult.rule_result,
+            )
+            .join(EvaluationRuleResult, EvaluationRuleResult.ed_id == EvaluationDecision.ed_id)
+            .join(Rule, Rule.r_id == EvaluationRuleResult.r_id)
+            .filter(EvaluationDecision.ed_id.in_(decision_ids))
+            .order_by(EvaluationDecision.ed_id.desc(), Rule.rid.asc())
+            .all()
+        )
+
+        for tl_id, r_id, rid, description, rule_logic, rule_result in rule_rows:
+            rule_id = int(r_id)
+            if include_referenced_fields and rule_id not in referenced_fields_by_rule_id:
+                referenced_fields_by_rule_id[rule_id] = _extract_referenced_fields(str(rule_logic))
+
+            triggered_rule = TriggeredRuleItem(
+                r_id=rule_id,
+                rid=str(rid),
+                description=str(description),
+                outcome=str(rule_result),
+            )
+            if include_referenced_fields:
+                triggered_rule.referenced_fields = referenced_fields_by_rule_id[rule_id]
+            triggered_rules_by_tl[int(tl_id)].append(triggered_rule)
+
+    events = [
+        TestedEventItem(
+            tl_id=int(decision.tl_id),
+            event_id=str(decision.event_id),
+            event_timestamp=int(decision.event_timestamp),
+            resolved_outcome=str(decision.resolved_outcome) if decision.resolved_outcome is not None else None,
+            label_name=label_names_by_id.get(int(label_id)) if label_id is not None else None,
+            outcome_counters=dict(decision.outcome_counters or {}),
+            event_data=dict(event_version.event_data or {}),
+            triggered_rules=triggered_rules_by_tl.get(int(decision.tl_id), []),
+        )
+        for decision, event_version, label_id in records
+    ]
+
+    return TestedEventsResponse(events=events, total=int(total), limit=limit)
+
+
+def _list_legacy_tested_events(
+    db: Any,
+    current_org_id: int,
+    limit: int,
+    include_referenced_fields: bool,
+) -> TestedEventsResponse:
     records = (
         db.query(TestingRecordLog)
         .filter(TestingRecordLog.o_id == current_org_id)

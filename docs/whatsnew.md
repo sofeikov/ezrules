@@ -1,5 +1,13 @@
 # What's New
 
+## v1.17.0
+
+* **Canonical evaluation ledgers**: Live evaluation now writes append-only event versions and immutable served-decision records as the default persistence contract, so repeated business events can be represented as ordered versions instead of ad hoc duplicate rows.
+* **Ledger-backed evaluate responses**: `POST /api/v2/evaluate` now returns the canonical `event_version` and `evaluation_decision_id` for the served decision.
+* **Served-decision provenance links**: Rollout and shadow comparison records can now point back to the immutable served decision that produced them, keeping traffic analysis and replay anchored to the same ledger record.
+* **Tested Events reads canonical decisions**: The Tested Events API now reads served traffic from the evaluation-decision ledger while preserving the existing UI response shape.
+* **Strict-mode control removed from Settings**: Served-decision persistence is now the default evaluator contract, so the Settings page no longer exposes a separate Strict Mode checkbox or disable confirmation flow.
+
 ## v1.16.0
 
 * **Default-on AI authoring setting**: New orgs now see AI Rule Authoring enabled in Settings by default, while explicit per-org disable choices remain respected.

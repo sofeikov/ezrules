@@ -47,7 +47,9 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
 
 `POST /api/v2/evaluate`
 
-Evaluates an event against the current rule configuration, resolves any conflicting outcomes using the configured outcome hierarchy, and stores evaluation results in the database.
+Evaluates an event against the current rule configuration, resolves any conflicting outcomes using the configured outcome hierarchy, and stores evaluation results in the canonical evaluation ledger.
+
+Each successful request appends an event version for the supplied `event_id` and writes an immutable served-decision record linked to that exact version. Re-submitting the same business event with new facts creates a later event version; replay/debug tooling can therefore distinguish "what was served then" from the latest known state of the event.
 
 #### Allowlist Short-Circuiting
 
@@ -97,11 +99,15 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
   "resolved_outcome": "HOLD",
   "rule_results": {
     "7": "HOLD"
-  }
+  },
+  "event_version": 1,
+  "evaluation_decision_id": 42
 }
 ```
 
 `resolved_outcome` is the highest-severity outcome after applying the ordering configured under **Settings → Outcome Resolution**.
+
+`event_version` is the append-only version number for the supplied `event_id` within the caller's organisation. `evaluation_decision_id` identifies the immutable served-decision record used by Tested Events, rollout/shadow provenance, replay, and downstream analysis.
 
 When allowlist rules match, `resolved_outcome` is derived from the allowlist result and the main rules do not contribute to the returned evaluation.
 

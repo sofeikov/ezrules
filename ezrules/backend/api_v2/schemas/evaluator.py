@@ -45,3 +45,5 @@ class EvaluateResponse(BaseModel):
         None, description="Highest-severity outcome after applying the configured hierarchy"
     )
     rule_results: dict[str, str] = Field(..., description="Mapping of rule_id to its outcome")
+    event_version: int | None = Field(None, description="Canonical append-only version for this business event")
+    evaluation_decision_id: int | None = Field(None, description="Immutable served-decision ledger identifier")

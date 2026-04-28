@@ -7,8 +7,6 @@ import { environment } from '../../environments/environment';
 export interface RuntimeSettings {
   autoPromoteActiveRuleUpdates: boolean;
   defaultAutoPromoteActiveRuleUpdates: boolean;
-  strictModeEnabled: boolean;
-  defaultStrictModeEnabled: boolean;
   mainRuleExecutionMode: string;
   defaultMainRuleExecutionMode: string;
   ruleQualityLookbackDays: number;
@@ -56,7 +54,6 @@ export interface OutcomeHierarchyItem {
 
 export interface RuntimeSettingsUpdateRequest {
   autoPromoteActiveRuleUpdates?: boolean;
-  strictModeEnabled?: boolean;
   mainRuleExecutionMode?: string;
   ruleQualityLookbackDays?: number;
   neutralOutcome?: string;
@@ -73,8 +70,6 @@ export interface AIAuthoringSettingsUpdateRequest {
 interface RuntimeSettingsV2 {
   auto_promote_active_rule_updates: boolean;
   default_auto_promote_active_rule_updates: boolean;
-  strict_mode_enabled: boolean;
-  default_strict_mode_enabled: boolean;
   main_rule_execution_mode: string;
   default_main_rule_execution_mode: string;
   rule_quality_lookback_days: number;
@@ -148,7 +143,6 @@ export class RuntimeSettingsService {
   updateRuntimeSettings(request: RuntimeSettingsUpdateRequest): Observable<RuntimeSettings> {
     return this.http.put<RuntimeSettingsV2>(this.settingsUrl, {
       auto_promote_active_rule_updates: request.autoPromoteActiveRuleUpdates,
-      strict_mode_enabled: request.strictModeEnabled,
       main_rule_execution_mode: request.mainRuleExecutionMode,
       rule_quality_lookback_days: request.ruleQualityLookbackDays,
       neutral_outcome: request.neutralOutcome,
@@ -270,8 +264,6 @@ export class RuntimeSettingsService {
     return {
       autoPromoteActiveRuleUpdates: response.auto_promote_active_rule_updates,
       defaultAutoPromoteActiveRuleUpdates: response.default_auto_promote_active_rule_updates,
-      strictModeEnabled: response.strict_mode_enabled,
-      defaultStrictModeEnabled: response.default_strict_mode_enabled,
       mainRuleExecutionMode: response.main_rule_execution_mode,
       defaultMainRuleExecutionMode: response.default_main_rule_execution_mode,
       ruleQualityLookbackDays: response.rule_quality_lookback_days,

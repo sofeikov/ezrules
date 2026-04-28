@@ -207,6 +207,8 @@ def evaluate(
                 outcome_set=result["outcome_set"],
                 resolved_outcome=result.get("resolved_outcome"),
                 rule_results={str(k): str(v) for k, v in result["rule_results"].items()},
+                event_version=result.get("event_version"),
+                evaluation_decision_id=result.get("evaluation_decision_id"),
             )
 
         production_result = lre.evaluate_rules(event.event_data)
@@ -247,10 +249,12 @@ def evaluate(
 
     if rollout_logs:
         try:
+            evaluation_decision_id = result.get("evaluation_decision_id")
             for log in rollout_logs:
                 db.add(
                     RuleDeploymentResultsLog(
                         tl_id=tl_id,
+                        ed_id=int(evaluation_decision_id) if evaluation_decision_id is not None else None,
                         r_id=int(log["r_id"]),
                         o_id=lre.o_id,
                         mode=str(log["mode"]),
@@ -285,6 +289,8 @@ def evaluate(
         event_id=str(event.event_id),
         event_data=event.event_data,
         production_all_rule_results=dict(production_result.get("all_rule_results", {})),
+        evaluation_decision_id=int(result["evaluation_decision_id"]),
+        event_version_id=int(result["event_version_id"]),
     )
 
     _persist_evaluate_observations(db, request_data.event_data, lre.o_id)
@@ -294,4 +300,6 @@ def evaluate(
         outcome_set=result["outcome_set"],
         resolved_outcome=result.get("resolved_outcome"),
         rule_results={str(k): str(v) for k, v in result["rule_results"].items()},
+        event_version=result.get("event_version"),
+        evaluation_decision_id=result.get("evaluation_decision_id"),
     )

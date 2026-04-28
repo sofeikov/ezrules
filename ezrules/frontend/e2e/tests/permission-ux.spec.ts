@@ -87,7 +87,7 @@ test.describe('Permission-Aware UX', () => {
     await expect(page.locator('text=+ Add role')).toHaveCount(0);
   });
 
-  test('renders the strict mode settings card without an active mutation path for a read-only settings viewer', async ({ page }) => {
+  test('renders settings without strict mode controls for a read-only settings viewer', async ({ page }) => {
     const settingsPage = new SettingsPage(page);
 
     await mockAuthMe(page, ['view_roles']);
@@ -145,10 +145,8 @@ test.describe('Permission-Aware UX', () => {
     await settingsPage.goto();
     await settingsPage.waitForPageToLoad();
 
-    await expect(settingsPage.strictModeCard).toBeVisible();
-    await expect(settingsPage.strictModeCheckbox).toBeDisabled();
-    await expect(settingsPage.strictModeSaveButton).toHaveCount(0);
-    await expect(settingsPage.strictModeAuditLink).toHaveCount(0);
-    await expect(settingsPage.strictModeCard).toContainText('are recorded in the dedicated audit trail');
+    await expect(page.locator('#settings-strictModeCard')).toHaveCount(0);
+    await expect(page.locator('#settings-strictModeEnabled')).toHaveCount(0);
+    await expect(page.locator('#settings-saveStrictMode')).toHaveCount(0);
   });
 });
