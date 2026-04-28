@@ -9,9 +9,9 @@ ezrules gives fraud, risk, and compliance administrators a web workspace for man
 ## Why Teams Use It
 
 - **Own the rule lifecycle.** Create rules, keep drafts separate from live logic, pause risky rules, restore older revisions, and promote changes deliberately.
-- **See what happened.** Review evaluated events, the outcome returned, every rule that fired, and the exact event fields those rules used.
+- **See what happened.** Review canonical served decisions, the outcome returned, every rule that fired, and the exact event version those rules used.
 - **Improve rules with evidence.** Use labels, precision/recall reports, backtests, shadow rules, and percentage rollouts before changing production decisions.
-- **Run with admin controls.** Manage roles, permissions, API keys, outcomes, user lists, field types, strict mode, and audit history inside the product.
+- **Run with admin controls.** Manage roles, permissions, API keys, outcomes, user lists, field types, traffic persistence, and audit history inside the product.
 - **Self-host it.** Run the full stack yourself with PostgreSQL, Redis, FastAPI, Celery, and the web UI.
 
 ## Demo

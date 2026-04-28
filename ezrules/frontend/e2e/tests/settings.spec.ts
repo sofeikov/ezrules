@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import { SettingsPage } from '../pages/settings.page';
-import { AuditTrailPage } from '../pages/audit-trail.page';
 import { getApiBaseUrl, getAuthToken } from '../support/config';
 
 const API_BASE = getApiBaseUrl();
@@ -39,94 +38,6 @@ test.describe('Settings Page', () => {
     await expect(settingsPage.successMessage).toBeVisible();
   });
 
-  test('should persist strict mode enablement and surface the audit entry', async ({ page, request }) => {
-    const auditTrailPage = new AuditTrailPage(page);
-    const authHeaders = { Authorization: `Bearer ${getAuthToken()}` };
-    const currentSettingsResponse = await request.get(`${API_BASE}/api/v2/settings/runtime`, { headers: authHeaders });
-    expect(currentSettingsResponse.ok()).toBeTruthy();
-    const currentSettings = await currentSettingsResponse.json();
-
-    try {
-      const prepareResponse = await request.put(`${API_BASE}/api/v2/settings/runtime`, {
-        headers: authHeaders,
-        data: { strict_mode_enabled: false },
-      });
-      expect(prepareResponse.ok()).toBeTruthy();
-
-      await settingsPage.goto();
-      await settingsPage.waitForPageToLoad();
-
-      const cards = page.locator('.space-y-6 > div.bg-white.rounded-lg.shadow');
-      await expect(settingsPage.strictModeCard).toBeVisible();
-      await expect(settingsPage.strictModeStatus).toHaveText('Not Enabled');
-      await expect(settingsPage.strictModeAuditLink).toBeVisible();
-      await expect(settingsPage.strictModeAuditLink).toHaveAttribute('href', /\/audit#strict-mode$/);
-      await expect(cards.last()).toHaveAttribute('id', 'settings-strictModeCard');
-      await expect(settingsPage.strictModeCheckbox).not.toBeChecked();
-
-      await settingsPage.setStrictModeEnabled(true);
-      await settingsPage.saveStrictMode();
-
-      await expect(page.locator('text=Strict mode enabled successfully.')).toBeVisible();
-      await expect(settingsPage.strictModeStatus).toHaveText('Enabled');
-      await expect(settingsPage.strictModeCheckbox).toBeChecked();
-
-      await settingsPage.strictModeAuditLink.click();
-      await expect(page).toHaveURL(/\/audit#strict-mode$/);
-      await auditTrailPage.waitForPageToLoad();
-      await expect(auditTrailPage.strictModeAccordion).toBeVisible();
-      await expect(auditTrailPage.strictModeTable).toBeVisible();
-      await expect(auditTrailPage.strictModeTable.locator('tbody tr').first()).toContainText('Enabled');
-      await expect(auditTrailPage.strictModeTable.locator('tbody tr').first()).toContainText('true');
-    } finally {
-      const restoreResponse = await request.put(`${API_BASE}/api/v2/settings/runtime`, {
-        headers: authHeaders,
-        data: { strict_mode_enabled: currentSettings.strict_mode_enabled },
-      });
-      expect(restoreResponse.ok()).toBeTruthy();
-    }
-  });
-
-  test('should require typed confirmation before disabling strict mode', async ({ request }) => {
-    const authHeaders = { Authorization: `Bearer ${getAuthToken()}` };
-    const currentSettingsResponse = await request.get(`${API_BASE}/api/v2/settings/runtime`, { headers: authHeaders });
-    expect(currentSettingsResponse.ok()).toBeTruthy();
-    const currentSettings = await currentSettingsResponse.json();
-
-    try {
-      const prepareResponse = await request.put(`${API_BASE}/api/v2/settings/runtime`, {
-        headers: authHeaders,
-        data: { strict_mode_enabled: true },
-      });
-      expect(prepareResponse.ok()).toBeTruthy();
-
-      await settingsPage.goto();
-      await settingsPage.waitForPageToLoad();
-
-      await expect(settingsPage.strictModeStatus).toHaveText('Enabled');
-      await settingsPage.setStrictModeEnabled(false);
-      await settingsPage.saveStrictMode();
-
-      await expect(settingsPage.strictModeDisableDialog).toBeVisible();
-      await expect(settingsPage.strictModeDisableConfirmButton).toBeDisabled();
-
-      await settingsPage.strictModeDisableConfirmationInput.fill('DISABLE STRICT MODE');
-      await expect(settingsPage.strictModeDisableConfirmButton).toBeEnabled();
-      await settingsPage.strictModeDisableConfirmButton.click();
-
-      await expect(settingsPage.strictModeDisableDialog).toHaveCount(0);
-      await expect(settingsPage.strictModeStatus).toHaveText('Not Enabled');
-      await expect(settingsPage.strictModeCheckbox).not.toBeChecked();
-      await expect(settingsPage.page.locator('text=Strict mode disabled successfully.')).toBeVisible();
-    } finally {
-      const restoreResponse = await request.put(`${API_BASE}/api/v2/settings/runtime`, {
-        headers: authHeaders,
-        data: { strict_mode_enabled: currentSettings.strict_mode_enabled },
-      });
-      expect(restoreResponse.ok()).toBeTruthy();
-    }
-  });
-
   test('should allow choosing a neutral outcome and surface it in allowlist helper text', async ({ page, request }) => {
     const authHeaders = { Authorization: `Bearer ${getAuthToken()}` };
     const currentSettingsResponse = await request.get(`${API_BASE}/api/v2/settings/runtime`, { headers: authHeaders });
@@ -152,7 +63,6 @@ test.describe('Settings Page', () => {
       const restoreResponse = await request.put(`${API_BASE}/api/v2/settings/runtime`, {
         headers: authHeaders,
         data: {
-          strict_mode_enabled: currentSettings.strict_mode_enabled,
           rule_quality_lookback_days: currentSettings.rule_quality_lookback_days,
           auto_promote_active_rule_updates: currentSettings.auto_promote_active_rule_updates,
           neutral_outcome: currentSettings.neutral_outcome,
@@ -230,7 +140,7 @@ test.describe('Settings Page', () => {
         headers: authHeaders,
         data: {
           provider: currentSettings.provider,
-          enabled: currentSettings.enabled,
+          enabled: currentSettings.api_key_configured ? currentSettings.enabled : false,
           model: currentSettings.model,
           clear_api_key: currentSettings.api_key_configured ? undefined : true,
         },

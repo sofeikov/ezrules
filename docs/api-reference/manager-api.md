@@ -346,7 +346,8 @@ Backtest task result note:
 | `POST` | `/api/v2/evaluate` | API key or Bearer | Evaluate one event against active rules |
 
 Evaluator storage note:
-- `POST /api/v2/evaluate` persists events and per-rule results, which can then be reviewed via `GET /api/v2/tested-events`.
+- `POST /api/v2/evaluate` persists append-only event versions, immutable served decisions, and per-rule results. Served decisions can then be reviewed via `GET /api/v2/tested-events`.
+- Each successful response includes `event_version` and `evaluation_decision_id` so callers can correlate a served response with the canonical ledger.
 - If required-field validation or strict rule lookup fails, the request returns `400` and nothing is persisted.
 
 ## API Conventions

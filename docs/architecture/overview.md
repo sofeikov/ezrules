@@ -73,16 +73,18 @@ High-level storage domains:
 5. Otherwise, the active main rule configuration is loaded/executed
 6. Outcomes are aggregated (`rule_results`, `outcome_counters`, `outcome_set`)
 7. A single `resolved_outcome` is selected from the configured outcome hierarchy
-8. Evaluation data is stored in DB
+8. The event payload is appended as an event version, and the served response is stored as an immutable evaluation decision
 9. Response returned to caller
+
+Repeated submissions with the same `event_id` are represented as later event versions. Downstream replay, Tested Events, rollout/shadow comparison, and analytics can anchor to the immutable served decision while future aggregate windows can separately choose latest-known event versions as of the evaluation time.
 
 Allowlist rules exist for explicit trust decisions where a match should stop the normal decision flow entirely.
 
 ### 2) Shadow Evaluation Flow
 
 1. A rule is deployed to the shadow `RuleEngineConfig` (via UI or API)
-2. Every `POST /api/v2/evaluate` call runs the production evaluation (result returned to caller) and a parallel shadow evaluation (result stored in `shadow_results_log`, never returned)
-3. Shadow results accumulate against the same `tl_id` as production results, enabling direct outcome comparison
+2. Every `POST /api/v2/evaluate` call runs the production evaluation (result returned to caller) and enqueues a parallel shadow evaluation using the same event payload and config snapshot
+3. Shadow results accumulate against the same served-decision provenance as production results, enabling direct outcome comparison
 4. Operator observes shadow vs production outcome distribution via `GET /api/v2/shadow/stats`
 5. Operator promotes (atomic: writes shadow logic to rules table + production config, clears shadow entry) or removes
 
