@@ -14,6 +14,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 from ezrules.backend.data_utils import Event, eval_and_store
+from ezrules.backend.label_assignments import assign_event_version_label, get_labelable_event_version
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.utils import record_observations
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
@@ -28,6 +29,7 @@ from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.demo_data import build_demo_events, build_demo_rules, determine_demo_label, seed_demo_user_lists
 from ezrules.models.backend_core import (
     AllowedOutcome,
+    EventVersionLabel,
     Label,
     Organisation,
     Role,
@@ -642,7 +644,20 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
                     label_name = _determine_realistic_label(event_data, list(available_labels.keys()))
 
                     if label_name and label_name in available_labels:
-                        event_record.el_id = available_labels[label_name].el_id
+                        event_version = get_labelable_event_version(
+                            session,
+                            o_id=org_id,
+                            event_id=str(event_record.event_id),
+                        )
+                        if event_version is None:
+                            continue
+                        assign_event_version_label(
+                            session,
+                            o_id=org_id,
+                            event_version=event_version,
+                            label=available_labels[label_name],
+                            assigned_by="cli",
+                        )
                         labeled_events.append((event_record.event_id, label_name))
                         logger.info(f"Marked {event_record.event_id} as {label_name}")
 
@@ -806,8 +821,6 @@ def export_test_csv(output_file: str, n_events: int, unlabeled_only: bool, org_n
             return
 
         query = session.query(TestingRecordLog).filter(TestingRecordLog.o_id == org_id)
-        if unlabeled_only:
-            query = query.filter(TestingRecordLog.el_id.is_(None))
 
         events = query.limit(n_events).all()
 
@@ -817,6 +830,17 @@ def export_test_csv(output_file: str, n_events: int, unlabeled_only: bool, org_n
 
         test_labels = []
         for event in events:
+            event_version = get_labelable_event_version(session, o_id=org_id, event_id=str(event.event_id))
+            if event_version is None:
+                continue
+            if unlabeled_only and event_version is not None:
+                existing_label = (
+                    session.query(EventVersionLabel)
+                    .filter(EventVersionLabel.o_id == org_id, EventVersionLabel.ev_id == event_version.ev_id)
+                    .first()
+                )
+                if existing_label is not None:
+                    continue
             event_data = event.event
             label_name = _determine_realistic_label(event_data, available_labels)
             if label_name:

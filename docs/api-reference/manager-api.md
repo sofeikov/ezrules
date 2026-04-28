@@ -176,18 +176,18 @@ Rule lifecycle fields on rule responses:
 | `GET` | `/api/v2/labels` | Bearer + permission | List labels in the caller's org |
 | `POST` | `/api/v2/labels` | Bearer + permission | Create label in the caller's org |
 | `POST` | `/api/v2/labels/bulk` | Bearer + permission | Create labels in bulk in the caller's org |
-| `POST` | `/api/v2/labels/mark-event` | Bearer + permission | Mark single event in the caller's org; returns `409` if that org has duplicate `event_id`s |
-| `POST` | `/api/v2/labels/upload` | Bearer + permission | CSV upload for events in the caller's org (`multipart/form-data`) with row-level success/error reporting |
+| `POST` | `/api/v2/labels/mark-event` | Bearer + permission | Mark a canonical served event version in the caller's org; omitting `event_version` labels the latest served version for that `event_id` |
+| `POST` | `/api/v2/labels/upload` | Bearer + permission | CSV upload for canonical served event versions in the caller's org (`event_id,label_name` or `event_id,event_version,label_name`) with row-level success/error reporting |
 | `DELETE` | `/api/v2/labels/{label_name}` | Bearer + permission | Delete label from the caller's org |
 
 ### Analytics
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/analytics/transaction-volume` | Bearer + permission | Time-series event volume |
-| `GET` | `/api/v2/analytics/outcomes-distribution` | Bearer + permission | Outcome trends |
-| `GET` | `/api/v2/analytics/rules/{rule_id}/outcomes-distribution` | Bearer + `VIEW_RULES` | Per-rule outcome hit trends for the caller's org |
-| `GET` | `/api/v2/analytics/rule-activity` | Bearer + `VIEW_RULES` | Most/least firing active rules for the caller's org; counts stored non-null outcomes and includes zero-hit active rules in the least-firing ranking |
+| `GET` | `/api/v2/analytics/transaction-volume` | Bearer + permission | Time-series served-decision volume from the canonical evaluation ledger |
+| `GET` | `/api/v2/analytics/outcomes-distribution` | Bearer + permission | Served outcome trends from canonical per-rule evaluation results |
+| `GET` | `/api/v2/analytics/rules/{rule_id}/outcomes-distribution` | Bearer + `VIEW_RULES` | Per-rule served outcome hit trends for the caller's org |
+| `GET` | `/api/v2/analytics/rule-activity` | Bearer + `VIEW_RULES` | Most/least firing active rules for the caller's org; counts canonical served non-null outcomes and includes zero-hit active rules in the least-firing ranking |
 | `GET` | `/api/v2/analytics/labels-summary` | Bearer + permission | Total labeled summary for the caller's org |
 | `GET` | `/api/v2/analytics/labels-distribution` | Bearer + permission | Label trends for the caller's org |
 | `GET` | `/api/v2/analytics/labeled-transaction-volume` | Bearer + permission | Time-series labeled event volume for the caller's org |
@@ -209,6 +209,11 @@ Rule activity query params:
 Per-rule outcome distribution query params:
 - `aggregation` (default `6h`; valid values `1h`, `6h`, `12h`, `24h`, `30d`)
 - `rule_id` path param must resolve to a rule in the caller's organisation or the endpoint returns `404`
+
+Dashboard analytics source of truth:
+- Transaction volume, outcome distribution, rule activity, and per-rule outcome distribution use served `evaluation_decisions` joined to `evaluation_rule_results`.
+- Time buckets are anchored on `evaluation_decisions.evaluated_at`, so charts show when a decision was served rather than the event's business timestamp.
+- Label analytics and rule-quality endpoints use canonical `event_version_labels` joined to served decisions and event labels.
 
 ### Settings
 

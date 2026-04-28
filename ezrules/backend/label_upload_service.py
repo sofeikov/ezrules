@@ -2,8 +2,9 @@ import csv
 import io
 from dataclasses import dataclass, field
 
+from ezrules.backend.label_assignments import assign_event_version_label, get_labelable_event_version
 from ezrules.core.application_context import get_organization_id
-from ezrules.models.backend_core import Label, TestingRecordLog
+from ezrules.models.backend_core import Label
 
 
 @dataclass
@@ -12,6 +13,7 @@ class AppliedLabelAssignment:
 
     row_number: int
     event_id: str
+    event_version: int
     label_name: str
     label_id: int
 
@@ -32,6 +34,7 @@ class ParsedRow:
 
     row_number: int
     event_id: str
+    event_version: int | None
     label_name: str
     is_valid: bool
     error_message: str = ""
@@ -59,11 +62,25 @@ class LabelUploadService:
         format_errors = []
 
         for row_num, row in enumerate(csv_reader, 1):
-            if len(row) != 2:
-                format_errors.append(f"Row {row_num}: Expected 2 columns (event_id,label), got {len(row)}")
+            if len(row) not in (2, 3):
+                format_errors.append(
+                    f"Row {row_num}: Expected 2 or 3 columns (event_id,label or event_id,event_version,label), got {len(row)}"
+                )
                 continue
 
-            event_id, label_name = row
+            if len(row) == 2:
+                event_id, label_name = row
+                event_version = None
+            else:
+                event_id, event_version_raw, label_name = row
+                try:
+                    event_version = int(event_version_raw.strip())
+                except ValueError:
+                    format_errors.append(f"Row {row_num}: event_version must be an integer")
+                    continue
+                if event_version < 1:
+                    format_errors.append(f"Row {row_num}: event_version must be greater than 0")
+                    continue
             event_id = event_id.strip()
             label_name = label_name.strip().upper()
 
@@ -71,7 +88,15 @@ class LabelUploadService:
                 format_errors.append(f"Row {row_num}: Empty event_id or label_name")
                 continue
 
-            parsed_rows.append(ParsedRow(row_number=row_num, event_id=event_id, label_name=label_name, is_valid=True))
+            parsed_rows.append(
+                ParsedRow(
+                    row_number=row_num,
+                    event_id=event_id,
+                    event_version=event_version,
+                    label_name=label_name,
+                    is_valid=True,
+                )
+            )
 
         return parsed_rows, format_errors
 
@@ -92,27 +117,17 @@ class LabelUploadService:
         for row in parsed_rows:
             try:
                 org_id = self._resolved_org_id()
-                # Find the event by event_id within the current organization.
-                event_records = (
-                    self.db_session.query(TestingRecordLog)
-                    .filter(
-                        TestingRecordLog.event_id == row.event_id,
-                        TestingRecordLog.o_id == org_id,
-                    )
-                    .limit(2)
-                    .all()
+                event_record = get_labelable_event_version(
+                    self.db_session,
+                    o_id=org_id,
+                    event_id=row.event_id,
+                    event_version=row.event_version,
                 )
-                if not event_records:
+                if event_record is None:
+                    suffix = f" version {row.event_version}" if row.event_version is not None else ""
                     error_count += 1
-                    errors.append(f"Row {row.row_number}: Event with id '{row.event_id}' not found")
+                    errors.append(f"Row {row.row_number}: Served event with id '{row.event_id}'{suffix} not found")
                     continue
-                if len(event_records) > 1:
-                    error_count += 1
-                    errors.append(
-                        f"Row {row.row_number}: Multiple events with id '{row.event_id}' found for the current organization"
-                    )
-                    continue
-                event_record = event_records[0]
 
                 # Find the label from cache
                 label = label_cache.get(row.label_name)
@@ -121,13 +136,19 @@ class LabelUploadService:
                     errors.append(f"Row {row.row_number}: Label '{row.label_name}' not found")
                     continue
 
-                # Update the event record with the label
-                event_record.el_id = label.el_id
+                assign_event_version_label(
+                    self.db_session,
+                    o_id=org_id,
+                    event_version=event_record,
+                    label=label,
+                    assigned_by=None,
+                )
                 success_count += 1
                 applied_assignments.append(
                     AppliedLabelAssignment(
                         row_number=row.row_number,
                         event_id=row.event_id,
+                        event_version=int(event_record.event_version),
                         label_name=row.label_name,
                         label_id=int(label.el_id),
                     )

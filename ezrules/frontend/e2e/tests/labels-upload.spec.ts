@@ -104,6 +104,6 @@ test.describe('Labels CSV Upload', () => {
     await expect(labelsPage.uploadSummary).toHaveText('1 row processed');
     await expect(labelsPage.uploadResult).toContainText('0 applied');
     await expect(labelsPage.uploadResult).toContainText('1 failed');
-    await expect(labelsPage.uploadErrors).toContainText(`Event with id '${missingEventId}' not found`);
+    await expect(labelsPage.uploadErrors).toContainText(`Served event with id '${missingEventId}' not found`);
   });
 });

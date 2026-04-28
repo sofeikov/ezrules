@@ -9,6 +9,8 @@ from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
     AllowedOutcome,
+    EvaluationDecision,
+    EventVersion,
     FieldObservation,
     FieldTypeConfig,
     Label,
@@ -29,6 +31,35 @@ def _grant_permissions(session, role: Role, permissions: list[PermissionAction])
     PermissionManager.init_default_actions()
     for permission in permissions:
         PermissionManager.grant_permission(int(role.id), permission)
+
+
+def _add_served_event_version(session, event: TestingRecordLog, event_version: int = 1) -> EventVersion:
+    version = EventVersion(
+        o_id=event.o_id,
+        event_id=event.event_id,
+        event_version=event_version,
+        event_timestamp=event.event_timestamp,
+        event_data=event.event,
+        payload_hash="0" * 64,
+        source="evaluate",
+    )
+    session.add(version)
+    session.flush()
+    session.add(
+        EvaluationDecision(
+            ev_id=version.ev_id,
+            tl_id=event.tl_id,
+            o_id=event.o_id,
+            event_id=event.event_id,
+            event_version=event_version,
+            event_timestamp=event.event_timestamp,
+            decision_type="served",
+            served=True,
+            rule_config_label="production",
+        )
+    )
+    session.commit()
+    return version
 
 
 def _create_user(
@@ -301,6 +332,9 @@ def test_label_usage_and_label_analytics_are_org_scoped(session):
     )
     session.add_all([org_event, org_upload_event, other_org_event])
     session.commit()
+    _add_served_event_version(session, org_event)
+    _add_served_event_version(session, org_upload_event)
+    _add_served_event_version(session, other_org_event)
 
     with TestClient(app) as client:
         foreign_mark_response = client.post(

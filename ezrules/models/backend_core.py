@@ -360,6 +360,27 @@ class EvaluationRuleResult(Base):
     rule_result = Column(String, nullable=False)
 
 
+class EventVersionLabel(Base):
+    __tablename__ = "event_version_labels"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["el_id", "o_id"],
+            ["event_labels.el_id", "event_labels.o_id"],
+            name="fk_event_version_labels_label_org",
+        ),
+        UniqueConstraint("o_id", "ev_id", name="uq_event_version_labels_org_event_version"),
+        Index("ix_event_version_labels_o_id_assigned_at", "o_id", "assigned_at"),
+        Index("ix_event_version_labels_o_id_el_id", "o_id", "el_id"),
+    )
+
+    evl_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    ev_id: Mapped[int] = mapped_column(ForeignKey("event_versions.ev_id", ondelete="CASCADE"), nullable=False)
+    el_id: Mapped[int] = mapped_column(Integer(), nullable=False)
+    assigned_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    assigned_by = Column(String(255), nullable=True)
+
+
 class TestingRecordLog(Base):
     __tablename__ = "testing_record_log"
     __table_args__ = (
@@ -555,7 +576,7 @@ class RuleQualityReport(Base):
     min_support = Column(Integer, nullable=False)
     lookback_days = Column(Integer, nullable=False)
     freeze_at = Column(DateTime, nullable=False)
-    max_tl_id = Column(Integer, nullable=False, default=0)
+    max_decision_id = Column(Integer, nullable=False, default=0)
     pair_set_hash = Column(String(64), nullable=False, index=True, default="")
     pair_set = Column(JSON, nullable=False, default=list)
     requested_by = Column(String(255), nullable=True)

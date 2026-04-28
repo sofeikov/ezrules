@@ -4,7 +4,17 @@ import datetime
 
 from ezrules.backend.rule_quality import compute_rule_quality_metrics
 from ezrules.cli import DEFAULT_DEMO_RULE_QUALITY_PAIRS, _ensure_default_rule_quality_pairs
-from ezrules.models.backend_core import AllowedOutcome, Label, Organisation, RuleQualityPair, TestingRecordLog
+from ezrules.models.backend_core import (
+    AllowedOutcome,
+    EvaluationDecision,
+    EvaluationRuleResult,
+    EventVersion,
+    EventVersionLabel,
+    Label,
+    Organisation,
+    RuleQualityPair,
+    TestingRecordLog,
+)
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.backend_core import TestingResultsLog
 
@@ -76,6 +86,34 @@ def test_compute_rule_quality_metrics_excludes_unscored_rules_from_rankings(sess
             rule_result="HOLD",
         )
     )
+    event_version = EventVersion(
+        o_id=org.o_id,
+        event_id=event.event_id,
+        event_version=1,
+        event_timestamp=event.event_timestamp,
+        event_data=event.event,
+        payload_hash="0" * 64,
+        source="evaluate",
+        ingested_at=created_at,
+    )
+    session.add(event_version)
+    session.flush()
+    decision = EvaluationDecision(
+        ev_id=event_version.ev_id,
+        tl_id=event.tl_id,
+        o_id=org.o_id,
+        event_id=event.event_id,
+        event_version=1,
+        event_timestamp=event.event_timestamp,
+        decision_type="served",
+        served=True,
+        rule_config_label="production",
+        evaluated_at=created_at,
+    )
+    session.add(decision)
+    session.flush()
+    session.add(EventVersionLabel(o_id=org.o_id, ev_id=event_version.ev_id, el_id=label.el_id))
+    session.add(EvaluationRuleResult(ed_id=decision.ed_id, r_id=rule.r_id, rule_result="HOLD"))
     session.commit()
 
     payload = compute_rule_quality_metrics(
@@ -83,7 +121,7 @@ def test_compute_rule_quality_metrics_excludes_unscored_rules_from_rankings(sess
         min_support=1,
         lookback_days=30,
         freeze_at=created_at + datetime.timedelta(minutes=1),
-        max_tl_id=event.tl_id,
+        max_decision_id=decision.ed_id,
         o_id=org.o_id,
         curated_pairs=[("RELEASE", "CHARGEBACK")],
     )

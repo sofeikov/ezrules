@@ -15,6 +15,10 @@ from ezrules.models.backend_core import (
     AllowedOutcome,
     ApiKey,
     ApiKeyHistory,
+    EvaluationDecision,
+    EvaluationRuleResult,
+    EventVersion,
+    EventVersionLabel,
     FieldObservation,
     FieldTypeHistory,
     Label,
@@ -323,10 +327,61 @@ def test_shadow_routes_and_tested_events_are_org_scoped(session):
     session.add_all([org_event, other_event])
     session.commit()
 
+    org_event_version = EventVersion(
+        o_id=int(org.o_id),
+        event_id=str(org_event.event_id),
+        event_version=1,
+        event_timestamp=int(org_event.event_timestamp),
+        event_data=dict(org_event.event),
+        payload_hash="0" * 64,
+        source="evaluate",
+    )
+    other_event_version = EventVersion(
+        o_id=int(other_org.o_id),
+        event_id=str(other_event.event_id),
+        event_version=1,
+        event_timestamp=int(other_event.event_timestamp),
+        event_data=dict(other_event.event),
+        payload_hash="0" * 64,
+        source="evaluate",
+    )
+    session.add_all([org_event_version, other_event_version])
+    session.flush()
+    org_decision = EvaluationDecision(
+        ev_id=int(org_event_version.ev_id),
+        tl_id=int(org_event.tl_id),
+        o_id=int(org.o_id),
+        event_id=str(org_event.event_id),
+        event_version=1,
+        event_timestamp=int(org_event.event_timestamp),
+        decision_type="served",
+        served=True,
+        rule_config_label="production",
+        outcome_counters={"ORG1_HOLD": 1},
+        resolved_outcome="ORG1_HOLD",
+    )
+    other_decision = EvaluationDecision(
+        ev_id=int(other_event_version.ev_id),
+        tl_id=int(other_event.tl_id),
+        o_id=int(other_org.o_id),
+        event_id=str(other_event.event_id),
+        event_version=1,
+        event_timestamp=int(other_event.event_timestamp),
+        decision_type="served",
+        served=True,
+        rule_config_label="production",
+        outcome_counters={"ORG2_REVIEW": 1},
+        resolved_outcome="ORG2_REVIEW",
+    )
+    session.add_all([org_decision, other_decision])
+    session.flush()
+
     session.add_all(
         [
             TestingResultsLog(tl_id=int(org_event.tl_id), r_id=int(org_rule.r_id), rule_result="ORG1_HOLD"),
             TestingResultsLog(tl_id=int(other_event.tl_id), r_id=int(other_rule.r_id), rule_result="ORG2_REVIEW"),
+            EvaluationRuleResult(ed_id=int(org_decision.ed_id), r_id=int(org_rule.r_id), rule_result="ORG1_HOLD"),
+            EvaluationRuleResult(ed_id=int(other_decision.ed_id), r_id=int(other_rule.r_id), rule_result="ORG2_REVIEW"),
             ShadowResultsLog(tl_id=int(org_event.tl_id), r_id=int(org_rule.r_id), rule_result="ORG1_HOLD"),
             ShadowResultsLog(tl_id=int(other_event.tl_id), r_id=int(other_rule.r_id), rule_result="ORG2_REVIEW"),
         ]
@@ -574,10 +629,74 @@ def test_analytics_rule_quality_and_reports_are_org_scoped(session, monkeypatch)
     session.add_all([org_event, other_event])
     session.commit()
 
+    org_event_version = EventVersion(
+        o_id=int(org.o_id),
+        event_id=str(org_event.event_id),
+        event_version=1,
+        event_timestamp=int(org_event.event_timestamp),
+        event_data=dict(org_event.event),
+        payload_hash="0" * 64,
+        source="evaluate",
+        ingested_at=now,
+    )
+    other_event_version = EventVersion(
+        o_id=int(other_org.o_id),
+        event_id=str(other_event.event_id),
+        event_version=1,
+        event_timestamp=int(other_event.event_timestamp),
+        event_data=dict(other_event.event),
+        payload_hash="0" * 64,
+        source="evaluate",
+        ingested_at=now,
+    )
+    session.add_all([org_event_version, other_event_version])
+    session.flush()
+
+    org_decision = EvaluationDecision(
+        ev_id=int(org_event_version.ev_id),
+        tl_id=int(org_event.tl_id),
+        o_id=int(org.o_id),
+        event_id=str(org_event.event_id),
+        event_version=1,
+        event_timestamp=int(org_event.event_timestamp),
+        decision_type="served",
+        served=True,
+        rule_config_label="production",
+        outcome_counters={"HOLD": 1},
+        resolved_outcome="HOLD",
+        all_rule_results={str(org_rule.r_id): "HOLD"},
+        evaluated_at=now,
+    )
+    other_decision = EvaluationDecision(
+        ev_id=int(other_event_version.ev_id),
+        tl_id=int(other_event.tl_id),
+        o_id=int(other_org.o_id),
+        event_id=str(other_event.event_id),
+        event_version=1,
+        event_timestamp=int(other_event.event_timestamp),
+        decision_type="served",
+        served=True,
+        rule_config_label="production",
+        outcome_counters={"REVIEW": 1},
+        resolved_outcome="REVIEW",
+        all_rule_results={str(other_rule.r_id): "REVIEW"},
+        evaluated_at=now,
+    )
+    session.add_all([org_decision, other_decision])
+    session.flush()
+
     session.add_all(
         [
             TestingResultsLog(tl_id=int(org_event.tl_id), r_id=int(org_rule.r_id), rule_result="HOLD"),
             TestingResultsLog(tl_id=int(other_event.tl_id), r_id=int(other_rule.r_id), rule_result="REVIEW"),
+            EvaluationRuleResult(ed_id=int(org_decision.ed_id), r_id=int(org_rule.r_id), rule_result="HOLD"),
+            EvaluationRuleResult(ed_id=int(other_decision.ed_id), r_id=int(other_rule.r_id), rule_result="REVIEW"),
+            EventVersionLabel(o_id=int(org.o_id), ev_id=int(org_event_version.ev_id), el_id=int(org_label.el_id)),
+            EventVersionLabel(
+                o_id=int(other_org.o_id),
+                ev_id=int(other_event_version.ev_id),
+                el_id=int(other_org_label.el_id),
+            ),
             RuleQualityPair(
                 outcome="HOLD",
                 label=label_name,

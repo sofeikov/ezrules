@@ -16,7 +16,16 @@ from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Label, Organisation, Role, TestingRecordLog, User
+from ezrules.models.backend_core import (
+    EvaluationDecision,
+    EventVersion,
+    EventVersionLabel,
+    Label,
+    Organisation,
+    Role,
+    TestingRecordLog,
+    User,
+)
 
 
 @pytest.fixture(scope="function")
@@ -92,6 +101,35 @@ def sample_label(session):
     return label
 
 
+def _add_served_event_version(session, event: TestingRecordLog) -> EventVersion:
+    version = EventVersion(
+        o_id=event.o_id,
+        event_id=event.event_id,
+        event_version=1,
+        event_timestamp=event.event_timestamp,
+        event_data=event.event,
+        payload_hash="0" * 64,
+        source="evaluate",
+    )
+    session.add(version)
+    session.flush()
+    session.add(
+        EvaluationDecision(
+            ev_id=version.ev_id,
+            tl_id=event.tl_id,
+            o_id=event.o_id,
+            event_id=event.event_id,
+            event_version=1,
+            event_timestamp=event.event_timestamp,
+            decision_type="served",
+            served=True,
+            rule_config_label="production",
+        )
+    )
+    session.commit()
+    return version
+
+
 @pytest.fixture(scope="function")
 def sample_event(session):
     """Create a sample event for testing mark-event functionality."""
@@ -109,6 +147,7 @@ def sample_event(session):
     )
     session.add(event)
     session.commit()
+    _add_served_event_version(session, event)
     return event
 
 
@@ -349,7 +388,16 @@ class TestMarkEvent:
         data = response.json()
         assert data["success"] is True
         assert data["event_id"] == "test_event_123"
+        assert data["event_version"] == 1
         assert data["label_name"] == "TEST_LABEL"
+        assignment = session = labels_test_client.test_data["session"]
+        assert (
+            assignment.query(EventVersionLabel)
+            .join(EventVersion, EventVersion.ev_id == EventVersionLabel.ev_id)
+            .filter(EventVersion.event_id == "test_event_123")
+            .count()
+            == 1
+        )
 
     def test_mark_event_nonexistent_event(self, labels_test_client, sample_label):
         """Should return 404 for non-existent event."""
@@ -365,7 +413,7 @@ class TestMarkEvent:
         )
 
         assert response.status_code == 404
-        assert "Event" in response.json()["detail"]
+        assert "event" in response.json()["detail"]
 
     def test_mark_event_nonexistent_label(self, labels_test_client, sample_event):
         """Should return 404 for non-existent label."""
@@ -553,7 +601,7 @@ class TestUploadLabels:
         """Should return errors for CSV with invalid format (wrong column count)."""
         token = labels_test_client.test_data["token"]
 
-        csv_content = "only_one_column\nthree,columns,here\n"
+        csv_content = "only_one_column\ntoo,many,columns,here\n"
 
         response = labels_test_client.post(
             "/api/v2/labels/upload",
@@ -566,7 +614,7 @@ class TestUploadLabels:
         assert data["successful"] == 0
         assert data["failed"] == 2
         assert len(data["errors"]) == 2
-        assert all("Expected 2 columns" in e["error"] for e in data["errors"])
+        assert all("Expected 2 or 3 columns" in e["error"] for e in data["errors"])
 
     def test_upload_partial_failure(self, labels_test_client, sample_label, sample_event):
         """Should handle mix of valid and invalid rows."""

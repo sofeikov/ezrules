@@ -37,12 +37,20 @@ from ezrules.backend.rule_quality import (
     compute_rule_quality_metrics,
     compute_rule_quality_pairs_hash,
     get_active_rule_quality_pairs,
-    get_rule_quality_snapshot_max_tl_id,
+    get_rule_quality_snapshot_max_decision_id,
 )
 from ezrules.backend.runtime_settings import get_rule_quality_lookback_days
 from ezrules.backend.tasks import generate_rule_quality_report
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Label, RuleQualityReport, RuleStatus, TestingRecordLog, TestingResultsLog, User
+from ezrules.models.backend_core import (
+    EvaluationDecision,
+    EvaluationRuleResult,
+    EventVersionLabel,
+    Label,
+    RuleQualityReport,
+    RuleStatus,
+    User,
+)
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.settings import app_settings
 
@@ -99,6 +107,22 @@ def build_rule_activity_items(rows: list[Any]) -> list[RuleFireActivityItem]:
     ]
 
 
+def apply_served_decision_window(
+    query: Any,
+    current_org_id: int,
+    start_time: datetime.datetime,
+    end_time: datetime.datetime,
+) -> Any:
+    """Limit a dashboard analytics query to canonical served decisions."""
+    return (
+        query.filter(EvaluationDecision.evaluated_at >= start_time)
+        .filter(EvaluationDecision.evaluated_at <= end_time)
+        .filter(EvaluationDecision.o_id == current_org_id)
+        .filter(EvaluationDecision.served.is_(True))
+        .filter(EvaluationDecision.decision_type == "served")
+    )
+
+
 # =============================================================================
 # TRANSACTION VOLUME
 # =============================================================================
@@ -120,13 +144,15 @@ def get_transaction_volume(
     aggregation_period, config = validate_aggregation(aggregation)
     start_time, end_time = get_current_time_bounds(config["delta"])
 
-    bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
+    bucket_expr = get_bucket_expression(config, EvaluationDecision.evaluated_at)
 
     transactions = (
-        db.query(bucket_expr.label("bucket"), sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
-        .filter(TestingRecordLog.created_at >= start_time)
-        .filter(TestingRecordLog.created_at <= end_time)
-        .filter(TestingRecordLog.o_id == current_org_id)
+        apply_served_decision_window(
+            db.query(bucket_expr.label("bucket"), sqlalchemy.func.count(EvaluationDecision.ed_id).label("count")),
+            current_org_id,
+            start_time,
+            end_time,
+        )
         .group_by("bucket")
         .order_by("bucket")
         .all()
@@ -163,19 +189,20 @@ def get_outcomes_distribution(
     aggregation_period, config = validate_aggregation(aggregation)
     start_time, end_time = get_current_time_bounds(config["delta"])
 
-    bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
+    bucket_expr = get_bucket_expression(config, EvaluationDecision.evaluated_at)
 
-    outcomes = (
+    outcomes_query = (
         db.query(
             bucket_expr.label("bucket"),
-            TestingResultsLog.rule_result,
-            sqlalchemy.func.count(TestingResultsLog.rule_result).label("count"),
+            EvaluationRuleResult.rule_result,
+            sqlalchemy.func.count(EvaluationRuleResult.err_id).label("count"),
         )
-        .join(TestingRecordLog, TestingRecordLog.tl_id == TestingResultsLog.tl_id)
-        .filter(TestingRecordLog.created_at >= start_time)
-        .filter(TestingRecordLog.created_at <= end_time)
-        .filter(TestingRecordLog.o_id == current_org_id)
-        .group_by("bucket", TestingResultsLog.rule_result)
+        .join(EvaluationDecision, EvaluationDecision.ed_id == EvaluationRuleResult.ed_id)
+        .filter(EvaluationRuleResult.rule_result.isnot(None))
+    )
+    outcomes = (
+        apply_served_decision_window(outcomes_query, current_org_id, start_time, end_time)
+        .group_by("bucket", EvaluationRuleResult.rule_result)
         .order_by("bucket")
         .all()
     )
@@ -236,22 +263,22 @@ def get_rule_activity(
     """
     Return most/least firing active rules for the selected time window.
 
-    Fire counts are derived from stored non-null rule outcomes in testing_results_log.
+    Fire counts are derived from stored non-null rule outcomes in the canonical served-decision ledger.
     """
     aggregation_period, config = validate_aggregation(aggregation)
     start_time, end_time = get_current_time_bounds(config["delta"])
 
-    fire_counts = (
+    fire_counts_query = (
         db.query(
-            TestingResultsLog.r_id.label("r_id"),
-            sqlalchemy.func.count(TestingResultsLog.tr_id).label("fire_count"),
+            EvaluationRuleResult.r_id.label("r_id"),
+            sqlalchemy.func.count(EvaluationRuleResult.err_id).label("fire_count"),
         )
-        .join(TestingRecordLog, TestingRecordLog.tl_id == TestingResultsLog.tl_id)
-        .filter(TestingRecordLog.created_at >= start_time)
-        .filter(TestingRecordLog.created_at <= end_time)
-        .filter(TestingRecordLog.o_id == current_org_id)
-        .filter(TestingResultsLog.rule_result.isnot(None))
-        .group_by(TestingResultsLog.r_id)
+        .join(EvaluationDecision, EvaluationDecision.ed_id == EvaluationRuleResult.ed_id)
+        .filter(EvaluationRuleResult.rule_result.isnot(None))
+    )
+    fire_counts = (
+        apply_served_decision_window(fire_counts_query, current_org_id, start_time, end_time)
+        .group_by(EvaluationRuleResult.r_id)
         .subquery()
     )
 
@@ -306,21 +333,21 @@ def get_rule_outcomes_distribution(
     if rule is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
 
-    bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
+    bucket_expr = get_bucket_expression(config, EvaluationDecision.evaluated_at)
 
-    outcomes = (
+    outcomes_query = (
         db.query(
             bucket_expr.label("bucket"),
-            TestingResultsLog.rule_result,
-            sqlalchemy.func.count(TestingResultsLog.tr_id).label("count"),
+            EvaluationRuleResult.rule_result,
+            sqlalchemy.func.count(EvaluationRuleResult.err_id).label("count"),
         )
-        .join(TestingRecordLog, TestingRecordLog.tl_id == TestingResultsLog.tl_id)
-        .filter(TestingResultsLog.r_id == rule_id)
-        .filter(TestingRecordLog.created_at >= start_time)
-        .filter(TestingRecordLog.created_at <= end_time)
-        .filter(TestingRecordLog.o_id == current_org_id)
-        .filter(TestingResultsLog.rule_result.isnot(None))
-        .group_by("bucket", TestingResultsLog.rule_result)
+        .join(EvaluationDecision, EvaluationDecision.ed_id == EvaluationRuleResult.ed_id)
+        .filter(EvaluationRuleResult.r_id == rule_id)
+        .filter(EvaluationRuleResult.rule_result.isnot(None))
+    )
+    outcomes = (
+        apply_served_decision_window(outcomes_query, current_org_id, start_time, end_time)
+        .group_by("bucket", EvaluationRuleResult.rule_result)
         .order_by("bucket")
         .all()
     )
@@ -380,7 +407,7 @@ def get_labels_distribution(
     aggregation_period, config = validate_aggregation(aggregation)
     start_time, end_time = get_current_time_bounds(config["delta"])
 
-    bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
+    bucket_expr = get_bucket_expression(config, EventVersionLabel.assigned_at)
 
     labels_data = (
         db.query(
@@ -388,12 +415,11 @@ def get_labels_distribution(
             Label.label,
             sqlalchemy.func.count(Label.label).label("count"),
         )
-        .join(TestingRecordLog, TestingRecordLog.el_id == Label.el_id)
-        .filter(TestingRecordLog.created_at >= start_time)
-        .filter(TestingRecordLog.created_at <= end_time)
-        .filter(TestingRecordLog.o_id == current_org_id)
+        .join(EventVersionLabel, EventVersionLabel.el_id == Label.el_id)
+        .filter(EventVersionLabel.assigned_at >= start_time)
+        .filter(EventVersionLabel.assigned_at <= end_time)
+        .filter(EventVersionLabel.o_id == current_org_id)
         .filter(Label.o_id == current_org_id)
-        .filter(TestingRecordLog.el_id.isnot(None))
         .group_by("bucket", Label.label)
         .order_by("bucket")
         .all()
@@ -459,14 +485,13 @@ def get_labeled_transaction_volume(
     aggregation_period, config = validate_aggregation(aggregation)
     start_time, end_time = get_current_time_bounds(config["delta"])
 
-    bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
+    bucket_expr = get_bucket_expression(config, EventVersionLabel.assigned_at)
 
     transactions = (
-        db.query(bucket_expr.label("bucket"), sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
-        .filter(TestingRecordLog.created_at >= start_time)
-        .filter(TestingRecordLog.created_at <= end_time)
-        .filter(TestingRecordLog.o_id == current_org_id)
-        .filter(TestingRecordLog.el_id.isnot(None))
+        db.query(bucket_expr.label("bucket"), sqlalchemy.func.count(EventVersionLabel.evl_id).label("count"))
+        .filter(EventVersionLabel.assigned_at >= start_time)
+        .filter(EventVersionLabel.assigned_at <= end_time)
+        .filter(EventVersionLabel.o_id == current_org_id)
         .group_by("bucket")
         .order_by("bucket")
         .all()
@@ -501,19 +526,17 @@ def get_labels_summary(
     """
     # Total labeled events
     total_labeled = (
-        db.query(sqlalchemy.func.count(TestingRecordLog.tl_id))
-        .filter(TestingRecordLog.o_id == current_org_id)
-        .filter(TestingRecordLog.el_id.isnot(None))
+        db.query(sqlalchemy.func.count(EventVersionLabel.evl_id))
+        .filter(EventVersionLabel.o_id == current_org_id)
         .scalar()
     )
 
     # Label distribution (pie chart data)
     label_counts = (
-        db.query(Label.label, sqlalchemy.func.count(TestingRecordLog.tl_id).label("count"))
-        .join(TestingRecordLog, TestingRecordLog.el_id == Label.el_id)
-        .filter(TestingRecordLog.o_id == current_org_id)
+        db.query(Label.label, sqlalchemy.func.count(EventVersionLabel.evl_id).label("count"))
+        .join(EventVersionLabel, EventVersionLabel.el_id == Label.el_id)
+        .filter(EventVersionLabel.o_id == current_org_id)
         .filter(Label.o_id == current_org_id)
-        .filter(TestingRecordLog.el_id.isnot(None))
         .group_by(Label.label)
         .order_by(sqlalchemy.desc("count"))
         .all()
@@ -598,7 +621,7 @@ def get_rule_quality(
         lookback_days if lookback_days is not None else get_rule_quality_lookback_days(db, current_org_id)
     )
     _window_start, freeze_at = get_current_time_bounds()
-    max_tl_id = get_rule_quality_snapshot_max_tl_id(
+    max_decision_id = get_rule_quality_snapshot_max_decision_id(
         db,
         freeze_at=freeze_at,
         o_id=current_org_id,
@@ -608,7 +631,7 @@ def get_rule_quality(
         min_support=min_support,
         lookback_days=applied_lookback_days,
         freeze_at=freeze_at,
-        max_tl_id=max_tl_id,
+        max_decision_id=max_decision_id,
         o_id=current_org_id,
         curated_pairs=get_active_rule_quality_pairs(db, o_id=current_org_id),
     )
@@ -653,7 +676,7 @@ def request_rule_quality_report(
         )
 
     freeze_at = now
-    max_tl_id = get_rule_quality_snapshot_max_tl_id(
+    max_decision_id = get_rule_quality_snapshot_max_decision_id(
         db,
         freeze_at=freeze_at,
         o_id=current_org_id,
@@ -664,7 +687,7 @@ def request_rule_quality_report(
         min_support=request_data.min_support,
         lookback_days=applied_lookback_days,
         freeze_at=freeze_at,
-        max_tl_id=max_tl_id,
+        max_decision_id=max_decision_id,
         pair_set_hash=pair_set_hash,
         pair_set=[{"outcome": outcome, "label": label} for outcome, label in active_pairs],
         requested_by=str(user.email),

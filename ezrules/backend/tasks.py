@@ -277,7 +277,7 @@ def generate_rule_quality_report(report_id: int) -> dict[str, str]:
             min_support=report.min_support,
             lookback_days=report.lookback_days,
             freeze_at=report.freeze_at,
-            max_tl_id=report.max_tl_id,
+            max_decision_id=report.max_decision_id,
             o_id=report.o_id,
             curated_pairs=curated_pairs,
         )
