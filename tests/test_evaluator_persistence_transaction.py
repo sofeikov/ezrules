@@ -39,7 +39,7 @@ def test_eval_and_store_commits_once_for_parent_and_results(session):
     lre = SimpleNamespace(db=session, o_id=org.o_id)
     commit_events, commit_listener = _track_commit_events(session)
     try:
-        response, tl_id = eval_and_store(
+        response, decision_id = eval_and_store(
             lre,
             Event(
                 event_id="txn-single-commit",
@@ -56,10 +56,14 @@ def test_eval_and_store_commits_once_for_parent_and_results(session):
     assert response["resolved_outcome"] == "HOLD"
 
     stored_event = (
-        session.query(backend_core.TestingRecordLog).filter(backend_core.TestingRecordLog.tl_id == tl_id).one()
+        session.query(backend_core.EvaluationDecision)
+        .filter(backend_core.EvaluationDecision.ed_id == decision_id)
+        .one()
     )
     stored_results = (
-        session.query(backend_core.TestingResultsLog).filter(backend_core.TestingResultsLog.tl_id == tl_id).all()
+        session.query(backend_core.EvaluationRuleResult)
+        .filter(backend_core.EvaluationRuleResult.ed_id == decision_id)
+        .all()
     )
 
     assert stored_event.event_id == "txn-single-commit"
@@ -83,7 +87,7 @@ def test_eval_and_store_preserves_caller_commit_control(session):
     lre = SimpleNamespace(db=session, o_id=org.o_id)
     commit_events, commit_listener = _track_commit_events(session)
     try:
-        response, tl_id = eval_and_store(
+        response, decision_id = eval_and_store(
             lre,
             Event(
                 event_id="txn-deferred-commit",
@@ -94,7 +98,7 @@ def test_eval_and_store_preserves_caller_commit_control(session):
             commit=False,
         )
         assert commit_events == []
-        assert tl_id is not None
+        assert decision_id is not None
 
         session.commit()
     finally:
@@ -104,10 +108,14 @@ def test_eval_and_store_preserves_caller_commit_control(session):
     assert response["resolved_outcome"] == "HOLD"
 
     stored_event = (
-        session.query(backend_core.TestingRecordLog).filter(backend_core.TestingRecordLog.tl_id == tl_id).one()
+        session.query(backend_core.EvaluationDecision)
+        .filter(backend_core.EvaluationDecision.ed_id == decision_id)
+        .one()
     )
     stored_results = (
-        session.query(backend_core.TestingResultsLog).filter(backend_core.TestingResultsLog.tl_id == tl_id).all()
+        session.query(backend_core.EvaluationRuleResult)
+        .filter(backend_core.EvaluationRuleResult.ed_id == decision_id)
+        .all()
     )
 
     assert stored_event.event_id == "txn-deferred-commit"

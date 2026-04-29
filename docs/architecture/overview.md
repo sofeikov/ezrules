@@ -52,8 +52,8 @@ Primary runtime boundary:
 High-level storage domains:
 
 - Rules/config history: `rules`, `rules_history`, `rule_engine_config`, `rule_engine_config_history`
-- Event evaluation: `testing_record_log`, `testing_results_log`
-- Event evaluation rows persist both per-rule outcomes and the resolved winning outcome for each event
+- Event evaluation: `event_versions`, `evaluation_decisions`, `evaluation_rule_results`
+- Event evaluation ledgers persist event payload versions, served decisions, per-rule outcomes, and the resolved winning outcome
 - Separate `RuleEngineConfig` labels are used for the main production rule set and the allowlist rule lane
 - Shadow evaluation: `shadow_results_log` (parallel results, never returned to callers)
 - Decision controls: `allowed_outcomes`, `event_labels`, user list tables

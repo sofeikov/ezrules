@@ -3,42 +3,11 @@
 import pytest
 from ezrules.backend.label_upload_service import LabelUploadService, ParsedRow
 from ezrules.models.backend_core import (
-    EvaluationDecision,
-    EventVersion,
     EventVersionLabel,
     Label,
     Organisation,
-    TestingRecordLog,
 )
-
-
-def _add_served_event_version(session, event: TestingRecordLog) -> EventVersion:
-    version = EventVersion(
-        o_id=event.o_id,
-        event_id=event.event_id,
-        event_version=1,
-        event_timestamp=event.event_timestamp,
-        event_data=event.event,
-        payload_hash="0" * 64,
-        source="evaluate",
-    )
-    session.add(version)
-    session.flush()
-    session.add(
-        EvaluationDecision(
-            ev_id=version.ev_id,
-            tl_id=event.tl_id,
-            o_id=event.o_id,
-            event_id=event.event_id,
-            event_version=1,
-            event_timestamp=event.event_timestamp,
-            decision_type="served",
-            served=True,
-            rule_config_label="production",
-        )
-    )
-    session.commit()
-    return version
+from tests.canonical_helpers import add_served_decision
 
 
 class TestLabelUploadService:
@@ -120,14 +89,16 @@ class TestLabelUploadService:
         """Test successful label assignments"""
         # Create test data
         org = session.query(Organisation).first()
-        test_event = TestingRecordLog(
-            event_id="test_event", event_timestamp=1234567890, event={"test": "data"}, o_id=org.o_id
-        )
         fraud_label = Label(label="FRAUD")
-        session.add(test_event)
         session.add(fraud_label)
         session.commit()
-        _add_served_event_version(session, test_event)
+        add_served_decision(
+            session,
+            org_id=int(org.o_id),
+            event_id="test_event",
+            event_timestamp=1234567890,
+            event_data={"test": "data"},
+        )
 
         # Create service and test data
         service = LabelUploadService(session)
@@ -171,12 +142,13 @@ class TestLabelUploadService:
     def test_process_label_assignments_label_not_found(self, session):
         """Test handling of non-existent labels"""
         org = session.query(Organisation).first()
-        test_event = TestingRecordLog(
-            event_id="test_event", event_timestamp=1234567890, event={"test": "data"}, o_id=org.o_id
+        add_served_decision(
+            session,
+            org_id=int(org.o_id),
+            event_id="test_event",
+            event_timestamp=1234567890,
+            event_data={"test": "data"},
         )
-        session.add(test_event)
-        session.commit()
-        _add_served_event_version(session, test_event)
 
         service = LabelUploadService(session)
         parsed_rows = [
@@ -200,21 +172,25 @@ class TestLabelUploadService:
         """Test the complete workflow from CSV to database"""
         # Create test data
         org = session.query(Organisation).first()
-        test_event1 = TestingRecordLog(
-            event_id="event_1", event_timestamp=1234567890, event={"test": "data1"}, o_id=org.o_id
-        )
-        test_event2 = TestingRecordLog(
-            event_id="event_2", event_timestamp=1234567891, event={"test": "data2"}, o_id=org.o_id
-        )
         fraud_label = Label(label="FRAUD")
         normal_label = Label(label="NORMAL")
-        session.add(test_event1)
-        session.add(test_event2)
         session.add(fraud_label)
         session.add(normal_label)
         session.commit()
-        _add_served_event_version(session, test_event1)
-        _add_served_event_version(session, test_event2)
+        add_served_decision(
+            session,
+            org_id=int(org.o_id),
+            event_id="event_1",
+            event_timestamp=1234567890,
+            event_data={"test": "data1"},
+        )
+        add_served_decision(
+            session,
+            org_id=int(org.o_id),
+            event_id="event_2",
+            event_timestamp=1234567891,
+            event_data={"test": "data2"},
+        )
 
         # Test the complete workflow
         service = LabelUploadService(session)

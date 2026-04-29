@@ -8,6 +8,7 @@ from ezrules.backend.backtesting import (
     BACKTEST_QUEUE_DONE,
     BACKTEST_QUEUE_FAILED,
     BACKTEST_QUEUE_RUNNING,
+    BacktestRecord,
     compute_backtest_metrics,
 )
 from ezrules.backend.observation_queue import drain_observation_queue
@@ -21,7 +22,14 @@ from ezrules.backend.utils import load_cast_configs
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
 from ezrules.core.rule import Rule, RuleFactory
 from ezrules.core.user_lists import PersistentUserListManager
-from ezrules.models.backend_core import Label, RuleBackTestingResult, RuleQualityReport, TestingRecordLog
+from ezrules.models.backend_core import (
+    EvaluationDecision,
+    EventVersion,
+    EventVersionLabel,
+    Label,
+    RuleBackTestingResult,
+    RuleQualityReport,
+)
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
@@ -193,9 +201,20 @@ def execute_backtest_rule_change(
         one_month_ago = datetime.now(UTC) - timedelta(days=30)
 
         try:
-            query = db_session.query(TestingRecordLog).filter(
-                TestingRecordLog.created_at >= one_month_ago,
-                TestingRecordLog.o_id == org_id,
+            query = (
+                db_session.query(EventVersion.event_data, Label.label)
+                .join(EvaluationDecision, EvaluationDecision.ev_id == EventVersion.ev_id)
+                .outerjoin(
+                    EventVersionLabel,
+                    (EventVersionLabel.ev_id == EventVersion.ev_id) & (EventVersionLabel.o_id == org_id),
+                )
+                .outerjoin(Label, (Label.el_id == EventVersionLabel.el_id) & (Label.o_id == org_id))
+                .filter(
+                    EvaluationDecision.evaluated_at >= one_month_ago,
+                    EvaluationDecision.o_id == org_id,
+                    EvaluationDecision.served.is_(True),
+                    EvaluationDecision.decision_type == "served",
+                )
             )
         except Exception as e:
             payload = {"error": f"Failed to query test records: {e!s}"}
@@ -209,17 +228,15 @@ def execute_backtest_rule_change(
                 )
             return payload
 
-        label_lookup = {
-            int(label_id): str(label_name)
-            for label_id, label_name in db_session.query(Label.el_id, Label.label).filter(Label.o_id == org_id)
-        }
         configs = load_cast_configs(db_session, org_id)
 
         payload = compute_backtest_metrics(
             stored_rule=stored_rule,
             proposed_rule=proposed_rule,
-            test_records=query.yield_per(5000),
-            label_lookup=label_lookup,
+            test_records=(
+                BacktestRecord(event_data=dict(row.event_data or {}), label_name=str(row.label) if row.label else None)
+                for row in query.yield_per(5000)
+            ),
             configs=configs,
         )
     except Exception as e:

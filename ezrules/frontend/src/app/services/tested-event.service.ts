@@ -12,7 +12,7 @@ export interface TriggeredRule {
 }
 
 export interface TestedEvent {
-  tl_id: number;
+  evaluation_decision_id: number;
   event_id: string;
   event_timestamp: number;
   resolved_outcome: string | null;

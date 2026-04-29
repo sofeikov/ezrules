@@ -35,7 +35,6 @@ def get_shadow_evaluation_queue_client() -> Redis:
 
 def _serialize_shadow_payload(
     *,
-    tl_id: int,
     o_id: int,
     event_id: str,
     event_data: dict[str, Any],
@@ -48,7 +47,6 @@ def _serialize_shadow_payload(
 ) -> str:
     return json.dumps(
         {
-            "tl_id": tl_id,
             "o_id": o_id,
             "event_id": event_id,
             "event_data": event_data,
@@ -68,7 +66,6 @@ def _serialize_shadow_payload(
 def enqueue_shadow_evaluation(
     *,
     db,
-    tl_id: int,
     o_id: int,
     event_id: str,
     event_data: dict[str, Any],
@@ -84,7 +81,6 @@ def enqueue_shadow_evaluation(
         return False
 
     payload = _serialize_shadow_payload(
-        tl_id=tl_id,
         o_id=o_id,
         event_id=event_id,
         event_data=event_data,
@@ -128,8 +124,7 @@ def _parse_enqueued_at(raw_value: Any) -> datetime | None:
 
 def _persist_shadow_results(payload: dict[str, Any]) -> int:
     o_id = int(payload["o_id"])
-    tl_id = int(payload["tl_id"])
-    evaluation_decision_id = payload.get("evaluation_decision_id")
+    evaluation_decision_id = int(payload["evaluation_decision_id"])
     event_id = str(payload.get("event_id") or "")
     event_data = dict(payload.get("event_data") or {})
     production_all_rule_results = {
@@ -157,16 +152,14 @@ def _persist_shadow_results(payload: dict[str, Any]) -> int:
         for r_id, rule_result in shadow_result.get("all_rule_results", {}).items():
             db_session.add(
                 ShadowResultsLog(
-                    tl_id=tl_id,
-                    ed_id=int(evaluation_decision_id) if evaluation_decision_id is not None else None,
+                    ed_id=evaluation_decision_id,
                     r_id=int(r_id),
                     rule_result=str(rule_result),
                 )
             )
             db_session.add(
                 RuleDeploymentResultsLog(
-                    tl_id=tl_id,
-                    ed_id=int(evaluation_decision_id) if evaluation_decision_id is not None else None,
+                    ed_id=evaluation_decision_id,
                     r_id=int(r_id),
                     o_id=o_id,
                     mode=DEPLOYMENT_MODE_SHADOW,

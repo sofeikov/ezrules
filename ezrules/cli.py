@@ -29,12 +29,12 @@ from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.demo_data import build_demo_events, build_demo_rules, determine_demo_label, seed_demo_user_lists
 from ezrules.models.backend_core import (
     AllowedOutcome,
+    EventVersion,
     EventVersionLabel,
     Label,
     Organisation,
     Role,
     RuleQualityPair,
-    TestingRecordLog,
     User,
 )
 from ezrules.models.backend_core import Rule as RuleModel
@@ -580,10 +580,10 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
         lre = LocalRuleExecutorSQL(db=session, o_id=org_id)
 
         existing_event_count = (
-            session.query(TestingRecordLog)
+            session.query(EventVersion)
             .filter(
-                TestingRecordLog.o_id == org_id,
-                TestingRecordLog.event_id.like("TestEvent_%"),
+                EventVersion.o_id == org_id,
+                EventVersion.event_id.like("TestEvent_%"),
             )
             .count()
         )
@@ -619,35 +619,25 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
             if available_labels:
                 logger.info(f"Available labels: {list(available_labels.keys())}")
 
-                generated_event_ids = [generated_event.event_id for generated_event in generated_events]
-                all_events = (
-                    session.query(TestingRecordLog)
-                    .filter(
-                        TestingRecordLog.o_id == org_id,
-                        TestingRecordLog.event_id.in_(generated_event_ids),
-                    )
-                    .all()
-                )
-
-                n_to_label = int(len(all_events) * label_ratio)
+                n_to_label = int(len(generated_events) * label_ratio)
                 if n_to_label <= 0:
                     events_to_label = []
-                elif n_to_label >= len(all_events):
-                    events_to_label = all_events
+                elif n_to_label >= len(generated_events):
+                    events_to_label = generated_events
                 else:
-                    events_to_label = rng.sample(all_events, k=n_to_label)
+                    events_to_label = rng.sample(generated_events, k=n_to_label)
 
                 labeled_events = []
 
-                for event_record in events_to_label:
-                    event_data = event_record.event
+                for generated_event in events_to_label:
+                    event_data = generated_event.event_data
                     label_name = _determine_realistic_label(event_data, list(available_labels.keys()))
 
                     if label_name and label_name in available_labels:
                         event_version = get_labelable_event_version(
                             session,
                             o_id=org_id,
-                            event_id=str(event_record.event_id),
+                            event_id=str(generated_event.event_id),
                         )
                         if event_version is None:
                             continue
@@ -658,8 +648,8 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
                             label=available_labels[label_name],
                             assigned_by="cli",
                         )
-                        labeled_events.append((event_record.event_id, label_name))
-                        logger.info(f"Marked {event_record.event_id} as {label_name}")
+                        labeled_events.append((generated_event.event_id, label_name))
+                        logger.info(f"Marked {generated_event.event_id} as {label_name}")
 
                 session.commit()
                 logger.info(f"Successfully labeled {len(labeled_events)} events")
@@ -820,9 +810,13 @@ def export_test_csv(output_file: str, n_events: int, unlabeled_only: bool, org_n
             logger.warning("No labels found in database. Create labels in the UI or API before exporting a label CSV.")
             return
 
-        query = session.query(TestingRecordLog).filter(TestingRecordLog.o_id == org_id)
-
-        events = query.limit(n_events).all()
+        events = (
+            session.query(EventVersion)
+            .filter(EventVersion.o_id == org_id)
+            .order_by(EventVersion.ev_id.desc())
+            .limit(n_events)
+            .all()
+        )
 
         if not events:
             logger.warning("No events found matching criteria.")
@@ -841,7 +835,7 @@ def export_test_csv(output_file: str, n_events: int, unlabeled_only: bool, org_n
                 )
                 if existing_label is not None:
                     continue
-            event_data = event.event
+            event_data = event.event_data
             label_name = _determine_realistic_label(event_data, available_labels)
             if label_name:
                 test_labels.append((event.event_id, label_name))
@@ -905,9 +899,7 @@ def reset_dev(ctx, user_email, password, org_name, n_rules, n_events):
 def delete_test_data():
     _, engine, session = _create_cli_session()
     try:
-        session.query(TestingRecordLog).filter(TestingRecordLog.event_id.ilike("TestEvent_%")).delete(
-            synchronize_session=False
-        )
+        session.query(EventVersion).filter(EventVersion.event_id.ilike("TestEvent_%")).delete(synchronize_session=False)
         session.query(RuleModel).filter(RuleModel.rid.ilike("TestRule_%")).delete(synchronize_session=False)
         session.commit()
     finally:

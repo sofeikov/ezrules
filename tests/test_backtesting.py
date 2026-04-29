@@ -8,8 +8,9 @@ from ezrules.backend.tasks import app as celery_app
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Organisation, Role, RuleBackTestingResult, TestingRecordLog, User
+from ezrules.models.backend_core import Organisation, Role, RuleBackTestingResult, User
 from ezrules.models.backend_core import Rule as RuleModel
+from tests.canonical_helpers import add_served_decision
 
 
 @pytest.fixture(scope="function")
@@ -99,21 +100,20 @@ class TestBacktestTaskDirect:
     """Tests for the backtest_rule_change Celery task called directly."""
 
     def test_backtest_with_records(self, session, sample_rule_for_bt):
-        """Insert TestingRecordLog rows, run the task, verify outcome counts."""
+        """Insert served decision rows, run the task, verify outcome counts."""
         celery_app.conf.task_always_eager = True
         celery_app.conf.task_eager_propagates = True
 
         org = session.query(Organisation).filter(Organisation.o_id == 1).first()
 
-        # Insert test records
         for i in range(10):
-            record = TestingRecordLog(
-                event={"amount": 50 + i * 20},  # amounts: 50, 70, 90, 110, 130, 150, 170, 190, 210, 230
-                event_timestamp=1000000 + i,
+            add_served_decision(
+                session,
+                org_id=int(org.o_id),
                 event_id=f"evt_{i}",
-                o_id=org.o_id,
+                event_timestamp=1000000 + i,
+                event_data={"amount": 50 + i * 20},
             )
-            session.add(record)
         session.commit()
 
         # Run the task directly
@@ -260,13 +260,13 @@ class TestBacktestChunkedEvaluation:
         # Insert 50 records: 25 with amount > 100, 25 with amount <= 100
         for i in range(50):
             amount = 200 if i < 25 else 50
-            record = TestingRecordLog(
-                event={"amount": amount},
-                event_timestamp=2000000 + i,
+            add_served_decision(
+                session,
+                org_id=int(org.o_id),
                 event_id=f"chunk_evt_{i}",
-                o_id=org.o_id,
+                event_timestamp=2000000 + i,
+                event_data={"amount": amount},
             )
-            session.add(record)
         session.commit()
 
         result = backtest_rule_change(sample_rule_for_bt.r_id, "if $amount > 50:\n\treturn !FLAG", int(org.o_id))

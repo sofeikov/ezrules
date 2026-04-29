@@ -407,19 +407,21 @@ def get_labels_distribution(
     aggregation_period, config = validate_aggregation(aggregation)
     start_time, end_time = get_current_time_bounds(config["delta"])
 
-    bucket_expr = get_bucket_expression(config, EventVersionLabel.assigned_at)
+    bucket_expr = get_bucket_expression(config, EvaluationDecision.evaluated_at)
 
-    labels_data = (
+    labels_query = (
         db.query(
             bucket_expr.label("bucket"),
             Label.label,
             sqlalchemy.func.count(Label.label).label("count"),
         )
         .join(EventVersionLabel, EventVersionLabel.el_id == Label.el_id)
-        .filter(EventVersionLabel.assigned_at >= start_time)
-        .filter(EventVersionLabel.assigned_at <= end_time)
+        .join(EvaluationDecision, EvaluationDecision.ev_id == EventVersionLabel.ev_id)
         .filter(EventVersionLabel.o_id == current_org_id)
         .filter(Label.o_id == current_org_id)
+    )
+    labels_data = (
+        apply_served_decision_window(labels_query, current_org_id, start_time, end_time)
         .group_by("bucket", Label.label)
         .order_by("bucket")
         .all()
@@ -485,13 +487,15 @@ def get_labeled_transaction_volume(
     aggregation_period, config = validate_aggregation(aggregation)
     start_time, end_time = get_current_time_bounds(config["delta"])
 
-    bucket_expr = get_bucket_expression(config, EventVersionLabel.assigned_at)
+    bucket_expr = get_bucket_expression(config, EvaluationDecision.evaluated_at)
 
-    transactions = (
-        db.query(bucket_expr.label("bucket"), sqlalchemy.func.count(EventVersionLabel.evl_id).label("count"))
-        .filter(EventVersionLabel.assigned_at >= start_time)
-        .filter(EventVersionLabel.assigned_at <= end_time)
+    transactions_query = (
+        db.query(bucket_expr.label("bucket"), sqlalchemy.func.count(EvaluationDecision.ed_id).label("count"))
+        .join(EventVersionLabel, EventVersionLabel.ev_id == EvaluationDecision.ev_id)
         .filter(EventVersionLabel.o_id == current_org_id)
+    )
+    transactions = (
+        apply_served_decision_window(transactions_query, current_org_id, start_time, end_time)
         .group_by("bucket")
         .order_by("bucket")
         .all()

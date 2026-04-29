@@ -168,16 +168,16 @@
                     <td class="px-6 py-4 whitespace-nowrap text-right">
                       <button
                         type="button"
-                        (click)="toggleDetails(event.tl_id)"
+                        (click)="toggleDetails(event.evaluation_decision_id)"
                         class="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                         data-testid="tested-event-details-button"
                       >
-                        {{ isExpanded(event.tl_id) ? 'Hide details' : 'View details' }}
+                        {{ isExpanded(event.evaluation_decision_id) ? 'Hide details' : 'View details' }}
                       </button>
                     </td>
                   </tr>
 
-                  <tr *ngIf="isExpanded(event.tl_id)" data-testid="tested-event-details">
+                  <tr *ngIf="isExpanded(event.evaluation_decision_id)" data-testid="tested-event-details">
                     <td colspan="6" class="px-6 py-5 bg-gray-50">
                       <div class="grid gap-6 lg:grid-cols-2">
                         <div>
@@ -190,9 +190,9 @@
                               <div
                                 *ngFor="let rule of event.triggered_rules"
                                 class="bg-white border rounded-lg p-4 transition-colors"
-                                [ngClass]="isRuleHovered(event.tl_id, rule.r_id) ? 'border-amber-300 bg-amber-50' : 'border-gray-200'"
-                                (mouseenter)="setHoveredRule(event.tl_id, rule.r_id)"
-                                (mouseleave)="setHoveredRule(event.tl_id, null)"
+                                [ngClass]="isRuleHovered(event.evaluation_decision_id, rule.r_id) ? 'border-amber-300 bg-amber-50' : 'border-gray-200'"
+                                (mouseenter)="setHoveredRule(event.evaluation_decision_id, rule.r_id)"
+                                (mouseleave)="setHoveredRule(event.evaluation_decision_id, null)"
                                 data-testid="tested-event-triggered-rule"
                                 [attr.data-rule-id]="rule.r_id"
                               >

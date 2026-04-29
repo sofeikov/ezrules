@@ -1,41 +1,10 @@
 from ezrules.backend.label_upload_service import LabelUploadService
 from ezrules.models.backend_core import (
-    EvaluationDecision,
-    EventVersion,
     EventVersionLabel,
     Label,
     Organisation,
-    TestingRecordLog,
 )
-
-
-def _add_served_event_version(session, event: TestingRecordLog, event_version: int = 1) -> EventVersion:
-    version = EventVersion(
-        o_id=event.o_id,
-        event_id=event.event_id,
-        event_version=event_version,
-        event_timestamp=event.event_timestamp,
-        event_data=event.event,
-        payload_hash="0" * 64,
-        source="evaluate",
-    )
-    session.add(version)
-    session.flush()
-    session.add(
-        EvaluationDecision(
-            ev_id=version.ev_id,
-            tl_id=event.tl_id,
-            o_id=event.o_id,
-            event_id=event.event_id,
-            event_version=event_version,
-            event_timestamp=event.event_timestamp,
-            decision_type="served",
-            served=True,
-            rule_config_label="production",
-        )
-    )
-    session.commit()
-    return version
+from tests.canonical_helpers import add_served_decision
 
 
 def test_upload_labels_from_csv_is_scoped_to_the_configured_org(session):
@@ -47,15 +16,15 @@ def test_upload_labels_from_csv_is_scoped_to_the_configured_org(session):
     session.commit()
 
     label = Label(label="FRAUD")
-    off_scope_event = TestingRecordLog(
+    session.add(label)
+    session.commit()
+    add_served_decision(
+        session,
+        org_id=int(other_org.o_id),
         event_id="cross_org_event",
         event_timestamp=1234567890,
-        event={"amount": 100},
-        o_id=other_org.o_id,
+        event_data={"amount": 100},
     )
-    session.add(label)
-    session.add(off_scope_event)
-    session.commit()
 
     result = LabelUploadService(session, org_id=current_org.o_id).upload_labels_from_csv("cross_org_event,FRAUD\n")
 
@@ -71,24 +40,22 @@ def test_upload_labels_from_csv_labels_latest_duplicate_event_id_version(session
     assert current_org is not None
 
     label = Label(label="NORMAL")
-    first_event = TestingRecordLog(
+    session.add(label)
+    session.commit()
+    add_served_decision(
+        session,
+        org_id=int(current_org.o_id),
         event_id="duplicate_event",
         event_timestamp=1234567890,
-        event={"amount": 100},
-        o_id=current_org.o_id,
+        event_data={"amount": 100},
     )
-    second_event = TestingRecordLog(
+    latest_decision = add_served_decision(
+        session,
+        org_id=int(current_org.o_id),
         event_id="duplicate_event",
         event_timestamp=1234567891,
-        event={"amount": 200},
-        o_id=current_org.o_id,
+        event_data={"amount": 200},
     )
-    session.add(label)
-    session.add(first_event)
-    session.add(second_event)
-    session.commit()
-    _add_served_event_version(session, first_event, event_version=1)
-    latest_version = _add_served_event_version(session, second_event, event_version=2)
 
     result = LabelUploadService(session, org_id=current_org.o_id).upload_labels_from_csv("duplicate_event,NORMAL\n")
 
@@ -97,7 +64,7 @@ def test_upload_labels_from_csv_labels_latest_duplicate_event_id_version(session
     assert result.errors == []
     assert result.applied_assignments[0].event_version == 2
     assignment = session.query(EventVersionLabel).one()
-    assert assignment.ev_id == latest_version.ev_id
+    assert assignment.ev_id == latest_decision.ev_id
 
 
 def test_upload_labels_from_csv_returns_assignment_metadata_for_audit(session):
@@ -105,16 +72,15 @@ def test_upload_labels_from_csv_returns_assignment_metadata_for_audit(session):
     assert current_org is not None
 
     label = Label(label="CHARGEBACK")
-    event = TestingRecordLog(
+    session.add(label)
+    session.commit()
+    add_served_decision(
+        session,
+        org_id=int(current_org.o_id),
         event_id="audit_ready_event",
         event_timestamp=1234567890,
-        event={"amount": 300},
-        o_id=current_org.o_id,
+        event_data={"amount": 300},
     )
-    session.add(label)
-    session.add(event)
-    session.commit()
-    _add_served_event_version(session, event)
 
     result = LabelUploadService(session, org_id=current_org.o_id).upload_labels_from_csv(
         "audit_ready_event,CHARGEBACK\n"

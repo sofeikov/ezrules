@@ -8,8 +8,9 @@ from ezrules.backend.api_v2.routes import backtesting as backtesting_routes
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Label, Organisation, Role, RuleBackTestingResult, TestingRecordLog, User
+from ezrules.models.backend_core import Label, Organisation, Role, RuleBackTestingResult, User
 from ezrules.models.backend_core import Rule as RuleModel
+from tests.canonical_helpers import add_served_decision
 
 
 @pytest.fixture(scope="function")
@@ -85,23 +86,22 @@ def labeled_backtest_fixture(session):
     session.commit()
 
     records = [
-        {"event_id": "quality_evt_1", "amount": 200, "label_id": fraud_label.el_id},
-        {"event_id": "quality_evt_2", "amount": 180, "label_id": fraud_label.el_id},
-        {"event_id": "quality_evt_3", "amount": 120, "label_id": normal_label.el_id},
-        {"event_id": "quality_evt_4", "amount": 80, "label_id": normal_label.el_id},
-        {"event_id": "quality_evt_5", "amount": 220, "label_id": None},
-        {"event_id": "quality_evt_6", "amount": 60, "label_id": None},
+        {"event_id": "quality_evt_1", "amount": 200, "label": fraud_label},
+        {"event_id": "quality_evt_2", "amount": 180, "label": fraud_label},
+        {"event_id": "quality_evt_3", "amount": 120, "label": normal_label},
+        {"event_id": "quality_evt_4", "amount": 80, "label": normal_label},
+        {"event_id": "quality_evt_5", "amount": 220, "label": None},
+        {"event_id": "quality_evt_6", "amount": 60, "label": None},
     ]
 
     for index, record in enumerate(records):
-        session.add(
-            TestingRecordLog(
-                event={"amount": record["amount"]},
-                event_timestamp=1_900_000 + index,
-                event_id=record["event_id"],
-                o_id=org.o_id,
-                el_id=record["label_id"],
-            )
+        add_served_decision(
+            session,
+            org_id=int(org.o_id),
+            event_id=record["event_id"],
+            event_timestamp=1_900_000 + index,
+            event_data={"amount": record["amount"]},
+            label=record["label"],
         )
     session.commit()
 

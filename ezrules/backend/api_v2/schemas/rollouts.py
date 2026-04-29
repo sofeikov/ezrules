@@ -34,7 +34,7 @@ class RolloutConfigResponse(BaseModel):
 
 class RolloutResultItem(BaseModel):
     dr_id: int
-    tl_id: int
+    evaluation_decision_id: int
     r_id: int
     selected_variant: str
     traffic_percent: int | None

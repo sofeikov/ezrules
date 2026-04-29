@@ -54,8 +54,11 @@ def list_tested_events(
     records = (
         db.query(EvaluationDecision, EventVersion, Label.label)
         .join(EventVersion, EventVersion.ev_id == EvaluationDecision.ev_id)
-        .outerjoin(EventVersionLabel, EventVersionLabel.ev_id == EvaluationDecision.ev_id)
-        .outerjoin(Label, Label.el_id == EventVersionLabel.el_id)
+        .outerjoin(
+            EventVersionLabel,
+            (EventVersionLabel.ev_id == EvaluationDecision.ev_id) & (EventVersionLabel.o_id == EvaluationDecision.o_id),
+        )
+        .outerjoin(Label, (Label.el_id == EventVersionLabel.el_id) & (Label.o_id == EvaluationDecision.o_id))
         .filter(
             EvaluationDecision.o_id == current_org_id,
             EvaluationDecision.served.is_(True),
@@ -113,7 +116,7 @@ def list_tested_events(
 
     events = [
         TestedEventItem(
-            tl_id=int(decision.ed_id),
+            evaluation_decision_id=int(decision.ed_id),
             event_id=str(decision.event_id),
             event_timestamp=int(decision.event_timestamp),
             resolved_outcome=str(decision.resolved_outcome) if decision.resolved_outcome is not None else None,

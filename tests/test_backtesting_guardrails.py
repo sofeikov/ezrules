@@ -10,8 +10,9 @@ from ezrules.backend.tasks import app as celery_app
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import FieldTypeConfig, Organisation, Role, TestingRecordLog, User
+from ezrules.models.backend_core import FieldTypeConfig, Organisation, Role, User
 from ezrules.models.backend_core import Rule as RuleModel
+from tests.canonical_helpers import add_served_decision
 
 
 def _get_or_create_org(session):
@@ -32,14 +33,7 @@ def _create_rule(session, *, rid: str, logic: str):
 
 
 def _insert_record(session, *, org_id: int, event_id: str, event: dict):
-    session.add(
-        TestingRecordLog(
-            event=event,
-            event_timestamp=1700000000,
-            event_id=event_id,
-            o_id=org_id,
-        )
-    )
+    add_served_decision(session, org_id=org_id, event_id=event_id, event_timestamp=1700000000, event_data=event)
 
 
 @pytest.fixture(scope="function")

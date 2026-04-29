@@ -18,7 +18,7 @@ from ezrules.backend.api_v2.main import app
 from ezrules.backend.api_v2.routes import evaluator as evaluator_router
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
-from ezrules.models.backend_core import ApiKey, Organisation, Rule, TestingRecordLog
+from ezrules.models.backend_core import ApiKey, EvaluationDecision, Organisation, Rule
 
 
 @pytest.fixture(scope="function")
@@ -123,7 +123,7 @@ class TestEvaluate:
         assert data["resolved_outcome"] == "HOLD"
 
         stored_event = (
-            session.query(TestingRecordLog).filter(TestingRecordLog.event_id == "eval_v2_test_conflict").one()
+            session.query(EvaluationDecision).filter(EvaluationDecision.event_id == "eval_v2_test_conflict").one()
         )
         assert stored_event.resolved_outcome == "HOLD"
         assert stored_event.outcome_counters == {"HOLD": 1, "RELEASE": 1}

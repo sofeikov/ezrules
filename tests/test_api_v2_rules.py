@@ -19,14 +19,18 @@ from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager, save_rule_history
 from ezrules.models.backend_core import (
     AllowedOutcome,
+    EvaluationRuleResult,
     Organisation,
     Role,
+    RuleDeploymentResultsLog,
     RuleEngineConfig,
     RuleHistory,
     RuleStatus,
+    ShadowResultsLog,
     User,
 )
 from ezrules.models.backend_core import Rule as RuleModel
+from tests.canonical_helpers import add_served_decision
 
 
 @pytest.fixture(scope="function")
@@ -758,6 +762,45 @@ class TestRuleLifecycleAudit:
         assert history[0].to_status is None
         session.expire_all()
         assert session.query(RuleModel).filter(RuleModel.r_id == rule_id).one_or_none() is None
+
+    def test_delete_rule_removes_canonical_result_references(self, rules_test_client, sample_rule):
+        token = rules_test_client.test_data["token"]
+        session = rules_test_client.test_data["session"]
+        rule_id = int(sample_rule.r_id)
+        decision = add_served_decision(
+            session,
+            org_id=1,
+            event_id="delete-rule-canonical-event",
+            event_data={"amount": 250},
+            rule_results={rule_id: "HOLD"},
+        )
+        session.add_all(
+            [
+                ShadowResultsLog(ed_id=int(decision.ed_id), r_id=rule_id, rule_result="HOLD"),
+                RuleDeploymentResultsLog(
+                    ed_id=int(decision.ed_id),
+                    r_id=rule_id,
+                    o_id=1,
+                    mode="shadow",
+                    selected_variant="control",
+                    control_result="HOLD",
+                    candidate_result="HOLD",
+                    returned_result="HOLD",
+                ),
+            ]
+        )
+        session.commit()
+
+        response = rules_test_client.delete(
+            f"/api/v2/rules/{rule_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 204
+        assert session.query(RuleModel).filter(RuleModel.r_id == rule_id).one_or_none() is None
+        assert session.query(EvaluationRuleResult).filter(EvaluationRuleResult.r_id == rule_id).count() == 0
+        assert session.query(ShadowResultsLog).filter(ShadowResultsLog.r_id == rule_id).count() == 0
+        assert session.query(RuleDeploymentResultsLog).filter(RuleDeploymentResultsLog.r_id == rule_id).count() == 0
 
 
 # =============================================================================

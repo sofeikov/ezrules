@@ -213,7 +213,7 @@ Per-rule outcome distribution query params:
 Dashboard analytics source of truth:
 - Transaction volume, outcome distribution, rule activity, and per-rule outcome distribution use served `evaluation_decisions` joined to `evaluation_rule_results`.
 - Time buckets are anchored on `evaluation_decisions.evaluated_at`, so charts show when a decision was served rather than the event's business timestamp.
-- Label analytics and rule-quality endpoints use canonical `event_version_labels` joined to served decisions and event labels.
+- Label analytics and rule-quality endpoints use canonical `event_version_labels` joined to served decisions and event labels; label chart buckets are anchored on served decision time.
 
 ### Settings
 

@@ -240,7 +240,7 @@ def evaluate(
 
     try:
         # `result` already contains the merged served outcome; passing it avoids a second rule evaluation.
-        result, tl_id = data_utils.eval_and_store(lre, event, response=result)
+        result, evaluation_decision_id = data_utils.eval_and_store(lre, event, response=result)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -249,12 +249,10 @@ def evaluate(
 
     if rollout_logs:
         try:
-            evaluation_decision_id = result.get("evaluation_decision_id")
             for log in rollout_logs:
                 db.add(
                     RuleDeploymentResultsLog(
-                        tl_id=tl_id,
-                        ed_id=int(evaluation_decision_id) if evaluation_decision_id is not None else None,
+                        ed_id=int(evaluation_decision_id),
                         r_id=int(log["r_id"]),
                         o_id=lre.o_id,
                         mode=str(log["mode"]),
@@ -284,7 +282,6 @@ def evaluate(
 
     enqueue_shadow_evaluation(
         db=db,
-        tl_id=int(tl_id),
         o_id=int(lre.o_id),
         event_id=str(event.event_id),
         event_data=event.event_data,

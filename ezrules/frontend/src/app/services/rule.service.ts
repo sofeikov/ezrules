@@ -172,7 +172,7 @@ export interface ShadowConfigResponse {
 
 export interface ShadowResultItem {
   sr_id: number;
-  tl_id: number;
+  evaluation_decision_id: number;
   r_id: number;
   rule_result: string;
   event_id: string;
@@ -222,7 +222,7 @@ export interface RolloutConfigResponse {
 
 export interface RolloutResultItem {
   dr_id: number;
-  tl_id: number;
+  evaluation_decision_id: number;
   r_id: number;
   selected_variant: string;
   traffic_percent: number | null;

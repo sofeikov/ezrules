@@ -9,17 +9,15 @@ from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
     AllowedOutcome,
-    EvaluationDecision,
-    EventVersion,
     FieldObservation,
     FieldTypeConfig,
     Label,
     Organisation,
     Role,
-    TestingRecordLog,
     User,
     UserList,
 )
+from tests.canonical_helpers import add_served_decision
 
 
 def _unique_email(prefix: str) -> str:
@@ -31,35 +29,6 @@ def _grant_permissions(session, role: Role, permissions: list[PermissionAction])
     PermissionManager.init_default_actions()
     for permission in permissions:
         PermissionManager.grant_permission(int(role.id), permission)
-
-
-def _add_served_event_version(session, event: TestingRecordLog, event_version: int = 1) -> EventVersion:
-    version = EventVersion(
-        o_id=event.o_id,
-        event_id=event.event_id,
-        event_version=event_version,
-        event_timestamp=event.event_timestamp,
-        event_data=event.event,
-        payload_hash="0" * 64,
-        source="evaluate",
-    )
-    session.add(version)
-    session.flush()
-    session.add(
-        EvaluationDecision(
-            ev_id=version.ev_id,
-            tl_id=event.tl_id,
-            o_id=event.o_id,
-            event_id=event.event_id,
-            event_version=event_version,
-            event_timestamp=event.event_timestamp,
-            decision_type="served",
-            served=True,
-            rule_config_label="production",
-        )
-    )
-    session.commit()
-    return version
 
 
 def _create_user(
@@ -312,40 +281,42 @@ def test_label_usage_and_label_analytics_are_org_scoped(session):
     session.add_all([label_fraud, label_normal])
     session.commit()
 
-    org_event = TestingRecordLog(
-        event_id=f"phase1-org-{uuid.uuid4().hex[:6]}",
-        event={"amount": 100},
+    org_event_id = f"phase1-org-{uuid.uuid4().hex[:6]}"
+    org_upload_event_id = f"phase1-org-upload-{uuid.uuid4().hex[:6]}"
+    other_org_event_id = f"phase1-other-{uuid.uuid4().hex[:6]}"
+    add_served_decision(
+        session,
+        org_id=int(org.o_id),
+        event_id=org_event_id,
+        event_data={"amount": 100},
         event_timestamp=1234567890,
-        o_id=int(org.o_id),
     )
-    org_upload_event = TestingRecordLog(
-        event_id=f"phase1-org-upload-{uuid.uuid4().hex[:6]}",
-        event={"amount": 200},
+    add_served_decision(
+        session,
+        org_id=int(org.o_id),
+        event_id=org_upload_event_id,
+        event_data={"amount": 200},
         event_timestamp=1234567891,
-        o_id=int(org.o_id),
     )
-    other_org_event = TestingRecordLog(
-        event_id=f"phase1-other-{uuid.uuid4().hex[:6]}",
-        event={"amount": 300},
+    add_served_decision(
+        session,
+        org_id=int(other_org.o_id),
+        event_id=other_org_event_id,
+        event_data={"amount": 300},
         event_timestamp=1234567892,
-        o_id=int(other_org.o_id),
     )
-    session.add_all([org_event, org_upload_event, other_org_event])
     session.commit()
-    _add_served_event_version(session, org_event)
-    _add_served_event_version(session, org_upload_event)
-    _add_served_event_version(session, other_org_event)
 
     with TestClient(app) as client:
         foreign_mark_response = client.post(
             "/api/v2/labels/mark-event",
             headers=_auth_headers(user),
-            json={"event_id": other_org_event.event_id, "label_name": label_fraud.label},
+            json={"event_id": other_org_event_id, "label_name": label_fraud.label},
         )
         local_mark_response = client.post(
             "/api/v2/labels/mark-event",
             headers=_auth_headers(user),
-            json={"event_id": org_event.event_id, "label_name": label_fraud.label},
+            json={"event_id": org_event_id, "label_name": label_fraud.label},
         )
         upload_response = client.post(
             "/api/v2/labels/upload",
@@ -353,7 +324,7 @@ def test_label_usage_and_label_analytics_are_org_scoped(session):
             files={
                 "file": (
                     "labels.csv",
-                    f"{org_upload_event.event_id},{label_normal.label}\n{other_org_event.event_id},{label_normal.label}\n",
+                    f"{org_upload_event_id},{label_normal.label}\n{other_org_event_id},{label_normal.label}\n",
                     "text/csv",
                 )
             },

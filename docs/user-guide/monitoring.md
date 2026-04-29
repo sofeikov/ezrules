@@ -135,7 +135,7 @@ Healthy signal:
 
 Tip: responses are structured for Chart.js (`labels` + dataset series).
 
-Source-of-truth note: Dashboard volume, outcome, rule activity, and per-rule performance endpoints read canonical served decisions. Label analytics and rule quality use canonical `event_version_labels` linked to those served event versions.
+Source-of-truth note: Dashboard volume, outcome, rule activity, per-rule performance, and labeled-transaction charts read canonical served decisions. Label analytics and rule quality use canonical `event_version_labels` linked to those served event versions.
 
 ---
 
@@ -155,10 +155,16 @@ ORDER BY hour;
 ```
 
 ```sql
-SELECT el.label, COUNT(*) AS total
-FROM event_version_labels evl
+SELECT date_trunc('hour', ed.evaluated_at) AS hour,
+       el.label,
+       COUNT(*) AS total
+FROM evaluation_decisions ed
+JOIN event_version_labels evl ON evl.ev_id = ed.ev_id
 JOIN event_labels el ON evl.el_id = el.el_id
-GROUP BY el.label;
+WHERE ed.served = TRUE
+  AND ed.decision_type = 'served'
+GROUP BY hour, el.label
+ORDER BY hour;
 ```
 
 ---

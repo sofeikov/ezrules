@@ -17,15 +17,14 @@ from ezrules.backend.api_v2.main import app
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
-    EvaluationDecision,
     EventVersion,
     EventVersionLabel,
     Label,
     Organisation,
     Role,
-    TestingRecordLog,
     User,
 )
+from tests.canonical_helpers import add_served_decision
 
 
 @pytest.fixture(scope="function")
@@ -101,35 +100,6 @@ def sample_label(session):
     return label
 
 
-def _add_served_event_version(session, event: TestingRecordLog) -> EventVersion:
-    version = EventVersion(
-        o_id=event.o_id,
-        event_id=event.event_id,
-        event_version=1,
-        event_timestamp=event.event_timestamp,
-        event_data=event.event,
-        payload_hash="0" * 64,
-        source="evaluate",
-    )
-    session.add(version)
-    session.flush()
-    session.add(
-        EvaluationDecision(
-            ev_id=version.ev_id,
-            tl_id=event.tl_id,
-            o_id=event.o_id,
-            event_id=event.event_id,
-            event_version=1,
-            event_timestamp=event.event_timestamp,
-            decision_type="served",
-            served=True,
-            rule_config_label="production",
-        )
-    )
-    session.commit()
-    return version
-
-
 @pytest.fixture(scope="function")
 def sample_event(session):
     """Create a sample event for testing mark-event functionality."""
@@ -139,16 +109,15 @@ def sample_event(session):
         session.add(org)
         session.commit()
 
-    event = TestingRecordLog(
+    decision = add_served_decision(
+        session,
+        org_id=int(org.o_id),
         event_id="test_event_123",
-        event={"amount": 100, "currency": "USD"},
         event_timestamp=1234567890,
-        o_id=org.o_id,
+        event_data={"amount": 100, "currency": "USD"},
     )
-    session.add(event)
     session.commit()
-    _add_served_event_version(session, event)
-    return event
+    return decision
 
 
 # =============================================================================

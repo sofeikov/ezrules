@@ -300,6 +300,7 @@ class EventVersion(Base):
     __tablename__ = "event_versions"
     __table_args__ = (
         UniqueConstraint("o_id", "event_id", "event_version", name="uq_event_versions_org_event_version"),
+        UniqueConstraint("o_id", "ev_id", name="uq_event_versions_org_ev_id"),
         Index("ix_event_versions_o_id_event_id_version", "o_id", "event_id", "event_version"),
         Index("ix_event_versions_o_id_ingested_at", "o_id", "ingested_at"),
         Index("ix_event_versions_o_id_event_timestamp", "o_id", "event_timestamp"),
@@ -328,9 +329,6 @@ class EvaluationDecision(Base):
 
     ed_id = Column(Integer, unique=True, primary_key=True)
     ev_id: Mapped[int] = mapped_column(ForeignKey("event_versions.ev_id", ondelete="CASCADE"), nullable=False)
-    tl_id: Mapped[int | None] = mapped_column(
-        ForeignKey("testing_record_log.tl_id", ondelete="SET NULL"), nullable=True
-    )
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
     event_id = Column(String, nullable=False)
     event_version = Column(Integer, nullable=False)
@@ -368,6 +366,12 @@ class EventVersionLabel(Base):
             ["event_labels.el_id", "event_labels.o_id"],
             name="fk_event_version_labels_label_org",
         ),
+        ForeignKeyConstraint(
+            ["o_id", "ev_id"],
+            ["event_versions.o_id", "event_versions.ev_id"],
+            name="fk_event_version_labels_event_version_org",
+            ondelete="CASCADE",
+        ),
         UniqueConstraint("o_id", "ev_id", name="uq_event_version_labels_org_event_version"),
         Index("ix_event_version_labels_o_id_assigned_at", "o_id", "assigned_at"),
         Index("ix_event_version_labels_o_id_el_id", "o_id", "el_id"),
@@ -381,62 +385,11 @@ class EventVersionLabel(Base):
     assigned_by = Column(String(255), nullable=True)
 
 
-class TestingRecordLog(Base):
-    __tablename__ = "testing_record_log"
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["el_id", "o_id"],
-            ["event_labels.el_id", "event_labels.o_id"],
-            name="fk_testing_record_log_label_org",
-        ),
-        Index("ix_testing_record_log_o_id_event_id", "o_id", "event_id"),
-        Index("ix_testing_record_log_o_id_tl_id", "o_id", "tl_id"),
-        Index("ix_testing_record_log_o_id_created_at", "o_id", "created_at"),
-    )
-
-    tl_id = Column(
-        Integer,
-        unique=True,
-        primary_key=True,
-    )
-    event = Column(JSON, nullable=False)
-    event_timestamp = Column(Integer, nullable=False)
-    event_id = Column(String, nullable=False)
-    outcome_counters = Column(JSON, nullable=True)
-    resolved_outcome = Column(String, nullable=True)
-
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
-    el_id: Mapped[int | None] = mapped_column(Integer(), nullable=True)
-
-    testing_results: Mapped[list["TestingResultsLog"]] = relationship(
-        back_populates="testing_record",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-    )
-
-
-class TestingResultsLog(Base):
-    __tablename__ = "testing_results_log"
-    __table_args__ = (Index("ix_testing_results_log_tl_id_r_id", "tl_id", "r_id"),)
-
-    tr_id = Column(Integer, unique=True, primary_key=True)
-    tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id", ondelete="CASCADE"))
-    rule_result = Column(String, nullable=False)
-
-    r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
-
-    testing_record: Mapped["TestingRecordLog"] = relationship(back_populates="testing_results")
-
-
 class ShadowResultsLog(Base):
     __tablename__ = "shadow_results_log"
 
     sr_id = Column(Integer, unique=True, primary_key=True)
-    tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id", ondelete="CASCADE"))
-    ed_id: Mapped[int | None] = mapped_column(
-        ForeignKey("evaluation_decisions.ed_id", ondelete="SET NULL"), nullable=True
-    )
+    ed_id: Mapped[int] = mapped_column(ForeignKey("evaluation_decisions.ed_id", ondelete="CASCADE"), nullable=False)
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
     rule_result = Column(String, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
@@ -451,10 +404,7 @@ class RuleDeploymentResultsLog(Base):
     )
 
     dr_id = Column(Integer, unique=True, primary_key=True)
-    tl_id: Mapped[int] = mapped_column(ForeignKey("testing_record_log.tl_id", ondelete="CASCADE"))
-    ed_id: Mapped[int | None] = mapped_column(
-        ForeignKey("evaluation_decisions.ed_id", ondelete="SET NULL"), nullable=True
-    )
+    ed_id: Mapped[int] = mapped_column(ForeignKey("evaluation_decisions.ed_id", ondelete="CASCADE"), nullable=False)
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"))
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
     mode = Column(String(20), nullable=False)

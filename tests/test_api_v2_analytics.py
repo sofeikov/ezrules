@@ -33,8 +33,6 @@ from ezrules.models.backend_core import (
     RuleQualityPair,
     RuleQualityReport,
     Role,
-    TestingRecordLog,
-    TestingResultsLog,
     User,
 )
 from ezrules.models.backend_core import Rule as RuleModel
@@ -125,7 +123,6 @@ def _store_ledger_decision(
     evaluated_at: datetime.datetime,
     rule_results: dict[int, str],
     event_data: dict | None = None,
-    tl_id: int | None = None,
     served: bool = True,
     decision_type: str = "served",
 ) -> EvaluationDecision:
@@ -152,7 +149,6 @@ def _store_ledger_decision(
     resolved_outcome = next(iter(rule_results.values()), None)
     decision = EvaluationDecision(
         ev_id=version.ev_id,
-        tl_id=tl_id,
         o_id=org_id,
         event_id=event_id,
         event_version=event_version,
@@ -198,57 +194,27 @@ def sample_analytics_data(session):
     session.add(label)
     session.commit()
 
-    # Create test events (recent, within last hour)
     now = datetime.datetime.now()
-    events = []
     for i in range(5):
-        event = TestingRecordLog(
-            event_id=f"analytics_event_{i}",
-            event={"amount": 100 + i * 10},
-            event_timestamp=int((now - datetime.timedelta(minutes=i * 5)).timestamp()),
-            o_id=org.o_id,
-            created_at=now - datetime.timedelta(minutes=i * 5),
-        )
-        # Assign label to some events
-        if i < 3:
-            event.el_id = label.el_id
-        session.add(event)
-        events.append(event)
-    session.commit()
-
-    # Create test results for the events
-    for event in events:
-        outcome = "HOLD" if event.event["amount"] > 110 else "RELEASE"
-        result = TestingResultsLog(
-            tl_id=event.tl_id,
-            r_id=rule.r_id,
-            rule_result=outcome,
-        )
-        session.add(result)
-        _store_ledger_decision(
+        event_data = {"amount": 100 + i * 10}
+        evaluated_at = now - datetime.timedelta(minutes=i * 5)
+        outcome = "HOLD" if event_data["amount"] > 110 else "RELEASE"
+        decision = _store_ledger_decision(
             session,
             org_id=org.o_id,
-            event_id=event.event_id,
-            evaluated_at=event.created_at,
-            event_data=event.event,
+            event_id=f"analytics_event_{i}",
+            evaluated_at=evaluated_at,
+            event_data=event_data,
             rule_results={rule.r_id: outcome},
-            tl_id=event.tl_id,
         )
-        if event.el_id is not None:
-            version = (
-                session.query(EventVersion)
-                .filter(EventVersion.o_id == org.o_id, EventVersion.event_id == event.event_id)
-                .one()
-            )
-            session.add(EventVersionLabel(o_id=org.o_id, ev_id=version.ev_id, el_id=event.el_id))
+        if i < 3:
+            session.add(EventVersionLabel(o_id=org.o_id, ev_id=decision.ev_id, el_id=label.el_id))
             session.commit()
-    session.commit()
 
     return {
         "org": org,
         "rule": rule,
         "label": label,
-        "events": events,
     }
 
 
@@ -302,54 +268,22 @@ def sample_rule_quality_data(session):
 
     # Six labeled events. rule_b is perfect for HOLD->QUALITY_FRAUD and
     # RELEASE->QUALITY_NORMAL. rule_a is intentionally mixed.
-    labels = [
-        fraud_label.el_id,
-        fraud_label.el_id,
-        normal_label.el_id,
-        normal_label.el_id,
-        fraud_label.el_id,
-        normal_label.el_id,
-    ]
+    labels = [fraud_label, fraud_label, normal_label, normal_label, fraud_label, normal_label]
     rule_a_outcomes = ["HOLD", "RELEASE", "HOLD", "RELEASE", "HOLD", "RELEASE"]
     rule_b_outcomes = ["HOLD", "HOLD", "RELEASE", "RELEASE", "HOLD", "RELEASE"]
 
     now = datetime.datetime.now()
-    for idx, label_id in enumerate(labels):
-        event = TestingRecordLog(
-            event_id=f"quality_event_{idx}",
-            event={"idx": idx},
-            event_timestamp=int((now - datetime.timedelta(minutes=idx)).timestamp()),
-            o_id=org.o_id,
-            el_id=label_id,
-            created_at=now - datetime.timedelta(minutes=idx),
-        )
-        session.add(event)
-        session.commit()
-
-        session.add(
-            TestingResultsLog(
-                tl_id=event.tl_id,
-                r_id=rule_a.r_id,
-                rule_result=rule_a_outcomes[idx],
-            )
-        )
-        session.add(
-            TestingResultsLog(
-                tl_id=event.tl_id,
-                r_id=rule_b.r_id,
-                rule_result=rule_b_outcomes[idx],
-            )
-        )
+    for idx, label in enumerate(labels):
+        evaluated_at = now - datetime.timedelta(minutes=idx)
         decision = _store_ledger_decision(
             session,
             org_id=org.o_id,
-            event_id=event.event_id,
-            evaluated_at=event.created_at,
-            event_data=event.event,
+            event_id=f"quality_event_{idx}",
+            evaluated_at=evaluated_at,
+            event_data={"idx": idx},
             rule_results={rule_a.r_id: rule_a_outcomes[idx], rule_b.r_id: rule_b_outcomes[idx]},
-            tl_id=event.tl_id,
         )
-        session.add(EventVersionLabel(o_id=org.o_id, ev_id=decision.ev_id, el_id=label_id))
+        session.add(EventVersionLabel(o_id=org.o_id, ev_id=decision.ev_id, el_id=label.el_id))
 
     session.commit()
     return {
@@ -413,16 +347,6 @@ class TestTransactionVolume:
             o_id=org.o_id,
         )
         session.add(rule)
-        session.commit()
-
-        compatibility_only = TestingRecordLog(
-            event_id="legacy-only-volume",
-            event={"amount": 10},
-            event_timestamp=int(now.timestamp()),
-            o_id=org.o_id,
-            created_at=now,
-        )
-        session.add(compatibility_only)
         session.commit()
 
         _store_ledger_decision(
@@ -536,7 +460,7 @@ class TestOutcomesDistribution:
             assert "backgroundColor" in dataset
 
     def test_outcomes_distribution_uses_served_ledger_and_org_scope(self, analytics_test_client):
-        """Should ignore compatibility-only rows, non-served decisions, and other org decisions."""
+        """Should ignore non-served decisions and other org decisions."""
         token = analytics_test_client.test_data["token"]
         session = analytics_test_client.test_data["session"]
         now = datetime.datetime.now()
@@ -555,18 +479,6 @@ class TestOutcomesDistribution:
             o_id=2,
         )
         session.add_all([other_org, org_rule, other_org_rule])
-        session.commit()
-
-        legacy_event = TestingRecordLog(
-            event_id="legacy-only-outcome",
-            event={"amount": 10},
-            event_timestamp=int(now.timestamp()),
-            o_id=1,
-            created_at=now,
-        )
-        session.add(legacy_event)
-        session.commit()
-        session.add(TestingResultsLog(tl_id=legacy_event.tl_id, r_id=org_rule.r_id, rule_result="LEGACY_ONLY"))
         session.commit()
 
         _store_ledger_decision(
@@ -854,32 +766,13 @@ class TestRuleQuality:
         fraud_label = sample_rule_quality_data["fraud_label"]
 
         old_created_at = datetime.datetime.now() - datetime.timedelta(days=40)
-        old_event = TestingRecordLog(
-            event_id="quality_old_event",
-            event={"idx": 999},
-            event_timestamp=int(old_created_at.timestamp()),
-            o_id=1,
-            el_id=fraud_label.el_id,
-            created_at=old_created_at,
-        )
-        session.add(old_event)
-        session.commit()
-
-        session.add(
-            TestingResultsLog(
-                tl_id=old_event.tl_id,
-                r_id=rule_a.r_id,
-                rule_result="HOLD",
-            )
-        )
         old_decision = _store_ledger_decision(
             session,
             org_id=1,
-            event_id=old_event.event_id,
-            evaluated_at=old_event.created_at,
-            event_data=old_event.event,
+            event_id="quality_old_event",
+            evaluated_at=old_created_at,
+            event_data={"idx": 999},
             rule_results={rule_a.r_id: "HOLD"},
-            tl_id=old_event.tl_id,
         )
         session.add(EventVersionLabel(o_id=1, ev_id=old_decision.ev_id, el_id=fraud_label.el_id))
         session.commit()

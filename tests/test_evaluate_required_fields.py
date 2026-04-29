@@ -4,7 +4,7 @@ from ezrules.backend.api_v2.main import app
 from ezrules.backend.api_v2.routes import evaluator as evaluator_router
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
-from ezrules.models.backend_core import FieldTypeConfig, Organisation, Rule, TestingRecordLog
+from ezrules.models.backend_core import EvaluationDecision, FieldTypeConfig, Organisation, Rule
 
 
 def _setup_rule_engine(session, *, rid: str, r_id: int, logic: str):
@@ -44,8 +44,8 @@ class TestEvaluateRequiredFieldContracts:
         assert response.status_code == 400
         assert "amount" in response.json()["detail"]
         assert (
-            session.query(TestingRecordLog)
-            .filter(TestingRecordLog.event_id == "required_missing_eval", TestingRecordLog.o_id == org.o_id)
+            session.query(EvaluationDecision)
+            .filter(EvaluationDecision.event_id == "required_missing_eval", EvaluationDecision.o_id == org.o_id)
             .count()
             == 0
         )
@@ -76,8 +76,8 @@ class TestEvaluateRequiredFieldContracts:
         assert response.status_code == 400
         assert "amount" in response.json()["detail"]
         assert (
-            session.query(TestingRecordLog)
-            .filter(TestingRecordLog.event_id == "required_null_eval", TestingRecordLog.o_id == org.o_id)
+            session.query(EvaluationDecision)
+            .filter(EvaluationDecision.event_id == "required_null_eval", EvaluationDecision.o_id == org.o_id)
             .count()
             == 0
         )
@@ -107,8 +107,8 @@ class TestEvaluateRequiredFieldContracts:
         assert "country" in response.json()["detail"]
         assert "lookup failed" in response.json()["detail"]
         assert (
-            session.query(TestingRecordLog)
-            .filter(TestingRecordLog.event_id == "strict_lookup_missing_eval", TestingRecordLog.o_id == org.o_id)
+            session.query(EvaluationDecision)
+            .filter(EvaluationDecision.event_id == "strict_lookup_missing_eval", EvaluationDecision.o_id == org.o_id)
             .count()
             == 0
         )

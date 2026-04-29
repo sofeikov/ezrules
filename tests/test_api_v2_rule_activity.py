@@ -8,17 +8,13 @@ from ezrules.backend.api_v2.main import app
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
-    EvaluationDecision,
-    EvaluationRuleResult,
-    EventVersion,
     Organisation,
     Role,
     RuleStatus,
-    TestingRecordLog,
-    TestingResultsLog,
     User,
 )
 from ezrules.models.backend_core import Rule as RuleModel
+from tests.canonical_helpers import add_served_decision
 
 
 def _create_event(
@@ -29,54 +25,15 @@ def _create_event(
     created_at: datetime.datetime,
     fired_rules: list[RuleModel],
 ) -> None:
-    event_timestamp = int(created_at.timestamp())
-    event = TestingRecordLog(
+    add_served_decision(
+        session,
+        org_id=org_id,
         event_id=event_id,
-        event={"event_id": event_id},
-        event_timestamp=event_timestamp,
-        o_id=org_id,
-        created_at=created_at,
-    )
-    session.add(event)
-    session.commit()
-
-    version = EventVersion(
-        o_id=org_id,
-        event_id=event_id,
-        event_version=1,
-        event_timestamp=event_timestamp,
         event_data={"event_id": event_id},
-        payload_hash="0" * 64,
-        source="evaluate",
-        ingested_at=created_at,
-    )
-    session.add(version)
-    session.flush()
-
-    decision = EvaluationDecision(
-        ev_id=version.ev_id,
-        tl_id=event.tl_id,
-        o_id=org_id,
-        event_id=event_id,
-        event_version=1,
-        event_timestamp=event_timestamp,
-        decision_type="served",
-        served=True,
-        rule_config_label="production",
+        event_timestamp=int(created_at.timestamp()),
         evaluated_at=created_at,
+        rule_results={int(rule.r_id): "HOLD" for rule in fired_rules},
     )
-    session.add(decision)
-    session.flush()
-
-    for rule in fired_rules:
-        session.add(
-            TestingResultsLog(
-                tl_id=event.tl_id,
-                r_id=rule.r_id,
-                rule_result="HOLD",
-            )
-        )
-        session.add(EvaluationRuleResult(ed_id=decision.ed_id, r_id=rule.r_id, rule_result="HOLD"))
     session.commit()
 
 
