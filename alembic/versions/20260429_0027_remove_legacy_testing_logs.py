@@ -28,6 +28,33 @@ def upgrade() -> None:
         ondelete="CASCADE",
     )
 
+    op.drop_constraint(
+        "fk_shadow_results_log_ed_id_evaluation_decisions",
+        "shadow_results_log",
+        type_="foreignkey",
+    )
+    op.drop_constraint(
+        "fk_rule_deployment_results_log_ed_id_evaluation_decisions",
+        "rule_deployment_results_log",
+        type_="foreignkey",
+    )
+    op.create_foreign_key(
+        "fk_shadow_results_log_ed_id_evaluation_decisions",
+        "shadow_results_log",
+        "evaluation_decisions",
+        ["ed_id"],
+        ["ed_id"],
+        ondelete="CASCADE",
+    )
+    op.create_foreign_key(
+        "fk_rule_deployment_results_log_ed_id_evaluation_decisions",
+        "rule_deployment_results_log",
+        "evaluation_decisions",
+        ["ed_id"],
+        ["ed_id"],
+        ondelete="CASCADE",
+    )
+
     op.execute("ALTER TABLE evaluation_decisions DROP CONSTRAINT IF EXISTS evaluation_decisions_tl_id_fkey")
     op.execute("ALTER TABLE shadow_results_log DROP CONSTRAINT IF EXISTS shadow_results_log_tl_id_fkey")
     op.execute(
@@ -45,6 +72,35 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_constraint(
+        "fk_rule_deployment_results_log_ed_id_evaluation_decisions",
+        "rule_deployment_results_log",
+        type_="foreignkey",
+    )
+    op.drop_constraint(
+        "fk_shadow_results_log_ed_id_evaluation_decisions",
+        "shadow_results_log",
+        type_="foreignkey",
+    )
+    op.alter_column("rule_deployment_results_log", "ed_id", existing_type=sa.Integer(), nullable=True)
+    op.alter_column("shadow_results_log", "ed_id", existing_type=sa.Integer(), nullable=True)
+    op.create_foreign_key(
+        "fk_rule_deployment_results_log_ed_id_evaluation_decisions",
+        "rule_deployment_results_log",
+        "evaluation_decisions",
+        ["ed_id"],
+        ["ed_id"],
+        ondelete="SET NULL",
+    )
+    op.create_foreign_key(
+        "fk_shadow_results_log_ed_id_evaluation_decisions",
+        "shadow_results_log",
+        "evaluation_decisions",
+        ["ed_id"],
+        ["ed_id"],
+        ondelete="SET NULL",
+    )
+
     op.drop_constraint("fk_event_version_labels_event_version_org", "event_version_labels", type_="foreignkey")
     op.drop_constraint("uq_event_versions_org_ev_id", "event_versions", type_="unique")
 

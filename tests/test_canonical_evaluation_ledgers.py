@@ -18,8 +18,10 @@ from ezrules.models.backend_core import (
     Rule,
     RuleDeploymentResultsLog,
     RuleStatus,
+    ShadowResultsLog,
     User,
 )
+from tests.canonical_helpers import add_served_decision
 
 
 @pytest.fixture(scope="function")
@@ -151,3 +153,40 @@ def test_rollout_provenance_links_to_the_served_decision(session, ledger_api_key
     assert log.mode == "split"
     assert log.selected_variant == "candidate"
     assert log.returned_result == "CANDIDATE"
+
+
+def test_event_version_delete_cascades_canonical_result_logs(session):
+    rule = _save_production_rule(session)
+    decision = add_served_decision(
+        session,
+        org_id=1,
+        event_id="TestEvent_cascade_result_logs",
+        event_data={"amount": 42},
+        rule_results={int(rule.r_id): "HOLD"},
+    )
+    session.add_all(
+        [
+            ShadowResultsLog(ed_id=int(decision.ed_id), r_id=int(rule.r_id), rule_result="HOLD"),
+            RuleDeploymentResultsLog(
+                ed_id=int(decision.ed_id),
+                r_id=int(rule.r_id),
+                o_id=1,
+                mode="shadow",
+                selected_variant="control",
+                control_result="HOLD",
+                candidate_result="HOLD",
+                returned_result="HOLD",
+            ),
+        ]
+    )
+    session.commit()
+
+    decision_id = int(decision.ed_id)
+    event_version_id = int(decision.ev_id)
+
+    session.query(EventVersion).filter(EventVersion.ev_id == event_version_id).delete(synchronize_session=False)
+    session.commit()
+
+    assert session.query(EvaluationDecision).filter(EvaluationDecision.ed_id == decision_id).count() == 0
+    assert session.query(ShadowResultsLog).filter(ShadowResultsLog.ed_id == decision_id).count() == 0
+    assert session.query(RuleDeploymentResultsLog).filter(RuleDeploymentResultsLog.ed_id == decision_id).count() == 0
