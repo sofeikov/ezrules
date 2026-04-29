@@ -1,6 +1,7 @@
 from ezrules.backend.tasks import backtest_rule_change
-from ezrules.models.backend_core import Organisation, TestingRecordLog
+from ezrules.models.backend_core import Organisation
 from ezrules.models.backend_core import Rule as RuleModel
+from tests.canonical_helpers import add_served_decision
 
 
 def test_backtest_skips_records_when_proposed_score_field_never_appeared_in_history(session):
@@ -12,21 +13,19 @@ def test_backtest_skips_records_when_proposed_score_field_never_appeared_in_hist
         o_id=int(org.o_id),
     )
     session.add(rule)
-    session.add_all(
-        [
-            TestingRecordLog(
-                event={"amount": 150},
-                event_timestamp=1700000001,
-                event_id="score-regression-1",
-                o_id=int(org.o_id),
-            ),
-            TestingRecordLog(
-                event={"amount": 75},
-                event_timestamp=1700000002,
-                event_id="score-regression-2",
-                o_id=int(org.o_id),
-            ),
-        ]
+    add_served_decision(
+        session,
+        org_id=int(org.o_id),
+        event_id="score-regression-1",
+        event_timestamp=1700000001,
+        event_data={"amount": 150},
+    )
+    add_served_decision(
+        session,
+        org_id=int(org.o_id),
+        event_id="score-regression-2",
+        event_timestamp=1700000002,
+        event_data={"amount": 75},
     )
     session.commit()
 

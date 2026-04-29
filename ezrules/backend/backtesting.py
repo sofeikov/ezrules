@@ -15,7 +15,6 @@ from ezrules.core.type_casting import (
     find_missing_fields,
     normalize_event,
 )
-from ezrules.models.backend_core import TestingRecordLog
 
 BACKTEST_QUEUE_PENDING = "pending"
 BACKTEST_QUEUE_RUNNING = "running"
@@ -51,6 +50,12 @@ def _count_rates(counts: Counter[str], total_records: int) -> dict[str, float]:
     if total_records <= 0:
         return {}
     return {key: round((100 * counts[key] / total_records), 4) for key in sorted(counts)}
+
+
+@dataclass
+class BacktestRecord:
+    event_data: dict[str, Any]
+    label_name: str | None = None
 
 
 @dataclass
@@ -161,8 +166,7 @@ def compute_backtest_metrics(
     *,
     stored_rule: Any,
     proposed_rule: Any,
-    test_records: Iterable[TestingRecordLog],
-    label_lookup: dict[int, str],
+    test_records: Iterable[BacktestRecord],
     configs: list[FieldCastConfig],
 ) -> dict[str, Any]:
     stored_rule_fields = set(stored_rule.get_rule_params())
@@ -180,7 +184,7 @@ def compute_backtest_metrics(
     proposed_metrics = _RuleMetricsAccumulator()
 
     for record in test_records:
-        raw_payload = record.event if isinstance(record.event, dict) else {}
+        raw_payload = record.event_data if isinstance(record.event_data, dict) else {}
         raw_event = dict(raw_payload)
 
         missing_fields = find_missing_fields(raw_event, referenced_fields)
@@ -213,12 +217,10 @@ def compute_backtest_metrics(
 
         total_records += 1
 
-        label_name: str | None = None
-        if record.el_id is not None:
-            label_name = label_lookup.get(int(record.el_id))
-            if label_name is not None:
-                labeled_records += 1
-                label_counts[label_name] += 1
+        label_name = record.label_name
+        if label_name is not None:
+            labeled_records += 1
+            label_counts[label_name] += 1
 
         stored_outcome_name = str(stored_outcome) if stored_outcome is not None else None
         proposed_outcome_name = str(proposed_outcome) if proposed_outcome is not None else None

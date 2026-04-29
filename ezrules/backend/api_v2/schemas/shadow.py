@@ -32,7 +32,7 @@ class ShadowConfigResponse(BaseModel):
 
 class ShadowResultItem(BaseModel):
     sr_id: int
-    tl_id: int
+    evaluation_decision_id: int
     r_id: int
     rule_result: str
     event_id: str

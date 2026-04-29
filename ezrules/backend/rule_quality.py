@@ -9,7 +9,13 @@ from typing import Any
 
 import sqlalchemy
 
-from ezrules.models.backend_core import Label, RuleQualityPair, TestingRecordLog, TestingResultsLog
+from ezrules.models.backend_core import (
+    EvaluationDecision,
+    EvaluationRuleResult,
+    EventVersionLabel,
+    Label,
+    RuleQualityPair,
+)
 from ezrules.models.backend_core import Rule as RuleModel
 
 
@@ -50,20 +56,22 @@ def get_active_rule_quality_pairs(
     return normalize_rule_quality_pairs(pairs)
 
 
-def get_rule_quality_snapshot_max_tl_id(
+def get_rule_quality_snapshot_max_decision_id(
     db: Any,
     *,
     freeze_at: datetime.datetime,
     o_id: int | None,
 ) -> int:
-    """Return upper tl_id bound for a stable snapshot at freeze_at."""
-    query = db.query(sqlalchemy.func.max(TestingRecordLog.tl_id)).filter(
-        TestingRecordLog.created_at <= freeze_at,
+    """Return upper decision-id bound for a stable snapshot at freeze_at."""
+    query = db.query(sqlalchemy.func.max(EvaluationDecision.ed_id)).filter(
+        EvaluationDecision.evaluated_at <= freeze_at,
+        EvaluationDecision.served.is_(True),
+        EvaluationDecision.decision_type == "served",
     )
     if o_id is not None:
-        query = query.filter(TestingRecordLog.o_id == o_id)
-    max_tl_id = query.scalar()
-    return int(max_tl_id or 0)
+        query = query.filter(EvaluationDecision.o_id == o_id)
+    max_decision_id = query.scalar()
+    return int(max_decision_id or 0)
 
 
 def compute_rule_quality_metrics(
@@ -72,7 +80,7 @@ def compute_rule_quality_metrics(
     min_support: int,
     lookback_days: int,
     freeze_at: datetime.datetime,
-    max_tl_id: int | None,
+    max_decision_id: int | None,
     o_id: int | None,
     curated_pairs: list[tuple[str, str]],
 ) -> dict[str, Any]:
@@ -81,16 +89,27 @@ def compute_rule_quality_metrics(
     selected_pairs = normalize_rule_quality_pairs(curated_pairs)
 
     base_filters: list[Any] = [
-        TestingRecordLog.el_id.isnot(None),
-        TestingRecordLog.created_at >= start_time,
-        TestingRecordLog.created_at <= freeze_at,
+        EvaluationDecision.served.is_(True),
+        EvaluationDecision.decision_type == "served",
+        EvaluationDecision.evaluated_at >= start_time,
+        EvaluationDecision.evaluated_at <= freeze_at,
+        EventVersionLabel.assigned_at <= freeze_at,
     ]
-    if max_tl_id is not None and max_tl_id > 0:
-        base_filters.append(TestingRecordLog.tl_id <= max_tl_id)
+    if max_decision_id is not None and max_decision_id > 0:
+        base_filters.append(EvaluationDecision.ed_id <= max_decision_id)
     if o_id is not None:
-        base_filters.append(TestingRecordLog.o_id == o_id)
+        base_filters.append(EvaluationDecision.o_id == o_id)
 
-    total_labeled_events = db.query(sqlalchemy.func.count(TestingRecordLog.tl_id)).filter(*base_filters).scalar() or 0
+    total_labeled_events = (
+        db.query(sqlalchemy.func.count(sqlalchemy.func.distinct(EvaluationDecision.ed_id)))
+        .join(EventVersionLabel, EventVersionLabel.ev_id == EvaluationDecision.ev_id)
+        .join(Label, Label.el_id == EventVersionLabel.el_id)
+        .filter(*base_filters)
+        .filter(EventVersionLabel.o_id == o_id if o_id is not None else sqlalchemy.true())
+        .filter(Label.o_id == o_id if o_id is not None else sqlalchemy.true())
+        .scalar()
+        or 0
+    )
 
     if not selected_pairs:
         return {
@@ -105,23 +124,25 @@ def compute_rule_quality_metrics(
 
     grouped_rows = (
         db.query(
-            TestingResultsLog.r_id,
+            EvaluationRuleResult.r_id,
             RuleModel.rid,
             RuleModel.description,
-            TestingResultsLog.rule_result,
+            EvaluationRuleResult.rule_result,
             Label.label,
-            sqlalchemy.func.count(TestingResultsLog.tr_id).label("count"),
+            sqlalchemy.func.count(EvaluationRuleResult.err_id).label("count"),
         )
-        .join(TestingRecordLog, TestingRecordLog.tl_id == TestingResultsLog.tl_id)
-        .join(Label, Label.el_id == TestingRecordLog.el_id)
-        .join(RuleModel, RuleModel.r_id == TestingResultsLog.r_id)
+        .join(EvaluationDecision, EvaluationDecision.ed_id == EvaluationRuleResult.ed_id)
+        .join(EventVersionLabel, EventVersionLabel.ev_id == EvaluationDecision.ev_id)
+        .join(Label, Label.el_id == EventVersionLabel.el_id)
+        .join(RuleModel, RuleModel.r_id == EvaluationRuleResult.r_id)
         .filter(*base_filters)
+        .filter(EventVersionLabel.o_id == o_id if o_id is not None else sqlalchemy.true())
         .filter(Label.o_id == o_id if o_id is not None else sqlalchemy.true())
         .group_by(
-            TestingResultsLog.r_id,
+            EvaluationRuleResult.r_id,
             RuleModel.rid,
             RuleModel.description,
-            TestingResultsLog.rule_result,
+            EvaluationRuleResult.rule_result,
             Label.label,
         )
         .all()

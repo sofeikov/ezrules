@@ -9,11 +9,11 @@ from ezrules.backend.api_v2.routes import evaluator as evaluator_router
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
 from ezrules.models.backend_core import (
     ApiKey,
+    EvaluationDecision,
+    EvaluationRuleResult,
     Organisation,
     RuleStatus,
     RuntimeSetting,
-    TestingRecordLog,
-    TestingResultsLog,
 )
 from ezrules.models.backend_core import Rule as RuleModel
 
@@ -98,14 +98,14 @@ def test_evaluate_first_match_uses_main_rule_execution_order(session):
     assert payload["outcome_counters"] == {"HOLD": 1}
     assert payload["rule_results"] == {"9402": "HOLD"}
 
-    stored_event = session.query(TestingRecordLog).filter_by(event_id="first-match-main-order").one()
+    stored_event = session.query(EvaluationDecision).filter_by(event_id="first-match-main-order").one()
     assert stored_event.resolved_outcome == "HOLD"
     assert stored_event.outcome_counters == {"HOLD": 1}
 
     stored_results = (
-        session.query(TestingResultsLog)
-        .filter(TestingResultsLog.tl_id == stored_event.tl_id)
-        .order_by(TestingResultsLog.r_id.asc())
+        session.query(EvaluationRuleResult)
+        .filter(EvaluationRuleResult.ed_id == stored_event.ed_id)
+        .order_by(EvaluationRuleResult.r_id.asc())
         .all()
     )
     assert [int(result.r_id) for result in stored_results] == [9402]

@@ -15,6 +15,7 @@ from ezrules.models.backend_core import (
     AllowedOutcome,
     ApiKey,
     ApiKeyHistory,
+    EvaluationDecision,
     FieldObservation,
     FieldTypeHistory,
     Label,
@@ -28,14 +29,14 @@ from ezrules.models.backend_core import (
     RuleQualityPair,
     RuleQualityReport,
     RuntimeSetting,
+    RuleDeploymentResultsLog,
     ShadowResultsLog,
-    TestingRecordLog,
-    TestingResultsLog,
     User,
     UserList,
     UserListEntry,
     UserListHistory,
 )
+from tests.canonical_helpers import add_served_decision
 
 
 def _unique_email(prefix: str) -> str:
@@ -304,31 +305,52 @@ def test_shadow_routes_and_tested_events_are_org_scoped(session):
     )
     session.commit()
 
-    org_event = TestingRecordLog(
-        event_id=f"phase2-shadow-org1-{uuid.uuid4().hex[:6]}",
-        event={"amount": 10},
+    org_event_id = f"phase2-shadow-org1-{uuid.uuid4().hex[:6]}"
+    other_event_id = f"phase2-shadow-org2-{uuid.uuid4().hex[:6]}"
+    org_decision = add_served_decision(
+        session,
+        org_id=int(org.o_id),
+        event_id=org_event_id,
+        event_data={"amount": 10},
         event_timestamp=1700000100,
         outcome_counters={"ORG1_HOLD": 1},
         resolved_outcome="ORG1_HOLD",
-        o_id=int(org.o_id),
+        rule_results={int(org_rule.r_id): "ORG1_HOLD"},
     )
-    other_event = TestingRecordLog(
-        event_id=f"phase2-shadow-org2-{uuid.uuid4().hex[:6]}",
-        event={"amount": 20},
+    other_decision = add_served_decision(
+        session,
+        org_id=int(other_org.o_id),
+        event_id=other_event_id,
+        event_data={"amount": 20},
         event_timestamp=1700000200,
         outcome_counters={"ORG2_REVIEW": 1},
         resolved_outcome="ORG2_REVIEW",
-        o_id=int(other_org.o_id),
+        rule_results={int(other_rule.r_id): "ORG2_REVIEW"},
     )
-    session.add_all([org_event, other_event])
-    session.commit()
-
     session.add_all(
         [
-            TestingResultsLog(tl_id=int(org_event.tl_id), r_id=int(org_rule.r_id), rule_result="ORG1_HOLD"),
-            TestingResultsLog(tl_id=int(other_event.tl_id), r_id=int(other_rule.r_id), rule_result="ORG2_REVIEW"),
-            ShadowResultsLog(tl_id=int(org_event.tl_id), r_id=int(org_rule.r_id), rule_result="ORG1_HOLD"),
-            ShadowResultsLog(tl_id=int(other_event.tl_id), r_id=int(other_rule.r_id), rule_result="ORG2_REVIEW"),
+            ShadowResultsLog(ed_id=int(org_decision.ed_id), r_id=int(org_rule.r_id), rule_result="ORG1_HOLD"),
+            ShadowResultsLog(ed_id=int(other_decision.ed_id), r_id=int(other_rule.r_id), rule_result="ORG2_REVIEW"),
+            RuleDeploymentResultsLog(
+                ed_id=int(org_decision.ed_id),
+                r_id=int(org_rule.r_id),
+                o_id=int(org.o_id),
+                mode="shadow",
+                selected_variant="control",
+                control_result="ORG1_HOLD",
+                candidate_result="ORG1_HOLD",
+                returned_result="ORG1_HOLD",
+            ),
+            RuleDeploymentResultsLog(
+                ed_id=int(other_decision.ed_id),
+                r_id=int(other_rule.r_id),
+                o_id=int(other_org.o_id),
+                mode="shadow",
+                selected_variant="control",
+                control_result="ORG2_REVIEW",
+                candidate_result="ORG2_REVIEW",
+                returned_result="ORG2_REVIEW",
+            ),
         ]
     )
     session.commit()
@@ -342,7 +364,7 @@ def test_shadow_routes_and_tested_events_are_org_scoped(session):
     assert tested_events_response.status_code == 200
     tested_events_payload = tested_events_response.json()
     assert tested_events_payload["total"] == 1
-    assert [item["event_id"] for item in tested_events_payload["events"]] == [str(org_event.event_id)]
+    assert [item["event_id"] for item in tested_events_payload["events"]] == [org_event_id]
 
     assert shadow_config_response.status_code == 200
     shadow_rule_ids = {item["r_id"] for item in shadow_config_response.json()["rules"]}
@@ -351,7 +373,7 @@ def test_shadow_routes_and_tested_events_are_org_scoped(session):
     assert shadow_results_response.status_code == 200
     shadow_results_payload = shadow_results_response.json()
     assert shadow_results_payload["total"] == 1
-    assert [item["event_id"] for item in shadow_results_payload["results"]] == [str(org_event.event_id)]
+    assert [item["event_id"] for item in shadow_results_payload["results"]] == [org_event_id]
 
     assert shadow_stats_response.status_code == 200
     assert {item["r_id"] for item in shadow_stats_response.json()["rules"]} == {int(org_rule.r_id)}
@@ -427,12 +449,12 @@ def test_api_keys_and_evaluate_use_auth_derived_org(session):
     assert other_eval_response.status_code == 200
     assert other_eval_response.json()["resolved_outcome"] == "ORG2_REVIEW"
 
-    stored_events = (
-        session.query(TestingRecordLog)
-        .filter(TestingRecordLog.event_id.in_(["phase2-eval-org1", "phase2-eval-org2"]))
+    stored_decisions = (
+        session.query(EvaluationDecision)
+        .filter(EvaluationDecision.event_id.in_(["phase2-eval-org1", "phase2-eval-org2"]))
         .all()
     )
-    org_ids_by_event = {str(event.event_id): int(event.o_id) for event in stored_events}
+    org_ids_by_event = {str(decision.event_id): int(decision.o_id) for decision in stored_decisions}
     assert org_ids_by_event == {
         "phase2-eval-org1": int(org.o_id),
         "phase2-eval-org2": int(other_org.o_id),
@@ -555,29 +577,33 @@ def test_analytics_rule_quality_and_reports_are_org_scoped(session, monkeypatch)
     )
 
     now = datetime.datetime.utcnow()
-    org_event = TestingRecordLog(
+    add_served_decision(
+        session,
+        org_id=int(org.o_id),
         event_id=f"phase2-analytics-org1-{uuid.uuid4().hex[:6]}",
-        event={"amount": 100},
+        event_data={"amount": 100},
         event_timestamp=int(now.timestamp()),
-        o_id=int(org.o_id),
-        el_id=int(org_label.el_id),
-        created_at=now,
+        outcome_counters={"HOLD": 1},
+        resolved_outcome="HOLD",
+        rule_results={int(org_rule.r_id): "HOLD"},
+        label=org_label,
+        evaluated_at=now,
     )
-    other_event = TestingRecordLog(
+    add_served_decision(
+        session,
+        org_id=int(other_org.o_id),
         event_id=f"phase2-analytics-org2-{uuid.uuid4().hex[:6]}",
-        event={"amount": 200},
+        event_data={"amount": 200},
         event_timestamp=int(now.timestamp()),
-        o_id=int(other_org.o_id),
-        el_id=int(other_org_label.el_id),
-        created_at=now,
+        outcome_counters={"REVIEW": 1},
+        resolved_outcome="REVIEW",
+        rule_results={int(other_rule.r_id): "REVIEW"},
+        label=other_org_label,
+        evaluated_at=now,
     )
-    session.add_all([org_event, other_event])
-    session.commit()
 
     session.add_all(
         [
-            TestingResultsLog(tl_id=int(org_event.tl_id), r_id=int(org_rule.r_id), rule_result="HOLD"),
-            TestingResultsLog(tl_id=int(other_event.tl_id), r_id=int(other_rule.r_id), rule_result="REVIEW"),
             RuleQualityPair(
                 outcome="HOLD",
                 label=label_name,

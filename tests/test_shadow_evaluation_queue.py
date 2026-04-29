@@ -94,30 +94,30 @@ def _create_shadow_rule(session) -> RuleModel:
     return rule
 
 
-def _create_testing_record(session, o_id: int) -> int:
+def _create_decision(session, o_id: int) -> int:
     response = {
         "all_rule_results": {},
         "rule_results": {},
         "outcome_counters": {},
         "outcome_set": [],
     }
-    _, tl_id = store_eval_result(
+    _, decision_id = store_eval_result(
         db_session=session,
         o_id=o_id,
         event=Event(event_id="shadow-queue-event", event_timestamp=1234567890, event_data={"amount": 100}),
         response=response,
         commit=True,
     )
-    return int(tl_id)
+    return int(decision_id)
 
 
 def test_enqueue_shadow_evaluation_serializes_shadow_snapshot(session, fake_shadow_redis: FakeRedis):
     rule = _create_shadow_rule(session)
-    tl_id = _create_testing_record(session, int(rule.o_id))
+    decision_id = _create_decision(session, int(rule.o_id))
 
     queued = shadow_evaluation_queue.enqueue_shadow_evaluation(
         db=session,
-        tl_id=tl_id,
+        evaluation_decision_id=decision_id,
         o_id=int(rule.o_id),
         event_id="shadow-queue-event",
         event_data={"amount": 100},
@@ -129,7 +129,7 @@ def test_enqueue_shadow_evaluation_serializes_shadow_snapshot(session, fake_shad
     assert len(payloads) == 1
 
     payload = json.loads(payloads[0])
-    assert payload["tl_id"] == tl_id
+    assert payload["evaluation_decision_id"] == decision_id
     assert payload["o_id"] == int(rule.o_id)
     assert payload["event_data"] == {"amount": 100}
     assert payload["production_all_rule_results"] == {str(int(rule.r_id)): "HOLD"}
@@ -140,11 +140,11 @@ def test_enqueue_shadow_evaluation_serializes_shadow_snapshot(session, fake_shad
 
 def test_drain_shadow_queue_uses_enqueued_config_snapshot(session, fake_shadow_redis: FakeRedis):
     rule = _create_shadow_rule(session)
-    tl_id = _create_testing_record(session, int(rule.o_id))
+    decision_id = _create_decision(session, int(rule.o_id))
 
     shadow_evaluation_queue.enqueue_shadow_evaluation(
         db=session,
-        tl_id=tl_id,
+        evaluation_decision_id=decision_id,
         o_id=int(rule.o_id),
         event_id="shadow-queue-event",
         event_data={"amount": 100},
@@ -164,13 +164,13 @@ def test_drain_shadow_queue_uses_enqueued_config_snapshot(session, fake_shadow_r
     assert drained["drained_batches"] == 1
     assert drained["drained_messages"] == 1
 
-    shadow_log = session.query(ShadowResultsLog).filter(ShadowResultsLog.tl_id == tl_id).one()
+    shadow_log = session.query(ShadowResultsLog).filter(ShadowResultsLog.ed_id == decision_id).one()
     assert shadow_log.rule_result == "HOLD"
 
     comparison_log = (
         session.query(RuleDeploymentResultsLog)
         .filter(
-            RuleDeploymentResultsLog.tl_id == tl_id,
+            RuleDeploymentResultsLog.ed_id == decision_id,
             RuleDeploymentResultsLog.mode == "shadow",
             RuleDeploymentResultsLog.r_id == int(rule.r_id),
         )
@@ -216,11 +216,11 @@ def test_drain_shadow_queue_uses_enqueued_execution_mode_snapshot(session, fake_
     deploy_rule_to_shadow(db=session, o_id=org.o_id, rule_model=first_rule, changed_by="test")
     deploy_rule_to_shadow(db=session, o_id=org.o_id, rule_model=second_rule, changed_by="test")
 
-    tl_id = _create_testing_record(session, int(org.o_id))
+    decision_id = _create_decision(session, int(org.o_id))
 
     shadow_evaluation_queue.enqueue_shadow_evaluation(
         db=session,
-        tl_id=tl_id,
+        evaluation_decision_id=decision_id,
         o_id=int(org.o_id),
         event_id="shadow-queue-execution-mode",
         event_data={"amount": 100},
@@ -241,7 +241,7 @@ def test_drain_shadow_queue_uses_enqueued_execution_mode_snapshot(session, fake_
     assert drained["drained_messages"] == 1
     shadow_logs = (
         session.query(ShadowResultsLog)
-        .filter(ShadowResultsLog.tl_id == tl_id)
+        .filter(ShadowResultsLog.ed_id == decision_id)
         .order_by(ShadowResultsLog.r_id.asc())
         .all()
     )
@@ -255,11 +255,11 @@ def test_drain_shadow_queue_requeues_on_persist_failure(
     monkeypatch: pytest.MonkeyPatch,
 ):
     rule = _create_shadow_rule(session)
-    tl_id = _create_testing_record(session, int(rule.o_id))
+    decision_id = _create_decision(session, int(rule.o_id))
 
     shadow_evaluation_queue.enqueue_shadow_evaluation(
         db=session,
-        tl_id=tl_id,
+        evaluation_decision_id=decision_id,
         o_id=int(rule.o_id),
         event_id="shadow-queue-event",
         event_data={"amount": 100},
@@ -286,11 +286,11 @@ def test_drain_shadow_queue_requeues_on_persist_failure(
 
 def test_drain_shadow_queue_skips_when_lock_is_held(session, fake_shadow_redis: FakeRedis):
     rule = _create_shadow_rule(session)
-    tl_id = _create_testing_record(session, int(rule.o_id))
+    decision_id = _create_decision(session, int(rule.o_id))
 
     shadow_evaluation_queue.enqueue_shadow_evaluation(
         db=session,
-        tl_id=tl_id,
+        evaluation_decision_id=decision_id,
         o_id=int(rule.o_id),
         event_id="shadow-queue-event",
         event_data={"amount": 100},

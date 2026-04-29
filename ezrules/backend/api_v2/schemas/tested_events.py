@@ -21,7 +21,7 @@ class TriggeredRuleItem(BaseModel):
 class TestedEventItem(BaseModel):
     """Stored event evaluation with the rules that fired."""
 
-    tl_id: int = Field(..., description="Stored tested-event identifier")
+    evaluation_decision_id: int = Field(..., description="Immutable served-decision ledger identifier")
     event_id: str = Field(..., description="External event identifier")
     event_timestamp: int = Field(..., description="Original event timestamp as a Unix integer")
     resolved_outcome: str | None = Field(None, description="Winning outcome after severity resolution")

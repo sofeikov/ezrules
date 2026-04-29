@@ -9,8 +9,6 @@ from ezrules.models.backend_core import (
     EvaluationDecision,
     EvaluationRuleResult,
     EventVersion,
-    TestingRecordLog,
-    TestingResultsLog,
 )
 
 
@@ -54,7 +52,7 @@ def _next_event_version(db_session, o_id: int, event_id: str) -> tuple[int, int 
 def eval_and_store(lre, event: Event, response: dict | None = None, commit: bool = True):
     if response is None:
         response = lre.evaluate_rules(event.event_data)
-    response, tl_id = store_eval_result(
+    response, decision_id = store_eval_result(
         db_session=lre.db,
         o_id=lre.o_id,
         event=event,
@@ -64,7 +62,7 @@ def eval_and_store(lre, event: Event, response: dict | None = None, commit: bool
         runtime_config={"execution_mode": getattr(lre, "execution_mode", None)},
         commit=commit,
     )
-    return response, tl_id
+    return response, decision_id
 
 
 def store_eval_result(
@@ -82,7 +80,6 @@ def store_eval_result(
     runtime_config: dict | None = None,
 ):
     outcome_manager = DatabaseOutcome(db_session=db_session, o_id=o_id)
-    created_at_datetime = datetime.fromtimestamp(event.event_timestamp)
     event_version, supersedes_ev_id = _next_event_version(db_session, o_id, event.event_id)
     event_version_record = EventVersion(
         o_id=o_id,
@@ -96,22 +93,9 @@ def store_eval_result(
     db_session.add(event_version_record)
     db_session.flush()
 
-    tl = TestingRecordLog(
-        o_id=o_id,
-        event=event.event_data,
-        event_timestamp=event.event_timestamp,
-        event_id=event.event_id,
-        created_at=created_at_datetime,
-    )
-    db_session.add(tl)
-    db_session.flush()
-
     resolved_outcome = outcome_manager.resolve_outcome(response["outcome_counters"])
-    tl.outcome_counters = response["outcome_counters"]
-    tl.resolved_outcome = resolved_outcome
     decision = EvaluationDecision(
         ev_id=int(event_version_record.ev_id),
-        tl_id=int(tl.tl_id),
         o_id=o_id,
         event_id=event.event_id,
         event_version=event_version,
@@ -131,8 +115,6 @@ def store_eval_result(
     db_session.flush()
 
     for r_id, result in response["rule_results"].items():
-        trl = TestingResultsLog(tl_id=tl.tl_id, r_id=r_id, rule_result=result)
-        db_session.add(trl)
         db_session.add(EvaluationRuleResult(ed_id=int(decision.ed_id), r_id=int(r_id), rule_result=str(result)))
     response["resolved_outcome"] = resolved_outcome
     response["event_version"] = event_version
@@ -140,4 +122,4 @@ def store_eval_result(
     response["evaluation_decision_id"] = int(decision.ed_id)
     if commit:
         db_session.commit()
-    return response, tl.tl_id
+    return response, int(decision.ed_id)

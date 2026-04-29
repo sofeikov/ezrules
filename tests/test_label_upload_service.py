@@ -2,7 +2,12 @@
 
 import pytest
 from ezrules.backend.label_upload_service import LabelUploadService, ParsedRow
-from ezrules.models.backend_core import Label, TestingRecordLog, Organisation
+from ezrules.models.backend_core import (
+    EventVersionLabel,
+    Label,
+    Organisation,
+)
+from tests.canonical_helpers import add_served_decision
 
 
 class TestLabelUploadService:
@@ -36,8 +41,8 @@ class TestLabelUploadService:
 
         assert len(parsed_rows) == 0
         assert len(format_errors) == 2
-        assert "Expected 2 columns" in format_errors[0]
-        assert "Expected 2 columns" in format_errors[1]
+        assert "Expected 2 or 3 columns" in format_errors[0]
+        assert "event_version must be an integer" in format_errors[1]
 
     def test_parse_csv_content_empty_values(self):
         """Test parsing CSV with empty values"""
@@ -84,17 +89,22 @@ class TestLabelUploadService:
         """Test successful label assignments"""
         # Create test data
         org = session.query(Organisation).first()
-        test_event = TestingRecordLog(
-            event_id="test_event", event_timestamp=1234567890, event={"test": "data"}, o_id=org.o_id
-        )
         fraud_label = Label(label="FRAUD")
-        session.add(test_event)
         session.add(fraud_label)
         session.commit()
+        add_served_decision(
+            session,
+            org_id=int(org.o_id),
+            event_id="test_event",
+            event_timestamp=1234567890,
+            event_data={"test": "data"},
+        )
 
         # Create service and test data
         service = LabelUploadService(session)
-        parsed_rows = [ParsedRow(row_number=1, event_id="test_event", label_name="FRAUD", is_valid=True)]
+        parsed_rows = [
+            ParsedRow(row_number=1, event_id="test_event", event_version=None, label_name="FRAUD", is_valid=True)
+        ]
         label_cache = {"FRAUD": fraud_label}
 
         result = service.process_label_assignments(parsed_rows, label_cache)
@@ -103,9 +113,7 @@ class TestLabelUploadService:
         assert result.error_count == 0
         assert len(result.errors) == 0
 
-        # The service doesn't commit, that's the controller's responsibility
-        # But we can verify the assignment was made in memory
-        assert test_event.el_id == fraud_label.el_id
+        assert session.query(EventVersionLabel).filter(EventVersionLabel.el_id == fraud_label.el_id).count() == 1
 
     def test_process_label_assignments_event_not_found(self, session):
         """Test handling of non-existent events"""
@@ -114,26 +122,44 @@ class TestLabelUploadService:
         session.commit()
 
         service = LabelUploadService(session)
-        parsed_rows = [ParsedRow(row_number=1, event_id="nonexistent_event", label_name="FRAUD", is_valid=True)]
+        parsed_rows = [
+            ParsedRow(
+                row_number=1,
+                event_id="nonexistent_event",
+                event_version=None,
+                label_name="FRAUD",
+                is_valid=True,
+            )
+        ]
         label_cache = {"FRAUD": fraud_label}
 
         result = service.process_label_assignments(parsed_rows, label_cache)
 
         assert result.success_count == 0
         assert result.error_count == 1
-        assert "Event with id 'nonexistent_event' not found" in result.errors[0]
+        assert "Served event with id 'nonexistent_event' not found" in result.errors[0]
 
     def test_process_label_assignments_label_not_found(self, session):
         """Test handling of non-existent labels"""
         org = session.query(Organisation).first()
-        test_event = TestingRecordLog(
-            event_id="test_event", event_timestamp=1234567890, event={"test": "data"}, o_id=org.o_id
+        add_served_decision(
+            session,
+            org_id=int(org.o_id),
+            event_id="test_event",
+            event_timestamp=1234567890,
+            event_data={"test": "data"},
         )
-        session.add(test_event)
-        session.commit()
 
         service = LabelUploadService(session)
-        parsed_rows = [ParsedRow(row_number=1, event_id="test_event", label_name="NONEXISTENT_LABEL", is_valid=True)]
+        parsed_rows = [
+            ParsedRow(
+                row_number=1,
+                event_id="test_event",
+                event_version=None,
+                label_name="NONEXISTENT_LABEL",
+                is_valid=True,
+            )
+        ]
         label_cache = {}  # Empty cache
 
         result = service.process_label_assignments(parsed_rows, label_cache)
@@ -146,19 +172,25 @@ class TestLabelUploadService:
         """Test the complete workflow from CSV to database"""
         # Create test data
         org = session.query(Organisation).first()
-        test_event1 = TestingRecordLog(
-            event_id="event_1", event_timestamp=1234567890, event={"test": "data1"}, o_id=org.o_id
-        )
-        test_event2 = TestingRecordLog(
-            event_id="event_2", event_timestamp=1234567891, event={"test": "data2"}, o_id=org.o_id
-        )
         fraud_label = Label(label="FRAUD")
         normal_label = Label(label="NORMAL")
-        session.add(test_event1)
-        session.add(test_event2)
         session.add(fraud_label)
         session.add(normal_label)
         session.commit()
+        add_served_decision(
+            session,
+            org_id=int(org.o_id),
+            event_id="event_1",
+            event_timestamp=1234567890,
+            event_data={"test": "data1"},
+        )
+        add_served_decision(
+            session,
+            org_id=int(org.o_id),
+            event_id="event_2",
+            event_timestamp=1234567891,
+            event_data={"test": "data2"},
+        )
 
         # Test the complete workflow
         service = LabelUploadService(session)
@@ -169,13 +201,10 @@ class TestLabelUploadService:
         assert result.success_count == 2
         assert result.error_count == 1
         assert len(result.errors) == 1
-        assert "Event with id 'invalid_event' not found" in result.errors[0]
+        assert "Served event with id 'invalid_event' not found" in result.errors[0]
 
-        # Verify database updates
-        session.refresh(test_event1)
-        session.refresh(test_event2)
-        assert test_event1.el_id == fraud_label.el_id
-        assert test_event2.el_id == normal_label.el_id
+        assert session.query(EventVersionLabel).filter(EventVersionLabel.el_id == fraud_label.el_id).count() == 1
+        assert session.query(EventVersionLabel).filter(EventVersionLabel.el_id == normal_label.el_id).count() == 1
 
     def test_upload_labels_from_csv_empty_content(self, session):
         """Test handling of empty CSV content"""

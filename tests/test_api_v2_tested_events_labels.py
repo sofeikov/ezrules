@@ -8,7 +8,6 @@ import bcrypt
 import pytest
 from fastapi.testclient import TestClient
 
-from ezrules import models
 from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
 from ezrules.backend.data_utils import Event, eval_and_store
@@ -16,7 +15,7 @@ from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
-from ezrules.models.backend_core import Label, Organisation, Role, User
+from ezrules.models.backend_core import EventVersion, EventVersionLabel, Label, Organisation, Role, User
 
 
 @pytest.fixture(scope="function")
@@ -88,15 +87,15 @@ def test_returns_uploaded_label_name_for_labeled_events(session, tested_events_c
     _store_event(session, org.o_id, "evt-labeled", 1700000200, {"amount": 125, "country": "US"})
     _store_event(session, org.o_id, "evt-unlabeled", 1700000201, {"amount": 90, "country": "GB"})
 
-    labeled_record = (
-        session.query(models.backend_core.TestingRecordLog)
+    labeled_version = (
+        session.query(EventVersion)
         .filter(
-            models.backend_core.TestingRecordLog.o_id == org.o_id,
-            models.backend_core.TestingRecordLog.event_id == "evt-labeled",
+            EventVersion.o_id == org.o_id,
+            EventVersion.event_id == "evt-labeled",
         )
         .one()
     )
-    labeled_record.el_id = int(label.el_id)
+    session.add(EventVersionLabel(o_id=org.o_id, ev_id=labeled_version.ev_id, el_id=label.el_id))
     session.commit()
 
     response = tested_events_client.get(

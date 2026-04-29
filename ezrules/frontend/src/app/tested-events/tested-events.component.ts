@@ -56,12 +56,12 @@ export class TestedEventsComponent implements OnInit {
         this.hoveredRuleIdsByEvent = new Map(
           [...this.hoveredRuleIdsByEvent].filter(([eventId, ruleId]) =>
             this.events.some(
-              (event) => event.tl_id === eventId && event.triggered_rules.some((rule) => rule.r_id === ruleId)
+              (event) => event.evaluation_decision_id === eventId && event.triggered_rules.some((rule) => rule.r_id === ruleId)
             )
           )
         );
         this.expandedEventIds = new Set(
-          [...this.expandedEventIds].filter((eventId) => this.events.some((event) => event.tl_id === eventId))
+          [...this.expandedEventIds].filter((eventId) => this.events.some((event) => event.evaluation_decision_id === eventId))
         );
       },
       error: () => {
@@ -144,7 +144,7 @@ export class TestedEventsComponent implements OnInit {
   }
 
   payloadHint(event: TestedEvent): string {
-    return this.hoveredRuleIdsByEvent.has(event.tl_id)
+    return this.hoveredRuleIdsByEvent.has(event.evaluation_decision_id)
       ? 'Highlighting fields referenced by the hovered rule inside the payload JSON.'
       : 'Highlighting fields referenced by any triggered rule. Hover a rule to focus the JSON view.';
   }
@@ -170,7 +170,7 @@ export class TestedEventsComponent implements OnInit {
   }
 
   private highlightedFields(event: TestedEvent): Set<string> {
-    const hoveredRuleId = this.hoveredRuleIdsByEvent.get(event.tl_id);
+    const hoveredRuleId = this.hoveredRuleIdsByEvent.get(event.evaluation_decision_id);
     const fields = hoveredRuleId === undefined
       ? event.triggered_rules.flatMap((rule) => rule.referenced_fields)
       : event.triggered_rules

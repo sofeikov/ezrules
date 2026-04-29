@@ -52,14 +52,14 @@ def get_bucket_expression(config, timestamp_column):
 
     Args:
         config: Configuration dict with 'use_date_trunc' and 'bucket_seconds' keys
-        timestamp_column: SQLAlchemy column to bucket (e.g., TestingRecordLog.created_at)
+        timestamp_column: SQLAlchemy column to bucket (for example, EvaluationDecision.evaluated_at)
 
     Returns:
         SQLAlchemy expression for time bucketing that can be used in queries
 
     Example:
         >>> config = AGGREGATION_CONFIG["1h"]
-        >>> bucket_expr = get_bucket_expression(config, TestingRecordLog.created_at)
+        >>> bucket_expr = get_bucket_expression(config, EvaluationDecision.evaluated_at)
         >>> query = db_session.query(bucket_expr.label("bucket"), func.count(...))
     """
     if config["use_date_trunc"]:

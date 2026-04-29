@@ -14,11 +14,10 @@ from ezrules.models.backend_core import (
     Rule as RuleModel,
     RuleDeploymentResultsLog,
     RuleStatus,
-    ShadowResultsLog,
-    TestingRecordLog,
-    TestingResultsLog,
     User,
 )
+from ezrules.models.backend_core import EvaluationDecision
+from tests.canonical_helpers import add_served_decision
 
 
 def _view_headers(session) -> dict[str, str]:
@@ -83,21 +82,21 @@ def _create_rule(
     return rule
 
 
-def _create_event(session, *, event_id: str, outcome: str | None = None) -> TestingRecordLog:
-    record = TestingRecordLog(
+def _create_decision(session, *, event_id: str, outcome: str | None = None) -> EvaluationDecision:
+    decision = add_served_decision(
+        session,
+        org_id=1,
         event_id=event_id,
-        event={"amount": 100},
+        event_data={"amount": 100},
         event_timestamp=1700000000,
         outcome_counters={outcome: 1} if outcome is not None else None,
         resolved_outcome=outcome,
-        o_id=1,
     )
-    session.add(record)
     session.commit()
-    return record
+    return decision
 
 
-def test_shadow_results_and_stats_prefer_shared_logs_over_legacy_duplicates(session):
+def test_shadow_results_and_stats_use_canonical_deployment_logs(session):
     headers = _view_headers(session)
     rule = _create_rule(
         session,
@@ -106,15 +105,12 @@ def test_shadow_results_and_stats_prefer_shared_logs_over_legacy_duplicates(sess
         description="Rule for shadow regression coverage",
     )
 
-    shared_event = _create_event(session, event_id="shadow-shared-event", outcome="CONTROL_A")
-    legacy_only_event = _create_event(session, event_id="shadow-legacy-only-event", outcome="CONTROL_B")
+    decision = _create_decision(session, event_id="shadow-shared-event", outcome="CONTROL_A")
 
     session.add_all(
         [
-            TestingResultsLog(tl_id=int(shared_event.tl_id), r_id=int(rule.r_id), rule_result="CONTROL_A"),
-            TestingResultsLog(tl_id=int(legacy_only_event.tl_id), r_id=int(rule.r_id), rule_result="CONTROL_B"),
             RuleDeploymentResultsLog(
-                tl_id=int(shared_event.tl_id),
+                ed_id=int(decision.ed_id),
                 r_id=int(rule.r_id),
                 o_id=1,
                 mode="shadow",
@@ -122,16 +118,6 @@ def test_shadow_results_and_stats_prefer_shared_logs_over_legacy_duplicates(sess
                 control_result="CONTROL_A",
                 candidate_result="SHARED_CANDIDATE",
                 returned_result="CONTROL_A",
-            ),
-            ShadowResultsLog(
-                tl_id=int(shared_event.tl_id),
-                r_id=int(rule.r_id),
-                rule_result="LEGACY_DUPLICATE",
-            ),
-            ShadowResultsLog(
-                tl_id=int(legacy_only_event.tl_id),
-                r_id=int(rule.r_id),
-                rule_result="LEGACY_ONLY",
             ),
         ]
     )
@@ -143,12 +129,11 @@ def test_shadow_results_and_stats_prefer_shared_logs_over_legacy_duplicates(sess
 
     assert results_response.status_code == 200
     results_payload = results_response.json()
-    assert results_payload["total"] == 2
+    assert results_payload["total"] == 1
 
     results_by_event = {item["event_id"]: item["rule_result"] for item in results_payload["results"]}
     assert results_by_event == {
         "shadow-shared-event": "SHARED_CANDIDATE",
-        "shadow-legacy-only-event": "LEGACY_ONLY",
     }
 
     assert stats_response.status_code == 200
@@ -156,14 +141,12 @@ def test_shadow_results_and_stats_prefer_shared_logs_over_legacy_duplicates(sess
     assert len(stats_payload["rules"]) == 1
     rule_stats = stats_payload["rules"][0]
     assert rule_stats["r_id"] == int(rule.r_id)
-    assert rule_stats["total"] == 2
+    assert rule_stats["total"] == 1
     assert {item["outcome"]: item["count"] for item in rule_stats["shadow_outcomes"]} == {
         "SHARED_CANDIDATE": 1,
-        "LEGACY_ONLY": 1,
     }
     assert {item["outcome"]: item["count"] for item in rule_stats["prod_outcomes"]} == {
         "CONTROL_A": 1,
-        "CONTROL_B": 1,
     }
 
 
@@ -187,16 +170,16 @@ def test_rollout_stats_aggregate_counts_in_sql(session):
     )
 
     events = [
-        _create_event(session, event_id="rollout-event-1", outcome="REVIEW"),
-        _create_event(session, event_id="rollout-event-2", outcome="REVIEW"),
-        _create_event(session, event_id="rollout-event-3", outcome="HOLD"),
-        _create_event(session, event_id="rollout-event-4", outcome="HOLD"),
+        _create_decision(session, event_id="rollout-event-1", outcome="REVIEW"),
+        _create_decision(session, event_id="rollout-event-2", outcome="REVIEW"),
+        _create_decision(session, event_id="rollout-event-3", outcome="HOLD"),
+        _create_decision(session, event_id="rollout-event-4", outcome="HOLD"),
     ]
 
     session.add_all(
         [
             RuleDeploymentResultsLog(
-                tl_id=int(events[0].tl_id),
+                ed_id=int(events[0].ed_id),
                 r_id=int(rule.r_id),
                 o_id=1,
                 mode="split",
@@ -208,7 +191,7 @@ def test_rollout_stats_aggregate_counts_in_sql(session):
                 returned_result="REVIEW",
             ),
             RuleDeploymentResultsLog(
-                tl_id=int(events[1].tl_id),
+                ed_id=int(events[1].ed_id),
                 r_id=int(rule.r_id),
                 o_id=1,
                 mode="split",
@@ -220,7 +203,7 @@ def test_rollout_stats_aggregate_counts_in_sql(session):
                 returned_result="REVIEW",
             ),
             RuleDeploymentResultsLog(
-                tl_id=int(events[2].tl_id),
+                ed_id=int(events[2].ed_id),
                 r_id=int(rule.r_id),
                 o_id=1,
                 mode="split",
@@ -232,7 +215,7 @@ def test_rollout_stats_aggregate_counts_in_sql(session):
                 returned_result="HOLD",
             ),
             RuleDeploymentResultsLog(
-                tl_id=int(events[3].tl_id),
+                ed_id=int(events[3].ed_id),
                 r_id=int(rule.r_id),
                 o_id=1,
                 mode="split",

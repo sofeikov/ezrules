@@ -31,6 +31,8 @@ Healthy signal:
 - outcome lines change after rule updates or test submissions
 - the rule-detail performance chart shows the same rule generating plausible outcome counts in the time window you selected
 
+Dashboard charts use the canonical served-decision ledger. Transaction volume counts served `evaluation_decisions`, including repeated versions of the same business `event_id`; outcome and rule-activity charts count per-rule `evaluation_rule_results` for those served decisions. Time buckets are based on `evaluation_decisions.evaluated_at`, which shows when ezrules served the decision.
+
 ![30-day transaction volume chart](../assets/readme/dashboard-30d-volume.png)
 
 ![30-day outcome trend charts](../assets/readme/dashboard-30d-outcomes.png)
@@ -133,26 +135,36 @@ Healthy signal:
 
 Tip: responses are structured for Chart.js (`labels` + dataset series).
 
+Source-of-truth note: Dashboard volume, outcome, rule activity, per-rule performance, and labeled-transaction charts read canonical served decisions. Label analytics and rule quality use canonical `event_version_labels` linked to those served event versions.
+
 ---
 
 ## SQL Checks
 
 ```sql
-SELECT date_trunc('hour', tr.created_at) AS hour,
-       trl.rule_result,
+SELECT date_trunc('hour', ed.evaluated_at) AS hour,
+       err.rule_result,
        COUNT(*) AS total
-FROM testing_results_log trl
-JOIN testing_record_log tr ON trl.tl_id = tr.tl_id
-WHERE tr.created_at >= NOW() - INTERVAL '7 days'
-GROUP BY hour, trl.rule_result
+FROM evaluation_decisions ed
+JOIN evaluation_rule_results err ON err.ed_id = ed.ed_id
+WHERE ed.served = TRUE
+  AND ed.decision_type = 'served'
+  AND ed.evaluated_at >= NOW() - INTERVAL '7 days'
+GROUP BY hour, err.rule_result
 ORDER BY hour;
 ```
 
 ```sql
-SELECT el.label, COUNT(*) AS total
-FROM testing_record_log tr
-JOIN event_labels el ON tr.el_id = el.el_id
-GROUP BY el.label;
+SELECT date_trunc('hour', ed.evaluated_at) AS hour,
+       el.label,
+       COUNT(*) AS total
+FROM evaluation_decisions ed
+JOIN event_version_labels evl ON evl.ev_id = ed.ev_id
+JOIN event_labels el ON evl.el_id = el.el_id
+WHERE ed.served = TRUE
+  AND ed.decision_type = 'served'
+GROUP BY hour, el.label
+ORDER BY hour;
 ```
 
 ---

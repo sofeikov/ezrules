@@ -4,9 +4,14 @@ import datetime
 
 from ezrules.backend.rule_quality import compute_rule_quality_metrics
 from ezrules.cli import DEFAULT_DEMO_RULE_QUALITY_PAIRS, _ensure_default_rule_quality_pairs
-from ezrules.models.backend_core import AllowedOutcome, Label, Organisation, RuleQualityPair, TestingRecordLog
+from ezrules.models.backend_core import (
+    AllowedOutcome,
+    Label,
+    Organisation,
+    RuleQualityPair,
+)
 from ezrules.models.backend_core import Rule as RuleModel
-from ezrules.models.backend_core import TestingResultsLog
+from tests.canonical_helpers import add_served_decision
 
 
 def test_ensure_default_rule_quality_pairs_seeds_demo_ready_pairs(session):
@@ -58,23 +63,15 @@ def test_compute_rule_quality_metrics_excludes_unscored_rules_from_rankings(sess
     session.commit()
 
     created_at = datetime.datetime.now()
-    event = TestingRecordLog(
+    decision = add_served_decision(
+        session,
+        org_id=int(org.o_id),
         event_id="quality_unscored_event",
-        event={"amount": 100},
+        event_data={"amount": 100},
         event_timestamp=int(created_at.timestamp()),
-        o_id=org.o_id,
-        el_id=label.el_id,
-        created_at=created_at,
-    )
-    session.add(event)
-    session.commit()
-
-    session.add(
-        TestingResultsLog(
-            tl_id=event.tl_id,
-            r_id=rule.r_id,
-            rule_result="HOLD",
-        )
+        evaluated_at=created_at,
+        rule_results={int(rule.r_id): "HOLD"},
+        label=label,
     )
     session.commit()
 
@@ -83,7 +80,7 @@ def test_compute_rule_quality_metrics_excludes_unscored_rules_from_rankings(sess
         min_support=1,
         lookback_days=30,
         freeze_at=created_at + datetime.timedelta(minutes=1),
-        max_tl_id=event.tl_id,
+        max_decision_id=decision.ed_id,
         o_id=org.o_id,
         curated_pairs=[("RELEASE", "CHARGEBACK")],
     )

@@ -7,8 +7,14 @@ from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Organisation, Role, RuleStatus, TestingRecordLog, TestingResultsLog, User
+from ezrules.models.backend_core import (
+    Organisation,
+    Role,
+    RuleStatus,
+    User,
+)
 from ezrules.models.backend_core import Rule as RuleModel
+from tests.canonical_helpers import add_served_decision
 
 
 def _create_event(
@@ -19,24 +25,15 @@ def _create_event(
     created_at: datetime.datetime,
     fired_rules: list[RuleModel],
 ) -> None:
-    event = TestingRecordLog(
+    add_served_decision(
+        session,
+        org_id=org_id,
         event_id=event_id,
-        event={"event_id": event_id},
+        event_data={"event_id": event_id},
         event_timestamp=int(created_at.timestamp()),
-        o_id=org_id,
-        created_at=created_at,
+        evaluated_at=created_at,
+        rule_results={int(rule.r_id): "HOLD" for rule in fired_rules},
     )
-    session.add(event)
-    session.commit()
-
-    for rule in fired_rules:
-        session.add(
-            TestingResultsLog(
-                tl_id=event.tl_id,
-                r_id=rule.r_id,
-                rule_result="HOLD",
-            )
-        )
     session.commit()
 
 

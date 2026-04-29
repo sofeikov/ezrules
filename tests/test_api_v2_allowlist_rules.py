@@ -17,12 +17,12 @@ from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManage
 from ezrules.models.backend_core import (
     AllowedOutcome,
     ApiKey,
+    EvaluationDecision,
+    EvaluationRuleResult,
     Organisation,
     Role,
     RuleStatus,
     RuntimeSetting,
-    TestingRecordLog,
-    TestingResultsLog,
     User,
 )
 from ezrules.models.backend_core import Rule as RuleModel
@@ -224,14 +224,14 @@ class TestAllowlistEvaluation:
         assert payload["outcome_counters"] == {"RELEASE": 1}
         assert payload["rule_results"] == {"9201": "RELEASE"}
 
-        stored_event = session.query(TestingRecordLog).filter_by(event_id="allowlist-short-circuit").one()
+        stored_event = session.query(EvaluationDecision).filter_by(event_id="allowlist-short-circuit").one()
         assert stored_event.resolved_outcome == "RELEASE"
         assert stored_event.outcome_counters == {"RELEASE": 1}
 
         stored_results = (
-            session.query(TestingResultsLog)
-            .filter(TestingResultsLog.tl_id == stored_event.tl_id)
-            .order_by(TestingResultsLog.r_id.asc())
+            session.query(EvaluationRuleResult)
+            .filter(EvaluationRuleResult.ed_id == stored_event.ed_id)
+            .order_by(EvaluationRuleResult.r_id.asc())
             .all()
         )
         assert [int(result.r_id) for result in stored_results] == [9201]

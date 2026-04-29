@@ -7,8 +7,13 @@ from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Organisation, Role, TestingRecordLog, TestingResultsLog, User
+from ezrules.models.backend_core import (
+    Organisation,
+    Role,
+    User,
+)
 from ezrules.models.backend_core import Rule as RuleModel
+from tests.canonical_helpers import add_served_decision
 
 
 def _create_rule_analytics_user(session, *, email: str, grant_view_rules: bool) -> User:
@@ -61,22 +66,14 @@ def _store_rule_result(
     created_at: datetime.datetime,
     outcome: str,
 ) -> None:
-    event = TestingRecordLog(
+    add_served_decision(
+        session,
+        org_id=org_id,
         event_id=event_id,
-        event={"event_id": event_id},
+        event_data={"event_id": event_id},
         event_timestamp=int(created_at.timestamp()),
-        o_id=org_id,
-        created_at=created_at,
-    )
-    session.add(event)
-    session.commit()
-
-    session.add(
-        TestingResultsLog(
-            tl_id=event.tl_id,
-            r_id=rule.r_id,
-            rule_result=outcome,
-        )
+        evaluated_at=created_at,
+        rule_results={int(rule.r_id): outcome},
     )
     session.commit()
 

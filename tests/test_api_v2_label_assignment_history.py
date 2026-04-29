@@ -6,7 +6,15 @@ from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Label, LabelHistory, Organisation, Role, TestingRecordLog, User
+from ezrules.models.backend_core import (
+    EventVersionLabel,
+    Label,
+    LabelHistory,
+    Organisation,
+    Role,
+    User,
+)
+from tests.canonical_helpers import add_served_decision
 
 
 def _get_org(session) -> Organisation:
@@ -69,15 +77,15 @@ def audit_label(session):
 def audit_event(session):
     org = _get_org(session)
 
-    event = TestingRecordLog(
+    decision = add_served_decision(
+        session,
+        org_id=int(org.o_id),
         event_id="audit_event_123",
-        event={"amount": 100, "currency": "USD"},
         event_timestamp=1234567890,
-        o_id=int(org.o_id),
+        event_data={"amount": 100, "currency": "USD"},
     )
-    session.add(event)
     session.commit()
-    return event
+    return decision
 
 
 class TestLabelAssignmentAudit:
@@ -97,7 +105,7 @@ class TestLabelAssignmentAudit:
         assert len(history_entries) == 1
         assert history_entries[0].action == "assigned"
         assert history_entries[0].label == audit_label.label
-        assert history_entries[0].details == f"Event ID: {audit_event.event_id}"
+        assert history_entries[0].details == f"Event ID: {audit_event.event_id}, event version: 1"
         assert history_entries[0].changed_by == "labelaudit@example.com"
 
     def test_upload_records_history_only_for_successful_rows_and_exposes_details_in_audit(
@@ -122,7 +130,7 @@ class TestLabelAssignmentAudit:
         history_entries = session.query(LabelHistory).order_by(LabelHistory.id.asc()).all()
         assert len(history_entries) == 1
         assert history_entries[0].action == "assigned_via_csv"
-        assert history_entries[0].details == f"Event ID: {audit_event.event_id}"
+        assert history_entries[0].details == f"Event ID: {audit_event.event_id}, event version: 1"
 
         audit_response = label_audit_client.get(
             "/api/v2/audit/labels",
@@ -133,28 +141,26 @@ class TestLabelAssignmentAudit:
         audit_data = audit_response.json()
         assert audit_data["total"] == 1
         assert audit_data["items"][0]["action"] == "assigned_via_csv"
-        assert audit_data["items"][0]["details"] == f"Event ID: {audit_event.event_id}"
+        assert audit_data["items"][0]["details"] == f"Event ID: {audit_event.event_id}, event version: 1"
 
-    def test_mark_event_returns_conflict_for_duplicate_event_ids_in_current_org(self, label_audit_client, audit_label):
+    def test_mark_event_labels_latest_duplicate_event_id_version(self, label_audit_client, audit_label):
         token = label_audit_client.test_data["token"]
         session = label_audit_client.test_data["session"]
         org = label_audit_client.test_data["org"]
 
-        session.add(
-            TestingRecordLog(
-                event_id="duplicate_mark_event",
-                event={"amount": 100},
-                event_timestamp=1234567890,
-                o_id=org.o_id,
-            )
+        add_served_decision(
+            session,
+            org_id=int(org.o_id),
+            event_id="duplicate_mark_event",
+            event_timestamp=1234567890,
+            event_data={"amount": 100},
         )
-        session.add(
-            TestingRecordLog(
-                event_id="duplicate_mark_event",
-                event={"amount": 200},
-                event_timestamp=1234567891,
-                o_id=org.o_id,
-            )
+        latest_decision = add_served_decision(
+            session,
+            org_id=int(org.o_id),
+            event_id="duplicate_mark_event",
+            event_timestamp=1234567891,
+            event_data={"amount": 200},
         )
         session.commit()
 
@@ -164,9 +170,10 @@ class TestLabelAssignmentAudit:
             json={"event_id": "duplicate_mark_event", "label_name": audit_label.label},
         )
 
-        assert response.status_code == 409
-        assert "Multiple events with id 'duplicate_mark_event' found" in response.json()["detail"]
-        assert session.query(LabelHistory).count() == 0
+        assert response.status_code == 200
+        assert response.json()["event_version"] == 2
+        assert session.query(EventVersionLabel).filter(EventVersionLabel.ev_id == latest_decision.ev_id).count() == 1
+        assert session.query(LabelHistory).count() == 1
 
     def test_upload_rejects_invalid_file_type(self, label_audit_client):
         token = label_audit_client.test_data["token"]

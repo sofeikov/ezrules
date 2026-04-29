@@ -25,7 +25,7 @@ from ezrules.backend.api_v2.schemas.rollouts import (
 )
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule_updater import ROLLOUT_CONFIG_LABEL, get_deployment_config, list_candidate_deployments
-from ezrules.models.backend_core import RuleDeploymentResultsLog, TestingRecordLog, User
+from ezrules.models.backend_core import EvaluationDecision, RuleDeploymentResultsLog, User
 
 router = APIRouter(prefix="/api/v2/rollouts", tags=["Rollouts"])
 
@@ -63,11 +63,12 @@ def get_rollout_results(
     db: Any = Depends(get_db),
 ) -> RolloutResultsResponse:
     rows = (
-        db.query(RuleDeploymentResultsLog, TestingRecordLog)
-        .join(TestingRecordLog, RuleDeploymentResultsLog.tl_id == TestingRecordLog.tl_id)
+        db.query(RuleDeploymentResultsLog, EvaluationDecision)
+        .join(EvaluationDecision, EvaluationDecision.ed_id == RuleDeploymentResultsLog.ed_id)
         .filter(
             RuleDeploymentResultsLog.o_id == current_org_id,
             RuleDeploymentResultsLog.mode == "split",
+            EvaluationDecision.o_id == current_org_id,
         )
         .order_by(RuleDeploymentResultsLog.dr_id.desc())
         .limit(limit)
@@ -86,7 +87,7 @@ def get_rollout_results(
     results = [
         RolloutResultItem(
             dr_id=int(log.dr_id),
-            tl_id=int(log.tl_id),
+            evaluation_decision_id=int(log.ed_id),
             r_id=int(log.r_id),
             selected_variant=str(log.selected_variant),
             traffic_percent=int(log.traffic_percent) if log.traffic_percent is not None else None,
@@ -94,11 +95,11 @@ def get_rollout_results(
             control_result=str(log.control_result) if log.control_result is not None else None,
             candidate_result=str(log.candidate_result) if log.candidate_result is not None else None,
             returned_result=str(log.returned_result) if log.returned_result is not None else None,
-            event_id=str(record.event_id),
-            event_timestamp=int(record.event_timestamp),
+            event_id=str(decision.event_id),
+            event_timestamp=int(decision.event_timestamp),
             created_at=log.created_at,
         )
-        for log, record in rows
+        for log, decision in rows
     ]
     return RolloutResultsResponse(results=results, total=total)
 

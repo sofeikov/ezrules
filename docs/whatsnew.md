@@ -1,11 +1,14 @@
 # What's New
 
-## v1.17.0
+## v1.18.0
 
 * **Canonical evaluation ledgers**: Live evaluation now writes append-only event versions and immutable served-decision records as the default persistence contract, so repeated business events can be represented as ordered versions instead of ad hoc duplicate rows.
 * **Ledger-backed evaluate responses**: `POST /api/v2/evaluate` now returns the canonical `event_version` and `evaluation_decision_id` for the served decision.
 * **Served-decision provenance links**: Rollout and shadow comparison records can now point back to the immutable served decision that produced them, keeping traffic analysis and replay anchored to the same ledger record.
 * **Tested Events reads canonical decisions**: The Tested Events API now reads served traffic from the evaluation-decision ledger while preserving the existing UI response shape.
+* **Dashboard analytics read canonical decisions**: Dashboard transaction volume, outcome distribution, rule activity, and per-rule outcome charts now aggregate from served `evaluation_decisions` and `evaluation_rule_results` using decision time semantics.
+* **Labels attach to canonical event versions**: Label marking, CSV upload, label analytics, Tested Events labels, and rule-quality reports now use `event_version_labels` instead of the old testing-log label field.
+* **Legacy testing logs removed from runtime storage**: Evaluation, backtesting, shadow, rollout, CLI demo data, and frontend event identifiers now use the canonical event-version and served-decision ledgers instead of `testing_record_log` / `testing_results_log`.
 * **Strict-mode control removed from Settings**: Served-decision persistence is now the default evaluator contract, so the Settings page no longer exposes a separate Strict Mode checkbox or disable confirmation flow.
 
 ## v1.16.0

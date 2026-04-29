@@ -76,7 +76,17 @@ from ezrules.core.rule_updater import (
     save_rule_history,
 )
 from ezrules.core.type_casting import CastError, RequiredFieldError, normalize_event
-from ezrules.models.backend_core import Action, AIRuleAuthoringHistory, RoleActions, RuleHistory, RuleStatus, User
+from ezrules.models.backend_core import (
+    Action,
+    AIRuleAuthoringHistory,
+    EvaluationRuleResult,
+    RoleActions,
+    RuleDeploymentResultsLog,
+    RuleHistory,
+    RuleStatus,
+    ShadowResultsLog,
+    User,
+)
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.settings import app_settings
 
@@ -104,6 +114,12 @@ def get_config_producer(db: Any, org_id: int) -> RDBRuleEngineConfigProducer:
 def is_active(rule: RuleModel) -> bool:
     """Return True when a rule is currently active."""
     return rule.status == RuleStatus.ACTIVE
+
+
+def delete_rule_result_references(db: Any, rule_id: int) -> None:
+    """Remove canonical per-rule result rows that would otherwise block hard deletion."""
+    for model in (RuleDeploymentResultsLog, ShadowResultsLog, EvaluationRuleResult):
+        db.query(model).filter(model.r_id == rule_id).delete(synchronize_session=False)
 
 
 def user_has_permission(db: Any, user: User, action: PermissionAction) -> bool:
@@ -767,6 +783,7 @@ def delete_rule(
     )
 
     remove_rule_from_shadow(db, o_id=current_org_id, r_id=rule_id, changed_by=str(user.email))
+    delete_rule_result_references(db, rule_id)
 
     db.delete(rule)
     db.commit()

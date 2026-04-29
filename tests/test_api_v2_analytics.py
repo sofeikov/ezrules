@@ -24,13 +24,15 @@ from ezrules.backend.tasks import generate_rule_quality_report
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
+    EvaluationDecision,
+    EvaluationRuleResult,
+    EventVersion,
+    EventVersionLabel,
     Label,
     Organisation,
     RuleQualityPair,
     RuleQualityReport,
     Role,
-    TestingRecordLog,
-    TestingResultsLog,
     User,
 )
 from ezrules.models.backend_core import Rule as RuleModel
@@ -101,6 +103,73 @@ def analytics_test_client(session):
         yield client
 
 
+def _next_event_version(session, *, org_id: int, event_id: str) -> tuple[int, int | None]:
+    latest = (
+        session.query(EventVersion)
+        .filter(EventVersion.o_id == org_id, EventVersion.event_id == event_id)
+        .order_by(EventVersion.event_version.desc(), EventVersion.ev_id.desc())
+        .first()
+    )
+    if latest is None:
+        return 1, None
+    return int(latest.event_version) + 1, int(latest.ev_id)
+
+
+def _store_ledger_decision(
+    session,
+    *,
+    org_id: int,
+    event_id: str,
+    evaluated_at: datetime.datetime,
+    rule_results: dict[int, str],
+    event_data: dict | None = None,
+    served: bool = True,
+    decision_type: str = "served",
+) -> EvaluationDecision:
+    payload = event_data or {"event_id": event_id}
+    event_timestamp = int(evaluated_at.timestamp())
+    event_version, supersedes_ev_id = _next_event_version(session, org_id=org_id, event_id=event_id)
+    version = EventVersion(
+        o_id=org_id,
+        event_id=event_id,
+        event_version=event_version,
+        event_timestamp=event_timestamp,
+        event_data=payload,
+        payload_hash="0" * 64,
+        source="evaluate",
+        supersedes_ev_id=supersedes_ev_id,
+        ingested_at=evaluated_at,
+    )
+    session.add(version)
+    session.flush()
+
+    outcome_counters: dict[str, int] = {}
+    for outcome in rule_results.values():
+        outcome_counters[outcome] = outcome_counters.get(outcome, 0) + 1
+    resolved_outcome = next(iter(rule_results.values()), None)
+    decision = EvaluationDecision(
+        ev_id=version.ev_id,
+        o_id=org_id,
+        event_id=event_id,
+        event_version=event_version,
+        event_timestamp=event_timestamp,
+        decision_type=decision_type,
+        served=served,
+        rule_config_label="production",
+        outcome_counters=outcome_counters,
+        resolved_outcome=resolved_outcome,
+        all_rule_results={str(rule_id): outcome for rule_id, outcome in rule_results.items()},
+        evaluated_at=evaluated_at,
+    )
+    session.add(decision)
+    session.flush()
+
+    for rule_id, outcome in rule_results.items():
+        session.add(EvaluationRuleResult(ed_id=decision.ed_id, r_id=rule_id, rule_result=outcome))
+    session.commit()
+    return decision
+
+
 @pytest.fixture(scope="function")
 def sample_analytics_data(session):
     """Create sample data for analytics testing."""
@@ -125,39 +194,27 @@ def sample_analytics_data(session):
     session.add(label)
     session.commit()
 
-    # Create test events (recent, within last hour)
     now = datetime.datetime.now()
-    events = []
     for i in range(5):
-        event = TestingRecordLog(
+        event_data = {"amount": 100 + i * 10}
+        evaluated_at = now - datetime.timedelta(minutes=i * 5)
+        outcome = "HOLD" if event_data["amount"] > 110 else "RELEASE"
+        decision = _store_ledger_decision(
+            session,
+            org_id=org.o_id,
             event_id=f"analytics_event_{i}",
-            event={"amount": 100 + i * 10},
-            event_timestamp=int((now - datetime.timedelta(minutes=i * 5)).timestamp()),
-            o_id=org.o_id,
-            created_at=now - datetime.timedelta(minutes=i * 5),
+            evaluated_at=evaluated_at,
+            event_data=event_data,
+            rule_results={rule.r_id: outcome},
         )
-        # Assign label to some events
         if i < 3:
-            event.el_id = label.el_id
-        session.add(event)
-        events.append(event)
-    session.commit()
-
-    # Create test results for the events
-    for event in events:
-        result = TestingResultsLog(
-            tl_id=event.tl_id,
-            r_id=rule.r_id,
-            rule_result="HOLD" if event.event["amount"] > 110 else "RELEASE",
-        )
-        session.add(result)
-    session.commit()
+            session.add(EventVersionLabel(o_id=org.o_id, ev_id=decision.ev_id, el_id=label.el_id))
+            session.commit()
 
     return {
         "org": org,
         "rule": rule,
         "label": label,
-        "events": events,
     }
 
 
@@ -211,44 +268,22 @@ def sample_rule_quality_data(session):
 
     # Six labeled events. rule_b is perfect for HOLD->QUALITY_FRAUD and
     # RELEASE->QUALITY_NORMAL. rule_a is intentionally mixed.
-    labels = [
-        fraud_label.el_id,
-        fraud_label.el_id,
-        normal_label.el_id,
-        normal_label.el_id,
-        fraud_label.el_id,
-        normal_label.el_id,
-    ]
+    labels = [fraud_label, fraud_label, normal_label, normal_label, fraud_label, normal_label]
     rule_a_outcomes = ["HOLD", "RELEASE", "HOLD", "RELEASE", "HOLD", "RELEASE"]
     rule_b_outcomes = ["HOLD", "HOLD", "RELEASE", "RELEASE", "HOLD", "RELEASE"]
 
     now = datetime.datetime.now()
-    for idx, label_id in enumerate(labels):
-        event = TestingRecordLog(
+    for idx, label in enumerate(labels):
+        evaluated_at = now - datetime.timedelta(minutes=idx)
+        decision = _store_ledger_decision(
+            session,
+            org_id=org.o_id,
             event_id=f"quality_event_{idx}",
-            event={"idx": idx},
-            event_timestamp=int((now - datetime.timedelta(minutes=idx)).timestamp()),
-            o_id=org.o_id,
-            el_id=label_id,
-            created_at=now - datetime.timedelta(minutes=idx),
+            evaluated_at=evaluated_at,
+            event_data={"idx": idx},
+            rule_results={rule_a.r_id: rule_a_outcomes[idx], rule_b.r_id: rule_b_outcomes[idx]},
         )
-        session.add(event)
-        session.commit()
-
-        session.add(
-            TestingResultsLog(
-                tl_id=event.tl_id,
-                r_id=rule_a.r_id,
-                rule_result=rule_a_outcomes[idx],
-            )
-        )
-        session.add(
-            TestingResultsLog(
-                tl_id=event.tl_id,
-                r_id=rule_b.r_id,
-                rule_result=rule_b_outcomes[idx],
-            )
-        )
+        session.add(EventVersionLabel(o_id=org.o_id, ev_id=decision.ev_id, el_id=label.el_id))
 
     session.commit()
     return {
@@ -297,6 +332,58 @@ class TestTransactionVolume:
         data = response.json()
         assert isinstance(data["labels"], list)
         assert isinstance(data["data"], list)
+
+    def test_transaction_volume_counts_served_event_versions_only(self, analytics_test_client):
+        """Should count canonical served decisions, including repeated business-event versions."""
+        token = analytics_test_client.test_data["token"]
+        session = analytics_test_client.test_data["session"]
+        org = analytics_test_client.test_data["org"]
+        now = datetime.datetime.now()
+
+        rule = RuleModel(
+            rid="ledger_volume_rule",
+            logic="return !HOLD",
+            description="Ledger volume rule",
+            o_id=org.o_id,
+        )
+        session.add(rule)
+        session.commit()
+
+        _store_ledger_decision(
+            session,
+            org_id=org.o_id,
+            event_id="repeat-volume-event",
+            evaluated_at=now - datetime.timedelta(minutes=20),
+            event_data={"amount": 100},
+            rule_results={rule.r_id: "HOLD"},
+        )
+        _store_ledger_decision(
+            session,
+            org_id=org.o_id,
+            event_id="repeat-volume-event",
+            evaluated_at=now - datetime.timedelta(minutes=10),
+            event_data={"amount": 200},
+            rule_results={rule.r_id: "RELEASE"},
+        )
+        _store_ledger_decision(
+            session,
+            org_id=org.o_id,
+            event_id="shadow-volume-event",
+            evaluated_at=now - datetime.timedelta(minutes=5),
+            event_data={"amount": 300},
+            rule_results={rule.r_id: "REVIEW"},
+            served=False,
+            decision_type="shadow",
+        )
+
+        response = analytics_test_client.get(
+            "/api/v2/analytics/transaction-volume?aggregation=1h",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert sum(data["data"]) == 2
 
     def test_transaction_volume_aggregation_param(self, analytics_test_client):
         """Should respect aggregation parameter."""
@@ -371,6 +458,62 @@ class TestOutcomesDistribution:
             assert "data" in dataset
             assert "borderColor" in dataset
             assert "backgroundColor" in dataset
+
+    def test_outcomes_distribution_uses_served_ledger_and_org_scope(self, analytics_test_client):
+        """Should ignore non-served decisions and other org decisions."""
+        token = analytics_test_client.test_data["token"]
+        session = analytics_test_client.test_data["session"]
+        now = datetime.datetime.now()
+
+        other_org = Organisation(o_id=2, name="Analytics Other Org")
+        org_rule = RuleModel(
+            rid="ledger_outcome_rule",
+            logic="return !HOLD",
+            description="Ledger outcome rule",
+            o_id=1,
+        )
+        other_org_rule = RuleModel(
+            rid="ledger_other_org_rule",
+            logic="return !RELEASE",
+            description="Other org ledger outcome rule",
+            o_id=2,
+        )
+        session.add_all([other_org, org_rule, other_org_rule])
+        session.commit()
+
+        _store_ledger_decision(
+            session,
+            org_id=1,
+            event_id="served-outcome",
+            evaluated_at=now - datetime.timedelta(minutes=15),
+            rule_results={org_rule.r_id: "HOLD"},
+        )
+        _store_ledger_decision(
+            session,
+            org_id=1,
+            event_id="shadow-outcome",
+            evaluated_at=now - datetime.timedelta(minutes=10),
+            rule_results={org_rule.r_id: "REVIEW"},
+            served=False,
+            decision_type="shadow",
+        )
+        _store_ledger_decision(
+            session,
+            org_id=2,
+            event_id="other-org-outcome",
+            evaluated_at=now - datetime.timedelta(minutes=5),
+            rule_results={other_org_rule.r_id: "RELEASE"},
+        )
+
+        response = analytics_test_client.get(
+            "/api/v2/analytics/outcomes-distribution?aggregation=1h",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        totals = {dataset["label"]: sum(dataset["data"]) for dataset in data["datasets"]}
+        assert totals == {"HOLD": 1}
 
     def test_outcomes_distribution_invalid_aggregation(self, analytics_test_client):
         """Should return 400 for invalid aggregation."""
@@ -623,24 +766,15 @@ class TestRuleQuality:
         fraud_label = sample_rule_quality_data["fraud_label"]
 
         old_created_at = datetime.datetime.now() - datetime.timedelta(days=40)
-        old_event = TestingRecordLog(
+        old_decision = _store_ledger_decision(
+            session,
+            org_id=1,
             event_id="quality_old_event",
-            event={"idx": 999},
-            event_timestamp=int(old_created_at.timestamp()),
-            o_id=1,
-            el_id=fraud_label.el_id,
-            created_at=old_created_at,
+            evaluated_at=old_created_at,
+            event_data={"idx": 999},
+            rule_results={rule_a.r_id: "HOLD"},
         )
-        session.add(old_event)
-        session.commit()
-
-        session.add(
-            TestingResultsLog(
-                tl_id=old_event.tl_id,
-                r_id=rule_a.r_id,
-                rule_result="HOLD",
-            )
-        )
+        session.add(EventVersionLabel(o_id=1, ev_id=old_decision.ev_id, el_id=fraud_label.el_id))
         session.commit()
 
         recent_response = analytics_test_client.get(
