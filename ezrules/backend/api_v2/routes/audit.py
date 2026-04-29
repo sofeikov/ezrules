@@ -82,8 +82,6 @@ def rule_history_to_response(history: RuleHistory) -> RuleHistoryEntry:
         status=history.status,
         to_status=history.to_status,
         effective_from=history.effective_from if history.effective_from is not None else None,  # type: ignore[arg-type]
-        approved_by=int(history.approved_by) if history.approved_by is not None else None,
-        approved_at=history.approved_at if history.approved_at is not None else None,  # type: ignore[arg-type]
         changed=changed,  # type: ignore[arg-type]
         changed_by=str(history.changed_by) if history.changed_by else None,
     )
