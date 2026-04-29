@@ -103,15 +103,15 @@ Rule lifecycle fields on rule responses:
 - `evaluation_lane`: `main` or `allowlist`
 - `execution_order`: integer serving order used by main rules; lower values run earlier
 - `effective_from`: activation timestamp for active versions
-- `approved_by` / `approved_at`: approver audit metadata for promotions
+- `approved_by` / `approved_at`: the user and timestamp recorded for the last promote/resume/auto-promote action. The field names are kept for API compatibility; ezrules does not have a separate approval workflow. Audit endpoints use `action`, `changed_by`, `changed`, and `to_status` for event timelines.
 - `POST /api/v2/rules` creates draft rules.
 - `PUT /api/v2/rules/{id}` saves edits as draft by default and requires promotion to reactivate.
 - `POST /api/v2/rules/{id}/pause` moves an active rule out of live production evaluation without archiving it.
-- `POST /api/v2/rules/{id}/resume` returns a paused rule to `active` and records fresh approver metadata.
+- `POST /api/v2/rules/{id}/resume` returns a paused rule to `active` and records fresh activation metadata.
 - Editing a paused rule keeps it paused; it does not silently reactivate.
 - If runtime setting `auto_promote_active_rule_updates` is enabled for the caller's org, editing an already active rule keeps it active and updates production immediately, but the caller still needs `PROMOTE_RULES`.
 - `POST /api/v2/rules/{id}/rollback` restores the selected historical revision's logic and description into a brand new draft version, preserving the full revision chain.
-- Rule audit entries (`GET /api/v2/audit/rules*`) now include `action` (`updated`, `reordered`, `promoted`, `paused`, `resumed`, `deactivated`, `rolled_back`, `deleted`), `execution_order`, and `to_status` to show lifecycle transitions such as `draft -> active` or `active -> paused`.
+- Rule audit entries (`GET /api/v2/audit/rules*`) are event-log records. They include `action` (`updated`, `reordered`, `promoted`, `paused`, `resumed`, `deactivated`, `rolled_back`, `deleted`), `changed_by`, `changed`, `execution_order`, and `to_status` to show lifecycle transitions such as `draft -> active` or `active -> paused`; they do not expose `approved_by` or `approved_at`.
 - Deleting a rule preserves its history so `GET /api/v2/audit/rules/{rule_id}` remains available after deletion.
 - Rules with an active shadow deployment or rollout cannot be edited, paused, archived, deleted, directly promoted, resumed, or rolled back until the candidate deployment is removed or promoted.
 - Allowlist rules are first-class production rules. They cannot be deployed to shadow or rollout.
@@ -305,8 +305,8 @@ Field type config note:
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | `GET` | `/api/v2/audit` | Bearer + permission | Summary for the caller's org |
-| `GET` | `/api/v2/audit/rules` | Bearer + permission | Rule history (`limit`, `offset`, filters) |
-| `GET` | `/api/v2/audit/rules/{rule_id}` | Bearer + permission | Full history for one rule |
+| `GET` | `/api/v2/audit/rules` | Bearer + permission | Rule event history (`limit`, `offset`, filters) with action, actor, timestamp, and status transition |
+| `GET` | `/api/v2/audit/rules/{rule_id}` | Bearer + permission | Full event history for one rule |
 | `GET` | `/api/v2/audit/config` | Bearer + permission | Config history (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/user-lists` | Bearer + permission | User-list history |
 | `GET` | `/api/v2/audit/outcomes` | Bearer + permission | Outcome history |

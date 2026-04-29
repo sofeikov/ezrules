@@ -209,7 +209,7 @@ AI-assisted rule authoring in ezrules does exactly that:
 - native engine syntax
 - explicit validation
 - visual review aids
-- human approval before save
+- human acceptance before save
 
 That is a much better fit for production transaction monitoring than a fully automatic rule-writing workflow.
 

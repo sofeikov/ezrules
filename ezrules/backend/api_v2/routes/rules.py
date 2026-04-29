@@ -805,7 +805,7 @@ def promote_rule(
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleMutationResponse:
-    """Promote a draft rule to active and record approver metadata."""
+    """Promote a draft rule to active and record who activated it."""
     rule_manager = get_rule_manager(db, current_org_id)
     config_producer = get_config_producer(db, current_org_id)
     rule = rule_manager.load_rule(rule_id)

@@ -238,6 +238,34 @@ class TestListRuleHistory:
         item = response.json()["items"][0]
         assert "action" in item
         assert "to_status" in item
+        assert "changed_by" in item
+        assert "changed" in item
+
+    def test_list_rule_history_does_not_expose_rule_activation_snapshot_fields(
+        self, audit_test_client, sample_rule_with_history
+    ):
+        """Rule audit payload should expose event metadata, not stored rule activation metadata."""
+        token = audit_test_client.test_data["token"]
+        session = audit_test_client.test_data["session"]
+        user = audit_test_client.test_data["user"]
+
+        sample = session.query(RuleHistory).filter(RuleHistory.r_id == sample_rule_with_history.r_id).first()
+        assert sample is not None
+        sample.action = "promoted"
+        sample.status = RuleStatus.DRAFT
+        sample.to_status = RuleStatus.ACTIVE
+        sample.approved_by = user.id
+        session.commit()
+
+        response = audit_test_client.get(
+            f"/api/v2/audit/rules?rule_id={sample_rule_with_history.r_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        item = response.json()["items"][0]
+        assert "approved_by" not in item
+        assert "approved_at" not in item
 
 
 # =============================================================================
@@ -267,6 +295,8 @@ class TestGetRuleAudit:
         # History should be ordered by version ascending
         assert data["history"][0]["version"] == 1
         assert data["history"][1]["version"] == 2
+        assert "approved_by" not in data["history"][0]
+        assert "approved_at" not in data["history"][0]
 
     def test_get_rule_audit_not_found(self, audit_test_client):
         """Should return 404 for non-existent rule."""
