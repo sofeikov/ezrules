@@ -21,6 +21,7 @@ export const ROUTE_PERMISSION_REQUIREMENTS = {
   shadowRules: { allOf: ['view_rules'] },
   rollouts: { allOf: ['view_rules'] },
   apiKeys: { allOf: ['manage_api_keys'] },
+  alerts: { allOf: ['view_alerts'] },
 } as const satisfies Record<string, PermissionRequirement>;
 
 export const ACTION_PERMISSION_REQUIREMENTS = {
@@ -50,6 +51,7 @@ export const ACTION_PERMISSION_REQUIREMENTS = {
   modifyFieldTypes: { allOf: ['modify_field_types'] },
   deleteFieldType: { allOf: ['delete_field_type'] },
   manageApiKeys: { allOf: ['manage_api_keys'] },
+  manageAlerts: { allOf: ['manage_alerts'] },
 } as const satisfies Record<string, PermissionRequirement>;
 
 export const PERMISSION_LABELS: Record<string, string> = {
@@ -88,6 +90,8 @@ export const PERMISSION_LABELS: Record<string, string> = {
   modify_field_types: 'Modify field types',
   delete_field_type: 'Delete field types',
   manage_api_keys: 'Manage API keys',
+  view_alerts: 'View alerts',
+  manage_alerts: 'Manage alerts',
 };
 
 export function hasPermissionRequirement(

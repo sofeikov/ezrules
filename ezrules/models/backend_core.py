@@ -417,6 +417,147 @@ class RuleDeploymentResultsLog(Base):
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
 
 
+class AlertRule(Base):
+    __tablename__ = "alert_rules"
+    __table_args__ = (
+        Index("ix_alert_rules_o_id_outcome_enabled", "o_id", "outcome", "enabled"),
+        UniqueConstraint("o_id", "name", name="uq_alert_rules_org_name"),
+    )
+
+    ar_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    outcome = Column(String(255), nullable=False)
+    threshold = Column(Integer, nullable=False)
+    window_seconds = Column(Integer, nullable=False)
+    cooldown_seconds = Column(Integer, nullable=False, default=1800)
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.UTC),
+        onupdate=lambda: datetime.datetime.now(datetime.UTC),
+        nullable=False,
+    )
+
+
+class AlertIncident(Base):
+    __tablename__ = "alert_incidents"
+    __table_args__ = (
+        Index("ix_alert_incidents_o_id_triggered_at", "o_id", "triggered_at"),
+        Index("ix_alert_incidents_alert_rule_status", "alert_rule_id", "status"),
+        UniqueConstraint("alert_rule_id", "dedupe_key", name="uq_alert_incidents_rule_dedupe"),
+    )
+
+    ai_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    alert_rule_id: Mapped[int] = mapped_column(ForeignKey("alert_rules.ar_id", ondelete="CASCADE"), nullable=False)
+    outcome = Column(String(255), nullable=False)
+    observed_count = Column(Integer, nullable=False)
+    threshold = Column(Integer, nullable=False)
+    window_start = Column(DateTime, nullable=False)
+    window_end = Column(DateTime, nullable=False)
+    dedupe_key = Column(String(255), nullable=False)
+    status = Column(String(32), nullable=False, default="open")
+    triggered_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    acknowledged_at = Column(DateTime, nullable=True)
+    acknowledged_by = Column(String(255), nullable=True)
+
+
+class NotificationChannel(Base):
+    __tablename__ = "notification_channels"
+    __table_args__ = (
+        Index("ix_notification_channels_o_id_type_enabled", "o_id", "channel_type", "enabled"),
+        UniqueConstraint("o_id", "name", name="uq_notification_channels_org_name"),
+    )
+
+    nc_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    channel_type = Column(String(64), nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True)
+    config = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.UTC),
+        onupdate=lambda: datetime.datetime.now(datetime.UTC),
+        nullable=False,
+    )
+
+
+class NotificationPolicy(Base):
+    __tablename__ = "notification_policies"
+    __table_args__ = (
+        UniqueConstraint("alert_rule_id", "notification_channel_id", name="uq_notification_policies_rule_channel"),
+        Index("ix_notification_policies_alert_rule_enabled", "alert_rule_id", "enabled"),
+    )
+
+    np_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    alert_rule_id: Mapped[int] = mapped_column(ForeignKey("alert_rules.ar_id", ondelete="CASCADE"), nullable=False)
+    notification_channel_id: Mapped[int] = mapped_column(
+        ForeignKey("notification_channels.nc_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+
+
+class NotificationAttempt(Base):
+    __tablename__ = "notification_attempts"
+    __table_args__ = (
+        Index("ix_notification_attempts_incident_channel", "alert_incident_id", "notification_channel_id"),
+        Index("ix_notification_attempts_o_id_attempted_at", "o_id", "attempted_at"),
+    )
+
+    na_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    alert_incident_id: Mapped[int] = mapped_column(
+        ForeignKey("alert_incidents.ai_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    notification_channel_id: Mapped[int] = mapped_column(ForeignKey("notification_channels.nc_id"), nullable=False)
+    status = Column(String(32), nullable=False)
+    error = Column(String, nullable=True)
+    attempted_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+
+
+class InAppNotification(Base):
+    __tablename__ = "in_app_notifications"
+    __table_args__ = (
+        Index("ix_in_app_notifications_o_id_created_at", "o_id", "created_at"),
+        Index("ix_in_app_notifications_o_id_source", "o_id", "source_type", "source_id"),
+    )
+
+    ian_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    severity = Column(String(32), nullable=False)
+    title = Column(String(255), nullable=False)
+    body = Column(String, nullable=False)
+    action_url = Column(String(512), nullable=True)
+    source_type = Column(String(64), nullable=False)
+    source_id = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    expires_at = Column(DateTime, nullable=True)
+
+
+class InAppNotificationRead(Base):
+    __tablename__ = "in_app_notification_reads"
+    __table_args__ = (
+        UniqueConstraint("notification_id", "user_id", name="uq_in_app_notification_reads_notification_user"),
+        Index("ix_in_app_notification_reads_user_read_at", "user_id", "read_at"),
+    )
+
+    ianr_id = Column(Integer, unique=True, primary_key=True)
+    notification_id: Mapped[int] = mapped_column(
+        ForeignKey("in_app_notifications.ian_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    read_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+
+
 class AllowedOutcome(Base):
     __tablename__ = "allowed_outcomes"
     __table_args__ = (UniqueConstraint("o_id", "severity_rank", name="uq_allowed_outcomes_org_severity_rank"),)
@@ -627,6 +768,20 @@ class UserAccountHistory(Base):
     action = Column(
         String, nullable=False
     )  # created, updated, deleted, activated, deactivated, role_assigned, role_removed
+    details = Column(String, nullable=True)
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
+    changed_by = Column(String, nullable=True)
+
+
+class AlertRuleHistory(Base):
+    __tablename__ = "alert_rule_history"
+    __table_args__ = (Index("ix_alert_rule_history_o_id_changed", "o_id", "changed"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    alert_rule_id = Column(Integer, nullable=False)
+    name = Column(String(255), nullable=False)
+    action = Column(String(64), nullable=False)
     details = Column(String, nullable=True)
     o_id = Column(Integer, nullable=False)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))

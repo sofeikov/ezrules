@@ -14,6 +14,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ezrules.backend import data_utils
+from ezrules.backend.alerts import enqueue_alert_detection
 from ezrules.backend.api_v2.auth.dependencies import get_current_evaluator_org_id, get_db
 from ezrules.backend.api_v2.schemas.evaluator import EvaluateRequest, EvaluateResponse
 from ezrules.backend.data_utils import Event
@@ -201,6 +202,11 @@ def evaluate(
         if allowlist_result.get("rule_results"):
             result = _build_response_from_all_results(dict(allowlist_result.get("all_rule_results", {})))
             result, _ = data_utils.eval_and_store(lre, event, response=result)
+            enqueue_alert_detection(
+                o_id=int(lre.o_id),
+                evaluation_decision_id=int(result["evaluation_decision_id"]),
+                resolved_outcome=result.get("resolved_outcome"),
+            )
             _persist_evaluate_observations(db, request_data.event_data, lre.o_id)
             return EvaluateResponse(
                 outcome_counters=result["outcome_counters"],
@@ -241,6 +247,11 @@ def evaluate(
     try:
         # `result` already contains the merged served outcome; passing it avoids a second rule evaluation.
         result, evaluation_decision_id = data_utils.eval_and_store(lre, event, response=result)
+        enqueue_alert_detection(
+            o_id=int(lre.o_id),
+            evaluation_decision_id=int(evaluation_decision_id),
+            resolved_outcome=result.get("resolved_outcome"),
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

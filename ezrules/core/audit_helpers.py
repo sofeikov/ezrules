@@ -10,6 +10,7 @@ import datetime
 
 from ezrules.models.backend_core import (
     AIRuleAuthoringHistory,
+    AlertRuleHistory,
     ApiKeyHistory,
     FieldTypeHistory,
     LabelHistory,
@@ -224,6 +225,28 @@ def save_strict_mode_history(
     """Record an audit entry for a strict mode state change."""
     history = StrictModeHistory(
         enabled=enabled,
+        action=action,
+        details=details,
+        o_id=o_id,
+        changed=datetime.datetime.now(datetime.UTC),
+        changed_by=changed_by,
+    )
+    db.add(history)
+
+
+def save_alert_rule_history(
+    db,
+    alert_rule_id: int,
+    name: str,
+    action: str,
+    o_id: int,
+    changed_by: str | None = None,
+    details: str | None = None,
+) -> None:
+    """Record an audit entry for an alert rule action."""
+    history = AlertRuleHistory(
+        alert_rule_id=alert_rule_id,
+        name=name,
         action=action,
         details=details,
         o_id=o_id,

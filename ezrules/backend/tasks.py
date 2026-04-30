@@ -3,6 +3,7 @@ from typing import Any, cast
 
 from celery import Celery
 
+from ezrules.backend.alerts import detect_alerts_for_decision, sweep_alert_rules
 from ezrules.backend.backtesting import (
     BACKTEST_QUEUE_CANCELLED,
     BACKTEST_QUEUE_DONE,
@@ -43,6 +44,10 @@ app.conf.beat_schedule = {
     "drain-shadow-evaluation-queue": {
         "task": "ezrules.backend.tasks.drain_shadow_evaluation_queue_task",
         "schedule": timedelta(seconds=app_settings.SHADOW_EVALUATION_QUEUE_DRAIN_INTERVAL_SECONDS),
+    },
+    "sweep-alert-rules": {
+        "task": "ezrules.backend.tasks.sweep_alert_rules_task",
+        "schedule": timedelta(seconds=app_settings.ALERT_SWEEP_INTERVAL_SECONDS),
     },
 }
 
@@ -325,3 +330,14 @@ def drain_field_observation_queue() -> dict[str, int]:
 @app.task(name="ezrules.backend.tasks.drain_shadow_evaluation_queue_task")
 def drain_shadow_evaluation_queue_task() -> dict[str, int]:
     return drain_shadow_evaluation_queue()
+
+
+@app.task(name="ezrules.backend.tasks.detect_alerts_for_decision_task")
+def detect_alerts_for_decision_task(o_id: int, evaluation_decision_id: int) -> dict[str, int]:
+    incident_ids = detect_alerts_for_decision(db_session, o_id=o_id, evaluation_decision_id=evaluation_decision_id)
+    return {"incidents": len(incident_ids)}
+
+
+@app.task(name="ezrules.backend.tasks.sweep_alert_rules_task")
+def sweep_alert_rules_task() -> dict[str, int]:
+    return sweep_alert_rules(db_session)

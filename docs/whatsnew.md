@@ -1,5 +1,12 @@
 # What's New
 
+## v1.19.0
+
+* **Outcome spike alerts**: Organisations can now define alert rules such as `CANCEL > 50 in 1 hour`, backed by the canonical served-decision ledger.
+* **Async alert detection**: Live evaluations enqueue alert checks after persistence, while a Celery beat sweeper repairs missed checks from worker restarts or queue outages.
+* **In-app notifications**: Alert incidents create org-wide in-app notifications with per-user read state and a sidebar notification bell.
+* **Extensible notification routing**: Alert incidents route through notification channels and policies so email, Slack, PagerDuty, and webhook delivery can be added without changing alert detection.
+
 ## v1.18.0
 
 * **Canonical evaluation ledgers**: Live evaluation now writes append-only event versions and immutable served-decision records as the default persistence contract, so repeated business events can be represented as ordered versions instead of ad hoc duplicate rows.
