@@ -139,11 +139,7 @@ test.describe('Audit Trail Page', () => {
       const rowCount = await auditTrailPage.getRuleHistoryRowCount();
       if (rowCount > 0) {
         const headers = await auditTrailPage.getRuleHistoryColumnHeaders();
-        expect(headers).toContain('Version');
-        expect(headers).toContain('Rule ID');
-        expect(headers).toContain('Description');
-        expect(headers).toContain('Changed By');
-        expect(headers).toContain('Changed');
+        expect(headers).toEqual(['Version', 'Rule ID', 'Action', 'Status Transition', 'Actor', 'Timestamp']);
       }
     });
   });

@@ -1,7 +1,7 @@
 """add alert rules and notification inbox
 
 Revision ID: 20260430_0028
-Revises: 20260429_0027
+Revises: 20260429_0028
 Create Date: 2026-04-30 10:00:00.000000
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 revision = "20260430_0028"
-down_revision = "20260429_0027"
+down_revision = "20260429_0028"
 branch_labels = None
 depends_on = None
 

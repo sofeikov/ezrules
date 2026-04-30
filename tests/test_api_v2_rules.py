@@ -583,7 +583,7 @@ class TestUpdateRule:
 class TestRuleLifecycleAudit:
     """Tests for lifecycle actions recorded in rule audit history."""
 
-    def test_promote_records_audit_transition_and_approver(self, rules_test_client):
+    def test_promote_records_audit_transition_and_activation_metadata(self, rules_test_client):
         token = rules_test_client.test_data["token"]
         session = rules_test_client.test_data["session"]
         user = rules_test_client.test_data["user"]

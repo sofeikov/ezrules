@@ -15,14 +15,21 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from ezrules.backend import data_utils
 from ezrules.backend.alerts import enqueue_alert_detection
-from ezrules.backend.api_v2.auth.dependencies import get_current_evaluator_org_id, get_db
-from ezrules.backend.api_v2.schemas.evaluator import EvaluateRequest, EvaluateResponse
+from ezrules.backend.api_v2.auth.dependencies import get_current_evaluator_org_id, get_db, require_permission
+from ezrules.backend.api_v2.schemas.evaluator import (
+    EvaluateRequest,
+    EvaluateResponse,
+    EventTestResponse,
+    EventTestRuleResult,
+)
 from ezrules.backend.data_utils import Event
 from ezrules.backend.observation_queue import enqueue_observations
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.runtime_settings import get_main_rule_execution_mode
 from ezrules.backend.shadow_evaluation_queue import enqueue_shadow_evaluation
 from ezrules.backend.utils import load_cast_configs, record_observations
+from ezrules.core.outcomes import DatabaseOutcome
+from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import MissingFieldLookupError, RuleFactory
 from ezrules.core.rule_engine import RULE_EXECUTION_MODE_FIRST_MATCH
 from ezrules.core.rule_updater import (
@@ -35,6 +42,7 @@ from ezrules.core.rule_updater import (
 )
 from ezrules.core.type_casting import CastError, RequiredFieldError, normalize_event
 from ezrules.core.user_lists import PersistentUserListManager
+from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.backend_core import RuleDeploymentResultsLog
 from ezrules.settings import app_settings
 
@@ -103,6 +111,47 @@ def _build_response_from_all_results(all_rule_results: dict[Any, Any]) -> dict[s
         "outcome_counters": outcome_counters,
         "outcome_set": sorted(set(outcome_counters.keys())),
     }
+
+
+def _resolve_dry_run_response(db: Any, o_id: int, result: dict[str, Any]) -> dict[str, Any]:
+    result["outcome_set"] = sorted(result.get("outcome_set") or [])
+    result["resolved_outcome"] = DatabaseOutcome(db_session=db, o_id=o_id).resolve_outcome(result["outcome_counters"])
+    result["event_version"] = None
+    result["evaluation_decision_id"] = None
+    return result
+
+
+def _serialize_rule_result(value: Any) -> str | None:
+    return str(value) if value is not None else None
+
+
+def _build_event_test_rule_results(db: Any, o_id: int, all_rule_results: dict[Any, Any]) -> list[EventTestRuleResult]:
+    rule_ids = [int(rule_id) for rule_id in all_rule_results if str(rule_id).isdigit()]
+    rules_by_id = {
+        int(rule.r_id): rule
+        for rule in db.query(RuleModel).filter(RuleModel.o_id == o_id, RuleModel.r_id.in_(rule_ids)).all()
+    }
+
+    results: list[EventTestRuleResult] = []
+    for rule_id, outcome in all_rule_results.items():
+        if not str(rule_id).isdigit():
+            continue
+        numeric_rule_id = int(rule_id)
+        rule = rules_by_id.get(numeric_rule_id)
+        if rule is None:
+            continue
+        serialized_outcome = _serialize_rule_result(outcome)
+        results.append(
+            EventTestRuleResult(
+                r_id=numeric_rule_id,
+                rid=str(rule.rid),
+                description=str(rule.description),
+                evaluation_lane=str(rule.evaluation_lane),
+                outcome=serialized_outcome,
+                matched=serialized_outcome is not None,
+            )
+        )
+    return results
 
 
 def _evaluate_rollout_result(
@@ -310,4 +359,82 @@ def evaluate(
         rule_results={str(k): str(v) for k, v in result["rule_results"].items()},
         event_version=result.get("event_version"),
         evaluation_decision_id=result.get("evaluation_decision_id"),
+    )
+
+
+@router.post("/event-tests", response_model=EventTestResponse)
+def test_event(
+    request_data: EvaluateRequest,
+    lre: LocalRuleExecutorSQL = Depends(_get_rule_executor),
+    allowlist_lre: LocalRuleExecutorSQL = Depends(_get_allowlist_executor),
+    db: Any = Depends(get_db),
+    _: None = Depends(require_permission(PermissionAction.SUBMIT_TEST_EVENTS)),
+) -> EventTestResponse:
+    """
+    Dry-run an event against the current rule engine configuration.
+
+    This mirrors live evaluation behavior but does not store the event, write
+    rollout/shadow logs, enqueue shadow work, or record field observations.
+    """
+    configs = load_cast_configs(db, lre.o_id)
+    try:
+        event_data = normalize_event(request_data.event_data, configs)
+    except (CastError, RequiredFieldError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    event = Event(
+        event_id=request_data.event_id,
+        event_timestamp=request_data.event_timestamp,
+        event_data=event_data,
+    )
+
+    skipped_main_rules = False
+    result: dict[str, Any]
+    try:
+        allowlist_result = allowlist_lre.evaluate_rules(event.event_data)
+        if allowlist_result.get("rule_results"):
+            result = _build_response_from_all_results(dict(allowlist_result.get("all_rule_results", {})))
+            skipped_main_rules = True
+        else:
+            production_result = lre.evaluate_rules(event.event_data)
+            rollout_entries = list_candidate_deployments(db, lre.o_id, ROLLOUT_CONFIG_LABEL)
+            if rollout_entries:
+                result, rollout_logs = _evaluate_rollout_result(
+                    event_data=event.event_data,
+                    lre=lre,
+                    rollout_entries=rollout_entries,
+                    assignment_key=_get_assignment_key(event),
+                    list_provider=PersistentUserListManager(db, lre.o_id),
+                )
+                del rollout_logs
+            else:
+                result = production_result
+    except MissingFieldLookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Event test failed",
+        ) from exc
+
+    result = _resolve_dry_run_response(db, lre.o_id, result)
+    all_rule_results = dict(result.get("all_rule_results") or result.get("rule_results") or {})
+
+    return EventTestResponse(
+        dry_run=True,
+        skipped_main_rules=skipped_main_rules,
+        outcome_counters=result["outcome_counters"],
+        outcome_set=result["outcome_set"],
+        resolved_outcome=result.get("resolved_outcome"),
+        rule_results={str(k): str(v) for k, v in result["rule_results"].items()},
+        event_version=None,
+        evaluation_decision_id=None,
+        all_rule_results={str(k): _serialize_rule_result(v) for k, v in all_rule_results.items()},
+        evaluated_rules=_build_event_test_rule_results(db, lre.o_id, all_rule_results),
     )

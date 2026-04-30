@@ -117,8 +117,20 @@ class RuleResponse(BaseModel):
     evaluation_lane: str = Field(..., description="Evaluation lane for this rule")
     status: RuleStatus = Field(..., description="Rule lifecycle status")
     effective_from: datetime | None = Field(None, description="When the currently active version became effective")
-    approved_by: int | None = Field(None, description="User ID that approved promotion to active")
-    approved_at: datetime | None = Field(None, description="When the rule was approved for activation")
+    approved_by: int | None = Field(
+        None,
+        description=(
+            "User ID recorded when the rule was last activated through promote, resume, or auto-promote. "
+            "This field is named for API compatibility; ezrules has no separate approval workflow."
+        ),
+    )
+    approved_at: datetime | None = Field(
+        None,
+        description=(
+            "Timestamp recorded when the rule was last activated through promote, resume, or auto-promote. "
+            "This field is named for API compatibility; ezrules has no separate approval workflow."
+        ),
+    )
     created_at: datetime | None = None
     revisions: list[RuleRevisionSummary] = Field(default_factory=list)
     revision_number: int | None = Field(None, description="Revision number (only for historical revisions)")
@@ -137,8 +149,20 @@ class RuleListItem(BaseModel):
     evaluation_lane: str = Field(..., description="Evaluation lane for this rule")
     status: RuleStatus = Field(..., description="Rule lifecycle status")
     effective_from: datetime | None = Field(None, description="When the currently active version became effective")
-    approved_by: int | None = Field(None, description="User ID that approved promotion to active")
-    approved_at: datetime | None = Field(None, description="When the rule was approved for activation")
+    approved_by: int | None = Field(
+        None,
+        description=(
+            "User ID recorded when the rule was last activated through promote, resume, or auto-promote. "
+            "This field is named for API compatibility; ezrules has no separate approval workflow."
+        ),
+    )
+    approved_at: datetime | None = Field(
+        None,
+        description=(
+            "Timestamp recorded when the rule was last activated through promote, resume, or auto-promote. "
+            "This field is named for API compatibility; ezrules has no separate approval workflow."
+        ),
+    )
     created_at: datetime | None = None
     in_shadow: bool = False
     in_rollout: bool = False
@@ -164,8 +188,20 @@ class RuleHistoryEntry(BaseModel):
     evaluation_lane: str = Field(..., description="Evaluation lane for this revision")
     status: RuleStatus = Field(..., description="Rule lifecycle status in this revision")
     effective_from: datetime | None = Field(None, description="When this revision became effective")
-    approved_by: int | None = Field(None, description="User ID that approved this revision")
-    approved_at: datetime | None = Field(None, description="When this revision was approved")
+    approved_by: int | None = Field(
+        None,
+        description=(
+            "User ID captured when this revision was activated. This field is named for API compatibility; "
+            "ezrules has no separate approval workflow."
+        ),
+    )
+    approved_at: datetime | None = Field(
+        None,
+        description=(
+            "Timestamp captured when this revision was activated. This field is named for API compatibility; "
+            "ezrules has no separate approval workflow."
+        ),
+    )
     created_at: datetime | None = None
     is_current: bool = False
 

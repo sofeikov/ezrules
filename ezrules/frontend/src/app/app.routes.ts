@@ -19,6 +19,7 @@ import { ShadowRulesComponent } from './shadow-rules/shadow-rules.component';
 import { RolloutsComponent } from './rollouts/rollouts.component';
 import { ApiKeysComponent } from './api-keys/api-keys.component';
 import { TestedEventsComponent } from './tested-events/tested-events.component';
+import { EventTesterComponent } from './event-tester/event-tester.component';
 import { authGuard } from './auth/auth.guard';
 import { ForgotPasswordComponent } from './forgot-password/forgot-password.component';
 import { ResetPasswordComponent } from './reset-password/reset-password.component';
@@ -93,6 +94,12 @@ export const routes: Routes = [
     component: TestedEventsComponent,
     canActivate: [authGuard, permissionGuard],
     data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.testedEvents }
+  },
+  {
+    path: 'event-tester',
+    component: EventTesterComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.eventTester }
   },
   {
     path: 'user-lists',

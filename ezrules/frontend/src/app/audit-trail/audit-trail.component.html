@@ -57,13 +57,10 @@
                   <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rule ID</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status Transition</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Approved By</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Approved At</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed By</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actor</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -74,7 +71,6 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-mono">
                       <a [routerLink]="['/rules', entry.r_id]" class="text-blue-600 hover:text-blue-800 hover:underline">{{ entry.rid }}</a>
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-600" [title]="entry.description">{{ truncateDescription(entry.description) }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm">
                       <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" [ngClass]="ruleActionClass(entry.action)">
                         {{ formatAction(entry.action) }}
@@ -83,8 +79,6 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {{ formatStatus(entry.status) }}<span *ngIf="entry.to_status"> → {{ formatStatus(entry.to_status) }}</span>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ entry.approved_by ?? '—' }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(entry.approved_at) }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ entry.changed_by || '—' }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(entry.changed) }}</td>
                   </tr>

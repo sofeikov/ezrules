@@ -42,11 +42,9 @@ class RuleHistoryEntry(BaseModel):
     action: str = Field(..., description="Action type (updated, promoted, deactivated, deleted, reordered)")
     status: RuleStatus = Field(..., description="Rule lifecycle status at this version")
     to_status: RuleStatus | None = Field(default=None, description="Target status for lifecycle transitions")
-    effective_from: datetime | None = Field(default=None, description="Activation timestamp for this version")
-    approved_by: int | None = Field(default=None, description="User ID that approved this version")
-    approved_at: datetime | None = Field(default=None, description="Approval timestamp for this version")
-    changed: datetime | None = Field(default=None, description="When this version was created")
-    changed_by: str | None = Field(default=None, description="Who made this change")
+    effective_from: datetime | None = Field(default=None, description="Activation timestamp captured on the rule")
+    changed: datetime | None = Field(default=None, description="When this audit event was recorded")
+    changed_by: str | None = Field(default=None, description="Actor that caused this audit event")
 
     model_config = {"from_attributes": True}
 

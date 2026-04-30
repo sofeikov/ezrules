@@ -1,11 +1,22 @@
 # What's New
 
-## v1.19.0
+## v1.20.0
 
 * **Outcome spike alerts**: Organisations can now define alert rules such as `CANCEL > 50 in 1 hour`, backed by the canonical served-decision ledger.
 * **Async alert detection**: Live evaluations enqueue alert checks after persistence, while a Celery beat sweeper repairs missed checks from worker restarts or queue outages.
 * **In-app notifications**: Alert incidents create org-wide in-app notifications with per-user read state and a sidebar notification bell.
 * **Extensible notification routing**: Alert incidents route through notification channels and policies so email, Slack, PagerDuty, and webhook delivery can be added without changing alert detection.
+
+## v1.19.0
+
+* **Event Tester dry runs**: Operators with the new `submit_test_events` permission can now use **Event Tester** to run a JSON event against the current rule set from the UI without storing the event or adding it to Tested Events.
+* **Non-persistent event-test API**: Added `POST /api/v2/event-tests`, which mirrors live evaluator normalization, allowlist short-circuiting, main-rule execution, rollout selection, and outcome resolution while returning no `event_version` or `evaluation_decision_id`.
+* **Dedicated test-event permission**: `submit_test_events` separates dry-run event submission from general rule viewing, so teams can grant this workflow without exposing broader admin capabilities.
+
+## v1.18.1
+
+* **Rule audit trail clarified**: Rule audit rows now read as event-log entries with action, actor, timestamp, and status transition, while activation metadata stays on rule snapshots instead of appearing as misleading Approved By / Approved At audit columns.
+* **Activation field wording**: Rule response fields named `approved_by` and `approved_at` are now documented as API-compatible names for promote/resume/auto-promote activation metadata, not evidence of a separate approval workflow.
 
 ## v1.18.0
 
@@ -209,11 +220,11 @@
 ## v0.18
 
 * **Rule lifecycle states**: Rules now carry lifecycle metadata with `status` (`draft`, `active`, `archived`), `effective_from`, `approved_by`, and `approved_at`.
-* **Promotion workflow**: Added `POST /api/v2/rules/{id}/promote` to transition draft rules to active with approver audit attribution.
+* **Promotion workflow**: Added `POST /api/v2/rules/{id}/promote` to transition draft rules to active with activation actor attribution.
 * **Archive workflow**: Added `POST /api/v2/rules/{id}/archive` to archive rules and remove active rules from production evaluation.
 * **Delete endpoint documented and permissioned**: `DELETE /api/v2/rules/{id}` is explicitly documented and guarded by `DELETE_RULE`.
 * **UI lifecycle controls**: Rule list now shows lifecycle badges and includes promote/archive actions.
-* **Audit trail enrichment**: Rule history entries now persist lifecycle/approval metadata plus explicit rule actions (`promoted`, `deactivated`, `deleted`) with target status transitions; deleted rules retain audit history and remain queryable via `GET /api/v2/audit/rules/{rule_id}`.
+* **Audit trail enrichment**: Rule history entries now persist lifecycle activation metadata plus explicit rule actions (`promoted`, `deactivated`, `deleted`) with target status transitions; deleted rules retain audit history and remain queryable via `GET /api/v2/audit/rules/{rule_id}`.
 * **E2E setup guardrail**: Frontend e2e docs now explicitly require starting API with `EZRULES_TESTING=false` for invite/reset email flows; testing mode disables SMTP delivery and causes those tests to fail.
 
 ## v0.17

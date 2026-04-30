@@ -69,6 +69,8 @@ Checkpoint:
    - one payload that should trigger
    - one payload that should not trigger
 
+Use **Event Tester** when you want to dry-run a full event against the currently active rule set instead of testing one rule's source in isolation. Event Tester requires `submit_test_events` and does not store the submitted event in Tested Events, analytics, or evaluation ledgers.
+
 !!! tip "Type casting in Test Rule"
     The **Test Rule** panel applies the same field type casting as live evaluation. If you have configured field types (under **Settings → Field Types**), values will be cast before the rule runs. Test JSON also contributes to field observations, helping you discover which types your fields carry.
     See [Field Type Management](field-types.md) for details.

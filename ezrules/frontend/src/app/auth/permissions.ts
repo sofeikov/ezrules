@@ -7,6 +7,7 @@ export const ROUTE_PERMISSION_REQUIREMENTS = {
   dashboard: { allOf: ['view_rules', 'view_outcomes'] },
   rules: { allOf: ['view_rules'] },
   ruleCreate: { allOf: ['create_rule'] },
+  eventTester: { allOf: ['view_rules', 'submit_test_events'] },
   labels: { allOf: ['view_labels'] },
   outcomes: { allOf: ['view_outcomes'] },
   testedEvents: { allOf: ['view_rules'] },
@@ -52,6 +53,7 @@ export const ACTION_PERMISSION_REQUIREMENTS = {
   deleteFieldType: { allOf: ['delete_field_type'] },
   manageApiKeys: { allOf: ['manage_api_keys'] },
   manageAlerts: { allOf: ['manage_alerts'] },
+  submitTestEvents: { allOf: ['submit_test_events'] },
 } as const satisfies Record<string, PermissionRequirement>;
 
 export const PERMISSION_LABELS: Record<string, string> = {
@@ -62,6 +64,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   promote_rules: 'Promote rules',
   delete_rule: 'Delete rules',
   view_rules: 'View rules',
+  submit_test_events: 'Submit test events',
   create_outcome: 'Create outcomes',
   modify_outcome: 'Modify outcomes',
   delete_outcome: 'Delete outcomes',
