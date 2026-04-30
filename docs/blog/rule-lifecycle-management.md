@@ -5,7 +5,7 @@ Rule engines usually fail at one of two extremes:
 - Every edit is live immediately, which is fast but risky.
 - Every edit requires an external process, which is safe but slow.
 
-ezrules now supports an explicit lifecycle so teams can move fast without losing control: `draft` -> `active` -> `paused` -> `active` or `archived`, with promotion approvals captured in the audit trail and rollback available when a historical revision needs to be restored as a new draft.
+ezrules now supports an explicit lifecycle so teams can move fast without losing control: `draft` -> `active` -> `paused` -> `active` or `archived`, with lifecycle events captured in the audit trail and rollback available when a historical revision needs to be restored as a new draft.
 
 ## Why lifecycle controls matter
 
@@ -26,19 +26,19 @@ Each rule now includes lifecycle metadata:
 
 - `status`: `draft`, `active`, `paused`, or `archived`
 - `effective_from`: when the active version became effective
-- `approved_by`: user id who approved promotion
-- `approved_at`: when promotion was approved
+- `approved_by`: user id recorded when the current rule version was activated or reactivated
+- `approved_at`: timestamp recorded when the current rule version was activated
 
-The same metadata is snapshotted into `rules_history`, so lifecycle transitions and approver chain context are preserved in historical revisions.
+There is no separate approval workflow. The `approved_*` field names are kept for API compatibility and refer to promote, resume, or auto-promote actions. The audit trail exposes lifecycle transitions as event-log rows: action, actor, timestamp, and status transition.
 
 ## API behavior by lifecycle
 
 The lifecycle is enforced by API behavior:
 
 - `POST /api/v2/rules` creates a `draft` rule
-- `PUT /api/v2/rules/{id}` saves edits as `draft` and clears previous approval metadata by default
+- `PUT /api/v2/rules/{id}` saves edits as `draft` and clears previous activation metadata by default
 - `POST /api/v2/rules/{id}/rollback` restores a historical revision's logic and description into a brand new `draft`
-- `POST /api/v2/rules/{id}/promote` moves `draft` to `active` and records approver + approval timestamp
+- `POST /api/v2/rules/{id}/promote` moves `draft` to `active` and records the activation actor + timestamp
 - `POST /api/v2/rules/{id}/pause` moves `active` to `paused` without archiving the rule and requires a dedicated pause permission
 - `POST /api/v2/rules/{id}/resume` moves `paused` back to `active`
 - `POST /api/v2/rules/{id}/archive` moves a rule to `archived`
@@ -73,12 +73,12 @@ In the rule list, the lifecycle state stays visible next to the rule, alongside 
 
 ![Rule list with draft, active, and shadow lifecycle badges](../assets/readme/rule-lifecycle-statuses.png)
 
-## Promotion is a first-class approval step
+## Promotion is a first-class activation step
 
 Promotion is no longer an implicit side effect of editing. It is an explicit operation that records:
 
-- who approved
-- when it was approved
+- who activated the rule
+- when it was activated
 - when it became effective
 
 That gives you a defensible trail for internal governance and external audits, while keeping authoring fast for rule editors.
@@ -156,7 +156,7 @@ A practical sequence is:
 1. Edit rule in draft
 2. (Optional) deploy to shadow for live validation
 3. Roll back to a known-good revision if a newer draft or active version proves wrong
-4. Promote when approved
+4. Promote when ready to activate
 5. Archive when rule is retired
 
 ## Net effect
@@ -165,7 +165,7 @@ You get a cleaner rule lifecycle without adding operational friction:
 
 - safer releases through explicit promotion
 - faster recovery through auditable rollback
-- auditable approval chain
+- auditable activation trail
 - clear operational state in UI and API
 - predictable retirement path through archive
 
