@@ -47,3 +47,29 @@ class EvaluateResponse(BaseModel):
     rule_results: dict[str, str] = Field(..., description="Mapping of rule_id to its outcome")
     event_version: int | None = Field(None, description="Canonical append-only version for this business event")
     evaluation_decision_id: int | None = Field(None, description="Immutable served-decision ledger identifier")
+
+
+class EventTestRuleResult(BaseModel):
+    """Rule result details returned by a dry-run event test."""
+
+    r_id: int = Field(..., description="Internal numeric rule identifier")
+    rid: str = Field(..., description="External rule identifier")
+    description: str = Field(..., description="Rule description")
+    evaluation_lane: str = Field(..., description="Rule evaluation lane")
+    outcome: str | None = Field(None, description="Outcome returned by the rule, if any")
+    matched: bool = Field(..., description="Whether the rule returned an outcome")
+
+
+class EventTestResponse(EvaluateResponse):
+    """Response from a non-persistent rule-set event test."""
+
+    dry_run: bool = Field(True, description="Always true for event test responses")
+    skipped_main_rules: bool = Field(False, description="Whether allowlist rules short-circuited main rule evaluation")
+    all_rule_results: dict[str, str | None] = Field(
+        default_factory=dict,
+        description="Mapping of evaluated rule IDs to their outcome, including non-matches",
+    )
+    evaluated_rules: list[EventTestRuleResult] = Field(
+        default_factory=list,
+        description="Metadata for all rules evaluated during the dry run",
+    )

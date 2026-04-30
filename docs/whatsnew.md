@@ -1,5 +1,11 @@
 # What's New
 
+## v1.19.0
+
+* **Event Tester dry runs**: Operators with the new `submit_test_events` permission can now use **Event Tester** to run a JSON event against the current rule set from the UI without storing the event or adding it to Tested Events.
+* **Non-persistent event-test API**: Added `POST /api/v2/event-tests`, which mirrors live evaluator normalization, allowlist short-circuiting, main-rule execution, rollout selection, and outcome resolution while returning no `event_version` or `evaluation_decision_id`.
+* **Dedicated test-event permission**: `submit_test_events` separates dry-run event submission from general rule viewing, so teams can grant this workflow without exposing broader admin capabilities.
+
 ## v1.18.1
 
 * **Rule audit trail clarified**: Rule audit rows now read as event-log entries with action, actor, timestamp, and status transition, while activation metadata stays on rule snapshots instead of appearing as misleading Approved By / Approved At audit columns.

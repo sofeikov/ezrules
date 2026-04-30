@@ -12,6 +12,7 @@ class PermissionAction(Enum):
     PROMOTE_RULES = "promote_rules"
     DELETE_RULE = "delete_rule"
     VIEW_RULES = "view_rules"
+    SUBMIT_TEST_EVENTS = "submit_test_events"
 
     # Outcome Management
     CREATE_OUTCOME = "create_outcome"
@@ -68,6 +69,7 @@ class PermissionAction(Enum):
             (cls.PROMOTE_RULES.value, "Promote draft or shadow rules to production", "rule"),
             (cls.DELETE_RULE.value, "Delete rules", "rule"),
             (cls.VIEW_RULES.value, "View rules", "rule"),
+            (cls.SUBMIT_TEST_EVENTS.value, "Submit dry-run test events", "rule"),
             (cls.CREATE_OUTCOME.value, "Create new outcomes", "outcome"),
             (cls.MODIFY_OUTCOME.value, "Modify existing outcomes", "outcome"),
             (cls.DELETE_OUTCOME.value, "Delete outcomes", "outcome"),
