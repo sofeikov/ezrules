@@ -107,6 +107,7 @@ Once a field is configured, normalization happens before rule execution:
 
 - `/api/v2/evaluate` — required fields are validated first, then values are cast before rules run. If a required field is missing/`null`, or if casting fails (for example a non-numeric string cast to `integer`), the request returns `HTTP 400` with a description of which field failed. Field observations from live traffic are buffered asynchronously, so they may appear shortly after the request succeeds.
 - **Test Rule** panel — the same required-field validation and casting rules apply before the rule is tested. Errors are shown inline in the result panel.
+- **Event Tester** — the same required-field validation and casting rules apply to full rule-set dry runs, but submitted dry-run payloads do not create field observations.
 
 !!! warning "CastError on invalid values"
     If an event arrives with a value that cannot be cast to the configured type, evaluation will be rejected with an error. Ensure upstream systems send values consistent with the configured types, or use `compare_as_is` to bypass casting.

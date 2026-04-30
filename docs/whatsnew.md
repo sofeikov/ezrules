@@ -1,5 +1,11 @@
 # What's New
 
+## v1.19.0
+
+* **Event Tester dry runs**: Operators with the new `submit_test_events` permission can now use **Event Tester** to run a JSON event against the current rule set from the UI without storing the event or adding it to Tested Events.
+* **Non-persistent event-test API**: Added `POST /api/v2/event-tests`, which mirrors live evaluator normalization, allowlist short-circuiting, main-rule execution, rollout selection, and outcome resolution while returning no `event_version` or `evaluation_decision_id`.
+* **Dedicated test-event permission**: `submit_test_events` separates dry-run event submission from general rule viewing, so teams can grant this workflow without exposing broader admin capabilities.
+
 ## v1.18.0
 
 * **Canonical evaluation ledgers**: Live evaluation now writes append-only event versions and immutable served-decision records as the default persistence contract, so repeated business events can be represented as ordered versions instead of ad hoc duplicate rows.

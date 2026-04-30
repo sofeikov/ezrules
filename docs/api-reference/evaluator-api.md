@@ -14,7 +14,7 @@ It executes the active rule set against one event payload and stores results.
 ## Authentication
 
 `/api/v2/evaluate` requires credentials on every request.
-Two methods are accepted:
+Two methods are accepted for live evaluation:
 
 ### API Key (recommended for service-to-service)
 
@@ -40,6 +40,8 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "Content-Type: application/json" \
   -d '{"event_id": "evt_1", "event_timestamp": 1700000000, "event_data": {}}'
 ```
+
+`/api/v2/event-tests` accepts bearer-token user sessions only and requires the `submit_test_events` permission.
 
 ## Endpoint
 
@@ -148,6 +150,72 @@ Nested lookups return the full dotted path in the same format:
 ```
 
 Field observations are also recorded on each successful call, contributing to the **Observed Fields** data visible in the UI. Observations include canonical dotted nested paths as well as parent objects. Live evaluation now buffers those observation writes through Redis and a periodic Celery drain, so observation listings are eventually consistent rather than immediate.
+
+### Test Event
+
+`POST /api/v2/event-tests`
+
+Dry-runs an event against the current rule configuration without writing event versions, served-decision records, Tested Events rows, rollout/shadow logs, or field observations.
+
+This endpoint uses the same request fields as `POST /api/v2/evaluate`, applies the same field normalization rules, honors allowlist short-circuiting, uses the configured main-rule execution mode, applies active rollout selection, and resolves the final outcome with the configured outcome hierarchy.
+
+#### Required Permission
+
+`submit_test_events`
+
+#### Example Request
+
+```bash
+curl -X POST http://localhost:8888/api/v2/event-tests \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id": "dry_run_123",
+    "event_timestamp": 1700000000,
+    "event_data": {
+      "amount": 15000,
+      "user_id": "user_42",
+      "country": "US"
+    }
+  }'
+```
+
+#### Example Response
+
+```json
+{
+  "dry_run": true,
+  "skipped_main_rules": false,
+  "outcome_counters": {
+    "HOLD": 1
+  },
+  "outcome_set": [
+    "HOLD"
+  ],
+  "resolved_outcome": "HOLD",
+  "rule_results": {
+    "7": "HOLD"
+  },
+  "event_version": null,
+  "evaluation_decision_id": null,
+  "all_rule_results": {
+    "7": "HOLD",
+    "8": null
+  },
+  "evaluated_rules": [
+    {
+      "r_id": 7,
+      "rid": "HIGH_AMOUNT",
+      "description": "Hold high amount transactions",
+      "evaluation_lane": "main",
+      "outcome": "HOLD",
+      "matched": true
+    }
+  ]
+}
+```
+
+`event_version` and `evaluation_decision_id` are always `null` for dry runs.
 
 #### Status Codes
 

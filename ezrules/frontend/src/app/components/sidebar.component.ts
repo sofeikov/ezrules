@@ -66,6 +66,14 @@ import { PermissionRequirement, ROUTE_PERMISSION_REQUIREMENTS, hasPermissionRequ
           <span>Tested Events</span>
         </a>
 
+        <a *ngIf="canAccess(routePermissions.eventTester)" href="/event-tester" [ngClass]="linkClasses('/event-tester')">
+          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5a3 3 0 006 0M9 13l2 2 4-4" />
+          </svg>
+          <span>Event Tester</span>
+        </a>
+
         <a *ngIf="canAccess(routePermissions.userLists)" href="/user-lists" [ngClass]="linkClasses('/user-lists')">
           <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />

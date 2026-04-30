@@ -110,6 +110,7 @@ The result is stored for review in the UI, including the winning outcome and the
 ## Core Workflows
 
 - **Rule authoring:** write rule logic with validation, observed field references, configured outcomes, and list references.
+- **Event testing:** dry-run JSON events against the active rule set without storing them in Tested Events or analytics.
 - **Shadow deployment:** observe what a rule would do on live traffic without changing production outcomes.
 - **Rule rollouts:** send a stable percentage of traffic through a candidate rule before full promotion.
 - **Backtesting:** compare proposed logic against historical events before release.
