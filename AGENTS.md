@@ -37,6 +37,10 @@ uv run pytest -q --cov=ezrules.backend --cov=ezrules.core --cov-report=xml tests
 - **Start Celery worker** (required for backtesting): `uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo`
 - **Generate test data**: `uv run ezrules generate-random-data --n-rules 10 --n-events 100`
 
+# Git and Pull Requests
+1. Never add `codex`, `[codex]`, or similar agent/tool branding to pull request titles.
+2. Never push branches or commits unless the user explicitly asks for a push, publish, PR creation/update, or another action that clearly requires pushing.
+
 # VS Code Launch Configs (.vscode/launch.json)
 When creating a new git worktree for this repository, copy the root `.vscode/` folder into the new worktree before starting work so all launch/run configurations remain available there.
 When working in a new git worktree, proactively ensure dependencies are installed in that worktree before starting: run `uv sync` for Python deps and make sure frontend deps are present in `ezrules/frontend/` (run `npm install` there if `node_modules` is missing) so the user does not have to do manual dependency setup.
