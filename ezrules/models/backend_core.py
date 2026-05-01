@@ -783,7 +783,7 @@ class AlertRuleHistory(Base):
     name = Column(String(255), nullable=False)
     action = Column(String(64), nullable=False)
     details = Column(String, nullable=True)
-    o_id = Column(Integer, nullable=False)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
     changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC))
     changed_by = Column(String, nullable=True)
 

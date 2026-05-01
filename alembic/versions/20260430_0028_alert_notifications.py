@@ -178,6 +178,7 @@ def upgrade() -> None:
         sa.Column("o_id", sa.Integer(), nullable=False),
         sa.Column("changed", sa.DateTime(), nullable=True),
         sa.Column("changed_by", sa.String(), nullable=True),
+        sa.ForeignKeyConstraint(["o_id"], ["organisation.o_id"]),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_alert_rule_history_o_id_changed", "alert_rule_history", ["o_id", "changed"])
