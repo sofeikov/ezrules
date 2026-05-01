@@ -1,0 +1,157 @@
+<app-sidebar></app-sidebar>
+
+<div class="ml-64 min-h-screen bg-gray-50">
+  <div class="p-8">
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-900">Alerts</h1>
+      <p class="mt-1 text-gray-600">Monitor outcome spikes and in-app notifications.</p>
+    </div>
+
+    <div *ngIf="error" class="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      {{ error }}
+    </div>
+    <div *ngIf="success" class="mb-6 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+      {{ success }}
+    </div>
+
+    <div *ngIf="loading" class="flex items-center justify-center py-12">
+      <div class="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
+    </div>
+
+    <div *ngIf="!loading" class="space-y-8">
+      <section *ngIf="canManageAlerts" class="bg-white border border-gray-200 rounded-lg p-6">
+        <h2 class="mb-4 text-lg font-semibold text-gray-900">Create Alert Rule</h2>
+        <form class="grid grid-cols-1 gap-4 md:grid-cols-6" (ngSubmit)="createRule()">
+          <label class="md:col-span-2">
+            <span class="mb-1 block text-sm font-medium text-gray-700">Name</span>
+            <input
+              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              name="name"
+              [(ngModel)]="newRule.name"
+              required
+              data-testid="alert-rule-name-input"
+            />
+          </label>
+          <label>
+            <span class="mb-1 block text-sm font-medium text-gray-700">Outcome</span>
+            <select
+              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              name="outcome"
+              [(ngModel)]="newRule.outcome"
+              required
+              data-testid="alert-rule-outcome-select"
+            >
+              <option *ngIf="outcomesLoading" value="" disabled>Loading outcomes...</option>
+              <option *ngFor="let outcome of outcomes" [ngValue]="outcome.outcome_name">
+                {{ outcome.outcome_name }}
+              </option>
+            </select>
+          </label>
+          <label>
+            <span class="mb-1 block text-sm font-medium text-gray-700">Threshold</span>
+            <input
+              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              type="number"
+              min="1"
+              name="threshold"
+              [(ngModel)]="newRule.threshold"
+              required
+              data-testid="alert-rule-threshold-input"
+            />
+          </label>
+          <label>
+            <span class="mb-1 block text-sm font-medium text-gray-700">Window</span>
+            <select
+              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              name="window"
+              [(ngModel)]="newRule.window_seconds"
+            >
+              <option [ngValue]="3600">1 hour</option>
+              <option [ngValue]="21600">6 hours</option>
+              <option [ngValue]="86400">24 hours</option>
+            </select>
+          </label>
+          <label>
+            <span class="mb-1 block text-sm font-medium text-gray-700">Cooldown</span>
+            <select
+              class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              name="cooldown"
+              [(ngModel)]="newRule.cooldown_seconds"
+            >
+              <option [ngValue]="0">None</option>
+              <option [ngValue]="1800">30 minutes</option>
+              <option [ngValue]="3600">1 hour</option>
+            </select>
+          </label>
+          <div class="md:col-span-6">
+            <button
+              type="submit"
+              class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              [disabled]="saving || outcomesLoading || outcomes.length === 0"
+              data-testid="create-alert-rule-button"
+            >
+              Create Rule
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="bg-white border border-gray-200 rounded-lg">
+        <div class="border-b border-gray-200 px-6 py-4">
+          <h2 class="text-lg font-semibold text-gray-900">Alert Rules</h2>
+        </div>
+        <div *ngIf="rules.length === 0" class="px-6 py-8 text-sm text-gray-500">No alert rules configured.</div>
+        <ul *ngIf="rules.length > 0" class="divide-y divide-gray-200">
+          <li *ngFor="let rule of rules" class="flex items-center justify-between gap-4 px-6 py-4">
+            <div>
+              <p class="font-medium text-gray-900">{{ rule.name }}</p>
+              <p class="text-sm text-gray-500">
+                {{ rule.outcome }} &gt; {{ rule.threshold }} in {{ rule.window_seconds / 60 | number:'1.0-0' }} minutes
+              </p>
+            </div>
+            <button
+              type="button"
+              class="rounded-md border px-3 py-1.5 text-sm font-medium"
+              [class.border-green-200]="rule.enabled"
+              [class.text-green-700]="rule.enabled"
+              [class.border-gray-200]="!rule.enabled"
+              [class.text-gray-600]="!rule.enabled"
+              [disabled]="!canManageAlerts"
+              (click)="toggleRule(rule)"
+            >
+              {{ rule.enabled ? 'Enabled' : 'Disabled' }}
+            </button>
+          </li>
+        </ul>
+      </section>
+
+      <section class="bg-white border border-gray-200 rounded-lg">
+        <div class="border-b border-gray-200 px-6 py-4">
+          <h2 class="text-lg font-semibold text-gray-900">Incidents</h2>
+        </div>
+        <div *ngIf="incidents.length === 0" class="px-6 py-8 text-sm text-gray-500">No alert incidents yet.</div>
+        <ul *ngIf="incidents.length > 0" class="divide-y divide-gray-200">
+          <li *ngFor="let incident of incidents" class="flex items-center justify-between gap-4 px-6 py-4">
+            <div>
+              <p class="font-medium text-gray-900">{{ incident.outcome }} spike detected</p>
+              <p class="text-sm text-gray-500">
+                {{ incident.observed_count }} observed, threshold {{ incident.threshold }}.
+              </p>
+            </div>
+            <button
+              *ngIf="incident.status === 'open'"
+              type="button"
+              class="rounded-md border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-700"
+              (click)="acknowledgeIncident(incident)"
+            >
+              Acknowledge
+            </button>
+            <span *ngIf="incident.status !== 'open'" class="text-sm font-medium text-gray-500">
+              {{ incident.status }}
+            </span>
+          </li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</div>

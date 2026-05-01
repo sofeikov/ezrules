@@ -1,5 +1,12 @@
 # What's New
 
+## v1.20.0
+
+* **Outcome spike alerts**: Organisations can now define alert rules such as `CANCEL > 50 in 1 hour`, backed by the canonical served-decision ledger.
+* **Async alert detection**: Live evaluations enqueue alert checks after persistence, while a Celery beat sweeper repairs missed checks from worker restarts or queue outages.
+* **In-app notifications**: Alert incidents create org-wide in-app notifications with per-user read state and a sidebar notification bell.
+* **Extensible notification routing**: Alert incidents route through notification channels and policies so email, Slack, PagerDuty, and webhook delivery can be added without changing alert detection.
+
 ## v1.19.0
 
 * **Event Tester dry runs**: Operators with the new `submit_test_events` permission can now use **Event Tester** to run a JSON event against the current rule set from the UI without storing the event or adding it to Tested Events.

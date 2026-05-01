@@ -37,6 +37,10 @@ uv run pytest -q --cov=ezrules.backend --cov=ezrules.core --cov-report=xml tests
 - **Start Celery worker** (required for backtesting): `uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo`
 - **Generate test data**: `uv run ezrules generate-random-data --n-rules 10 --n-events 100`
 
+# Git and Pull Requests
+1. Never add `codex`, `[codex]`, or similar agent/tool branding to pull request titles.
+2. Never push branches or commits unless the user explicitly asks for a push, publish, PR creation/update, or another action that clearly requires pushing.
+
 # VS Code Launch Configs (.vscode/launch.json)
 When creating a new git worktree for this repository, copy the root `.vscode/` folder into the new worktree before starting work so all launch/run configurations remain available there.
 When working in a new git worktree, proactively ensure dependencies are installed in that worktree before starting: run `uv sync` for Python deps and make sure frontend deps are present in `ezrules/frontend/` (run `npm install` there if `node_modules` is missing) so the user does not have to do manual dependency setup.
@@ -83,7 +87,7 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 4. Any new functionality must be covered with tests.
 5. When implementing new functionality, explicitly ask the user whether permissions and audit logging should be included in scope.
 6. **FOR ANGULAR FRONTEND CHANGES**: Any new pages/navigation must have Playwright e2e tests in `ezrules/frontend/e2e/tests/` plus corresponding page objects in `e2e/pages/*.page.ts`. New or modified Playwright coverage must follow the repeated targeted verification rules below.
-7. **FOR USER-VISIBLE UI FEATURES OR WORKFLOWS**: Record a short browser demonstration against a live local stack that proves the feature works end to end. Use a private dev DB, run the backend/frontend on random high ports, save the recording artifact under `artifacts/` in the worktree, and keep the proof focused on the implemented behavior.
+7. **FOR USER-VISIBLE UI FEATURES OR WORKFLOWS**: Record a browser demonstration against a live local stack that proves the feature works end to end. Use a private dev DB, run the backend/frontend on random high ports, save the recording artifact under `artifacts/` in the worktree, and keep the proof focused on the implemented behavior. Pace demo recordings for human viewing and social sharing: move slowly, pause 1-2 seconds before and after each meaningful click/type/navigation, keep key UI states visible long enough to understand, and avoid ultra-short recordings where the workflow cannot be followed.
 8. **FOR NEW OR UPDATED FUNCTIONALITY**: Check whether `README.md`, docs pages, and `docs/assets/readme/` screenshots or GIF demos need to be updated. If the change affects a captured UI surface or a documented workflow, regenerate the relevant asset from a live local stack and zoom into the specific UI area that proves the behavior; if not, mention in the final report that screenshots/GIFs were reviewed and did not need changes.
 9. When the browser recording is generated as `.webm`, convert it to a shareable `.mp4` using H.264 + `yuv420p` + `faststart` so it can be uploaded to services such as X/Twitter. Preferred command: `ffmpeg -y -i input.webm -c:v libx264 -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k output.mp4`. File must be named accorind to the feature it demos.
 10. If a new endpoint is implemented, restart the API server if needed.

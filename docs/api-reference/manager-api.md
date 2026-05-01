@@ -215,6 +215,25 @@ Dashboard analytics source of truth:
 - Time buckets are anchored on `evaluation_decisions.evaluated_at`, so charts show when a decision was served rather than the event's business timestamp.
 - Label analytics and rule-quality endpoints use canonical `event_version_labels` joined to served decisions and event labels; label chart buckets are anchored on served decision time.
 
+### Alerts and Notifications
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/alerts/rules` | Bearer + `VIEW_ALERTS` | List outcome-threshold alert rules for the caller's org |
+| `POST` | `/api/v2/alerts/rules` | Bearer + `MANAGE_ALERTS` | Create an alert rule such as `CANCEL > 50` in a rolling window |
+| `PATCH` | `/api/v2/alerts/rules/{rule_id}` | Bearer + `MANAGE_ALERTS` | Update an alert rule's threshold, window, cooldown, outcome, or enabled state |
+| `GET` | `/api/v2/alerts/incidents` | Bearer + `VIEW_ALERTS` | List recent alert incidents for the caller's org |
+| `POST` | `/api/v2/alerts/incidents/{incident_id}/acknowledge` | Bearer + `VIEW_ALERTS` | Acknowledge an open incident |
+| `GET` | `/api/v2/notifications` | Bearer + `VIEW_ALERTS` | List in-app notifications with per-user read state |
+| `GET` | `/api/v2/notifications/unread-count` | Bearer + `VIEW_ALERTS` | Return the caller's unread notification count |
+| `POST` | `/api/v2/notifications/{notification_id}/read` | Bearer + `VIEW_ALERTS` | Mark one in-app notification as read for the caller |
+| `POST` | `/api/v2/notifications/read-all` | Bearer + `VIEW_ALERTS` | Mark all visible in-app notifications as read for the caller |
+
+Alert detection source of truth:
+- Alert rules count canonical served `evaluation_decisions` by `resolved_outcome`.
+- Evaluation-time detection is queued after the served decision is persisted; Celery beat also sweeps enabled alert rules as a repair loop.
+- V1 delivers via the in-app notification channel. Notification channel and policy tables are intentionally separate so email, Slack, PagerDuty, and webhook channels can be added later.
+
 ### Settings
 
 | Method | Path | Auth | Notes |

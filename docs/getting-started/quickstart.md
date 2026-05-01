@@ -13,7 +13,7 @@ By the end of this page, you should have:
 - one saved rule
 - one allowed outcome used by that rule
 - one successful rule test in UI
-- chart activity in **Dashboard** or **Analytics**
+- chart activity in **Dashboard** or **Analytics**, and configure spike notifications in **Alerts**
 
 ---
 
@@ -61,7 +61,7 @@ By the end of this page, you should have:
 
 1. Open [http://localhost:4200](http://localhost:4200)
 2. Sign in with your created user
-3. Confirm sidebar shows: **Dashboard**, **Rules**, **Shadow Rules**, **Rule Rollouts**, **Labels**, **Outcomes**, **Analytics**, **Rule Quality**
+3. Confirm sidebar shows: **Dashboard**, **Rules**, **Shadow Rules**, **Rule Rollouts**, **Labels**, **Outcomes**, **Analytics**, **Rule Quality**, **Alerts**
 
 ---
 

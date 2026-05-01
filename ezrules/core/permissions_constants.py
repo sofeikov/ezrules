@@ -58,6 +58,10 @@ class PermissionAction(Enum):
     # API Key Management
     MANAGE_API_KEYS = "manage_api_keys"
 
+    # Alert Management
+    VIEW_ALERTS = "view_alerts"
+    MANAGE_ALERTS = "manage_alerts"
+
     @classmethod
     def get_default_actions(cls):
         """Get list of (action_name, description, resource_type) tuples for initialization."""
@@ -98,6 +102,8 @@ class PermissionAction(Enum):
             (cls.MODIFY_FIELD_TYPES.value, "Create and update field type configurations", "field_type"),
             (cls.DELETE_FIELD_TYPE.value, "Delete field type configurations", "field_type"),
             (cls.MANAGE_API_KEYS.value, "Manage API keys for service integration", "api_key"),
+            (cls.VIEW_ALERTS.value, "View alert rules, incidents, and notifications", "alert"),
+            (cls.MANAGE_ALERTS.value, "Create and update alert rules and notification policies", "alert"),
         ]
 
 

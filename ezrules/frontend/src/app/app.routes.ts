@@ -25,6 +25,7 @@ import { ForgotPasswordComponent } from './forgot-password/forgot-password.compo
 import { ResetPasswordComponent } from './reset-password/reset-password.component';
 import { AcceptInviteComponent } from './accept-invite/accept-invite.component';
 import { SettingsComponent } from './settings/settings.component';
+import { AlertsComponent } from './alerts/alerts.component';
 import { AccessDeniedComponent } from './access-denied/access-denied.component';
 import { permissionGuard } from './auth/permission.guard';
 import { ROUTE_PERMISSION_REQUIREMENTS } from './auth/permissions';
@@ -123,6 +124,12 @@ export const routes: Routes = [
     component: SettingsComponent,
     canActivate: [authGuard, permissionGuard],
     data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.settings }
+  },
+  {
+    path: 'alerts',
+    component: AlertsComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.alerts }
   },
   {
     path: 'management/users',

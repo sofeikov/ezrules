@@ -33,6 +33,8 @@ Healthy signal:
 
 Dashboard charts use the canonical served-decision ledger. Transaction volume counts served `evaluation_decisions`, including repeated versions of the same business `event_id`; outcome and rule-activity charts count per-rule `evaluation_rule_results` for those served decisions. Time buckets are based on `evaluation_decisions.evaluated_at`, which shows when ezrules served the decision.
 
+Use **Alerts** when an outcome needs active attention instead of passive chart review. Alert rules watch the same canonical served-decision ledger as the dashboard; for example, a rule can notify when `CANCEL` exceeds `50` served decisions in a rolling one-hour window. Alert incidents are recorded and delivered to the in-app notification bell. Celery beat also sweeps alert rules on a schedule so missed queue jobs are repaired after worker restarts.
+
 ![30-day transaction volume chart](../assets/readme/dashboard-30d-volume.png)
 
 ![30-day outcome trend charts](../assets/readme/dashboard-30d-outcomes.png)
@@ -132,6 +134,9 @@ Healthy signal:
 - `GET /api/v2/analytics/labels-distribution?aggregation=30d`
 - `GET /api/v2/analytics/rule-quality?min_support=5&lookback_days=30`
 - `POST /api/v2/analytics/rule-quality/reports` then `GET /api/v2/analytics/rule-quality/reports/{report_id}`
+- `GET /api/v2/alerts/rules`
+- `GET /api/v2/alerts/incidents`
+- `GET /api/v2/notifications/unread-count`
 
 Tip: responses are structured for Chart.js (`labels` + dataset series).
 

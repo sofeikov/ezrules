@@ -19,6 +19,7 @@ from ezrules.backend.api_v2.auth.dependencies import (
     get_org_id_for_api_key,
 )
 from ezrules.backend.api_v2.routes import (
+    alerts,
     analytics,
     api_keys,
     audit,
@@ -145,6 +146,9 @@ app.include_router(labels.router)
 
 # Analytics routes: /api/v2/analytics/*
 app.include_router(analytics.router)
+
+# Alert and notification routes: /api/v2/alerts/*, /api/v2/notifications/*
+app.include_router(alerts.router)
 
 # Users routes: /api/v2/users/*
 app.include_router(users.router)

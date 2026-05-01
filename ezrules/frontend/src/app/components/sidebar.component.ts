@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { PermissionRequirement, ROUTE_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
+import { NotificationBellComponent } from './notification-bell.component';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, NotificationBellComponent],
   template: `
     <div class="w-64 bg-gray-900 text-white h-screen fixed left-0 top-0 flex flex-col">
       <div class="p-6">
@@ -104,6 +105,14 @@ import { PermissionRequirement, ROUTE_PERMISSION_REQUIREMENTS, hasPermissionRequ
           <span>Audit Trail</span>
         </a>
 
+        <a *ngIf="canAccess(routePermissions.alerts)" href="/alerts" [ngClass]="linkClasses('/alerts')">
+          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.74-2.99L13.74 4a2 2 0 00-3.48 0L3.33 16.01A2 2 0 005.07 19z" />
+          </svg>
+          <span>Alerts</span>
+        </a>
+
         <a *ngIf="canAccess(routePermissions.users)" href="/management/users" [ngClass]="linkClasses('/management/users')">
           <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -149,7 +158,10 @@ import { PermissionRequirement, ROUTE_PERMISSION_REQUIREMENTS, hasPermissionRequ
       </nav>
 
       <div class="p-4 border-t border-gray-700 flex-shrink-0">
-        <p class="text-xs text-gray-400 truncate mb-2">{{ userEmail }}</p>
+        <div class="mb-2 flex items-center justify-between gap-3">
+          <p class="truncate text-xs text-gray-400">{{ userEmail }}</p>
+          <app-notification-bell *ngIf="canAccess(routePermissions.alerts)"></app-notification-bell>
+        </div>
         <button
           (click)="onLogout()"
           class="flex items-center text-gray-300 hover:text-white transition-colors text-sm"

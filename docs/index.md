@@ -44,6 +44,7 @@ ezrules provides building blocks to define rule-based decisions, evaluate live e
 - **Role-Based Access Control** - Granular permissions with 32 distinct actions that can be assigned per role
 - **Transaction Labeling** - Label events through REST API flows and analyze label trends in the UI
 - **Analytics Dashboard** - Monitor transaction volume and outcome trends with configurable time ranges
+- **Outcome Spike Alerts** - Notify operators in-app when configured outcomes exceed rolling thresholds
 - **Audit Trail** - Track rule revisions plus user list, outcome, label, and configuration history for compliance requirements
 
 ---
@@ -57,7 +58,7 @@ ezrules provides building blocks to define rule-based decisions, evaluate live e
 | **API Service** | Unified FastAPI service for rule management and real-time evaluation at `/api/v2/evaluate` |
 | **Security** | 32 permission actions with role-based access control |
 | **Labeling** | API and bulk CSV upload for transaction labels |
-| **Analytics** | Time-series charts with 1h, 6h, 12h, 24h, 30d ranges |
+| **Analytics & Alerts** | Time-series charts with 1h, 6h, 12h, 24h, 30d ranges plus outcome spike notifications |
 | **Database** | PostgreSQL backend with SQLAlchemy ORM |
 | **Audit Trail** | History for rules, config, user lists, outcomes, and labels |
 | **Backtesting** | Test rule changes against historical data |
