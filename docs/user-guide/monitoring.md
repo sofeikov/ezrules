@@ -31,7 +31,7 @@ Healthy signal:
 - outcome lines change after rule updates or test submissions
 - the rule-detail performance chart shows the same rule generating plausible outcome counts in the time window you selected
 
-Dashboard charts use the canonical served-decision ledger. Transaction volume counts served `evaluation_decisions`, including repeated versions of the same business `event_id`; outcome and rule-activity charts count per-rule `evaluation_rule_results` for those served decisions. Time buckets are based on `evaluation_decisions.evaluated_at`, which shows when ezrules served the decision.
+Dashboard charts use the canonical served-decision ledger filtered to current transaction projections. Transaction volume counts current served `evaluation_decisions` per `transaction_id`; outcome and rule-activity charts count per-rule `evaluation_rule_results` for those current decisions. Time buckets are based on `evaluation_decisions.evaluated_at`, which shows when ezrules served the decision.
 
 Use **Alerts** when an outcome needs active attention instead of passive chart review. Alert rules watch the same canonical served-decision ledger as the dashboard; for example, a rule can notify when `CANCEL` exceeds `50` served decisions in a rolling one-hour window. Alert incidents are recorded and delivered to the in-app notification bell. Celery beat also sweeps alert rules on a schedule so missed queue jobs are repaired after worker restarts.
 

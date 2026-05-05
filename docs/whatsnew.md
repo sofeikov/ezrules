@@ -1,5 +1,12 @@
 # What's New
 
+## v1.21.0
+
+* **Transaction lifecycle contract**: Live evaluation now uses `transaction_id`, `effective_at`, and `observed_at` to separate stable transaction identity from append-only event versions.
+* **Duplicate-safe evaluator writes**: Exact duplicate transaction versions now return the original evaluation with `evaluation_status=duplicate` instead of creating duplicate versions, decisions, alerts, shadow work, or field-observation side effects.
+* **Current transaction projection**: New versions update `transaction_current_versions` when they become current, mark prior current decisions superseded, and leave late-arriving or post-terminal versions as historical records.
+* **Evaluation status responses**: `POST /api/v2/evaluate` now reports `new`, `duplicate`, or `superseding` plus `event_version_id`, `evaluation_id`, and current-projection state.
+
 ## v1.20.0
 
 * **Outcome spike alerts**: Organisations can now define alert rules such as `CANCEL > 50 in 1 hour`, backed by the canonical served-decision ledger.

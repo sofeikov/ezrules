@@ -24,7 +24,7 @@ Pass the raw key in the `X-API-Key` header:
 curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "X-API-Key: ezrk_<your-key>" \
   -H "Content-Type: application/json" \
-  -d '{"event_id": "evt_1", "event_timestamp": 1700000000, "event_data": {}}'
+  -d '{"transaction_id": "txn_1", "effective_at": "2026-04-23T12:00:00Z", "event_data": {}}'
 ```
 
 API keys are created via `POST /api/v2/api-keys` (requires `MANAGE_API_KEYS` permission).
@@ -38,7 +38,7 @@ Pass a valid JWT access token obtained from `POST /api/v2/auth/login`:
 curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
-  -d '{"event_id": "evt_1", "event_timestamp": 1700000000, "event_data": {}}'
+  -d '{"transaction_id": "txn_1", "effective_at": "2026-04-23T12:00:00Z", "event_data": {}}'
 ```
 
 `/api/v2/event-tests` accepts bearer-token user sessions only and requires the `submit_test_events` permission.
@@ -49,9 +49,9 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
 
 `POST /api/v2/evaluate`
 
-Evaluates an event against the current rule configuration, resolves any conflicting outcomes using the configured outcome hierarchy, and stores evaluation results in the canonical evaluation ledger.
+Evaluates a transaction version against the current rule configuration, resolves any conflicting outcomes using the configured outcome hierarchy, and stores evaluation results in the canonical evaluation ledger.
 
-Each successful request appends an event version for the supplied `event_id` and writes an immutable served-decision record linked to that exact version. Re-submitting the same business event with new facts creates a later event version; replay/debug tooling can therefore distinguish "what was served then" from the latest known state of the event.
+Each successful non-duplicate request appends an event version for the supplied `transaction_id` and writes an immutable served-decision record linked to that exact version. Re-submitting the same `transaction_id`, `effective_at`, payload hash, and terminal flag returns the existing evaluation with `evaluation_status=duplicate`. Re-submitting the transaction with new facts creates a later event version; if it becomes current, the prior current decision is marked superseded.
 
 #### Allowlist Short-Circuiting
 
@@ -67,8 +67,10 @@ Allowlist rules must return the configured neutral outcome using `!OUTCOME` synt
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `event_id` | `string` | Yes | Unique event identifier |
-| `event_timestamp` | `integer` | Yes | Unix timestamp |
+| `transaction_id` | `string` | Yes | Stable real-world transaction identifier |
+| `effective_at` | `datetime` | Yes | When this version became true in the source system |
+| `observed_at` | `datetime` | No | When this version was observed; defaults to evaluator ingest time |
+| `terminal_state` | `boolean` | No | Whether this version closes the transaction lifecycle |
 | `event_data` | `object` | Yes | Event payload used by rules (fields accessed via `$field`) |
 
 #### Example Request
@@ -78,8 +80,9 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "X-API-Key: ezrk_<your-key>" \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "evt_123456",
-    "event_timestamp": 1700000000,
+    "transaction_id": "txn_123456",
+    "effective_at": "2026-04-23T12:00:00Z",
+    "observed_at": "2026-04-23T12:00:03Z",
     "event_data": {
       "amount": 15000,
       "user_id": "user_42",
@@ -92,6 +95,7 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
 
 ```json
 {
+  "transaction_id": "txn_123456",
   "outcome_counters": {
     "HOLD": 1
   },
@@ -103,13 +107,17 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
     "7": "HOLD"
   },
   "event_version": 1,
-  "evaluation_decision_id": 42
+  "event_version_id": 81,
+  "evaluation_id": 42,
+  "evaluation_status": "new",
+  "is_current": true,
+  "superseded_evaluation_id": null
 }
 ```
 
 `resolved_outcome` is the highest-severity outcome after applying the ordering configured under **Settings → Outcome Resolution**.
 
-`event_version` is the append-only version number for the supplied `event_id` within the caller's organisation. `evaluation_decision_id` identifies the immutable served-decision record used by Tested Events, rollout/shadow provenance, replay, and downstream analysis.
+`event_version` is the append-only version number for the supplied `transaction_id` within the caller's organisation. `event_version_id` identifies the immutable payload version; `evaluation_id` identifies the immutable served-decision record used by Tested Events, rollout/shadow provenance, replay, and downstream analysis. `evaluation_status` is `new`, `duplicate`, or `superseding`.
 
 When allowlist rules match, `resolved_outcome` is derived from the allowlist result and the main rules do not contribute to the returned evaluation.
 
@@ -170,8 +178,8 @@ curl -X POST http://localhost:8888/api/v2/event-tests \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "dry_run_123",
-    "event_timestamp": 1700000000,
+    "transaction_id": "dry_run_123",
+    "effective_at": "2026-04-23T12:00:00Z",
     "event_data": {
       "amount": 15000,
       "user_id": "user_42",
@@ -184,6 +192,7 @@ curl -X POST http://localhost:8888/api/v2/event-tests \
 
 ```json
 {
+  "transaction_id": "dry_run_123",
   "dry_run": true,
   "skipped_main_rules": false,
   "outcome_counters": {
@@ -197,7 +206,11 @@ curl -X POST http://localhost:8888/api/v2/event-tests \
     "7": "HOLD"
   },
   "event_version": null,
-  "evaluation_decision_id": null,
+  "event_version_id": null,
+  "evaluation_id": null,
+  "evaluation_status": "new",
+  "is_current": null,
+  "superseded_evaluation_id": null,
   "all_rule_results": {
     "7": "HOLD",
     "8": null
@@ -215,7 +228,7 @@ curl -X POST http://localhost:8888/api/v2/event-tests \
 }
 ```
 
-`event_version` and `evaluation_decision_id` are always `null` for dry runs.
+`event_version`, `event_version_id`, and `evaluation_id` are always `null` for dry runs.
 
 #### Status Codes
 
@@ -253,10 +266,10 @@ Validation error (`422`):
   "detail": [
     {
       "type": "missing",
-      "loc": ["body", "event_id"],
+      "loc": ["body", "transaction_id"],
       "msg": "Field required",
       "input": {
-        "event_timestamp": 1700000000,
+        "effective_at": "2026-04-23T12:00:00Z",
         "event_data": {"amount": 100}
       }
     }

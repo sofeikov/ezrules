@@ -39,8 +39,8 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "txn_1001",
-    "event_timestamp": 1700000000,
+    "transaction_id": "txn_1001",
+    "effective_at": "2026-04-23T12:00:00Z",
     "event_data": {
       "amount": 15000,
       "user_id": "user_42"
@@ -50,6 +50,9 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
 
 Expected response fields:
 
+- `evaluation_status`
+- `evaluation_id`
+- `event_version_id`
 - `rule_results`
 - `outcome_counters`
 - `outcome_set`
@@ -63,7 +66,7 @@ curl -X POST http://localhost:8888/api/v2/labels/mark-event \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "txn_1001",
+    "transaction_id": "txn_1001",
     "label_name": "FRAUD"
   }'
 ```

@@ -30,12 +30,12 @@ Common examples:
 
 1. Open **Labels**.
 2. Ensure the label names you use operationally exist (`FRAUD`, `NORMAL`, `CHARGEBACK`, etc.).
-3. Upload `event_id,label_name` rows from the CSV section on the page.
+3. Upload `transaction_id,label_name` rows from the CSV section on the page.
 4. Confirm changes in **Analytics**.
 
 API alternatives are listed in **Automation Appendix** below.
 
-Create `labels.csv` with no header row and exactly two columns (`event_id,label_name`) when using CSV workflows.
+Create `labels.csv` with no header row and exactly two columns (`transaction_id,label_name`) when using CSV workflows.
 
 Example:
 
@@ -185,7 +185,7 @@ curl -X POST http://localhost:8888/api/v2/labels/mark-event \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "txn_123",
+    "transaction_id": "txn_123",
     "label_name": "FRAUD"
   }'
 ```

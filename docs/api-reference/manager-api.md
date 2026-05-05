@@ -176,8 +176,8 @@ Rule lifecycle fields on rule responses:
 | `GET` | `/api/v2/labels` | Bearer + permission | List labels in the caller's org |
 | `POST` | `/api/v2/labels` | Bearer + permission | Create label in the caller's org |
 | `POST` | `/api/v2/labels/bulk` | Bearer + permission | Create labels in bulk in the caller's org |
-| `POST` | `/api/v2/labels/mark-event` | Bearer + permission | Mark a canonical served event version in the caller's org; omitting `event_version` labels the latest served version for that `event_id` |
-| `POST` | `/api/v2/labels/upload` | Bearer + permission | CSV upload for canonical served event versions in the caller's org (`event_id,label_name` or `event_id,event_version,label_name`) with row-level success/error reporting |
+| `POST` | `/api/v2/labels/mark-event` | Bearer + permission | Mark a canonical served transaction version in the caller's org; omitting `event_version` labels the current served version for that `transaction_id` |
+| `POST` | `/api/v2/labels/upload` | Bearer + permission | CSV upload for canonical served transaction versions in the caller's org (`transaction_id,label_name` or `transaction_id,event_version,label_name`) with row-level success/error reporting |
 | `DELETE` | `/api/v2/labels/{label_name}` | Bearer + permission | Delete label from the caller's org |
 
 ### Analytics
@@ -370,8 +370,8 @@ Backtest task result note:
 | `POST` | `/api/v2/evaluate` | API key or Bearer | Evaluate one event against active rules |
 
 Evaluator storage note:
-- `POST /api/v2/evaluate` persists append-only event versions, immutable served decisions, and per-rule results. Served decisions can then be reviewed via `GET /api/v2/tested-events`.
-- Each successful response includes `event_version` and `evaluation_decision_id` so callers can correlate a served response with the canonical ledger.
+- `POST /api/v2/evaluate` persists append-only event versions, immutable served decisions, current transaction projections, and per-rule results. Served decisions can then be reviewed via `GET /api/v2/tested-events`.
+- Each non-duplicate response includes `event_version`, `event_version_id`, and `evaluation_id`; exact duplicates return the original identifiers with `evaluation_status=duplicate`.
 - If required-field validation or strict rule lookup fails, the request returns `400` and nothing is persisted.
 
 ## API Conventions

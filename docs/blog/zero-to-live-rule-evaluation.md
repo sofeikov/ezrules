@@ -51,8 +51,8 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "txn_live_001",
-    "event_timestamp": 1700000000,
+    "transaction_id": "txn_live_001",
+    "effective_at": 1700000000,
     "event_data": {
       "amount": 15000,
       "user_id": "user_42"
