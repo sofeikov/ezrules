@@ -159,7 +159,7 @@ Rule lifecycle fields on rule responses:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/tested-events` | Bearer + `VIEW_RULES` | Recent stored event evaluations with uploaded `label_name`, raw payload, and triggered rules (`?limit=50`). Add `include_referenced_fields=true` to include each rule's referenced top-level fields. |
+| `GET` | `/api/v2/tested-events` | Bearer + `VIEW_RULES` | Recent stored event evaluations with uploaded `label_name`, transaction lifecycle timestamps (`first_effective_at`, `first_observed_at`), raw payload, and triggered rules (`?limit=50`). Add `include_referenced_fields=true` to include each rule's referenced top-level fields. |
 
 ### Outcomes
 
@@ -370,7 +370,7 @@ Backtest task result note:
 | `POST` | `/api/v2/evaluate` | API key or Bearer | Evaluate one event against active rules |
 
 Evaluator storage note:
-- `POST /api/v2/evaluate` persists append-only event versions, immutable served decisions, current transaction projections, and per-rule results. Served decisions can then be reviewed via `GET /api/v2/tested-events`.
+- `POST /api/v2/evaluate` persists append-only event versions, immutable served decisions, current transaction projections with first/current lifecycle timestamps, and per-rule results. Served decisions can then be reviewed via `GET /api/v2/tested-events`.
 - Each non-duplicate response includes `event_version`, `event_version_id`, and `evaluation_id`; exact duplicates return the original identifiers with `evaluation_status=duplicate`.
 - If required-field validation or strict rule lookup fails, the request returns `400` and nothing is persisted.
 

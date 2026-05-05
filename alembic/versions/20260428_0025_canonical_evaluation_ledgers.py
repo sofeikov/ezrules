@@ -50,7 +50,7 @@ def upgrade() -> None:
     op.create_index(
         "ix_event_versions_o_id_transaction_hash",
         "event_versions",
-        ["o_id", "transaction_id", "payload_hash", "effective_at"],
+        ["o_id", "transaction_id", "payload_hash", "effective_at", "observed_at"],
     )
     op.create_index("ix_event_versions_o_id_effective_at", "event_versions", ["o_id", "effective_at"])
     op.create_index("ix_event_versions_o_id_ingested_at", "event_versions", ["o_id", "ingested_at"])
@@ -108,6 +108,8 @@ def upgrade() -> None:
         sa.Column("transaction_id", sa.String(), nullable=False),
         sa.Column("current_ev_id", sa.Integer(), nullable=False),
         sa.Column("current_ed_id", sa.Integer(), nullable=False),
+        sa.Column("first_effective_at", sa.DateTime(), nullable=False),
+        sa.Column("first_observed_at", sa.DateTime(), nullable=False),
         sa.Column("current_effective_at", sa.DateTime(), nullable=False),
         sa.Column("current_observed_at", sa.DateTime(), nullable=False),
         sa.Column("terminal_state", sa.Boolean(), nullable=False),
@@ -123,6 +125,11 @@ def upgrade() -> None:
         "ix_transaction_current_o_id_effective_at",
         "transaction_current_versions",
         ["o_id", "current_effective_at"],
+    )
+    op.create_index(
+        "ix_transaction_current_o_id_first_effective_at",
+        "transaction_current_versions",
+        ["o_id", "first_effective_at"],
     )
 
     op.create_table(
@@ -185,6 +192,7 @@ def downgrade() -> None:
     op.drop_index("ix_evaluation_rule_results_ed_id_r_id", table_name="evaluation_rule_results")
     op.drop_table("evaluation_rule_results")
 
+    op.drop_index("ix_transaction_current_o_id_first_effective_at", table_name="transaction_current_versions")
     op.drop_index("ix_transaction_current_o_id_effective_at", table_name="transaction_current_versions")
     op.drop_table("transaction_current_versions")
 
