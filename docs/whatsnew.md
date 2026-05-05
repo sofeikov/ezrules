@@ -4,6 +4,7 @@
 
 * **Canonical business journey contract**: Added a deterministic evaluation universe with fixed outcomes, rules, user lists, and transaction scenarios that prove core `/api/v2/evaluate` behavior through the real PostgreSQL-backed API path.
 * **Product journey regression coverage**: Added deterministic journeys for rule authoring through served decisions, dry-run isolation, Tested Events explainability, pause/resume serving changes, and no-side-effect negative paths.
+* **Extended product workflow proof**: Added deterministic coverage for permission grant/revoke behavior, rule edit promotion semantics, user-list driven serving changes, label-backed rule-quality analytics, audit trail reads, and rollout candidate provenance.
 * **Business gate in CI**: Added a dedicated GitHub Actions workflow that runs the canonical business journey suite on pull requests and main-branch pushes.
 
 ## v1.21.0
