@@ -1,5 +1,10 @@
 # What's New
 
+## v1.21.1
+
+* **Canonical business journey contract**: Added a deterministic evaluation universe with fixed outcomes, rules, user lists, and transaction scenarios that prove core `/api/v2/evaluate` behavior through the real PostgreSQL-backed API path.
+* **Business gate in CI**: Added a dedicated GitHub Actions workflow that runs the canonical business journey suite on pull requests and main-branch pushes.
+
 ## v1.21.0
 
 * **Transaction lifecycle contract**: Live evaluation now uses `transaction_id`, `effective_at`, and `observed_at` to separate stable transaction identity from append-only event versions.
