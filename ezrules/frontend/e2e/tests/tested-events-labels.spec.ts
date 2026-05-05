@@ -23,8 +23,8 @@ async function createEvaluatedEvent(request: APIRequestContext, eventId: string)
   const response = await request.post(`${API_BASE}/api/v2/evaluate`, {
     headers: authHeaders(),
     data: {
-      event_id: eventId,
-      event_timestamp: Math.floor(Date.now() / 1000),
+      transaction_id: eventId,
+      effective_at: Math.floor(Date.now() / 1000),
       event_data: {
         amount: 245,
         currency: 'USD',
@@ -89,5 +89,7 @@ test.describe('Tested Events Labels', () => {
     const labeledRow = page.locator('[data-testid="tested-event-row"]').filter({ hasText: eventId }).first();
     await expect(labeledRow).toBeVisible();
     await expect(labeledRow.locator('[data-testid="tested-event-label"]')).toContainText(labelName);
+    await expect(labeledRow.locator('[data-testid="tested-event-lifecycle"]')).toContainText('Originated');
+    await expect(labeledRow.locator('[data-testid="tested-event-lifecycle"]')).toContainText('First seen');
   });
 });

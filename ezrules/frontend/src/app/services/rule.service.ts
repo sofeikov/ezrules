@@ -175,8 +175,8 @@ export interface ShadowResultItem {
   evaluation_decision_id: number;
   r_id: number;
   rule_result: string;
-  event_id: string;
-  event_timestamp: number;
+  transaction_id: string;
+  effective_at: string;
   created_at: string | null;
 }
 
@@ -230,8 +230,8 @@ export interface RolloutResultItem {
   control_result: string | null;
   candidate_result: string | null;
   returned_result: string | null;
-  event_id: string;
-  event_timestamp: number;
+  transaction_id: string;
+  effective_at: string;
   created_at: string | null;
 }
 

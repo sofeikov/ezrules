@@ -84,8 +84,8 @@ const DEFAULT_EVENT_PAYLOAD: Record<string, unknown> = {
   templateUrl: './event-tester.component.html'
 })
 export class EventTesterComponent implements OnInit {
-  eventId = '';
-  eventTimestamp = 0;
+  transactionId = '';
+  effectiveAt = 0;
   eventJson = '';
   testing = false;
   error: string | null = null;
@@ -98,8 +98,8 @@ export class EventTesterComponent implements OnInit {
   }
 
   resetExample(): void {
-    this.eventId = `test_evt_${Date.now()}`;
-    this.eventTimestamp = Math.floor(Date.now() / 1000);
+    this.transactionId = `test_txn_${Date.now()}`;
+    this.effectiveAt = Math.floor(Date.now() / 1000);
     this.eventJson = JSON.stringify(
       DEFAULT_EVENT_PAYLOAD,
       null,
@@ -128,8 +128,8 @@ export class EventTesterComponent implements OnInit {
 
     this.testing = true;
     this.eventTestService.runTest({
-      event_id: this.eventId.trim() || `test_evt_${Date.now()}`,
-      event_timestamp: Number(this.eventTimestamp),
+      transaction_id: this.transactionId.trim() || `test_txn_${Date.now()}`,
+      effective_at: Number(this.effectiveAt),
       event_data: eventData,
     }).subscribe({
       next: (response) => {

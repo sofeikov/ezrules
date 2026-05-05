@@ -62,8 +62,8 @@ async function createEvaluatedEvent(
   const response = await request.post(`${API_BASE}/api/v2/evaluate`, {
     headers: authHeaders(),
     data: {
-      event_id: eventId,
-      event_timestamp: eventTimestamp,
+      transaction_id: eventId,
+      effective_at: eventTimestamp,
       event_data: buildEvaluatedEventData(eventId, amount),
     },
   });

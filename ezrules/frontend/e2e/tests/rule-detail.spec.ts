@@ -287,8 +287,8 @@ test.describe('Rule Detail Page', () => {
         const evaluateResponse = await request.post(`${API_BASE}/api/v2/evaluate`, {
           headers: { Authorization: `Bearer ${getAuthToken()}` },
           data: {
-            event_id: eventId,
-            event_timestamp: timestamp + index,
+            transaction_id: eventId,
+            effective_at: timestamp + index,
             event_data: buildEvaluatedEventData(eventId, amount),
           },
         });

@@ -23,8 +23,8 @@ async function createEvaluatedEvent(request: APIRequestContext, eventId: string)
   const response = await request.post(`${API_BASE}/api/v2/evaluate`, {
     headers: authHeaders(),
     data: {
-      event_id: eventId,
-      event_timestamp: Math.floor(Date.now() / 1000),
+      transaction_id: eventId,
+      effective_at: Math.floor(Date.now() / 1000),
       event_data: {
         amount: 125,
         currency: 'USD',
@@ -104,6 +104,6 @@ test.describe('Labels CSV Upload', () => {
     await expect(labelsPage.uploadSummary).toHaveText('1 row processed');
     await expect(labelsPage.uploadResult).toContainText('0 applied');
     await expect(labelsPage.uploadResult).toContainText('1 failed');
-    await expect(labelsPage.uploadErrors).toContainText(`Served event with id '${missingEventId}' not found`);
+    await expect(labelsPage.uploadErrors).toContainText(`Served transaction with id '${missingEventId}' not found`);
   });
 });

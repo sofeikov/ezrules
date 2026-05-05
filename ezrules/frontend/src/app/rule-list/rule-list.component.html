@@ -41,7 +41,7 @@
             </p>
             <p class="text-sm text-gray-700 mb-2">Test example:</p>
             <div class="bg-gray-900 text-gray-100 p-3 rounded text-xs font-mono overflow-x-auto">
-              curl -X POST -H "Content-Type: application/json" -d '&#123;"event_timestamp":23, "event_id":"123", "event_data":&#123;"age": 25, "amount": 9000&#125;&#125;' {{ evaluateEndpoint }}
+              curl -X POST -H "Content-Type: application/json" -d '&#123;"effective_at":23, "transaction_id":"123", "event_data":&#123;"age": 25, "amount": 9000&#125;&#125;' {{ evaluateEndpoint }}
             </div>
           </div>
         </div>

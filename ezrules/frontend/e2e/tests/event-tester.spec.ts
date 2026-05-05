@@ -77,7 +77,7 @@ test.describe('Event Tester Page', () => {
       });
       expect(testedEventsResponse.ok()).toBeTruthy();
       const testedEvents = await testedEventsResponse.json();
-      expect(testedEvents.events.some((event: { event_id: string }) => event.event_id === eventId)).toBe(false);
+      expect(testedEvents.events.some((event: { transaction_id: string }) => event.transaction_id === eventId)).toBe(false);
     } finally {
       await request.delete(`${API_BASE}/api/v2/rules/${ruleId}`, { headers });
     }
