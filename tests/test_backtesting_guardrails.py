@@ -32,8 +32,10 @@ def _create_rule(session, *, rid: str, logic: str):
     return org, rule
 
 
-def _insert_record(session, *, org_id: int, event_id: str, event: dict):
-    add_served_decision(session, org_id=org_id, event_id=event_id, event_timestamp=1700000000, event_data=event)
+def _insert_record(session, *, org_id: int, transaction_id: str, event: dict):
+    add_served_decision(
+        session, org_id=org_id, transaction_id=transaction_id, effective_at=1700000000, event_data=event
+    )
 
 
 @pytest.fixture(scope="function")
@@ -92,8 +94,8 @@ class TestBacktestingGuardrails:
             logic="if $amount > 100:\n\treturn !HOLD",
         )
         session.add(FieldTypeConfig(field_name="amount", configured_type="integer", o_id=org.o_id))
-        _insert_record(session, org_id=org.o_id, event_id="cast-1", event={"amount": "150"})
-        _insert_record(session, org_id=org.o_id, event_id="cast-2", event={"amount": "50"})
+        _insert_record(session, org_id=org.o_id, transaction_id="cast-1", event={"amount": "150"})
+        _insert_record(session, org_id=org.o_id, transaction_id="cast-2", event={"amount": "50"})
         session.commit()
 
         result = backtest_rule_change(rule.r_id, "if $amount > 120:\n\treturn !BLOCK", int(org.o_id))
@@ -112,9 +114,9 @@ class TestBacktestingGuardrails:
             rid="BT_GUARD_002",
             logic="if $amount > 100:\n\treturn !HOLD",
         )
-        _insert_record(session, org_id=org.o_id, event_id="subset-1", event={"amount": 150, "country": "US"})
-        _insert_record(session, org_id=org.o_id, event_id="subset-2", event={"amount": 150})
-        _insert_record(session, org_id=org.o_id, event_id="subset-3", event={"amount": 50, "country": "US"})
+        _insert_record(session, org_id=org.o_id, transaction_id="subset-1", event={"amount": 150, "country": "US"})
+        _insert_record(session, org_id=org.o_id, transaction_id="subset-2", event={"amount": 150})
+        _insert_record(session, org_id=org.o_id, transaction_id="subset-3", event={"amount": 50, "country": "US"})
         session.commit()
 
         result = backtest_rule_change(
@@ -138,8 +140,10 @@ class TestBacktestingGuardrails:
             logic="if $amount > 100:\n\treturn !HOLD",
         )
         session.add(FieldTypeConfig(field_name="merchant_id", configured_type="string", required=True, o_id=org.o_id))
-        _insert_record(session, org_id=org.o_id, event_id="required-1", event={"amount": 150})
-        _insert_record(session, org_id=org.o_id, event_id="required-2", event={"amount": 200, "merchant_id": "m-1"})
+        _insert_record(session, org_id=org.o_id, transaction_id="required-1", event={"amount": 150})
+        _insert_record(
+            session, org_id=org.o_id, transaction_id="required-2", event={"amount": 200, "merchant_id": "m-1"}
+        )
         session.commit()
 
         result = backtest_rule_change(rule.r_id, "if $amount > 120:\n\treturn !BLOCK", int(org.o_id))
@@ -157,8 +161,8 @@ class TestBacktestingGuardrails:
             rid="BT_GUARD_004",
             logic="if $amount > 100:\n\treturn !HOLD",
         )
-        _insert_record(session, org_id=org.o_id, event_id="api-1", event={"amount": 150, "country": "US"})
-        _insert_record(session, org_id=org.o_id, event_id="api-2", event={"amount": 200})
+        _insert_record(session, org_id=org.o_id, transaction_id="api-1", event={"amount": 150, "country": "US"})
+        _insert_record(session, org_id=org.o_id, transaction_id="api-2", event={"amount": 200})
         session.commit()
 
         trigger_response = backtest_guardrail_client.post(

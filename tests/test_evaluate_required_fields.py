@@ -32,8 +32,8 @@ class TestEvaluateRequiredFieldContracts:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "required_missing_eval",
-                    "event_timestamp": 1700000000,
+                    "transaction_id": "required_missing_eval",
+                    "effective_at": 1700000000,
                     "event_data": {"country": "US"},
                 },
                 headers={"X-API-Key": live_api_key},
@@ -45,7 +45,7 @@ class TestEvaluateRequiredFieldContracts:
         assert "amount" in response.json()["detail"]
         assert (
             session.query(EvaluationDecision)
-            .filter(EvaluationDecision.event_id == "required_missing_eval", EvaluationDecision.o_id == org.o_id)
+            .filter(EvaluationDecision.transaction_id == "required_missing_eval", EvaluationDecision.o_id == org.o_id)
             .count()
             == 0
         )
@@ -64,8 +64,8 @@ class TestEvaluateRequiredFieldContracts:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "required_null_eval",
-                    "event_timestamp": 1700000000,
+                    "transaction_id": "required_null_eval",
+                    "effective_at": 1700000000,
                     "event_data": {"amount": None},
                 },
                 headers={"X-API-Key": live_api_key},
@@ -77,7 +77,7 @@ class TestEvaluateRequiredFieldContracts:
         assert "amount" in response.json()["detail"]
         assert (
             session.query(EvaluationDecision)
-            .filter(EvaluationDecision.event_id == "required_null_eval", EvaluationDecision.o_id == org.o_id)
+            .filter(EvaluationDecision.transaction_id == "required_null_eval", EvaluationDecision.o_id == org.o_id)
             .count()
             == 0
         )
@@ -94,8 +94,8 @@ class TestEvaluateRequiredFieldContracts:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "strict_lookup_missing_eval",
-                    "event_timestamp": 1700000000,
+                    "transaction_id": "strict_lookup_missing_eval",
+                    "effective_at": 1700000000,
                     "event_data": {"amount": 100},
                 },
                 headers={"X-API-Key": live_api_key},
@@ -108,7 +108,9 @@ class TestEvaluateRequiredFieldContracts:
         assert "lookup failed" in response.json()["detail"]
         assert (
             session.query(EvaluationDecision)
-            .filter(EvaluationDecision.event_id == "strict_lookup_missing_eval", EvaluationDecision.o_id == org.o_id)
+            .filter(
+                EvaluationDecision.transaction_id == "strict_lookup_missing_eval", EvaluationDecision.o_id == org.o_id
+            )
             .count()
             == 0
         )

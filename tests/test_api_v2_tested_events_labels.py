@@ -62,13 +62,13 @@ def _save_rule_config(session, org_id: int) -> None:
     config_producer.save_config(rule_manager)
 
 
-def _store_event(session, org_id: int, event_id: str, event_timestamp: int, event_data: dict) -> None:
+def _store_event(session, org_id: int, transaction_id: str, effective_at: int, event_data: dict) -> None:
     executor = LocalRuleExecutorSQL(db=session, o_id=org_id)
     eval_and_store(
         executor,
         Event(
-            event_id=event_id,
-            event_timestamp=event_timestamp,
+            transaction_id=transaction_id,
+            effective_at=effective_at,
             event_data=event_data,
         ),
     )
@@ -91,7 +91,7 @@ def test_returns_uploaded_label_name_for_labeled_events(session, tested_events_c
         session.query(EventVersion)
         .filter(
             EventVersion.o_id == org.o_id,
-            EventVersion.event_id == "evt-labeled",
+            EventVersion.transaction_id == "evt-labeled",
         )
         .one()
     )
@@ -112,8 +112,8 @@ def test_returns_uploaded_label_name_for_labeled_events(session, tested_events_c
     latest_event = data["events"][0]
     older_event = data["events"][1]
 
-    assert latest_event["event_id"] == "evt-unlabeled"
+    assert latest_event["transaction_id"] == "evt-unlabeled"
     assert latest_event["label_name"] is None
 
-    assert older_event["event_id"] == "evt-labeled"
+    assert older_event["transaction_id"] == "evt-labeled"
     assert older_event["label_name"] == label.label

@@ -86,20 +86,20 @@ def labeled_backtest_fixture(session):
     session.commit()
 
     records = [
-        {"event_id": "quality_evt_1", "amount": 200, "label": fraud_label},
-        {"event_id": "quality_evt_2", "amount": 180, "label": fraud_label},
-        {"event_id": "quality_evt_3", "amount": 120, "label": normal_label},
-        {"event_id": "quality_evt_4", "amount": 80, "label": normal_label},
-        {"event_id": "quality_evt_5", "amount": 220, "label": None},
-        {"event_id": "quality_evt_6", "amount": 60, "label": None},
+        {"transaction_id": "quality_evt_1", "amount": 200, "label": fraud_label},
+        {"transaction_id": "quality_evt_2", "amount": 180, "label": fraud_label},
+        {"transaction_id": "quality_evt_3", "amount": 120, "label": normal_label},
+        {"transaction_id": "quality_evt_4", "amount": 80, "label": normal_label},
+        {"transaction_id": "quality_evt_5", "amount": 220, "label": None},
+        {"transaction_id": "quality_evt_6", "amount": 60, "label": None},
     ]
 
     for index, record in enumerate(records):
         add_served_decision(
             session,
             org_id=int(org.o_id),
-            event_id=record["event_id"],
-            event_timestamp=1_900_000 + index,
+            transaction_id=record["transaction_id"],
+            effective_at=1_900_000 + index,
             event_data={"amount": record["amount"]},
             label=record["label"],
         )

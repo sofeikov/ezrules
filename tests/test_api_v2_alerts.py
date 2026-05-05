@@ -77,14 +77,14 @@ def alerts_test_client(session):
         yield client
 
 
-def _add_decision(session, *, org_id: int, event_id: str, outcome: str, evaluated_at: datetime.datetime) -> None:
+def _add_decision(session, *, org_id: int, transaction_id: str, outcome: str, evaluated_at: datetime.datetime) -> None:
     event = EventVersion(
         o_id=org_id,
-        event_id=event_id,
+        transaction_id=transaction_id,
         event_version=1,
-        event_timestamp=int(evaluated_at.timestamp()),
-        event_data={"event_id": event_id},
-        payload_hash=event_id,
+        effective_at=int(evaluated_at.timestamp()),
+        event_data={"transaction_id": transaction_id},
+        payload_hash=transaction_id,
     )
     session.add(event)
     session.flush()
@@ -92,9 +92,9 @@ def _add_decision(session, *, org_id: int, event_id: str, outcome: str, evaluate
         EvaluationDecision(
             ev_id=int(event.ev_id),
             o_id=org_id,
-            event_id=event_id,
+            transaction_id=transaction_id,
             event_version=1,
-            event_timestamp=int(evaluated_at.timestamp()),
+            effective_at=int(evaluated_at.timestamp()),
             decision_type="served",
             served=True,
             outcome_counters={outcome: 1},
@@ -164,8 +164,8 @@ def test_detect_alert_creates_incident_and_in_app_notification(session):
     )
     session.add(rule)
     session.commit()
-    _add_decision(session, org_id=1, event_id="alert-1", outcome="CANCEL", evaluated_at=now)
-    _add_decision(session, org_id=1, event_id="alert-2", outcome="CANCEL", evaluated_at=now)
+    _add_decision(session, org_id=1, transaction_id="alert-1", outcome="CANCEL", evaluated_at=now)
+    _add_decision(session, org_id=1, transaction_id="alert-2", outcome="CANCEL", evaluated_at=now)
 
     incident_ids = detect_alerts_for_outcome(session, o_id=1, outcome="CANCEL", now=now)
 

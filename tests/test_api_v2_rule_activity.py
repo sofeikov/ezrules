@@ -21,16 +21,16 @@ def _create_event(
     session,
     *,
     org_id: int,
-    event_id: str,
+    transaction_id: str,
     created_at: datetime.datetime,
     fired_rules: list[RuleModel],
 ) -> None:
     add_served_decision(
         session,
         org_id=org_id,
-        event_id=event_id,
-        event_data={"event_id": event_id},
-        event_timestamp=int(created_at.timestamp()),
+        transaction_id=transaction_id,
+        event_data={"transaction_id": transaction_id},
+        effective_at=int(created_at.timestamp()),
         evaluated_at=created_at,
         rule_results={int(rule.r_id): "HOLD" for rule in fired_rules},
     )
@@ -162,28 +162,28 @@ def test_rule_activity_returns_ranked_active_rules_including_zero_hits(session):
     _create_event(
         session,
         org_id=1,
-        event_id="rule-activity-1",
+        transaction_id="rule-activity-1",
         created_at=now - datetime.timedelta(minutes=10),
         fired_rules=[alpha_rule, beta_rule, draft_rule],
     )
     _create_event(
         session,
         org_id=1,
-        event_id="rule-activity-2",
+        transaction_id="rule-activity-2",
         created_at=now - datetime.timedelta(minutes=20),
         fired_rules=[alpha_rule, beta_rule],
     )
     _create_event(
         session,
         org_id=1,
-        event_id="rule-activity-3",
+        transaction_id="rule-activity-3",
         created_at=now - datetime.timedelta(minutes=30),
         fired_rules=[delta_rule],
     )
     _create_event(
         session,
         org_id=1,
-        event_id="rule-activity-old",
+        transaction_id="rule-activity-old",
         created_at=now - datetime.timedelta(days=2),
         fired_rules=[alpha_rule, archived_rule],
     )
@@ -191,7 +191,7 @@ def test_rule_activity_returns_ranked_active_rules_including_zero_hits(session):
         _create_event(
             session,
             org_id=2,
-            event_id=f"other-org-{idx}",
+            transaction_id=f"other-org-{idx}",
             created_at=now - datetime.timedelta(minutes=idx),
             fired_rules=[other_org_rule],
         )

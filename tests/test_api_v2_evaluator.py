@@ -63,8 +63,8 @@ class TestEvaluate:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "eval_v2_test_1",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "eval_v2_test_1",
+                    "effective_at": 1234567890,
                     "event_data": {"amount": 500},
                 },
                 headers={"X-API-Key": eval_api_key},
@@ -107,8 +107,8 @@ class TestEvaluate:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "eval_v2_test_conflict",
-                    "event_timestamp": 1234567891,
+                    "transaction_id": "eval_v2_test_conflict",
+                    "effective_at": 1234567891,
                     "event_data": {"amount": 500},
                 },
                 headers={"X-API-Key": eval_api_key},
@@ -123,7 +123,7 @@ class TestEvaluate:
         assert data["resolved_outcome"] == "HOLD"
 
         stored_event = (
-            session.query(EvaluationDecision).filter(EvaluationDecision.event_id == "eval_v2_test_conflict").one()
+            session.query(EvaluationDecision).filter(EvaluationDecision.transaction_id == "eval_v2_test_conflict").one()
         )
         assert stored_event.resolved_outcome == "HOLD"
         assert stored_event.outcome_counters == {"HOLD": 1, "RELEASE": 1}
@@ -134,7 +134,7 @@ class TestEvaluate:
             # Missing required fields
             response = client.post(
                 "/api/v2/evaluate",
-                json={"event_id": "bad"},
+                json={"transaction_id": "bad"},
                 headers={"X-API-Key": eval_api_key},
             )
 
@@ -146,8 +146,8 @@ class TestEvaluate:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "ts_test",
-                    "event_timestamp": -1,
+                    "transaction_id": "ts_test",
+                    "effective_at": -1,
                     "event_data": {},
                 },
                 headers={"X-API-Key": eval_api_key},
@@ -161,8 +161,8 @@ class TestEvaluate:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "no_auth_test",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "no_auth_test",
+                    "effective_at": 1234567890,
                     "event_data": {"amount": 100},
                 },
             )

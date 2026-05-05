@@ -62,13 +62,13 @@ def _save_rule_config(session, org_id: int) -> None:
     config_producer.save_config(rule_manager)
 
 
-def _store_event(session, org_id: int, event_id: str, event_timestamp: int, event_data: dict) -> None:
+def _store_event(session, org_id: int, transaction_id: str, effective_at: int, event_data: dict) -> None:
     executor = LocalRuleExecutorSQL(db=session, o_id=org_id)
     eval_and_store(
         executor,
         Event(
-            event_id=event_id,
-            event_timestamp=event_timestamp,
+            transaction_id=transaction_id,
+            effective_at=effective_at,
             event_data=event_data,
         ),
     )
@@ -115,7 +115,7 @@ def test_returns_referenced_fields_for_triggered_rules(session, tested_events_fi
 
     assert response.status_code == 200
     data = response.json()
-    assert data["events"][0]["event_id"] == "evt-highlight-fields"
+    assert data["events"][0]["transaction_id"] == "evt-highlight-fields"
     assert data["events"][0]["triggered_rules"] == [
         {
             "r_id": 9201,

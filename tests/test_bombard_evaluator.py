@@ -1,6 +1,7 @@
 """Unit tests for scripts/bombard_evaluator.py helpers."""
 
 import importlib
+from types import SimpleNamespace
 
 
 bombard = importlib.import_module("scripts.bombard_evaluator")
@@ -76,3 +77,56 @@ def test_ensure_label_exists_creates_missing_label(monkeypatch):
 
     assert bombard.ensure_label_exists("http://localhost:8888", "FRAUD", "token") is True
     assert calls["post"] == 1
+
+
+def test_run_finite_labels_successful_transactions(monkeypatch):
+    marked: dict[str, object] = {}
+    events = [
+        {"transaction_id": "txn-1", "effective_at": 1700000001, "event_data": {"amount": 100}},
+        {"transaction_id": "txn-2", "effective_at": 1700000002, "event_data": {"amount": 200}},
+    ]
+
+    monkeypatch.setattr(bombard, "randint", lambda _lower, _upper: 2)
+    monkeypatch.setattr(bombard, "build_bombard_events", lambda n: events[:n])
+    monkeypatch.setattr(
+        bombard,
+        "send_one",
+        lambda _url, event, _headers: {
+            "ok": True,
+            "status": 200,
+            "elapsed": 0.01,
+            "transaction_id": event["transaction_id"],
+            "outcome_set": ["HOLD"],
+        },
+    )
+    monkeypatch.setattr(bombard, "pick_fraud_event_ids", lambda transaction_ids, _rate: transaction_ids)
+
+    def fake_mark_events(url, transaction_ids, label_name, token, concurrency):  # noqa: ANN001
+        marked["url"] = url
+        marked["transaction_ids"] = transaction_ids
+        marked["label_name"] = label_name
+        marked["token"] = token
+        marked["concurrency"] = concurrency
+        return [{"ok": True, "status": 200, "elapsed": 0.01, "transaction_id": item} for item in transaction_ids]
+
+    monkeypatch.setattr(bombard, "mark_events", fake_mark_events)
+    monkeypatch.setattr(bombard, "print_summary", lambda *_args, **_kwargs: None)
+
+    args = SimpleNamespace(
+        n=2,
+        url="http://localhost:8888",
+        concurrency=1,
+        token="token",
+        fraud_rate=1.0,
+        fraud_label="FRAUD",
+    )
+
+    bombard.run_finite(args, evaluate_headers={"Authorization": "Bearer token"}, label_enabled=True)
+
+    assert marked == {
+        "url": "http://localhost:8888",
+        "transaction_ids": ["txn-1", "txn-2"],
+        "label_name": "FRAUD",
+        "token": "token",
+        "concurrency": 1,
+    }

@@ -81,8 +81,8 @@ def test_evaluate_first_match_uses_main_rule_execution_order(session):
         response = client.post(
             "/api/v2/evaluate",
             json={
-                "event_id": "first-match-main-order",
-                "event_timestamp": 1234567890,
+                "transaction_id": "first-match-main-order",
+                "effective_at": 1234567890,
                 "event_data": {"amount": 500},
             },
             headers={"X-API-Key": api_key},
@@ -98,7 +98,7 @@ def test_evaluate_first_match_uses_main_rule_execution_order(session):
     assert payload["outcome_counters"] == {"HOLD": 1}
     assert payload["rule_results"] == {"9402": "HOLD"}
 
-    stored_event = session.query(EvaluationDecision).filter_by(event_id="first-match-main-order").one()
+    stored_event = session.query(EvaluationDecision).filter_by(transaction_id="first-match-main-order").one()
     assert stored_event.resolved_outcome == "HOLD"
     assert stored_event.outcome_counters == {"HOLD": 1}
 

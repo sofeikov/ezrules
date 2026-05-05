@@ -770,7 +770,7 @@ class TestRuleLifecycleAudit:
         decision = add_served_decision(
             session,
             org_id=1,
-            event_id="delete-rule-canonical-event",
+            transaction_id="delete-rule-canonical-event",
             event_data={"amount": 250},
             rule_results={rule_id: "HOLD"},
         )

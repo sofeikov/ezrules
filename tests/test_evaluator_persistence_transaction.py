@@ -42,8 +42,8 @@ def test_eval_and_store_commits_once_for_parent_and_results(session):
         response, decision_id = eval_and_store(
             lre,
             Event(
-                event_id="txn-single-commit",
-                event_timestamp=1700000300,
+                transaction_id="txn-single-commit",
+                effective_at=1700000300,
                 event_data={"amount": 100},
             ),
             response=_build_response(rule.r_id),
@@ -66,7 +66,7 @@ def test_eval_and_store_commits_once_for_parent_and_results(session):
         .all()
     )
 
-    assert stored_event.event_id == "txn-single-commit"
+    assert stored_event.transaction_id == "txn-single-commit"
     assert stored_event.outcome_counters == {"HOLD": 1}
     assert stored_event.resolved_outcome == "HOLD"
     assert [(result.r_id, result.rule_result) for result in stored_results] == [(rule.r_id, "HOLD")]
@@ -90,8 +90,8 @@ def test_eval_and_store_preserves_caller_commit_control(session):
         response, decision_id = eval_and_store(
             lre,
             Event(
-                event_id="txn-deferred-commit",
-                event_timestamp=1700000301,
+                transaction_id="txn-deferred-commit",
+                effective_at=1700000301,
                 event_data={"amount": 200},
             ),
             response=_build_response(rule.r_id),
@@ -118,7 +118,7 @@ def test_eval_and_store_preserves_caller_commit_control(session):
         .all()
     )
 
-    assert stored_event.event_id == "txn-deferred-commit"
+    assert stored_event.transaction_id == "txn-deferred-commit"
     assert stored_event.outcome_counters == {"HOLD": 1}
     assert stored_event.resolved_outcome == "HOLD"
     assert [(result.r_id, result.rule_result) for result in stored_results] == [(rule.r_id, "HOLD")]

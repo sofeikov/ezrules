@@ -53,9 +53,9 @@ def test_event_version_label_fk_rejects_cross_org_labels(session):
     decision = add_served_decision(
         session,
         org_id=int(org.o_id),
-        event_id=f"tenant-hardening-event-{uuid.uuid4().hex[:8]}",
+        transaction_id=f"tenant-hardening-event-{uuid.uuid4().hex[:8]}",
         event_data={"amount": 42},
-        event_timestamp=1_700_000_000,
+        effective_at=1_700_000_000,
     )
     other_org_label = Label(label=f"TENANT_HARDENING_{uuid.uuid4().hex[:8]}", o_id=int(other_org.o_id))
     session.add(other_org_label)
@@ -79,9 +79,9 @@ def test_event_version_label_fk_rejects_cross_org_event_versions(session):
     decision = add_served_decision(
         session,
         org_id=int(org.o_id),
-        event_id=f"tenant-hardening-event-version-{uuid.uuid4().hex[:8]}",
+        transaction_id=f"tenant-hardening-event-version-{uuid.uuid4().hex[:8]}",
         event_data={"amount": 42},
-        event_timestamp=1_700_000_000,
+        effective_at=1_700_000_000,
     )
     other_org_label = Label(label=f"TENANT_HARDENING_EVENT_{uuid.uuid4().hex[:8]}", o_id=int(other_org.o_id))
     session.add(other_org_label)

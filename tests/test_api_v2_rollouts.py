@@ -28,16 +28,16 @@ from ezrules.models.backend_core import (
 )
 
 
-def _stable_bucket(o_id: int, r_id: int, event_id: str) -> int:
-    digest = hashlib.sha256(f"{o_id}:{r_id}:{event_id}".encode("utf-8")).hexdigest()
+def _stable_bucket(o_id: int, r_id: int, transaction_id: str) -> int:
+    digest = hashlib.sha256(f"{o_id}:{r_id}:{transaction_id}".encode("utf-8")).hexdigest()
     return int(digest, 16) % 100
 
 
 def _find_event_id_for_bucket(o_id: int, r_id: int, predicate) -> str:
     for index in range(1, 2000):
-        event_id = f"rollout-event-{index}"
-        if predicate(_stable_bucket(o_id, r_id, event_id)):
-            return event_id
+        transaction_id = f"rollout-event-{index}"
+        if predicate(_stable_bucket(o_id, r_id, transaction_id)):
+            return transaction_id
     raise AssertionError("Could not find a matching event id for rollout bucket test")
 
 
@@ -312,13 +312,13 @@ class TestRolloutEvaluation:
             description_override="Candidate",
         )
 
-        event_id = _find_event_id_for_bucket(1, active_rollout_rule.r_id, lambda bucket: bucket < 10)
+        transaction_id = _find_event_id_for_bucket(1, active_rollout_rule.r_id, lambda bucket: bucket < 10)
         with TestClient(app) as client:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": event_id,
-                    "event_timestamp": 1234567890,
+                    "transaction_id": transaction_id,
+                    "effective_at": 1234567890,
                     "event_data": {"amount": 100},
                 },
                 headers={"X-API-Key": live_api_key},
@@ -343,7 +343,7 @@ class TestRolloutEvaluation:
     def test_rollout_percentage_increase_is_monotonic(self, session, active_rollout_rule, live_api_key):
         from ezrules.core.rule_updater import deploy_rule_to_rollout
 
-        event_id = _find_event_id_for_bucket(1, active_rollout_rule.r_id, lambda bucket: 10 <= bucket < 20)
+        transaction_id = _find_event_id_for_bucket(1, active_rollout_rule.r_id, lambda bucket: 10 <= bucket < 20)
 
         deploy_rule_to_rollout(
             db=session,
@@ -360,7 +360,7 @@ class TestRolloutEvaluation:
         with TestClient(app) as client:
             initial_response = client.post(
                 "/api/v2/evaluate",
-                json={"event_id": event_id, "event_timestamp": 1234567890, "event_data": {}},
+                json={"transaction_id": transaction_id, "effective_at": 1234567890, "event_data": {}},
                 headers={"X-API-Key": live_api_key},
             )
 
@@ -379,7 +379,7 @@ class TestRolloutEvaluation:
         with TestClient(app) as client:
             expanded_response = client.post(
                 "/api/v2/evaluate",
-                json={"event_id": event_id, "event_timestamp": 1234567891, "event_data": {}},
+                json={"transaction_id": transaction_id, "effective_at": 1234567891, "event_data": {}},
                 headers={"X-API-Key": live_api_key},
             )
 
@@ -409,7 +409,7 @@ class TestRolloutEvaluation:
         with TestClient(app) as client:
             response = client.post(
                 "/api/v2/evaluate",
-                json={"event_id": "always-candidate", "event_timestamp": 1234567890, "event_data": {}},
+                json={"transaction_id": "always-candidate", "effective_at": 1234567890, "event_data": {}},
                 headers={"X-API-Key": live_api_key},
             )
 

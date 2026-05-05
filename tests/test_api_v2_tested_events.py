@@ -62,13 +62,14 @@ def _save_rule_config(session, org_id: int) -> None:
     config_producer.save_config(rule_manager)
 
 
-def _store_event(session, org_id: int, event_id: str, event_timestamp: int, event_data: dict) -> None:
+def _store_event(session, org_id: int, transaction_id: str, effective_at: int, event_data: dict) -> None:
     executor = LocalRuleExecutorSQL(db=session, o_id=org_id)
     eval_and_store(
         executor,
         Event(
-            event_id=event_id,
-            event_timestamp=event_timestamp,
+            transaction_id=transaction_id,
+            effective_at=effective_at,
+            observed_at=effective_at,
             event_data=event_data,
         ),
     )
@@ -112,8 +113,10 @@ class TestListTestedEvents:
         assert len(data["events"]) == 1
 
         latest_event = data["events"][0]
-        assert latest_event["event_id"] == "evt-latest"
-        assert latest_event["event_timestamp"] == 1700000001
+        assert latest_event["transaction_id"] == "evt-latest"
+        assert latest_event["effective_at"] == "2023-11-14T22:13:21Z"
+        assert latest_event["first_effective_at"] == "2023-11-14T22:13:21Z"
+        assert latest_event["first_observed_at"] == "2023-11-14T22:13:21Z"
         assert latest_event["resolved_outcome"] == "HOLD"
         assert latest_event["outcome_counters"] == {"HOLD": 1, "RELEASE": 1}
         assert latest_event["event_data"] == {"amount": 2500, "country": "GB"}
@@ -159,7 +162,7 @@ class TestListTestedEvents:
         data = response.json()
         assert data["total"] == 1
         assert len(data["events"]) == 1
-        assert data["events"][0]["event_id"] == "evt-no-hit"
+        assert data["events"][0]["transaction_id"] == "evt-no-hit"
         assert data["events"][0]["resolved_outcome"] is None
         assert data["events"][0]["outcome_counters"] == {}
         assert data["events"][0]["triggered_rules"] == []

@@ -207,8 +207,8 @@ class TestAllowlistEvaluation:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "allowlist-short-circuit",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "allowlist-short-circuit",
+                    "effective_at": 1234567890,
                     "event_data": {"country": "GB"},
                 },
                 headers={"X-API-Key": allowlist_api_key},
@@ -224,7 +224,7 @@ class TestAllowlistEvaluation:
         assert payload["outcome_counters"] == {"RELEASE": 1}
         assert payload["rule_results"] == {"9201": "RELEASE"}
 
-        stored_event = session.query(EvaluationDecision).filter_by(event_id="allowlist-short-circuit").one()
+        stored_event = session.query(EvaluationDecision).filter_by(transaction_id="allowlist-short-circuit").one()
         assert stored_event.resolved_outcome == "RELEASE"
         assert stored_event.outcome_counters == {"RELEASE": 1}
 

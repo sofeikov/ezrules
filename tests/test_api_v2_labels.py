@@ -112,8 +112,8 @@ def sample_event(session):
     decision = add_served_decision(
         session,
         org_id=int(org.o_id),
-        event_id="test_event_123",
-        event_timestamp=1234567890,
+        transaction_id="test_event_123",
+        effective_at=1234567890,
         event_data={"amount": 100, "currency": "USD"},
     )
     session.commit()
@@ -348,7 +348,7 @@ class TestMarkEvent:
             "/api/v2/labels/mark-event",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "event_id": "test_event_123",
+                "transaction_id": "test_event_123",
                 "label_name": "TEST_LABEL",
             },
         )
@@ -356,14 +356,14 @@ class TestMarkEvent:
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert data["event_id"] == "test_event_123"
+        assert data["transaction_id"] == "test_event_123"
         assert data["event_version"] == 1
         assert data["label_name"] == "TEST_LABEL"
         assignment = session = labels_test_client.test_data["session"]
         assert (
             assignment.query(EventVersionLabel)
             .join(EventVersion, EventVersion.ev_id == EventVersionLabel.ev_id)
-            .filter(EventVersion.event_id == "test_event_123")
+            .filter(EventVersion.transaction_id == "test_event_123")
             .count()
             == 1
         )
@@ -376,7 +376,7 @@ class TestMarkEvent:
             "/api/v2/labels/mark-event",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "event_id": "nonexistent_event",
+                "transaction_id": "nonexistent_event",
                 "label_name": "TEST_LABEL",
             },
         )
@@ -392,7 +392,7 @@ class TestMarkEvent:
             "/api/v2/labels/mark-event",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "event_id": "test_event_123",
+                "transaction_id": "test_event_123",
                 "label_name": "NONEXISTENT_LABEL",
             },
         )
@@ -407,7 +407,7 @@ class TestMarkEvent:
         response = labels_test_client.post(
             "/api/v2/labels/mark-event",
             headers={"Authorization": f"Bearer {token}"},
-            json={"event_id": "some_event"},  # Missing label_name
+            json={"transaction_id": "some_event"},  # Missing label_name
         )
 
         assert response.status_code == 422
@@ -551,7 +551,7 @@ class TestUploadLabels:
         """Should successfully upload a valid CSV and assign labels to events."""
         token = labels_test_client.test_data["token"]
 
-        csv_content = f"{sample_event.event_id},{sample_label.label}\n"
+        csv_content = f"{sample_event.transaction_id},{sample_label.label}\n"
 
         response = labels_test_client.post(
             "/api/v2/labels/upload",
@@ -589,7 +589,7 @@ class TestUploadLabels:
         """Should handle mix of valid and invalid rows."""
         token = labels_test_client.test_data["token"]
 
-        csv_content = f"{sample_event.event_id},{sample_label.label}\nnonexistent_event,TEST_LABEL\n"
+        csv_content = f"{sample_event.transaction_id},{sample_label.label}\nnonexistent_event,TEST_LABEL\n"
 
         response = labels_test_client.post(
             "/api/v2/labels/upload",

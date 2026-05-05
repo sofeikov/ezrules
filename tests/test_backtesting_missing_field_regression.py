@@ -16,15 +16,15 @@ def test_backtest_skips_records_when_proposed_score_field_never_appeared_in_hist
     add_served_decision(
         session,
         org_id=int(org.o_id),
-        event_id="score-regression-1",
-        event_timestamp=1700000001,
+        transaction_id="score-regression-1",
+        effective_at=1700000001,
         event_data={"amount": 150},
     )
     add_served_decision(
         session,
         org_id=int(org.o_id),
-        event_id="score-regression-2",
-        event_timestamp=1700000002,
+        transaction_id="score-regression-2",
+        effective_at=1700000002,
         event_data={"amount": 75},
     )
     session.commit()

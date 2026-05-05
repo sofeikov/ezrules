@@ -1,3 +1,5 @@
+import datetime
+
 import bcrypt
 import pytest
 from fastapi.testclient import TestClient
@@ -19,9 +21,16 @@ from ezrules.models.backend_core import (
     RuleDeploymentResultsLog,
     RuleStatus,
     ShadowResultsLog,
+    TransactionCurrentVersion,
     User,
 )
 from tests.canonical_helpers import add_served_decision
+
+
+def _timestamp(value):
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=datetime.UTC)
+    return int(value.timestamp())
 
 
 @pytest.fixture(scope="function")
@@ -75,12 +84,12 @@ def test_repeated_business_event_creates_ordered_event_versions_and_served_decis
         with TestClient(app) as client:
             first = client.post(
                 "/api/v2/evaluate",
-                json={"event_id": "txn-123", "event_timestamp": 1710000000, "event_data": {"amount": 10}},
+                json={"transaction_id": "txn-123", "effective_at": 1710000000, "event_data": {"amount": 10}},
                 headers={"X-API-Key": api_key},
             )
             second = client.post(
                 "/api/v2/evaluate",
-                json={"event_id": "txn-123", "event_timestamp": 1710000300, "event_data": {"amount": 25}},
+                json={"transaction_id": "txn-123", "effective_at": 1710000300, "event_data": {"amount": 25}},
                 headers={"X-API-Key": api_key},
             )
     finally:
@@ -88,13 +97,18 @@ def test_repeated_business_event_creates_ordered_event_versions_and_served_decis
 
     assert first.status_code == 200
     assert second.status_code == 200
+    assert first.json()["transaction_id"] == "txn-123"
     assert first.json()["event_version"] == 1
+    assert first.json()["event_version_id"] is not None
+    assert first.json()["evaluation_id"] is not None
+    assert first.json()["evaluation_status"] == "new"
     assert second.json()["event_version"] == 2
-    assert first.json()["evaluation_decision_id"] != second.json()["evaluation_decision_id"]
+    assert second.json()["evaluation_status"] == "superseding"
+    assert first.json()["evaluation_id"] != second.json()["evaluation_id"]
 
     versions = (
         session.query(EventVersion)
-        .filter(EventVersion.o_id == 1, EventVersion.event_id == "txn-123")
+        .filter(EventVersion.o_id == 1, EventVersion.transaction_id == "txn-123")
         .order_by(EventVersion.event_version.asc())
         .all()
     )
@@ -105,7 +119,7 @@ def test_repeated_business_event_creates_ordered_event_versions_and_served_decis
 
     decisions = (
         session.query(EvaluationDecision)
-        .filter(EvaluationDecision.o_id == 1, EvaluationDecision.event_id == "txn-123")
+        .filter(EvaluationDecision.o_id == 1, EvaluationDecision.transaction_id == "txn-123")
         .order_by(EvaluationDecision.event_version.asc())
         .all()
     )
@@ -113,9 +127,201 @@ def test_repeated_business_event_creates_ordered_event_versions_and_served_decis
     assert all(decision.served for decision in decisions)
     assert all(decision.decision_type == "served" for decision in decisions)
     assert all(decision.rule_config_label == "production" for decision in decisions)
+    assert [decision.is_current for decision in decisions] == [False, True]
+    assert decisions[0].superseded_by_ed_id == decisions[1].ed_id
+
+    current = (
+        session.query(TransactionCurrentVersion)
+        .filter(TransactionCurrentVersion.o_id == 1, TransactionCurrentVersion.transaction_id == "txn-123")
+        .one()
+    )
+    assert current.current_ed_id == decisions[1].ed_id
+    assert current.first_effective_at == versions[0].effective_at
+    assert current.first_observed_at == versions[0].observed_at
+    assert current.current_effective_at == versions[1].effective_at
+    assert current.current_observed_at == versions[1].observed_at
 
     rule_results = session.query(EvaluationRuleResult).filter(EvaluationRuleResult.ed_id == decisions[-1].ed_id).all()
     assert [(result.r_id, result.rule_result) for result in rule_results] == [(rule.r_id, "HOLD")]
+
+
+def test_exact_duplicate_submission_reuses_existing_evaluation_without_new_version(session, ledger_api_key):
+    api_key, _token = ledger_api_key
+    _save_production_rule(session)
+    evaluator_module._lre = LocalRuleExecutorSQL(db=session, o_id=1, label="production")
+
+    payload = {"transaction_id": "txn-dupe", "effective_at": 1710000000, "event_data": {"amount": 10}}
+    try:
+        with TestClient(app) as client:
+            first = client.post("/api/v2/evaluate", json=payload, headers={"X-API-Key": api_key})
+            projection = (
+                session.query(TransactionCurrentVersion)
+                .filter(TransactionCurrentVersion.o_id == 1, TransactionCurrentVersion.transaction_id == "txn-dupe")
+                .one()
+            )
+            first_effective_at = projection.first_effective_at
+            first_observed_at = projection.first_observed_at
+            current_effective_at = projection.current_effective_at
+            current_observed_at = projection.current_observed_at
+            duplicate = client.post("/api/v2/evaluate", json=payload, headers={"X-API-Key": api_key})
+    finally:
+        evaluator_module._lre = None
+
+    assert first.status_code == 200
+    assert duplicate.status_code == 200
+    assert duplicate.json()["evaluation_status"] == "duplicate"
+    assert duplicate.json()["event_version"] == first.json()["event_version"]
+    assert duplicate.json()["evaluation_id"] == first.json()["evaluation_id"]
+    session.refresh(projection)
+    assert projection.first_effective_at == first_effective_at
+    assert projection.first_observed_at == first_observed_at
+    assert projection.current_effective_at == current_effective_at
+    assert projection.current_observed_at == current_observed_at
+
+    assert (
+        session.query(EventVersion).filter(EventVersion.o_id == 1, EventVersion.transaction_id == "txn-dupe").count()
+        == 1
+    )
+    assert (
+        session.query(EvaluationDecision)
+        .filter(EvaluationDecision.o_id == 1, EvaluationDecision.transaction_id == "txn-dupe")
+        .count()
+        == 1
+    )
+
+
+def test_same_payload_with_new_observed_time_creates_new_observed_version(session, ledger_api_key):
+    api_key, _token = ledger_api_key
+    _save_production_rule(session)
+    evaluator_module._lre = LocalRuleExecutorSQL(db=session, o_id=1, label="production")
+
+    first_payload = {
+        "transaction_id": "txn-observed-replay",
+        "effective_at": 1710000000,
+        "observed_at": 1710000001,
+        "event_data": {"amount": 10},
+    }
+    replay_payload = {**first_payload, "observed_at": 1710000300}
+    try:
+        with TestClient(app) as client:
+            first = client.post("/api/v2/evaluate", json=first_payload, headers={"X-API-Key": api_key})
+            replay = client.post("/api/v2/evaluate", json=replay_payload, headers={"X-API-Key": api_key})
+    finally:
+        evaluator_module._lre = None
+
+    assert first.status_code == 200
+    assert replay.status_code == 200
+    assert first.json()["evaluation_status"] == "new"
+    assert replay.json()["evaluation_status"] == "superseding"
+    assert replay.json()["event_version"] == 2
+    assert replay.json()["evaluation_id"] != first.json()["evaluation_id"]
+
+    projection = (
+        session.query(TransactionCurrentVersion)
+        .filter(TransactionCurrentVersion.o_id == 1, TransactionCurrentVersion.transaction_id == "txn-observed-replay")
+        .one()
+    )
+    assert _timestamp(projection.first_effective_at) == 1710000000
+    assert _timestamp(projection.first_observed_at) == 1710000001
+    assert _timestamp(projection.current_effective_at) == 1710000000
+    assert _timestamp(projection.current_observed_at) == 1710000300
+    assert (
+        session.query(EventVersion)
+        .filter(EventVersion.o_id == 1, EventVersion.transaction_id == "txn-observed-replay")
+        .count()
+        == 2
+    )
+
+
+def test_late_arriving_update_is_stored_but_does_not_replace_current_projection(session, ledger_api_key):
+    api_key, _token = ledger_api_key
+    _save_production_rule(session)
+    evaluator_module._lre = LocalRuleExecutorSQL(db=session, o_id=1, label="production")
+
+    try:
+        with TestClient(app) as client:
+            current = client.post(
+                "/api/v2/evaluate",
+                json={
+                    "transaction_id": "txn-late",
+                    "effective_at": 1710000300,
+                    "observed_at": 1710000301,
+                    "event_data": {"amount": 30},
+                },
+                headers={"X-API-Key": api_key},
+            )
+            late = client.post(
+                "/api/v2/evaluate",
+                json={
+                    "transaction_id": "txn-late",
+                    "effective_at": 1710000000,
+                    "observed_at": 1710000600,
+                    "event_data": {"amount": 20},
+                },
+                headers={"X-API-Key": api_key},
+            )
+    finally:
+        evaluator_module._lre = None
+
+    assert current.status_code == 200
+    assert late.status_code == 200
+    assert late.json()["evaluation_status"] == "new"
+    assert late.json()["is_current"] is False
+
+    projection = (
+        session.query(TransactionCurrentVersion)
+        .filter(TransactionCurrentVersion.o_id == 1, TransactionCurrentVersion.transaction_id == "txn-late")
+        .one()
+    )
+    assert projection.current_ed_id == current.json()["evaluation_id"]
+    assert _timestamp(projection.current_effective_at) == 1710000300
+    assert _timestamp(projection.current_observed_at) == 1710000301
+    assert _timestamp(projection.first_effective_at) == 1710000000
+    assert _timestamp(projection.first_observed_at) == 1710000301
+
+
+def test_terminal_current_transaction_blocks_later_non_terminal_supersession(session, ledger_api_key):
+    api_key, _token = ledger_api_key
+    _save_production_rule(session)
+    evaluator_module._lre = LocalRuleExecutorSQL(db=session, o_id=1, label="production")
+
+    try:
+        with TestClient(app) as client:
+            terminal = client.post(
+                "/api/v2/evaluate",
+                json={
+                    "transaction_id": "txn-terminal",
+                    "effective_at": 1710000000,
+                    "event_data": {"amount": 10, "state": "settled"},
+                    "terminal_state": True,
+                },
+                headers={"X-API-Key": api_key},
+            )
+            later = client.post(
+                "/api/v2/evaluate",
+                json={
+                    "transaction_id": "txn-terminal",
+                    "effective_at": 1710000900,
+                    "event_data": {"amount": 11, "state": "pending-correction"},
+                },
+                headers={"X-API-Key": api_key},
+            )
+    finally:
+        evaluator_module._lre = None
+
+    assert terminal.status_code == 200
+    assert later.status_code == 200
+    assert terminal.json()["is_current"] is True
+    assert later.json()["evaluation_status"] == "new"
+    assert later.json()["is_current"] is False
+
+    projection = (
+        session.query(TransactionCurrentVersion)
+        .filter(TransactionCurrentVersion.o_id == 1, TransactionCurrentVersion.transaction_id == "txn-terminal")
+        .one()
+    )
+    assert projection.terminal_state is True
+    assert projection.current_ed_id == terminal.json()["evaluation_id"]
 
 
 def test_rollout_provenance_links_to_the_served_decision(session, ledger_api_key):
@@ -136,14 +342,14 @@ def test_rollout_provenance_links_to_the_served_decision(session, ledger_api_key
         with TestClient(app) as client:
             response = client.post(
                 "/api/v2/evaluate",
-                json={"event_id": "rollout-ledger", "event_timestamp": 1710000000, "event_data": {"amount": 99}},
+                json={"transaction_id": "rollout-ledger", "effective_at": 1710000000, "event_data": {"amount": 99}},
                 headers={"X-API-Key": api_key},
             )
     finally:
         evaluator_module._lre = None
 
     assert response.status_code == 200
-    decision_id = response.json()["evaluation_decision_id"]
+    decision_id = response.json()["evaluation_id"]
 
     log = (
         session.query(RuleDeploymentResultsLog)
@@ -160,7 +366,7 @@ def test_event_version_delete_cascades_canonical_result_logs(session):
     decision = add_served_decision(
         session,
         org_id=1,
-        event_id="TestEvent_cascade_result_logs",
+        transaction_id="TestEvent_cascade_result_logs",
         event_data={"amount": 42},
         rule_results={int(rule.r_id): "HOLD"},
     )

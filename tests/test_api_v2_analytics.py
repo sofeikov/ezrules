@@ -103,10 +103,10 @@ def analytics_test_client(session):
         yield client
 
 
-def _next_event_version(session, *, org_id: int, event_id: str) -> tuple[int, int | None]:
+def _next_event_version(session, *, org_id: int, transaction_id: str) -> tuple[int, int | None]:
     latest = (
         session.query(EventVersion)
-        .filter(EventVersion.o_id == org_id, EventVersion.event_id == event_id)
+        .filter(EventVersion.o_id == org_id, EventVersion.transaction_id == transaction_id)
         .order_by(EventVersion.event_version.desc(), EventVersion.ev_id.desc())
         .first()
     )
@@ -119,21 +119,21 @@ def _store_ledger_decision(
     session,
     *,
     org_id: int,
-    event_id: str,
+    transaction_id: str,
     evaluated_at: datetime.datetime,
     rule_results: dict[int, str],
     event_data: dict | None = None,
     served: bool = True,
     decision_type: str = "served",
 ) -> EvaluationDecision:
-    payload = event_data or {"event_id": event_id}
-    event_timestamp = int(evaluated_at.timestamp())
-    event_version, supersedes_ev_id = _next_event_version(session, org_id=org_id, event_id=event_id)
+    payload = event_data or {"transaction_id": transaction_id}
+    effective_at = int(evaluated_at.timestamp())
+    event_version, supersedes_ev_id = _next_event_version(session, org_id=org_id, transaction_id=transaction_id)
     version = EventVersion(
         o_id=org_id,
-        event_id=event_id,
+        transaction_id=transaction_id,
         event_version=event_version,
-        event_timestamp=event_timestamp,
+        effective_at=effective_at,
         event_data=payload,
         payload_hash="0" * 64,
         source="evaluate",
@@ -150,9 +150,9 @@ def _store_ledger_decision(
     decision = EvaluationDecision(
         ev_id=version.ev_id,
         o_id=org_id,
-        event_id=event_id,
+        transaction_id=transaction_id,
         event_version=event_version,
-        event_timestamp=event_timestamp,
+        effective_at=effective_at,
         decision_type=decision_type,
         served=served,
         rule_config_label="production",
@@ -202,7 +202,7 @@ def sample_analytics_data(session):
         decision = _store_ledger_decision(
             session,
             org_id=org.o_id,
-            event_id=f"analytics_event_{i}",
+            transaction_id=f"analytics_event_{i}",
             evaluated_at=evaluated_at,
             event_data=event_data,
             rule_results={rule.r_id: outcome},
@@ -278,7 +278,7 @@ def sample_rule_quality_data(session):
         decision = _store_ledger_decision(
             session,
             org_id=org.o_id,
-            event_id=f"quality_event_{idx}",
+            transaction_id=f"quality_event_{idx}",
             evaluated_at=evaluated_at,
             event_data={"idx": idx},
             rule_results={rule_a.r_id: rule_a_outcomes[idx], rule_b.r_id: rule_b_outcomes[idx]},
@@ -352,7 +352,7 @@ class TestTransactionVolume:
         _store_ledger_decision(
             session,
             org_id=org.o_id,
-            event_id="repeat-volume-event",
+            transaction_id="repeat-volume-event",
             evaluated_at=now - datetime.timedelta(minutes=20),
             event_data={"amount": 100},
             rule_results={rule.r_id: "HOLD"},
@@ -360,7 +360,7 @@ class TestTransactionVolume:
         _store_ledger_decision(
             session,
             org_id=org.o_id,
-            event_id="repeat-volume-event",
+            transaction_id="repeat-volume-event",
             evaluated_at=now - datetime.timedelta(minutes=10),
             event_data={"amount": 200},
             rule_results={rule.r_id: "RELEASE"},
@@ -368,7 +368,7 @@ class TestTransactionVolume:
         _store_ledger_decision(
             session,
             org_id=org.o_id,
-            event_id="shadow-volume-event",
+            transaction_id="shadow-volume-event",
             evaluated_at=now - datetime.timedelta(minutes=5),
             event_data={"amount": 300},
             rule_results={rule.r_id: "REVIEW"},
@@ -484,14 +484,14 @@ class TestOutcomesDistribution:
         _store_ledger_decision(
             session,
             org_id=1,
-            event_id="served-outcome",
+            transaction_id="served-outcome",
             evaluated_at=now - datetime.timedelta(minutes=15),
             rule_results={org_rule.r_id: "HOLD"},
         )
         _store_ledger_decision(
             session,
             org_id=1,
-            event_id="shadow-outcome",
+            transaction_id="shadow-outcome",
             evaluated_at=now - datetime.timedelta(minutes=10),
             rule_results={org_rule.r_id: "REVIEW"},
             served=False,
@@ -500,7 +500,7 @@ class TestOutcomesDistribution:
         _store_ledger_decision(
             session,
             org_id=2,
-            event_id="other-org-outcome",
+            transaction_id="other-org-outcome",
             evaluated_at=now - datetime.timedelta(minutes=5),
             rule_results={other_org_rule.r_id: "RELEASE"},
         )
@@ -769,7 +769,7 @@ class TestRuleQuality:
         old_decision = _store_ledger_decision(
             session,
             org_id=1,
-            event_id="quality_old_event",
+            transaction_id="quality_old_event",
             evaluated_at=old_created_at,
             event_data={"idx": 999},
             rule_results={rule_a.r_id: "HOLD"},

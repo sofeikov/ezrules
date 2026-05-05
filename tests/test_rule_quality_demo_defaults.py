@@ -66,9 +66,9 @@ def test_compute_rule_quality_metrics_excludes_unscored_rules_from_rankings(sess
     decision = add_served_decision(
         session,
         org_id=int(org.o_id),
-        event_id="quality_unscored_event",
+        transaction_id="quality_unscored_event",
         event_data={"amount": 100},
-        event_timestamp=int(created_at.timestamp()),
+        effective_at=int(created_at.timestamp()),
         evaluated_at=created_at,
         rule_results={int(rule.r_id): "HOLD"},
         label=label,

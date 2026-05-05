@@ -82,13 +82,13 @@ def _create_rule(
     return rule
 
 
-def _create_decision(session, *, event_id: str, outcome: str | None = None) -> EvaluationDecision:
+def _create_decision(session, *, transaction_id: str, outcome: str | None = None) -> EvaluationDecision:
     decision = add_served_decision(
         session,
         org_id=1,
-        event_id=event_id,
+        transaction_id=transaction_id,
         event_data={"amount": 100},
-        event_timestamp=1700000000,
+        effective_at=1700000000,
         outcome_counters={outcome: 1} if outcome is not None else None,
         resolved_outcome=outcome,
     )
@@ -105,7 +105,7 @@ def test_shadow_results_and_stats_use_canonical_deployment_logs(session):
         description="Rule for shadow regression coverage",
     )
 
-    decision = _create_decision(session, event_id="shadow-shared-event", outcome="CONTROL_A")
+    decision = _create_decision(session, transaction_id="shadow-shared-event", outcome="CONTROL_A")
 
     session.add_all(
         [
@@ -131,7 +131,7 @@ def test_shadow_results_and_stats_use_canonical_deployment_logs(session):
     results_payload = results_response.json()
     assert results_payload["total"] == 1
 
-    results_by_event = {item["event_id"]: item["rule_result"] for item in results_payload["results"]}
+    results_by_event = {item["transaction_id"]: item["rule_result"] for item in results_payload["results"]}
     assert results_by_event == {
         "shadow-shared-event": "SHARED_CANDIDATE",
     }
@@ -170,10 +170,10 @@ def test_rollout_stats_aggregate_counts_in_sql(session):
     )
 
     events = [
-        _create_decision(session, event_id="rollout-event-1", outcome="REVIEW"),
-        _create_decision(session, event_id="rollout-event-2", outcome="REVIEW"),
-        _create_decision(session, event_id="rollout-event-3", outcome="HOLD"),
-        _create_decision(session, event_id="rollout-event-4", outcome="HOLD"),
+        _create_decision(session, transaction_id="rollout-event-1", outcome="REVIEW"),
+        _create_decision(session, transaction_id="rollout-event-2", outcome="REVIEW"),
+        _create_decision(session, transaction_id="rollout-event-3", outcome="HOLD"),
+        _create_decision(session, transaction_id="rollout-event-4", outcome="HOLD"),
     ]
 
     session.add_all(
