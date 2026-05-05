@@ -255,8 +255,8 @@ def test_evaluate_reuses_cached_cast_configs_until_field_type_mutation(session, 
         first_response = client.post(
             "/api/v2/evaluate",
             json={
-                "event_id": "cast_cache_eval_1",
-                "event_timestamp": 1700000000,
+                "transaction_id": "cast_cache_eval_1",
+                "effective_at": 1700000000,
                 "event_data": {"ref": "123"},
             },
             headers={"X-API-Key": live_api_key},
@@ -264,8 +264,8 @@ def test_evaluate_reuses_cached_cast_configs_until_field_type_mutation(session, 
         second_response = client.post(
             "/api/v2/evaluate",
             json={
-                "event_id": "cast_cache_eval_2",
-                "event_timestamp": 1700000001,
+                "transaction_id": "cast_cache_eval_2",
+                "effective_at": 1700000001,
                 "event_data": {"ref": "456"},
             },
             headers={"X-API-Key": live_api_key},
@@ -278,8 +278,8 @@ def test_evaluate_reuses_cached_cast_configs_until_field_type_mutation(session, 
         post_update_response = client.post(
             "/api/v2/evaluate",
             json={
-                "event_id": "cast_cache_eval_3",
-                "event_timestamp": 1700000002,
+                "transaction_id": "cast_cache_eval_3",
+                "effective_at": 1700000002,
                 "event_data": {"ref": "not-a-number"},
             },
             headers={"X-API-Key": live_api_key},

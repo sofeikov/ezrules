@@ -4,8 +4,8 @@ import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface EventTestRequest {
-  event_id: string;
-  event_timestamp: number;
+  transaction_id: string;
+  effective_at: number;
   event_data: Record<string, unknown>;
 }
 
@@ -26,7 +26,7 @@ export interface EventTestResponse {
   resolved_outcome: string | null;
   rule_results: Record<string, string>;
   event_version: number | null;
-  evaluation_decision_id: number | null;
+  evaluation_id: number | null;
   all_rule_results: Record<string, string | null>;
   evaluated_rules: EventTestRuleResult[];
 }

@@ -95,8 +95,8 @@ def get_rollout_results(
             control_result=str(log.control_result) if log.control_result is not None else None,
             candidate_result=str(log.candidate_result) if log.candidate_result is not None else None,
             returned_result=str(log.returned_result) if log.returned_result is not None else None,
-            event_id=str(decision.event_id),
-            event_timestamp=int(decision.event_timestamp),
+            transaction_id=str(decision.transaction_id),
+            effective_at=decision.effective_at,
             created_at=log.created_at,
         )
         for log, decision in rows

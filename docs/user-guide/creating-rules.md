@@ -82,8 +82,8 @@ Example payload:
 
 ```json
 {
-  "event_id": "txn_101",
-  "event_timestamp": 1700000000,
+  "transaction_id": "txn_101",
+  "effective_at": "2026-04-23T12:00:00Z",
   "event_data": {
     "amount": 15000,
     "user_id": "user_42",

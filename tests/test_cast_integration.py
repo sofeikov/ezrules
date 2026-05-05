@@ -98,8 +98,8 @@ class TestEvaluateCasting:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "cast_eval_1",
-                    "event_timestamp": 1700000000,
+                    "transaction_id": "cast_eval_1",
+                    "effective_at": 1700000000,
                     "event_data": {"amount": "500"},
                 },
                 headers={"X-API-Key": live_api_key},
@@ -121,8 +121,8 @@ class TestEvaluateCasting:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "cast_eval_2",
-                    "event_timestamp": 1700000000,
+                    "transaction_id": "cast_eval_2",
+                    "effective_at": 1700000000,
                     "event_data": {"ref": "not-a-number"},
                 },
                 headers={"X-API-Key": live_api_key},
@@ -141,8 +141,8 @@ class TestEvaluateCasting:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "cast_eval_3",
-                    "event_timestamp": 1700000000,
+                    "transaction_id": "cast_eval_3",
+                    "effective_at": 1700000000,
                     "event_data": {"raw_field": "some_string"},
                 },
                 headers={"X-API-Key": live_api_key},

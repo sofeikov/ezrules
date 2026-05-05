@@ -104,8 +104,8 @@ export class TestedEventsComponent implements OnInit {
     return this.events.filter((event) => event.triggered_rules.length === 0).length;
   }
 
-  formatTimestamp(timestamp: number): string {
-    return new Date(timestamp * 1000).toLocaleString();
+  formatTimestamp(timestamp: string): string {
+    return new Date(timestamp).toLocaleString();
   }
 
   outcomeBadgeClass(outcome: string | null): string {

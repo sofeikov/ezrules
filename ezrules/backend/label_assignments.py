@@ -12,7 +12,7 @@ def get_labelable_event_version(
     db: Any,
     *,
     o_id: int,
-    event_id: str,
+    transaction_id: str,
     event_version: int | None = None,
 ) -> EventVersion | None:
     """Return the canonical event version to label.
@@ -26,7 +26,7 @@ def get_labelable_event_version(
         .join(EvaluationDecision, EvaluationDecision.ev_id == EventVersion.ev_id)
         .filter(
             EventVersion.o_id == o_id,
-            EventVersion.event_id == event_id,
+            EventVersion.transaction_id == transaction_id,
             EvaluationDecision.o_id == o_id,
             EvaluationDecision.served.is_(True),
             EvaluationDecision.decision_type == "served",
@@ -35,6 +35,7 @@ def get_labelable_event_version(
     if event_version is not None:
         query = query.filter(EventVersion.event_version == event_version)
     else:
+        query = query.filter(EvaluationDecision.is_current.is_(True))
         query = query.order_by(EventVersion.event_version.desc(), EventVersion.ev_id.desc())
     return query.first()
 

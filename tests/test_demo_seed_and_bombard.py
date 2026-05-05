@@ -66,11 +66,11 @@ def test_build_bombard_events_uses_demo_rule_schema():
     events = bombard.build_bombard_events(3, start_index=40)
 
     assert len(events) == 3
-    assert events[0]["event_id"].startswith("bombard_00000041_")
-    assert events[1]["event_id"].startswith("bombard_00000042_")
+    assert events[0]["transaction_id"].startswith("bombard_00000041_")
+    assert events[1]["transaction_id"].startswith("bombard_00000042_")
 
     for event in events:
-        assert isinstance(event["event_timestamp"], int)
+        assert isinstance(event["effective_at"], int)
         assert "amount" in event["event_data"]
         assert "txn_type" in event["event_data"]
         assert "merchant_category" in event["event_data"]

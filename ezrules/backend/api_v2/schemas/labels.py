@@ -43,18 +43,18 @@ class LabelBulkCreate(BaseModel):
 class MarkEventRequest(BaseModel):
     """Schema for marking an event with a label."""
 
-    event_id: str = Field(..., description="The event ID to mark")
+    transaction_id: str = Field(..., description="The transaction ID to mark")
     event_version: int | None = Field(
         default=None,
         ge=1,
-        description="Canonical event version to mark. Defaults to the latest served version for event_id.",
+        description="Canonical event version to mark. Defaults to the current served version for transaction_id.",
     )
     label_name: str = Field(..., description="The label name to apply")
 
     model_config = {
         "json_schema_extra": {
             "example": {
-                "event_id": "evt_123456",
+                "transaction_id": "txn_123456",
                 "event_version": 1,
                 "label_name": "FRAUD",
             }
@@ -114,7 +114,7 @@ class MarkEventResponse(BaseModel):
 
     success: bool
     message: str
-    event_id: str | None = None
+    transaction_id: str | None = None
     event_version: int | None = None
     label_name: str | None = None
     error: str | None = None

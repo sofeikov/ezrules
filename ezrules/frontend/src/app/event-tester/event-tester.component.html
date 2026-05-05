@@ -25,25 +25,25 @@
 
           <div class="grid gap-4 md:grid-cols-2 mb-4">
             <div>
-              <label for="event-test-id" class="block text-sm font-medium text-gray-700 mb-1">Event ID</label>
+              <label for="event-test-id" class="block text-sm font-medium text-gray-700 mb-1">Transaction ID</label>
               <input
                 id="event-test-id"
-                [(ngModel)]="eventId"
+                [(ngModel)]="transactionId"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 data-testid="event-test-id"
               />
             </div>
 
             <div>
-              <label for="event-test-timestamp" class="block text-sm font-medium text-gray-700 mb-1">Unix Timestamp</label>
+              <label for="event-test-timestamp" class="block text-sm font-medium text-gray-700 mb-1">Effective Time</label>
               <input
                 id="event-test-timestamp"
                 type="number"
-                [(ngModel)]="eventTimestamp"
+                [(ngModel)]="effectiveAt"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 data-testid="event-test-timestamp"
               />
-              <p class="text-xs text-gray-500 mt-1">{{ formatTimestamp(eventTimestamp) }}</p>
+              <p class="text-xs text-gray-500 mt-1">{{ formatTimestamp(effectiveAt) }}</p>
             </div>
           </div>
 
@@ -116,7 +116,7 @@
               <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <p class="text-sm text-gray-500">Ledger record</p>
                 <p class="text-2xl font-semibold text-gray-900 mt-2" data-testid="event-test-ledger-state">
-                  {{ result.evaluation_decision_id === null ? 'None' : result.evaluation_decision_id }}
+                  {{ result.evaluation_id === null ? 'None' : result.evaluation_id }}
                 </p>
               </div>
             </div>

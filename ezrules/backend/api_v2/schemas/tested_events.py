@@ -22,8 +22,13 @@ class TestedEventItem(BaseModel):
     """Stored event evaluation with the rules that fired."""
 
     evaluation_decision_id: int = Field(..., description="Immutable served-decision ledger identifier")
-    event_id: str = Field(..., description="External event identifier")
-    event_timestamp: int = Field(..., description="Original event timestamp as a Unix integer")
+    transaction_id: str = Field(..., description="Stable transaction identifier")
+    effective_at: str = Field(..., description="When this transaction version became true in the source system")
+    observed_at: str = Field(..., description="When this transaction version was observed")
+    first_effective_at: str = Field(..., description="Earliest effective time ever seen for this transaction")
+    first_observed_at: str = Field(..., description="Earliest observed time ever seen for this transaction")
+    event_version: int = Field(..., description="Append-only transaction version number")
+    is_current: bool = Field(..., description="Whether this evaluation is the current transaction projection")
     resolved_outcome: str | None = Field(None, description="Winning outcome after severity resolution")
     label_name: str | None = Field(None, description="Uploaded event label applied to the stored event")
     outcome_counters: dict[str, int] = Field(default_factory=dict, description="Counts of rule outcomes for the event")

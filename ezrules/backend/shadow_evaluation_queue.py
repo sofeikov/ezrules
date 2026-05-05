@@ -67,12 +67,16 @@ def enqueue_shadow_evaluation(
     *,
     db,
     o_id: int,
-    event_id: str,
     event_data: dict[str, Any],
     production_all_rule_results: dict[Any, Any],
+    event_id: str | None = None,
+    transaction_id: str | None = None,
     evaluation_decision_id: int | None = None,
     event_version_id: int | None = None,
 ) -> bool:
+    event_id = event_id or transaction_id
+    if event_id is None:
+        raise ValueError("event_id or transaction_id is required")
     config_obj = get_deployment_config(db, o_id=o_id, label=SHADOW_CONFIG_LABEL)
     if config_obj is None or not config_obj.config:
         return False

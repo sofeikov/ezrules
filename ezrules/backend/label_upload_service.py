@@ -12,10 +12,14 @@ class AppliedLabelAssignment:
     """A successful label assignment applied from an upload row."""
 
     row_number: int
-    event_id: str
+    transaction_id: str
     event_version: int
     label_name: str
     label_id: int
+
+    @property
+    def event_id(self) -> str:
+        return self.transaction_id
 
 
 @dataclass
@@ -33,11 +37,15 @@ class ParsedRow:
     """A parsed CSV row with validation status"""
 
     row_number: int
-    event_id: str
+    transaction_id: str
     event_version: int | None
     label_name: str
     is_valid: bool
     error_message: str = ""
+
+    @property
+    def event_id(self) -> str:
+        return self.transaction_id
 
 
 class LabelUploadService:
@@ -64,15 +72,17 @@ class LabelUploadService:
         for row_num, row in enumerate(csv_reader, 1):
             if len(row) not in (2, 3):
                 format_errors.append(
-                    f"Row {row_num}: Expected 2 or 3 columns (event_id,label or event_id,event_version,label), got {len(row)}"
+                    "Row "
+                    f"{row_num}: Expected 2 or 3 columns "
+                    f"(transaction_id,label or transaction_id,event_version,label), got {len(row)}"
                 )
                 continue
 
             if len(row) == 2:
-                event_id, label_name = row
+                transaction_id, label_name = row
                 event_version = None
             else:
-                event_id, event_version_raw, label_name = row
+                transaction_id, event_version_raw, label_name = row
                 try:
                     event_version = int(event_version_raw.strip())
                 except ValueError:
@@ -81,17 +91,17 @@ class LabelUploadService:
                 if event_version < 1:
                     format_errors.append(f"Row {row_num}: event_version must be greater than 0")
                     continue
-            event_id = event_id.strip()
+            transaction_id = transaction_id.strip()
             label_name = label_name.strip().upper()
 
-            if not event_id or not label_name:
-                format_errors.append(f"Row {row_num}: Empty event_id or label_name")
+            if not transaction_id or not label_name:
+                format_errors.append(f"Row {row_num}: Empty transaction_id or label_name")
                 continue
 
             parsed_rows.append(
                 ParsedRow(
                     row_number=row_num,
-                    event_id=event_id,
+                    transaction_id=transaction_id,
                     event_version=event_version,
                     label_name=label_name,
                     is_valid=True,
@@ -120,13 +130,15 @@ class LabelUploadService:
                 event_record = get_labelable_event_version(
                     self.db_session,
                     o_id=org_id,
-                    event_id=row.event_id,
+                    transaction_id=row.transaction_id,
                     event_version=row.event_version,
                 )
                 if event_record is None:
                     suffix = f" version {row.event_version}" if row.event_version is not None else ""
                     error_count += 1
-                    errors.append(f"Row {row.row_number}: Served event with id '{row.event_id}'{suffix} not found")
+                    errors.append(
+                        f"Row {row.row_number}: Served transaction with id '{row.transaction_id}'{suffix} not found"
+                    )
                     continue
 
                 # Find the label from cache
@@ -147,7 +159,7 @@ class LabelUploadService:
                 applied_assignments.append(
                     AppliedLabelAssignment(
                         row_number=row.row_number,
-                        event_id=row.event_id,
+                        transaction_id=row.transaction_id,
                         event_version=int(event_record.event_version),
                         label_name=row.label_name,
                         label_id=int(label.el_id),

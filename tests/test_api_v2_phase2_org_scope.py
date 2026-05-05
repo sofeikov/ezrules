@@ -310,9 +310,9 @@ def test_shadow_routes_and_tested_events_are_org_scoped(session):
     org_decision = add_served_decision(
         session,
         org_id=int(org.o_id),
-        event_id=org_event_id,
+        transaction_id=org_event_id,
         event_data={"amount": 10},
-        event_timestamp=1700000100,
+        effective_at=1700000100,
         outcome_counters={"ORG1_HOLD": 1},
         resolved_outcome="ORG1_HOLD",
         rule_results={int(org_rule.r_id): "ORG1_HOLD"},
@@ -320,9 +320,9 @@ def test_shadow_routes_and_tested_events_are_org_scoped(session):
     other_decision = add_served_decision(
         session,
         org_id=int(other_org.o_id),
-        event_id=other_event_id,
+        transaction_id=other_event_id,
         event_data={"amount": 20},
-        event_timestamp=1700000200,
+        effective_at=1700000200,
         outcome_counters={"ORG2_REVIEW": 1},
         resolved_outcome="ORG2_REVIEW",
         rule_results={int(other_rule.r_id): "ORG2_REVIEW"},
@@ -364,7 +364,7 @@ def test_shadow_routes_and_tested_events_are_org_scoped(session):
     assert tested_events_response.status_code == 200
     tested_events_payload = tested_events_response.json()
     assert tested_events_payload["total"] == 1
-    assert [item["event_id"] for item in tested_events_payload["events"]] == [org_event_id]
+    assert [item["transaction_id"] for item in tested_events_payload["events"]] == [org_event_id]
 
     assert shadow_config_response.status_code == 200
     shadow_rule_ids = {item["r_id"] for item in shadow_config_response.json()["rules"]}
@@ -373,7 +373,7 @@ def test_shadow_routes_and_tested_events_are_org_scoped(session):
     assert shadow_results_response.status_code == 200
     shadow_results_payload = shadow_results_response.json()
     assert shadow_results_payload["total"] == 1
-    assert [item["event_id"] for item in shadow_results_payload["results"]] == [org_event_id]
+    assert [item["transaction_id"] for item in shadow_results_payload["results"]] == [org_event_id]
 
     assert shadow_stats_response.status_code == 200
     assert {item["r_id"] for item in shadow_stats_response.json()["rules"]} == {int(org_rule.r_id)}
@@ -419,8 +419,8 @@ def test_api_keys_and_evaluate_use_auth_derived_org(session):
             "/api/v2/evaluate",
             headers=_auth_headers(user),
             json={
-                "event_id": "phase2-eval-org1",
-                "event_timestamp": 1700000300,
+                "transaction_id": "phase2-eval-org1",
+                "effective_at": 1700000300,
                 "event_data": {},
             },
         )
@@ -428,8 +428,8 @@ def test_api_keys_and_evaluate_use_auth_derived_org(session):
             "/api/v2/evaluate",
             headers={"X-API-Key": other_raw_key},
             json={
-                "event_id": "phase2-eval-org2",
-                "event_timestamp": 1700000400,
+                "transaction_id": "phase2-eval-org2",
+                "effective_at": 1700000400,
                 "event_data": {},
             },
         )
@@ -451,10 +451,10 @@ def test_api_keys_and_evaluate_use_auth_derived_org(session):
 
     stored_decisions = (
         session.query(EvaluationDecision)
-        .filter(EvaluationDecision.event_id.in_(["phase2-eval-org1", "phase2-eval-org2"]))
+        .filter(EvaluationDecision.transaction_id.in_(["phase2-eval-org1", "phase2-eval-org2"]))
         .all()
     )
-    org_ids_by_event = {str(decision.event_id): int(decision.o_id) for decision in stored_decisions}
+    org_ids_by_event = {str(decision.transaction_id): int(decision.o_id) for decision in stored_decisions}
     assert org_ids_by_event == {
         "phase2-eval-org1": int(org.o_id),
         "phase2-eval-org2": int(other_org.o_id),
@@ -580,9 +580,9 @@ def test_analytics_rule_quality_and_reports_are_org_scoped(session, monkeypatch)
     add_served_decision(
         session,
         org_id=int(org.o_id),
-        event_id=f"phase2-analytics-org1-{uuid.uuid4().hex[:6]}",
+        transaction_id=f"phase2-analytics-org1-{uuid.uuid4().hex[:6]}",
         event_data={"amount": 100},
-        event_timestamp=int(now.timestamp()),
+        effective_at=int(now.timestamp()),
         outcome_counters={"HOLD": 1},
         resolved_outcome="HOLD",
         rule_results={int(org_rule.r_id): "HOLD"},
@@ -592,9 +592,9 @@ def test_analytics_rule_quality_and_reports_are_org_scoped(session, monkeypatch)
     add_served_decision(
         session,
         org_id=int(other_org.o_id),
-        event_id=f"phase2-analytics-org2-{uuid.uuid4().hex[:6]}",
+        transaction_id=f"phase2-analytics-org2-{uuid.uuid4().hex[:6]}",
         event_data={"amount": 200},
-        event_timestamp=int(now.timestamp()),
+        effective_at=int(now.timestamp()),
         outcome_counters={"REVIEW": 1},
         resolved_outcome="REVIEW",
         rule_results={int(other_rule.r_id): "REVIEW"},

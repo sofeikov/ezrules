@@ -102,8 +102,8 @@
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Time</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Effective Time</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded Label</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Resolved Outcome</th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Triggered Rules</th>
@@ -113,13 +113,18 @@
               <tbody class="divide-y divide-gray-200">
                 <ng-container *ngFor="let event of events">
                   <tr class="hover:bg-gray-50 transition-colors align-top" data-testid="tested-event-row">
-                    <td class="px-6 py-4">
-                      <div class="text-sm font-medium text-gray-900">{{ event.event_id }}</div>
-                      <p class="text-xs text-gray-500 mt-1 break-all">{{ eventSummary(event.event_data) }}</p>
-                    </td>
+	                    <td class="px-6 py-4">
+	                      <div class="text-sm font-medium text-gray-900">{{ event.transaction_id }}</div>
+	                      <p class="text-xs text-gray-500 mt-1">Version {{ event.event_version }}{{ event.is_current ? ' · Current' : '' }}</p>
+	                      <div class="mt-1 space-y-0.5" data-testid="tested-event-lifecycle">
+	                        <p class="text-xs text-gray-500">Originated {{ formatTimestamp(event.first_effective_at) }}</p>
+	                        <p class="text-xs text-gray-500">First seen {{ formatTimestamp(event.first_observed_at) }}</p>
+	                      </div>
+	                      <p class="text-xs text-gray-500 mt-1 break-all">{{ eventSummary(event.event_data) }}</p>
+	                    </td>
 
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {{ formatTimestamp(event.event_timestamp) }}
+                      {{ formatTimestamp(event.effective_at) }}
                     </td>
 
                     <td class="px-6 py-4 whitespace-nowrap" data-testid="tested-event-label">

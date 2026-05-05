@@ -93,8 +93,8 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "Content-Type: application/json" \
   -H "X-API-Key: <api-key>" \
   -d '{
-    "event_id": "txn_123",
-    "event_timestamp": "2026-04-23T12:00:00Z",
+    "transaction_id": "txn_123",
+    "effective_at": "2026-04-23T12:00:00Z",
     "event_data": {
       "amount": 875.50,
       "currency": "EUR",

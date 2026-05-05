@@ -13,8 +13,13 @@ export interface TriggeredRule {
 
 export interface TestedEvent {
   evaluation_decision_id: number;
-  event_id: string;
-  event_timestamp: number;
+  transaction_id: string;
+  effective_at: string;
+  observed_at: string;
+  first_effective_at: string;
+  first_observed_at: string;
+  event_version: number;
+  is_current: boolean;
   resolved_outcome: string | null;
   label_name: string | null;
   outcome_counters: Record<string, number>;

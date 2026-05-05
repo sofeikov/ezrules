@@ -39,7 +39,7 @@ def test_tested_events_returns_nested_referenced_fields(session, tested_events_f
         db=session,
     )
 
-    assert payload.events[0].event_id == "evt-nested-fields"
+    assert payload.events[0].transaction_id == "evt-nested-fields"
     assert payload.events[0].event_data == {"customer": {"profile": {"age": 34}, "country": "GB"}}
     assert [item.model_dump(exclude_unset=True) for item in payload.events[0].triggered_rules] == [
         {

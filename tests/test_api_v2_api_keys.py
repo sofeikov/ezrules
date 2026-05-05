@@ -118,8 +118,8 @@ class TestApiKeyAuth:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "auth_test",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "auth_test",
+                    "effective_at": 1234567890,
                     "event_data": {},
                 },
             )
@@ -131,8 +131,8 @@ class TestApiKeyAuth:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "auth_test",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "auth_test",
+                    "effective_at": 1234567890,
                     "event_data": {},
                 },
                 headers={"X-API-Key": "ezrk_" + "0" * 64},
@@ -150,8 +150,8 @@ class TestApiKeyAuth:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "auth_key_test",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "auth_key_test",
+                    "effective_at": 1234567890,
                     "event_data": {},
                 },
                 headers={"X-API-Key": live_api_key},
@@ -170,8 +170,8 @@ class TestApiKeyAuth:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "bearer_test",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "bearer_test",
+                    "effective_at": 1234567890,
                     "event_data": {},
                 },
                 headers={"Authorization": f"Bearer {bearer_token}"},
@@ -186,8 +186,8 @@ class TestApiKeyAuth:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "bad_bearer",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "bad_bearer",
+                    "effective_at": 1234567890,
                     "event_data": {},
                 },
                 headers={"Authorization": "Bearer totally.invalid.token"},
@@ -220,8 +220,8 @@ class TestApiKeyErrorSanitisation:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "error_test",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "error_test",
+                    "effective_at": 1234567890,
                     "event_data": {},
                 },
                 headers={"X-API-Key": live_api_key},
@@ -351,8 +351,8 @@ class TestApiKeyCRUD:
             eval_resp = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "revoked_key_test",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "revoked_key_test",
+                    "effective_at": 1234567890,
                     "event_data": {},
                 },
                 headers={"X-API-Key": raw_key},

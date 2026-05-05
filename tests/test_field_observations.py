@@ -34,8 +34,8 @@ class TestFieldObservationCollection:
             client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "obs_test_1",
-                    "event_timestamp": 1700000000,
+                    "transaction_id": "obs_test_1",
+                    "effective_at": 1700000000,
                     "event_data": {"amount": 500, "country": "US"},
                 },
                 headers={"X-API-Key": live_api_key},
@@ -69,8 +69,8 @@ class TestFieldObservationCollection:
                 client.post(
                     "/api/v2/evaluate",
                     json={
-                        "event_id": f"obs_repeat_{i}",
-                        "event_timestamp": 1700000000,
+                        "transaction_id": f"obs_repeat_{i}",
+                        "effective_at": 1700000000,
                         "event_data": {"score": 1.5},
                     },
                     headers={"X-API-Key": live_api_key},
@@ -93,8 +93,8 @@ class TestFieldObservationCollection:
             client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "obs_type_1",
-                    "event_timestamp": 1700000000,
+                    "transaction_id": "obs_type_1",
+                    "effective_at": 1700000000,
                     "event_data": {"ref": 123},
                 },
                 headers={"X-API-Key": live_api_key},
@@ -102,8 +102,8 @@ class TestFieldObservationCollection:
             client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "obs_type_2",
-                    "event_timestamp": 1700000000,
+                    "transaction_id": "obs_type_2",
+                    "effective_at": 1700000000,
                     "event_data": {"ref": "ABC"},
                 },
                 headers={"X-API-Key": live_api_key},

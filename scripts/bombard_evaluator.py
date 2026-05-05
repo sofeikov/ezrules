@@ -49,8 +49,8 @@ def build_bombard_events(n: int, start_index: int | None = None) -> list[dict]:
         sequence = start_index + offset
         payloads.append(
             {
-                "event_id": f"bombard_{sequence:08d}_{uuid.uuid4().hex[:6]}",
-                "event_timestamp": demo_event.event_timestamp,
+                "transaction_id": f"bombard_{sequence:08d}_{uuid.uuid4().hex[:6]}",
+                "effective_at": demo_event.event_timestamp,
                 "event_data": demo_event.event_data,
             }
         )
@@ -115,7 +115,7 @@ def send_one(url: str, event: dict, headers: dict[str, str]) -> dict:
             "ok": response.status_code == 200,
             "status": response.status_code,
             "elapsed": elapsed,
-            "event_id": event["event_id"],
+            "transaction_id": event["transaction_id"],
             "outcome_set": response.json().get("outcome_set", []) if response.status_code == 200 else [],
         }
     except Exception as exc:
@@ -123,7 +123,7 @@ def send_one(url: str, event: dict, headers: dict[str, str]) -> dict:
             "ok": False,
             "status": -1,
             "elapsed": time.perf_counter() - t0,
-            "event_id": event["event_id"],
+            "transaction_id": event["transaction_id"],
             "outcome_set": [],
             "error": str(exc),
         }
@@ -138,11 +138,11 @@ def send_batch(url: str, batch: list[dict], concurrency: int, headers: dict[str,
     return results
 
 
-def mark_one(url: str, event_id: str, label_name: str, token: str) -> dict:
+def mark_one(url: str, transaction_id: str, label_name: str, token: str) -> dict:
     """Mark a single event with a label through the labels API."""
     t0 = time.perf_counter()
     headers = {"Authorization": f"Bearer {token}"}
-    payload = {"event_id": event_id, "label_name": label_name}
+    payload = {"transaction_id": transaction_id, "label_name": label_name}
 
     try:
         response = httpx.post(f"{url}/api/v2/labels/mark-event", json=payload, headers=headers, timeout=10)
@@ -150,14 +150,14 @@ def mark_one(url: str, event_id: str, label_name: str, token: str) -> dict:
             "ok": response.status_code == 200,
             "status": response.status_code,
             "elapsed": time.perf_counter() - t0,
-            "event_id": event_id,
+            "transaction_id": transaction_id,
         }
     except Exception as exc:
         return {
             "ok": False,
             "status": -1,
             "elapsed": time.perf_counter() - t0,
-            "event_id": event_id,
+            "transaction_id": transaction_id,
             "error": str(exc),
         }
 
@@ -237,8 +237,8 @@ def run_finite(args: argparse.Namespace, evaluate_headers: dict[str, str], label
 
     label_results: list[dict] | None = None
     if label_enabled and args.token:
-        successful_event_ids = [result["event_id"] for result in results if result["ok"]]
-        label_targets = pick_fraud_event_ids(successful_event_ids, args.fraud_rate)
+        successful_transaction_ids = [result["transaction_id"] for result in results if result["ok"]]
+        label_targets = pick_fraud_event_ids(successful_transaction_ids, args.fraud_rate)
         if label_targets:
             print(f"\nLabeling {len(label_targets)} events as {args.fraud_label} …")
             label_results = mark_events(args.url, label_targets, args.fraud_label, args.token, args.concurrency)
@@ -279,8 +279,8 @@ def run_continuous(args: argparse.Namespace, evaluate_headers: dict[str, str], l
 
         batch_labels_ok = 0
         if label_enabled and args.token and all_label_results is not None:
-            successful_event_ids = [result["event_id"] for result in results if result["ok"]]
-            label_targets = pick_fraud_event_ids(successful_event_ids, args.fraud_rate)
+            successful_transaction_ids = [result["transaction_id"] for result in results if result["ok"]]
+            label_targets = pick_fraud_event_ids(successful_transaction_ids, args.fraud_rate)
             label_results = mark_events(args.url, label_targets, args.fraud_label, args.token, args.concurrency)
             batch_labels_ok = sum(1 for result in label_results if result["ok"])
             all_label_results.extend(label_results)

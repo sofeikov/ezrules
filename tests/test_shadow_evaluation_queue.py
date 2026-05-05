@@ -104,7 +104,7 @@ def _create_decision(session, o_id: int) -> int:
     _, decision_id = store_eval_result(
         db_session=session,
         o_id=o_id,
-        event=Event(event_id="shadow-queue-event", event_timestamp=1234567890, event_data={"amount": 100}),
+        event=Event(transaction_id="shadow-queue-event", effective_at=1234567890, event_data={"amount": 100}),
         response=response,
         commit=True,
     )
@@ -119,7 +119,7 @@ def test_enqueue_shadow_evaluation_serializes_shadow_snapshot(session, fake_shad
         db=session,
         evaluation_decision_id=decision_id,
         o_id=int(rule.o_id),
-        event_id="shadow-queue-event",
+        transaction_id="shadow-queue-event",
         event_data={"amount": 100},
         production_all_rule_results={int(rule.r_id): "HOLD"},
     )
@@ -146,7 +146,7 @@ def test_drain_shadow_queue_uses_enqueued_config_snapshot(session, fake_shadow_r
         db=session,
         evaluation_decision_id=decision_id,
         o_id=int(rule.o_id),
-        event_id="shadow-queue-event",
+        transaction_id="shadow-queue-event",
         event_data={"amount": 100},
         production_all_rule_results={int(rule.r_id): "HOLD"},
     )
@@ -222,7 +222,7 @@ def test_drain_shadow_queue_uses_enqueued_execution_mode_snapshot(session, fake_
         db=session,
         evaluation_decision_id=decision_id,
         o_id=int(org.o_id),
-        event_id="shadow-queue-execution-mode",
+        transaction_id="shadow-queue-execution-mode",
         event_data={"amount": 100},
         production_all_rule_results={int(first_rule.r_id): "HOLD"},
     )
@@ -261,7 +261,7 @@ def test_drain_shadow_queue_requeues_on_persist_failure(
         db=session,
         evaluation_decision_id=decision_id,
         o_id=int(rule.o_id),
-        event_id="shadow-queue-event",
+        transaction_id="shadow-queue-event",
         event_data={"amount": 100},
         production_all_rule_results={int(rule.r_id): "HOLD"},
     )
@@ -292,7 +292,7 @@ def test_drain_shadow_queue_skips_when_lock_is_held(session, fake_shadow_redis: 
         db=session,
         evaluation_decision_id=decision_id,
         o_id=int(rule.o_id),
-        event_id="shadow-queue-event",
+        transaction_id="shadow-queue-event",
         event_data={"amount": 100},
         production_all_rule_results={int(rule.r_id): "HOLD"},
     )

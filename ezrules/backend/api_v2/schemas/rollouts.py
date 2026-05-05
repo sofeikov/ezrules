@@ -42,8 +42,8 @@ class RolloutResultItem(BaseModel):
     control_result: str | None
     candidate_result: str | None
     returned_result: str | None
-    event_id: str
-    event_timestamp: int
+    transaction_id: str
+    effective_at: datetime
     created_at: datetime | None
 
 

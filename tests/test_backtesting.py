@@ -110,8 +110,8 @@ class TestBacktestTaskDirect:
             add_served_decision(
                 session,
                 org_id=int(org.o_id),
-                event_id=f"evt_{i}",
-                event_timestamp=1000000 + i,
+                transaction_id=f"evt_{i}",
+                effective_at=1000000 + i,
                 event_data={"amount": 50 + i * 20},
             )
         session.commit()
@@ -263,8 +263,8 @@ class TestBacktestChunkedEvaluation:
             add_served_decision(
                 session,
                 org_id=int(org.o_id),
-                event_id=f"chunk_evt_{i}",
-                event_timestamp=2000000 + i,
+                transaction_id=f"chunk_evt_{i}",
+                effective_at=2000000 + i,
                 event_data={"amount": amount},
             )
         session.commit()

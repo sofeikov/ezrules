@@ -23,12 +23,12 @@ class TestLabelUploadService:
         assert len(parsed_rows) == 2
         assert len(format_errors) == 0
 
-        assert parsed_rows[0].event_id == "event_123"
+        assert parsed_rows[0].transaction_id == "event_123"
         assert parsed_rows[0].label_name == "FRAUD"
         assert parsed_rows[0].row_number == 1
         assert parsed_rows[0].is_valid is True
 
-        assert parsed_rows[1].event_id == "event_456"
+        assert parsed_rows[1].transaction_id == "event_456"
         assert parsed_rows[1].label_name == "NORMAL"
         assert parsed_rows[1].row_number == 2
 
@@ -53,7 +53,7 @@ class TestLabelUploadService:
 
         assert len(parsed_rows) == 0
         assert len(format_errors) == 3
-        assert all("Empty event_id or label_name" in error for error in format_errors)
+        assert all("Empty transaction_id or label_name" in error for error in format_errors)
 
     def test_parse_csv_content_whitespace_handling(self):
         """Test that whitespace is properly trimmed and labels are uppercased"""
@@ -64,7 +64,7 @@ class TestLabelUploadService:
 
         assert len(parsed_rows) == 1
         assert len(format_errors) == 0
-        assert parsed_rows[0].event_id == "event_123"
+        assert parsed_rows[0].transaction_id == "event_123"
         assert parsed_rows[0].label_name == "FRAUD"
 
     def test_get_label_cache(self, session):
@@ -95,15 +95,15 @@ class TestLabelUploadService:
         add_served_decision(
             session,
             org_id=int(org.o_id),
-            event_id="test_event",
-            event_timestamp=1234567890,
+            transaction_id="test_event",
+            effective_at=1234567890,
             event_data={"test": "data"},
         )
 
         # Create service and test data
         service = LabelUploadService(session)
         parsed_rows = [
-            ParsedRow(row_number=1, event_id="test_event", event_version=None, label_name="FRAUD", is_valid=True)
+            ParsedRow(row_number=1, transaction_id="test_event", event_version=None, label_name="FRAUD", is_valid=True)
         ]
         label_cache = {"FRAUD": fraud_label}
 
@@ -125,7 +125,7 @@ class TestLabelUploadService:
         parsed_rows = [
             ParsedRow(
                 row_number=1,
-                event_id="nonexistent_event",
+                transaction_id="nonexistent_event",
                 event_version=None,
                 label_name="FRAUD",
                 is_valid=True,
@@ -137,7 +137,7 @@ class TestLabelUploadService:
 
         assert result.success_count == 0
         assert result.error_count == 1
-        assert "Served event with id 'nonexistent_event' not found" in result.errors[0]
+        assert "Served transaction with id 'nonexistent_event' not found" in result.errors[0]
 
     def test_process_label_assignments_label_not_found(self, session):
         """Test handling of non-existent labels"""
@@ -145,8 +145,8 @@ class TestLabelUploadService:
         add_served_decision(
             session,
             org_id=int(org.o_id),
-            event_id="test_event",
-            event_timestamp=1234567890,
+            transaction_id="test_event",
+            effective_at=1234567890,
             event_data={"test": "data"},
         )
 
@@ -154,7 +154,7 @@ class TestLabelUploadService:
         parsed_rows = [
             ParsedRow(
                 row_number=1,
-                event_id="test_event",
+                transaction_id="test_event",
                 event_version=None,
                 label_name="NONEXISTENT_LABEL",
                 is_valid=True,
@@ -180,15 +180,15 @@ class TestLabelUploadService:
         add_served_decision(
             session,
             org_id=int(org.o_id),
-            event_id="event_1",
-            event_timestamp=1234567890,
+            transaction_id="event_1",
+            effective_at=1234567890,
             event_data={"test": "data1"},
         )
         add_served_decision(
             session,
             org_id=int(org.o_id),
-            event_id="event_2",
-            event_timestamp=1234567891,
+            transaction_id="event_2",
+            effective_at=1234567891,
             event_data={"test": "data2"},
         )
 
@@ -201,7 +201,7 @@ class TestLabelUploadService:
         assert result.success_count == 2
         assert result.error_count == 1
         assert len(result.errors) == 1
-        assert "Served event with id 'invalid_event' not found" in result.errors[0]
+        assert "Served transaction with id 'invalid_event' not found" in result.errors[0]
 
         assert session.query(EventVersionLabel).filter(EventVersionLabel.el_id == fraud_label.el_id).count() == 1
         assert session.query(EventVersionLabel).filter(EventVersionLabel.el_id == normal_label.el_id).count() == 1

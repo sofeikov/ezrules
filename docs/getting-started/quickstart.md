@@ -103,8 +103,8 @@ Checkpoint:
 
 ```json
 {
-  "event_id": "txn_001",
-  "event_timestamp": 1700000000,
+  "transaction_id": "txn_001",
+  "effective_at": "2026-04-23T12:00:00Z",
   "event_data": {
     "amount": 15000,
     "user_id": "user_42"
@@ -130,7 +130,7 @@ Checkpoint:
 6. Open **Settings → General**, add curated outcome→label pairs to track
 7. Open **Rule Quality** and confirm pair metrics load for curated pairs
 
-You can also upload a small `event_id,label_name` CSV in **Labels** and recheck the charts.
+You can also upload a small `transaction_id,label_name` CSV in **Labels** and recheck the charts.
 
 ![30-day label analytics charts](../assets/readme/label-analytics-30d.png)
 

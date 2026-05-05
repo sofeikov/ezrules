@@ -63,7 +63,8 @@ async function waitForBacktestCompletion(request: APIRequestContext, ruleId: num
   }
 
   expect(taskData?.status).toBe('SUCCESS');
-  return taskData;
+  expect(taskData).not.toBeNull();
+  return taskData!;
 }
 
 test.describe('Backtesting Eligibility Warnings', () => {
@@ -82,13 +83,13 @@ test.describe('Backtesting Eligibility Warnings', () => {
     try {
       const events = [
         {
-          event_id: `btwarn-${ruleId}-1`,
-          event_timestamp: 1700000001,
+          transaction_id: `btwarn-${ruleId}-1`,
+          effective_at: 1700000001,
           event_data: buildEvaluatedEventData(`btwarn-${ruleId}-1`, 150, 'US'),
         },
         {
-          event_id: `btwarn-${ruleId}-2`,
-          event_timestamp: 1700000002,
+          transaction_id: `btwarn-${ruleId}-2`,
+          effective_at: 1700000002,
           event_data: buildEvaluatedEventData(`btwarn-${ruleId}-2`, 200),
         },
       ];

@@ -62,16 +62,16 @@ def _store_rule_result(
     *,
     org_id: int,
     rule: RuleModel,
-    event_id: str,
+    transaction_id: str,
     created_at: datetime.datetime,
     outcome: str,
 ) -> None:
     add_served_decision(
         session,
         org_id=org_id,
-        event_id=event_id,
-        event_data={"event_id": event_id},
-        event_timestamp=int(created_at.timestamp()),
+        transaction_id=transaction_id,
+        event_data={"transaction_id": transaction_id},
+        effective_at=int(created_at.timestamp()),
         evaluated_at=created_at,
         rule_results={int(rule.r_id): outcome},
     )
@@ -116,7 +116,7 @@ def test_rule_outcomes_distribution_returns_only_selected_rule_series(session):
         session,
         org_id=1,
         rule=target_rule,
-        event_id="target-hold",
+        transaction_id="target-hold",
         created_at=now - datetime.timedelta(minutes=5),
         outcome="HOLD",
     )
@@ -124,7 +124,7 @@ def test_rule_outcomes_distribution_returns_only_selected_rule_series(session):
         session,
         org_id=1,
         rule=target_rule,
-        event_id="target-release",
+        transaction_id="target-release",
         created_at=now - datetime.timedelta(minutes=10),
         outcome="RELEASE",
     )
@@ -132,7 +132,7 @@ def test_rule_outcomes_distribution_returns_only_selected_rule_series(session):
         session,
         org_id=1,
         rule=target_rule,
-        event_id="target-hold-2",
+        transaction_id="target-hold-2",
         created_at=now - datetime.timedelta(minutes=15),
         outcome="HOLD",
     )
@@ -140,7 +140,7 @@ def test_rule_outcomes_distribution_returns_only_selected_rule_series(session):
         session,
         org_id=1,
         rule=other_rule,
-        event_id="other-rule-event",
+        transaction_id="other-rule-event",
         created_at=now - datetime.timedelta(minutes=3),
         outcome="REVIEW",
     )
@@ -148,7 +148,7 @@ def test_rule_outcomes_distribution_returns_only_selected_rule_series(session):
         session,
         org_id=2,
         rule=other_org_rule,
-        event_id="other-org-event",
+        transaction_id="other-org-event",
         created_at=now - datetime.timedelta(minutes=2),
         outcome="DECLINE",
     )
@@ -156,7 +156,7 @@ def test_rule_outcomes_distribution_returns_only_selected_rule_series(session):
         session,
         org_id=1,
         rule=target_rule,
-        event_id="target-old",
+        transaction_id="target-old",
         created_at=now - datetime.timedelta(days=2),
         outcome="ESCALATE",
     )

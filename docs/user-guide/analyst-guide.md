@@ -215,8 +215,8 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "txn_001",
-    "event_timestamp": 1704801000,
+    "transaction_id": "txn_001",
+    "effective_at": 1704801000,
     "event_data": {
       "amount": 15000,
       "user_id": "user_123"
@@ -237,7 +237,7 @@ curl -X POST http://localhost:8888/api/v2/labels/mark-event \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "event_id": "txn_001",
+    "transaction_id": "txn_001",
     "label_name": "FRAUD"
   }'
 ```

@@ -3,6 +3,7 @@ FastAPI routes for viewing recently tested events and triggered rules.
 """
 
 from collections import defaultdict
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
@@ -23,10 +24,17 @@ from ezrules.models.backend_core import (
     EventVersionLabel,
     Label,
     Rule,
+    TransactionCurrentVersion,
     User,
 )
 
 router = APIRouter(prefix="/api/v2/tested-events", tags=["Tested Events"])
+
+
+def _utc_isoformat(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _extract_referenced_fields(rule_logic: str) -> list[str]:
@@ -52,8 +60,13 @@ def list_tested_events(
 ) -> TestedEventsResponse:
     """Return the most recently stored event evaluations with triggered rules."""
     records = (
-        db.query(EvaluationDecision, EventVersion, Label.label)
+        db.query(EvaluationDecision, EventVersion, TransactionCurrentVersion, Label.label)
         .join(EventVersion, EventVersion.ev_id == EvaluationDecision.ev_id)
+        .join(
+            TransactionCurrentVersion,
+            (TransactionCurrentVersion.o_id == EvaluationDecision.o_id)
+            & (TransactionCurrentVersion.transaction_id == EvaluationDecision.transaction_id),
+        )
         .outerjoin(
             EventVersionLabel,
             (EventVersionLabel.ev_id == EvaluationDecision.ev_id) & (EventVersionLabel.o_id == EvaluationDecision.o_id),
@@ -80,7 +93,7 @@ def list_tested_events(
 
     triggered_rules_by_decision: dict[int, list[TriggeredRuleItem]] = defaultdict(list)
     referenced_fields_by_rule_id: dict[int, list[str]] = {}
-    decision_ids = [int(decision.ed_id) for decision, _event_version, _label_name in records]
+    decision_ids = [int(decision.ed_id) for decision, _event_version, _current_version, _label_name in records]
 
     if decision_ids:
         rule_rows = (
@@ -117,15 +130,20 @@ def list_tested_events(
     events = [
         TestedEventItem(
             evaluation_decision_id=int(decision.ed_id),
-            event_id=str(decision.event_id),
-            event_timestamp=int(decision.event_timestamp),
+            transaction_id=str(decision.transaction_id),
+            effective_at=_utc_isoformat(decision.effective_at),
+            observed_at=_utc_isoformat(decision.observed_at),
+            first_effective_at=_utc_isoformat(current_version.first_effective_at),
+            first_observed_at=_utc_isoformat(current_version.first_observed_at),
+            event_version=int(decision.event_version),
+            is_current=bool(decision.is_current),
             resolved_outcome=str(decision.resolved_outcome) if decision.resolved_outcome is not None else None,
             label_name=str(label_name) if label_name is not None else None,
             outcome_counters=dict(decision.outcome_counters or {}),
             event_data=dict(event_version.event_data or {}),
             triggered_rules=triggered_rules_by_decision.get(int(decision.ed_id), []),
         )
-        for decision, event_version, label_name in records
+        for decision, event_version, current_version, label_name in records
     ]
 
     return TestedEventsResponse(events=events, total=int(total), limit=limit)

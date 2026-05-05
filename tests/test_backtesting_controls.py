@@ -86,15 +86,15 @@ def _create_rule_with_history(session, *, logic: str = "if $amount > 100:\n\tret
     add_served_decision(
         session,
         org_id=int(org.o_id),
-        event_id=f"bt-controls-{rule.r_id}-1",
-        event_timestamp=1_800_000,
+        transaction_id=f"bt-controls-{rule.r_id}-1",
+        effective_at=1_800_000,
         event_data={"amount": 150},
     )
     add_served_decision(
         session,
         org_id=int(org.o_id),
-        event_id=f"bt-controls-{rule.r_id}-2",
-        event_timestamp=1_800_001,
+        transaction_id=f"bt-controls-{rule.r_id}-2",
+        effective_at=1_800_001,
         event_data={"amount": 50},
     )
     session.commit()

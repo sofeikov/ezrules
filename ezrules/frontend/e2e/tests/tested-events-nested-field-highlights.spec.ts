@@ -62,8 +62,8 @@ test.describe('Tested Events Nested Field Highlights', () => {
     const evaluateResponse = await request.post(`${API_BASE}/api/v2/evaluate`, {
       headers: authHeaders(),
       data: {
-        event_id: eventId,
-        event_timestamp: Math.floor(Date.now() / 1000),
+        transaction_id: eventId,
+        effective_at: Math.floor(Date.now() / 1000),
         event_data: {
           amount: 2500,
           currency: 'GBP',

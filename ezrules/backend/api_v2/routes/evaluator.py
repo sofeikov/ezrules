@@ -94,7 +94,7 @@ def _get_allowlist_executor(
 
 
 def _get_assignment_key(event: Event) -> str:
-    return str(event.event_id)
+    return str(event.transaction_id)
 
 
 def _get_rollout_bucket(o_id: int, r_id: int, assignment_key: str) -> int:
@@ -116,8 +116,13 @@ def _build_response_from_all_results(all_rule_results: dict[Any, Any]) -> dict[s
 def _resolve_dry_run_response(db: Any, o_id: int, result: dict[str, Any]) -> dict[str, Any]:
     result["outcome_set"] = sorted(result.get("outcome_set") or [])
     result["resolved_outcome"] = DatabaseOutcome(db_session=db, o_id=o_id).resolve_outcome(result["outcome_counters"])
+    result["transaction_id"] = ""
     result["event_version"] = None
-    result["evaluation_decision_id"] = None
+    result["event_version_id"] = None
+    result["evaluation_id"] = None
+    result["evaluation_status"] = "new"
+    result["is_current"] = None
+    result["superseded_evaluation_id"] = None
     return result
 
 
@@ -242,10 +247,28 @@ def evaluate(
         ) from exc
 
     event = Event(
-        event_id=request_data.event_id,
-        event_timestamp=request_data.event_timestamp,
+        transaction_id=request_data.transaction_id,
+        effective_at=request_data.effective_at,
+        observed_at=request_data.observed_at,
+        terminal_state=request_data.terminal_state,
         event_data=event_data,
     )
+    data_utils.lock_transaction_for_evaluation(db, lre.o_id, event.transaction_id)
+    duplicate = data_utils.find_duplicate_evaluation(db, lre.o_id, event)
+    if duplicate is not None:
+        return EvaluateResponse(
+            transaction_id=duplicate["transaction_id"],
+            outcome_counters=duplicate["outcome_counters"],
+            outcome_set=duplicate["outcome_set"],
+            resolved_outcome=duplicate.get("resolved_outcome"),
+            rule_results={str(k): str(v) for k, v in duplicate["rule_results"].items()},
+            event_version=duplicate.get("event_version"),
+            event_version_id=duplicate.get("event_version_id"),
+            evaluation_id=duplicate.get("evaluation_id"),
+            evaluation_status=duplicate.get("evaluation_status", "duplicate"),
+            is_current=duplicate.get("is_current"),
+            superseded_evaluation_id=duplicate.get("superseded_evaluation_id"),
+        )
     try:
         allowlist_result = allowlist_lre.evaluate_rules(event.event_data)
         if allowlist_result.get("rule_results"):
@@ -258,12 +281,17 @@ def evaluate(
             )
             _persist_evaluate_observations(db, request_data.event_data, lre.o_id)
             return EvaluateResponse(
+                transaction_id=result["transaction_id"],
                 outcome_counters=result["outcome_counters"],
                 outcome_set=result["outcome_set"],
                 resolved_outcome=result.get("resolved_outcome"),
                 rule_results={str(k): str(v) for k, v in result["rule_results"].items()},
                 event_version=result.get("event_version"),
-                evaluation_decision_id=result.get("evaluation_decision_id"),
+                event_version_id=result.get("event_version_id"),
+                evaluation_id=result.get("evaluation_id"),
+                evaluation_status=result.get("evaluation_status", "new"),
+                is_current=result.get("is_current"),
+                superseded_evaluation_id=result.get("superseded_evaluation_id"),
             )
 
         production_result = lre.evaluate_rules(event.event_data)
@@ -328,7 +356,7 @@ def evaluate(
         except Exception:
             logger.exception(
                 "Failed to persist rollout comparison logs for event_id=%s org_id=%s",
-                event.event_id,
+                event.transaction_id,
                 lre.o_id,
             )
             try:
@@ -336,29 +364,34 @@ def evaluate(
             except Exception:
                 logger.exception(
                     "Failed to rollback rollout comparison log transaction for event_id=%s org_id=%s",
-                    event.event_id,
+                    event.transaction_id,
                     lre.o_id,
                 )
 
     enqueue_shadow_evaluation(
         db=db,
         o_id=int(lre.o_id),
-        event_id=str(event.event_id),
+        event_id=str(event.transaction_id),
         event_data=event.event_data,
         production_all_rule_results=dict(production_result.get("all_rule_results", {})),
-        evaluation_decision_id=int(result["evaluation_decision_id"]),
+        evaluation_decision_id=int(result["evaluation_id"]),
         event_version_id=int(result["event_version_id"]),
     )
 
     _persist_evaluate_observations(db, request_data.event_data, lre.o_id)
 
     return EvaluateResponse(
+        transaction_id=result["transaction_id"],
         outcome_counters=result["outcome_counters"],
         outcome_set=result["outcome_set"],
         resolved_outcome=result.get("resolved_outcome"),
         rule_results={str(k): str(v) for k, v in result["rule_results"].items()},
         event_version=result.get("event_version"),
-        evaluation_decision_id=result.get("evaluation_decision_id"),
+        event_version_id=result.get("event_version_id"),
+        evaluation_id=result.get("evaluation_id"),
+        evaluation_status=result.get("evaluation_status", "new"),
+        is_current=result.get("is_current"),
+        superseded_evaluation_id=result.get("superseded_evaluation_id"),
     )
 
 
@@ -386,8 +419,10 @@ def test_event(
         ) from exc
 
     event = Event(
-        event_id=request_data.event_id,
-        event_timestamp=request_data.event_timestamp,
+        transaction_id=request_data.transaction_id,
+        effective_at=request_data.effective_at,
+        observed_at=request_data.observed_at,
+        terminal_state=request_data.terminal_state,
         event_data=event_data,
     )
 
@@ -427,6 +462,7 @@ def test_event(
     all_rule_results = dict(result.get("all_rule_results") or result.get("rule_results") or {})
 
     return EventTestResponse(
+        transaction_id=request_data.transaction_id,
         dry_run=True,
         skipped_main_rules=skipped_main_rules,
         outcome_counters=result["outcome_counters"],
@@ -434,7 +470,11 @@ def test_event(
         resolved_outcome=result.get("resolved_outcome"),
         rule_results={str(k): str(v) for k, v in result["rule_results"].items()},
         event_version=None,
-        evaluation_decision_id=None,
+        event_version_id=None,
+        evaluation_id=None,
+        evaluation_status="new",
+        is_current=None,
+        superseded_evaluation_id=None,
         all_rule_results={str(k): _serialize_rule_result(v) for k, v in all_rule_results.items()},
         evaluated_rules=_build_event_test_rule_results(db, lre.o_id, all_rule_results),
     )

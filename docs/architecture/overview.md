@@ -73,10 +73,10 @@ High-level storage domains:
 5. Otherwise, the active main rule configuration is loaded/executed
 6. Outcomes are aggregated (`rule_results`, `outcome_counters`, `outcome_set`)
 7. A single `resolved_outcome` is selected from the configured outcome hierarchy
-8. The event payload is appended as an event version, and the served response is stored as an immutable evaluation decision
+8. Exact duplicate transaction versions return the existing evaluation; otherwise the payload is appended as an event version and the served response is stored as an immutable evaluation decision
 9. Response returned to caller
 
-Repeated submissions with the same `event_id` are represented as later event versions. Downstream replay, Tested Events, rollout/shadow comparison, and analytics can anchor to the immutable served decision while future aggregate windows can separately choose latest-known event versions as of the evaluation time.
+Repeated submissions with the same `transaction_id` and new facts are represented as later event versions. The current transaction projection points at the latest effective non-terminal truth, while late-arriving and post-terminal versions remain audit-visible historical evaluations. Downstream replay and Tested Events can anchor to immutable served decisions; dashboard analytics and alert thresholds use the current projection.
 
 Allowlist rules exist for explicit trust decisions where a match should stop the normal decision flow entirely.
 

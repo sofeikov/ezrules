@@ -77,8 +77,8 @@ def test_event_test_dry_run_returns_rule_set_result_without_persisting(session):
                 "/api/v2/event-tests",
                 headers={"Authorization": f"Bearer {token}"},
                 json={
-                    "event_id": "dry_run_event_1",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "dry_run_event_1",
+                    "effective_at": 1234567890,
                     "event_data": {"amount": 250},
                 },
             )
@@ -90,7 +90,7 @@ def test_event_test_dry_run_returns_rule_set_result_without_persisting(session):
     payload = response.json()
     assert payload["dry_run"] is True
     assert payload["event_version"] is None
-    assert payload["evaluation_decision_id"] is None
+    assert payload["evaluation_id"] is None
     assert payload["resolved_outcome"] == "HOLD"
     assert payload["rule_results"] == {str(rule.r_id): "HOLD"}
     assert payload["evaluated_rules"] == [
@@ -103,8 +103,8 @@ def test_event_test_dry_run_returns_rule_set_result_without_persisting(session):
             "matched": True,
         }
     ]
-    assert session.query(EvaluationDecision).filter(EvaluationDecision.event_id == "dry_run_event_1").count() == 0
-    assert session.query(EventVersion).filter(EventVersion.event_id == "dry_run_event_1").count() == 0
+    assert session.query(EvaluationDecision).filter(EvaluationDecision.transaction_id == "dry_run_event_1").count() == 0
+    assert session.query(EventVersion).filter(EventVersion.transaction_id == "dry_run_event_1").count() == 0
 
 
 def test_event_test_requires_submit_test_events_permission(session):
@@ -120,8 +120,8 @@ def test_event_test_requires_submit_test_events_permission(session):
             "/api/v2/event-tests",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "event_id": "dry_run_denied",
-                "event_timestamp": 1234567890,
+                "transaction_id": "dry_run_denied",
+                "effective_at": 1234567890,
                 "event_data": {"amount": 250},
             },
         )

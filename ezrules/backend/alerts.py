@@ -44,6 +44,7 @@ def _count_matching_decisions(db: Any, *, o_id: int, outcome: str, window_start:
             EvaluationDecision.o_id == o_id,
             EvaluationDecision.served.is_(True),
             EvaluationDecision.decision_type == "served",
+            EvaluationDecision.is_current.is_(True),
             EvaluationDecision.resolved_outcome == outcome,
             EvaluationDecision.evaluated_at >= window_start,
             EvaluationDecision.evaluated_at <= window_end,

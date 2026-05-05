@@ -5,7 +5,7 @@ from ezrules.backend.data_utils import Event
 
 
 @pytest.mark.parametrize(
-    "event_id, event_timestamp, event_data, expected",
+    "transaction_id, effective_at, event_data, expected",
     [
         ("evt1", 1609459200, {"key": "value"}, True),
         ("evt2", 0, {"key": "value"}, True),
@@ -36,17 +36,17 @@ from ezrules.backend.data_utils import Event
         ),
     ],
 )
-def test_event(event_id: str, event_timestamp: int, event_data: dict, expected: bool):
+def test_event(transaction_id: str, effective_at: int, event_data: dict, expected: bool):
     if expected:
         # If expected is True, we expect the Event to be created successfully
-        event = Event(event_id=event_id, event_timestamp=event_timestamp, event_data=event_data)
-        assert event.event_id == event_id
-        assert event.event_timestamp == event_timestamp
+        event = Event(transaction_id=transaction_id, effective_at=effective_at, event_data=event_data)
+        assert event.transaction_id == transaction_id
+        assert event.effective_timestamp == effective_at
         assert event.event_data == event_data
     else:
         with pytest.raises(ValidationError):
             Event(
-                event_id=event_id,
-                event_timestamp=event_timestamp,
+                transaction_id=transaction_id,
+                effective_at=effective_at,
                 event_data=event_data,
             )

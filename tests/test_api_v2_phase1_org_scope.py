@@ -287,23 +287,23 @@ def test_label_usage_and_label_analytics_are_org_scoped(session):
     add_served_decision(
         session,
         org_id=int(org.o_id),
-        event_id=org_event_id,
+        transaction_id=org_event_id,
         event_data={"amount": 100},
-        event_timestamp=1234567890,
+        effective_at=1234567890,
     )
     add_served_decision(
         session,
         org_id=int(org.o_id),
-        event_id=org_upload_event_id,
+        transaction_id=org_upload_event_id,
         event_data={"amount": 200},
-        event_timestamp=1234567891,
+        effective_at=1234567891,
     )
     add_served_decision(
         session,
         org_id=int(other_org.o_id),
-        event_id=other_org_event_id,
+        transaction_id=other_org_event_id,
         event_data={"amount": 300},
-        event_timestamp=1234567892,
+        effective_at=1234567892,
     )
     session.commit()
 
@@ -311,12 +311,12 @@ def test_label_usage_and_label_analytics_are_org_scoped(session):
         foreign_mark_response = client.post(
             "/api/v2/labels/mark-event",
             headers=_auth_headers(user),
-            json={"event_id": other_org_event_id, "label_name": label_fraud.label},
+            json={"transaction_id": other_org_event_id, "label_name": label_fraud.label},
         )
         local_mark_response = client.post(
             "/api/v2/labels/mark-event",
             headers=_auth_headers(user),
-            json={"event_id": org_event_id, "label_name": label_fraud.label},
+            json={"transaction_id": org_event_id, "label_name": label_fraud.label},
         )
         upload_response = client.post(
             "/api/v2/labels/upload",

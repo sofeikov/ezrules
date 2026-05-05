@@ -99,8 +99,8 @@ def test_evaluate_api_key_auth_and_org_context_are_resolved_once(session, org, l
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "dedup-api-key",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "dedup-api-key",
+                    "effective_at": 1234567890,
                     "event_data": {},
                 },
                 headers={"X-API-Key": live_api_key},
@@ -125,8 +125,8 @@ def test_evaluate_bearer_auth_and_org_context_are_resolved_once(session, org, be
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "dedup-bearer",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "dedup-bearer",
+                    "effective_at": 1234567890,
                     "event_data": {},
                 },
                 headers={"Authorization": f"Bearer {bearer_token}"},

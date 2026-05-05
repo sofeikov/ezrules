@@ -222,8 +222,8 @@ def test_evaluate_reuses_cached_api_key_auth_until_revoke(session, org, live_api
         first_response = client.post(
             "/api/v2/evaluate",
             json={
-                "event_id": "api_key_cache_eval_1",
-                "event_timestamp": 1700000000,
+                "transaction_id": "api_key_cache_eval_1",
+                "effective_at": 1700000000,
                 "event_data": {},
             },
             headers={"X-API-Key": live_api_key},
@@ -231,8 +231,8 @@ def test_evaluate_reuses_cached_api_key_auth_until_revoke(session, org, live_api
         second_response = client.post(
             "/api/v2/evaluate",
             json={
-                "event_id": "api_key_cache_eval_2",
-                "event_timestamp": 1700000001,
+                "transaction_id": "api_key_cache_eval_2",
+                "effective_at": 1700000001,
                 "event_data": {},
             },
             headers={"X-API-Key": live_api_key},
@@ -244,8 +244,8 @@ def test_evaluate_reuses_cached_api_key_auth_until_revoke(session, org, live_api
         revoked_response = client.post(
             "/api/v2/evaluate",
             json={
-                "event_id": "api_key_cache_eval_3",
-                "event_timestamp": 1700000002,
+                "transaction_id": "api_key_cache_eval_3",
+                "effective_at": 1700000002,
                 "event_data": {},
             },
             headers={"X-API-Key": live_api_key},

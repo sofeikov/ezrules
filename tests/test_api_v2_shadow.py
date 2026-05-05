@@ -631,8 +631,8 @@ class TestShadowEvaluation:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "shadow_eval_test_1",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "shadow_eval_test_1",
+                    "effective_at": 1234567890,
                     "event_data": {"amount": 100},
                 },
                 headers={"X-API-Key": live_api_key},
@@ -672,8 +672,8 @@ class TestShadowEvaluation:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "shadow_eval_test_1",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "shadow_eval_test_1",
+                    "effective_at": 1234567890,
                     "event_data": {"amount": 100},
                 },
                 headers={"X-API-Key": live_api_key},
@@ -718,8 +718,8 @@ class TestShadowEvaluation:
             response = client.post(
                 "/api/v2/evaluate",
                 json={
-                    "event_id": "shadow_absent_test",
-                    "event_timestamp": 1234567890,
+                    "transaction_id": "shadow_absent_test",
+                    "effective_at": 1234567890,
                     "event_data": {},
                 },
                 headers={"X-API-Key": live_api_key},
