@@ -583,15 +583,15 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
             session.query(EventVersion)
             .filter(
                 EventVersion.o_id == org_id,
-                EventVersion.event_id.like("TestEvent_%"),
+                EventVersion.transaction_id.like("TestEvent_%"),
             )
             .count()
         )
         generated_events = build_demo_events(n_events=n_events, start_index=existing_event_count)
         for index, generated_event in enumerate(generated_events, start=1):
             event = Event(
-                event_id=generated_event.event_id,
-                event_timestamp=generated_event.event_timestamp,
+                transaction_id=generated_event.event_id,
+                effective_at=generated_event.event_timestamp,
                 event_data=generated_event.event_data,
             )
 
@@ -637,7 +637,7 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
                         event_version = get_labelable_event_version(
                             session,
                             o_id=org_id,
-                            event_id=str(generated_event.event_id),
+                            transaction_id=str(generated_event.event_id),
                         )
                         if event_version is None:
                             continue
@@ -824,7 +824,7 @@ def export_test_csv(output_file: str, n_events: int, unlabeled_only: bool, org_n
 
         test_labels = []
         for event in events:
-            event_version = get_labelable_event_version(session, o_id=org_id, event_id=str(event.event_id))
+            event_version = get_labelable_event_version(session, o_id=org_id, transaction_id=str(event.transaction_id))
             if event_version is None:
                 continue
             if unlabeled_only and event_version is not None:
@@ -899,7 +899,9 @@ def reset_dev(ctx, user_email, password, org_name, n_rules, n_events):
 def delete_test_data():
     _, engine, session = _create_cli_session()
     try:
-        session.query(EventVersion).filter(EventVersion.event_id.ilike("TestEvent_%")).delete(synchronize_session=False)
+        session.query(EventVersion).filter(EventVersion.transaction_id.ilike("TestEvent_%")).delete(
+            synchronize_session=False
+        )
         session.query(RuleModel).filter(RuleModel.rid.ilike("TestRule_%")).delete(synchronize_session=False)
         session.commit()
     finally:

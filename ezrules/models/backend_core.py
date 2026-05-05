@@ -47,6 +47,20 @@ class AsaList(types.TypeDecorator):
         return []
 
 
+class CoerceDateTime(types.TypeDecorator):
+    """Accept Unix seconds for legacy test fixtures while storing datetimes."""
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return datetime.datetime.now(datetime.UTC)
+        if isinstance(value, int):
+            return datetime.datetime.fromtimestamp(value, datetime.UTC)
+        return value
+
+
 class RoleMixin:
     """Mixin for Role model definitions.
 
@@ -299,23 +313,50 @@ class Label(Base):
 class EventVersion(Base):
     __tablename__ = "event_versions"
     __table_args__ = (
-        UniqueConstraint("o_id", "event_id", "event_version", name="uq_event_versions_org_event_version"),
+        UniqueConstraint("o_id", "transaction_id", "event_version", name="uq_event_versions_org_transaction_version"),
         UniqueConstraint("o_id", "ev_id", name="uq_event_versions_org_ev_id"),
-        Index("ix_event_versions_o_id_event_id_version", "o_id", "event_id", "event_version"),
+        Index("ix_event_versions_o_id_transaction_version", "o_id", "transaction_id", "event_version"),
+        Index(
+            "ix_event_versions_o_id_transaction_hash",
+            "o_id",
+            "transaction_id",
+            "payload_hash",
+            "effective_at",
+            "observed_at",
+        ),
         Index("ix_event_versions_o_id_ingested_at", "o_id", "ingested_at"),
-        Index("ix_event_versions_o_id_event_timestamp", "o_id", "event_timestamp"),
+        Index("ix_event_versions_o_id_effective_at", "o_id", "effective_at"),
     )
 
     ev_id = Column(Integer, unique=True, primary_key=True)
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
-    event_id = Column(String, nullable=False)
+    transaction_id = Column(String, nullable=False)
     event_version = Column(Integer, nullable=False)
-    event_timestamp = Column(Integer, nullable=False)
+    effective_at = Column(CoerceDateTime, nullable=False)
+    observed_at = Column(CoerceDateTime, nullable=False)
     event_data = Column(JSON, nullable=False)
     payload_hash = Column(String(64), nullable=False)
     source = Column(String(32), nullable=False, default="evaluate")
+    terminal_state = Column(Boolean, nullable=False, default=False)
     supersedes_ev_id: Mapped[int | None] = mapped_column(ForeignKey("event_versions.ev_id"), nullable=True)
     ingested_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+
+    @property
+    def event_id(self) -> str:
+        return str(self.transaction_id)
+
+    @event_id.setter
+    def event_id(self, value: str) -> None:
+        self.transaction_id = value
+
+    @property
+    def event_timestamp(self) -> int:
+        return int(self.effective_at.replace(tzinfo=datetime.UTC).timestamp())
+
+    @event_timestamp.setter
+    def event_timestamp(self, value: int) -> None:
+        self.effective_at = datetime.datetime.fromtimestamp(value, datetime.UTC)
+        self.observed_at = self.effective_at
 
 
 class EvaluationDecision(Base):
@@ -323,18 +364,23 @@ class EvaluationDecision(Base):
     __table_args__ = (
         UniqueConstraint("o_id", "idempotency_key", name="uq_evaluation_decisions_org_idempotency_key"),
         Index("ix_evaluation_decisions_o_id_evaluated_at", "o_id", "evaluated_at"),
-        Index("ix_evaluation_decisions_o_id_event_id_version", "o_id", "event_id", "event_version"),
+        Index("ix_evaluation_decisions_o_id_transaction_version", "o_id", "transaction_id", "event_version"),
         Index("ix_evaluation_decisions_o_id_served", "o_id", "served"),
+        Index("ix_evaluation_decisions_o_id_current", "o_id", "is_current"),
     )
 
     ed_id = Column(Integer, unique=True, primary_key=True)
     ev_id: Mapped[int] = mapped_column(ForeignKey("event_versions.ev_id", ondelete="CASCADE"), nullable=False)
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
-    event_id = Column(String, nullable=False)
+    transaction_id = Column(String, nullable=False)
     event_version = Column(Integer, nullable=False)
-    event_timestamp = Column(Integer, nullable=False)
+    effective_at = Column(CoerceDateTime, nullable=False)
+    observed_at = Column(CoerceDateTime, nullable=False)
     decision_type = Column(String(32), nullable=False, default="served")
     served = Column(Boolean, nullable=False, default=True)
+    is_current = Column(Boolean, nullable=False, default=True)
+    superseded_by_ed_id: Mapped[int | None] = mapped_column(ForeignKey("evaluation_decisions.ed_id"), nullable=True)
+    superseded_at = Column(DateTime, nullable=True)
     idempotency_key = Column(String(128), nullable=True)
     rule_config_label = Column(String(64), nullable=False, default="production")
     rule_config_version = Column(Integer, nullable=True)
@@ -343,6 +389,46 @@ class EvaluationDecision(Base):
     resolved_outcome = Column(String, nullable=True)
     all_rule_results = Column(JSON, nullable=True)
     evaluated_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+
+    @property
+    def event_id(self) -> str:
+        return str(self.transaction_id)
+
+    @event_id.setter
+    def event_id(self, value: str) -> None:
+        self.transaction_id = value
+
+    @property
+    def event_timestamp(self) -> int:
+        return int(self.effective_at.replace(tzinfo=datetime.UTC).timestamp())
+
+    @event_timestamp.setter
+    def event_timestamp(self, value: int) -> None:
+        self.effective_at = datetime.datetime.fromtimestamp(value, datetime.UTC)
+        self.observed_at = self.effective_at
+
+
+class TransactionCurrentVersion(Base):
+    __tablename__ = "transaction_current_versions"
+    __table_args__ = (
+        UniqueConstraint("o_id", "transaction_id", name="uq_transaction_current_org_transaction"),
+        Index("ix_transaction_current_o_id_effective_at", "o_id", "current_effective_at"),
+        Index("ix_transaction_current_o_id_first_effective_at", "o_id", "first_effective_at"),
+    )
+
+    tcv_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    transaction_id = Column(String, nullable=False)
+    current_ev_id: Mapped[int] = mapped_column(ForeignKey("event_versions.ev_id", ondelete="CASCADE"), nullable=False)
+    current_ed_id: Mapped[int] = mapped_column(
+        ForeignKey("evaluation_decisions.ed_id", ondelete="CASCADE"), nullable=False
+    )
+    first_effective_at = Column(CoerceDateTime, nullable=False)
+    first_observed_at = Column(CoerceDateTime, nullable=False)
+    current_effective_at = Column(CoerceDateTime, nullable=False)
+    current_observed_at = Column(CoerceDateTime, nullable=False)
+    terminal_state = Column(Boolean, nullable=False, default=False)
+    updated_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
 
 
 class EvaluationRuleResult(Base):
