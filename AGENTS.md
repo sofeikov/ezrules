@@ -29,6 +29,17 @@ uv run pytest -q --cov=ezrules.backend --cov=ezrules.core --cov-report=xml tests
 - Prefer quiet test output by default: use backend pytest in quiet mode (`-q`) and keep coverage output in XML unless a failing run specifically needs the more verbose terminal report.
 - Prefer the default quiet Playwright run (`npm run test:e2e`) instead of the verbose reporter variant. Use the verbose mode only when debugging failures interactively.
 
+# Agentic Exploratory Testing
+Agentic product exploration charters live under `tests/agentic_exploration/`. Treat them as free-testing prompts for finding unknown product issues, not deterministic CI gates.
+
+When asked to run agentic exploration:
+- Use `tests/agentic_exploration/RUN_CONTRACT.md` plus exactly one charter from `tests/agentic_exploration/charters/` per agent.
+- Run against a private local/dev database and disposable test data only. Never use shared `tests` or `ezrules` databases.
+- Ask agents to report findings using `tests/agentic_exploration/REPORT_TEMPLATE.md`.
+- Do not let exploration agents modify source code or fix bugs during the exploration run; they should report evidence and deterministic-test recommendations.
+- Convert credible repeatable findings into backend business tests or Playwright E2E tests before relying on them as release gates.
+- Generated exploration reports belong under `tests/agentic_exploration/reports/` or `artifacts/` and should not be committed unless explicitly requested.
+
 # Common Development Commands
 - **Install dependencies**: `uv sync`
 - **Initialize database**: `uv run ezrules init-db`
