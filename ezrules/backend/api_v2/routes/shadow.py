@@ -43,8 +43,8 @@ def _shadow_entries_subquery(current_org_id: int):
             RuleDeploymentResultsLog.r_id.label("r_id"),
             func.coalesce(RuleDeploymentResultsLog.candidate_result, literal("None")).label("shadow_result"),
             func.coalesce(RuleDeploymentResultsLog.control_result, literal("None")).label("prod_result"),
-            EvaluationDecision.event_id.label("event_id"),
-            EvaluationDecision.event_timestamp.label("event_timestamp"),
+            EvaluationDecision.transaction_id.label("transaction_id"),
+            EvaluationDecision.effective_at.label("effective_at"),
             RuleDeploymentResultsLog.created_at.label("created_at"),
         )
         .join(EvaluationDecision, EvaluationDecision.ed_id == RuleDeploymentResultsLog.ed_id)
@@ -104,8 +104,8 @@ def get_shadow_results(
             shadow_entries.c.decision_id,
             shadow_entries.c.r_id,
             shadow_entries.c.shadow_result,
-            shadow_entries.c.event_id,
-            shadow_entries.c.event_timestamp,
+            shadow_entries.c.transaction_id,
+            shadow_entries.c.effective_at,
             shadow_entries.c.created_at,
         )
         .order_by(shadow_entries.c.created_at.desc(), shadow_entries.c.log_id.desc())
@@ -120,8 +120,8 @@ def get_shadow_results(
             evaluation_decision_id=int(row.decision_id),
             r_id=int(row.r_id),
             rule_result=str(row.shadow_result),
-            event_id=str(row.event_id),
-            event_timestamp=int(row.event_timestamp),
+            transaction_id=str(row.transaction_id),
+            effective_at=row.effective_at,
             created_at=row.created_at,
         )
         for row in rows

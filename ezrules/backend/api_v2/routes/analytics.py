@@ -113,7 +113,7 @@ def apply_served_decision_window(
     start_time: datetime.datetime,
     end_time: datetime.datetime,
 ) -> Any:
-    """Limit a dashboard analytics query to canonical served decisions."""
+    """Limit dashboard analytics to canonical served decisions by decision time."""
     return (
         query.filter(EvaluationDecision.evaluated_at >= start_time)
         .filter(EvaluationDecision.evaluated_at <= end_time)

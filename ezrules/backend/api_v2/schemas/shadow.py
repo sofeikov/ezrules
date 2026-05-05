@@ -35,8 +35,8 @@ class ShadowResultItem(BaseModel):
     evaluation_decision_id: int
     r_id: int
     rule_result: str
-    event_id: str
-    event_timestamp: int
+    transaction_id: str
+    effective_at: datetime
     created_at: datetime | None
 
 

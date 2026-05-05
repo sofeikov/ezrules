@@ -52,17 +52,19 @@ def get_label_manager(db: Any, org_id: int) -> DatabaseLabelManager:
 
 def get_event_version_for_labeling(
     db: Any,
-    event_id: str,
+    transaction_id: str,
     event_version: int | None,
     org_id: int,
 ) -> EventVersion:
     """Load a canonical served event version for labeling or raise a precise error."""
-    event_record = get_labelable_event_version(db, o_id=org_id, event_id=event_id, event_version=event_version)
+    event_record = get_labelable_event_version(
+        db, o_id=org_id, transaction_id=transaction_id, event_version=event_version
+    )
     if event_record is None:
         suffix = f" version {event_version}" if event_version is not None else ""
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Served event with id '{event_id}'{suffix} not found",
+            detail=f"Served transaction with id '{transaction_id}'{suffix} not found",
         )
     return event_record
 
@@ -293,10 +295,10 @@ def mark_event(
 
     Associates an existing event with an existing label.
     """
-    event_id = request_data.event_id
+    transaction_id = request_data.transaction_id
     label_name = request_data.label_name.strip().upper()
 
-    event_record = get_event_version_for_labeling(db, event_id, request_data.event_version, current_org_id)
+    event_record = get_event_version_for_labeling(db, transaction_id, request_data.event_version, current_org_id)
 
     # Find the label by name
     label = get_label_by_name(db, label_name, current_org_id)
@@ -320,14 +322,17 @@ def mark_event(
         action="assigned",
         o_id=current_org_id,
         changed_by=str(user.email) if user.email else None,
-        details=f"Event ID: {event_id}, event version: {event_record.event_version}",
+        details=f"Transaction ID: {transaction_id}, event version: {event_record.event_version}",
     )
     db.commit()
 
     return MarkEventResponse(
         success=True,
-        message=f"Event '{event_id}' version {event_record.event_version} successfully marked with label '{label_name}'",
-        event_id=event_id,
+        message=(
+            f"Transaction '{transaction_id}' version {event_record.event_version} "
+            f"successfully marked with label '{label_name}'"
+        ),
+        transaction_id=transaction_id,
         event_version=int(event_record.event_version),
         label_name=label_name,
     )
@@ -359,7 +364,7 @@ async def upload_labels(
     """
     Upload a CSV file to bulk-assign labels to events.
 
-    CSV format: event_id,label_name or event_id,event_version,label_name (one per line, no header row).
+    CSV format: transaction_id,label_name or transaction_id,event_version,label_name (one per line, no header row).
     """
     if file.content_type not in ("text/csv", "application/octet-stream", "text/plain"):
         raise HTTPException(
@@ -387,7 +392,7 @@ async def upload_labels(
             action="assigned_via_csv",
             o_id=current_org_id,
             changed_by=str(user.email) if user.email else None,
-            details=f"Event ID: {assignment.event_id}, event version: {assignment.event_version}",
+            details=f"Transaction ID: {assignment.event_id}, event version: {assignment.event_version}",
         )
 
     db.commit()
