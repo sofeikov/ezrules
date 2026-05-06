@@ -1,0 +1,306 @@
+version: 1
+name: canonical_evaluation_universe
+
+outcomes:
+  - name: CANCEL
+    severity_rank: 1
+    meaning: Hard stop; highest severity outcome.
+  - name: HOLD
+    severity_rank: 2
+    meaning: Manual intervention required.
+  - name: REVIEW
+    severity_rank: 3
+    meaning: Analyst review required before release.
+  - name: RELEASE
+    severity_rank: 4
+    meaning: Neutral outcome; transaction may proceed.
+
+settings:
+  main_rule_execution_mode: all_matches
+  neutral_outcome: RELEASE
+
+user_lists:
+  TrustedCustomers:
+    - cust_trusted_001
+    - cust_trusted_002
+  HighRiskCountries:
+    - NG
+    - RU
+    - IR
+
+rules:
+  - id: R_AMOUNT_REVIEW
+    numeric_id: 10101
+    lane: main
+    order: 10
+    description: High amount requires review.
+    logic: "if $amount >= 1000:\n\treturn !REVIEW"
+
+  - id: R_COUNTRY_HOLD
+    numeric_id: 10102
+    lane: main
+    order: 20
+    description: High-risk country requires hold.
+    logic: "if $country in @HighRiskCountries:\n\treturn !HOLD"
+
+  - id: R_VELOCITY_CANCEL
+    numeric_id: 10103
+    lane: main
+    order: 30
+    description: High-value velocity requires cancel.
+    logic: "if $transaction_count_1h >= 5 and $amount >= 5000:\n\treturn !CANCEL"
+
+  - id: R_DEVICE_HOLD
+    numeric_id: 10104
+    lane: main
+    order: 40
+    description: Low device trust requires hold.
+    logic: "if $device_trust_score <= 20:\n\treturn !HOLD"
+
+  - id: A_TRUSTED_CUSTOMER_RELEASE
+    numeric_id: 10201
+    lane: allowlist
+    order: 1
+    description: Trusted customers bypass main rules.
+    logic: "if $customer_id in @TrustedCustomers:\n\treturn !RELEASE"
+
+scenarios:
+  - id: amount_only_reviews_transaction
+    purpose: A single main-rule hit persists a predictable REVIEW decision.
+    submissions:
+      - transaction_id: canonical_amount_only
+        effective_at: 1710000000
+        event_data:
+          amount: 1500
+          country: GB
+          customer_id: cust_normal_001
+          transaction_count_1h: 1
+          device_trust_score: 90
+        expected:
+          evaluation_status: new
+          event_version: 1
+          is_current: true
+          resolved_outcome: REVIEW
+          outcome_counters:
+            REVIEW: 1
+          rule_results:
+            R_AMOUNT_REVIEW: REVIEW
+    final:
+      event_versions: 1
+      decisions: 1
+      current_event_version: 1
+      current_resolved_outcome: REVIEW
+
+  - id: amount_and_country_resolves_highest_severity
+    purpose: Multiple main-rule hits preserve all rule results and resolve to the highest-severity outcome.
+    submissions:
+      - transaction_id: canonical_amount_country
+        effective_at: 1710000000
+        event_data:
+          amount: 2500
+          country: NG
+          customer_id: cust_normal_002
+          transaction_count_1h: 1
+          device_trust_score: 90
+        expected:
+          evaluation_status: new
+          event_version: 1
+          is_current: true
+          resolved_outcome: HOLD
+          outcome_counters:
+            REVIEW: 1
+            HOLD: 1
+          rule_results:
+            R_AMOUNT_REVIEW: REVIEW
+            R_COUNTRY_HOLD: HOLD
+    final:
+      event_versions: 1
+      decisions: 1
+      current_event_version: 1
+      current_resolved_outcome: HOLD
+
+  - id: velocity_cancel_wins_over_hold_and_review
+    purpose: CANCEL outranks lower-severity outcomes when several rules match together.
+    submissions:
+      - transaction_id: canonical_velocity_cancel
+        effective_at: 1710000000
+        event_data:
+          amount: 9000
+          country: NG
+          customer_id: cust_normal_003
+          transaction_count_1h: 7
+          device_trust_score: 90
+        expected:
+          evaluation_status: new
+          event_version: 1
+          is_current: true
+          resolved_outcome: CANCEL
+          outcome_counters:
+            REVIEW: 1
+            HOLD: 1
+            CANCEL: 1
+          rule_results:
+            R_AMOUNT_REVIEW: REVIEW
+            R_COUNTRY_HOLD: HOLD
+            R_VELOCITY_CANCEL: CANCEL
+    final:
+      event_versions: 1
+      decisions: 1
+      current_event_version: 1
+      current_resolved_outcome: CANCEL
+
+  - id: first_match_stops_after_first_hit
+    purpose: Ordered execution stops after the first matching main rule.
+    settings:
+      main_rule_execution_mode: first_match
+    submissions:
+      - transaction_id: canonical_first_match
+        effective_at: 1710000000
+        event_data:
+          amount: 9000
+          country: NG
+          customer_id: cust_normal_004
+          transaction_count_1h: 7
+          device_trust_score: 5
+        expected:
+          evaluation_status: new
+          event_version: 1
+          is_current: true
+          resolved_outcome: REVIEW
+          outcome_counters:
+            REVIEW: 1
+          rule_results:
+            R_AMOUNT_REVIEW: REVIEW
+          absent_rule_results:
+            - R_COUNTRY_HOLD
+            - R_VELOCITY_CANCEL
+            - R_DEVICE_HOLD
+    final:
+      event_versions: 1
+      decisions: 1
+      current_event_version: 1
+      current_resolved_outcome: REVIEW
+
+  - id: trusted_customer_short_circuits_main_rules
+    purpose: A matching allowlist rule returns the neutral outcome and prevents main-rule execution.
+    submissions:
+      - transaction_id: canonical_allowlist
+        effective_at: 1710000000
+        event_data:
+          amount: 9000
+          country: NG
+          customer_id: cust_trusted_001
+          transaction_count_1h: 7
+          device_trust_score: 5
+        expected:
+          evaluation_status: new
+          event_version: 1
+          is_current: true
+          resolved_outcome: RELEASE
+          outcome_counters:
+            RELEASE: 1
+          rule_results:
+            A_TRUSTED_CUSTOMER_RELEASE: RELEASE
+          absent_rule_results:
+            - R_AMOUNT_REVIEW
+            - R_COUNTRY_HOLD
+            - R_VELOCITY_CANCEL
+            - R_DEVICE_HOLD
+    final:
+      event_versions: 1
+      decisions: 1
+      current_event_version: 1
+      current_resolved_outcome: RELEASE
+
+  - id: exact_duplicate_reuses_served_decision
+    purpose: An exact replay returns the original served decision instead of creating a second event version.
+    submissions:
+      - transaction_id: canonical_duplicate
+        effective_at: 1710000000
+        event_data:
+          amount: 1500
+          country: GB
+          customer_id: cust_normal_005
+          transaction_count_1h: 1
+          device_trust_score: 90
+        expected:
+          evaluation_status: new
+          event_version: 1
+          is_current: true
+          resolved_outcome: REVIEW
+          outcome_counters:
+            REVIEW: 1
+          rule_results:
+            R_AMOUNT_REVIEW: REVIEW
+      - transaction_id: canonical_duplicate
+        effective_at: 1710000000
+        event_data:
+          amount: 1500
+          country: GB
+          customer_id: cust_normal_005
+          transaction_count_1h: 1
+          device_trust_score: 90
+        expected:
+          evaluation_status: duplicate
+          event_version: 1
+          same_evaluation_as_submission: 0
+          is_current: true
+          resolved_outcome: REVIEW
+          outcome_counters:
+            REVIEW: 1
+          rule_results:
+            R_AMOUNT_REVIEW: REVIEW
+    final:
+      event_versions: 1
+      decisions: 1
+      current_event_version: 1
+      current_resolved_outcome: REVIEW
+
+  - id: changed_payload_supersedes_current_transaction
+    purpose: A changed payload for the same transaction creates the next event version and updates current projection.
+    submissions:
+      - transaction_id: canonical_superseding
+        effective_at: 1710000000
+        event_data:
+          amount: 1500
+          country: GB
+          customer_id: cust_normal_006
+          transaction_count_1h: 1
+          device_trust_score: 90
+        expected:
+          evaluation_status: new
+          event_version: 1
+          is_current: true
+          resolved_outcome: REVIEW
+          outcome_counters:
+            REVIEW: 1
+          rule_results:
+            R_AMOUNT_REVIEW: REVIEW
+      - transaction_id: canonical_superseding
+        effective_at: 1710000300
+        event_data:
+          amount: 9000
+          country: NG
+          customer_id: cust_normal_006
+          transaction_count_1h: 7
+          device_trust_score: 90
+        expected:
+          evaluation_status: superseding
+          event_version: 2
+          is_current: true
+          resolved_outcome: CANCEL
+          outcome_counters:
+            REVIEW: 1
+            HOLD: 1
+            CANCEL: 1
+          rule_results:
+            R_AMOUNT_REVIEW: REVIEW
+            R_COUNTRY_HOLD: HOLD
+            R_VELOCITY_CANCEL: CANCEL
+    final:
+      event_versions: 2
+      decisions: 2
+      current_event_version: 2
+      current_resolved_outcome: CANCEL
+      superseded_decision_versions:
+        - 1

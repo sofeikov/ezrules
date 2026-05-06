@@ -1,0 +1,58 @@
+{
+  "events": {
+    "high_amount_review": {
+      "transaction_id": "agent_high_amount_review",
+      "effective_at": 1710000000,
+      "event_data": {
+        "amount": 1500,
+        "currency": "GBP",
+        "country": "GB",
+        "customer_id": "agent_customer_001",
+        "risk_score": 82
+      }
+    },
+    "trusted_customer_release": {
+      "transaction_id": "agent_trusted_customer_release",
+      "effective_at": 1710000000,
+      "event_data": {
+        "amount": 250,
+        "currency": "GBP",
+        "country": "GB",
+        "customer_id": "agent_trusted_001",
+        "risk_score": 12
+      }
+    },
+    "nested_profile_risk": {
+      "transaction_id": "agent_nested_profile_risk",
+      "effective_at": 1710000000,
+      "event_data": {
+        "amount": "1250.00",
+        "customer": {
+          "id": "agent_nested_001",
+          "profile": {
+            "age": 19,
+            "country": "NG"
+          }
+        },
+        "device": {
+          "trust_score": 9
+        }
+      }
+    }
+  },
+  "rule_logic": {
+    "amount_review": "if $amount >= 1000:\n\treturn !REVIEW",
+    "risk_hold": "if $risk_score >= 80:\n\treturn !HOLD",
+    "trusted_allowlist": "if $customer_id in @AgentTrustedCustomers:\n\treturn !RELEASE",
+    "nested_device_hold": "if $device.trust_score <= 10:\n\treturn !HOLD"
+  },
+  "lists": {
+    "trusted_customers": "AgentTrustedCustomers",
+    "watchlist_customers": "AgentWatchlistCustomers"
+  },
+  "labels": [
+    "AGENT_FRAUD",
+    "AGENT_FALSE_POSITIVE",
+    "AGENT_LEGIT"
+  ]
+}
