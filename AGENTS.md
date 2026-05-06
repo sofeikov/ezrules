@@ -6,8 +6,9 @@
 # Verification Policy
 Default to GitHub-hosted verification instead of local test execution.
 
-- Do not run local test suites, local Playwright runs, local backend suites, local docs builds, or local code-quality commands unless the user explicitly asks for local verification or the task is specifically about diagnosing a local-only bug.
-- For normal feature/fix work, implement the change, create or update the PR, push it, and use GitHub Actions/PR checks as the verification source of truth.
+- Always run `uv run poe check` locally before pushing a branch, opening a PR, or updating a PR. Fix any failures locally first so GitHub Actions does not get noisy code-quality/type/lint failures.
+- Do not run local test suites, local Playwright runs, local backend suites, or local docs builds unless the user explicitly asks for local verification or the task is specifically about diagnosing a local-only bug.
+- For normal feature/fix work, implement the change, run `uv run poe check`, create or update the PR, push it, and use GitHub Actions/PR checks as the verification source of truth for tests and full infra validation.
 - Do not bring up local Postgres, Redis, Mailpit, API, Celery, Angular, or Docker demo stacks just to verify code before opening a PR. Use CI/CD infrastructure for that.
 - If GitHub checks fail, inspect the failing CI logs, make a focused fix, push again, and let CI rerun.
 - Local infra is still appropriate when the user explicitly asks to run the app for manual testing, requests a local demo recording, or reports a bug that only reproduces in their local topology.
@@ -102,7 +103,7 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 
 # Writing New Code
 1. You may add new test files without asking. Do not modify existing test files unless explicitly allowed.
-2. Before reporting task completion, create or update the PR and confirm the relevant GitHub Actions checks have passed unless the user explicitly requested local-only work.
+2. Before pushing or reporting task completion, ensure `uv run poe check` passes locally, then create or update the PR and confirm the relevant GitHub Actions checks have passed unless the user explicitly requested local-only work.
 3. Any new imports must go to the top of the file (no inline imports in functions).
 4. Any new functionality must be covered with tests.
 5. When implementing new functionality, explicitly ask the user whether permissions and audit logging should be included in scope.
