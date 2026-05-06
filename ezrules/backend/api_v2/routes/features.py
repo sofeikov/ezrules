@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import text
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
@@ -34,6 +35,7 @@ from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import FeatureDefinition, User
 
 router = APIRouter(prefix="/api/v2/features", tags=["Features"])
+FEATURE_ACTIVATION_LOCK_NAMESPACE = 240506
 
 
 def _response(db: Any, o_id: int, feature: FeatureDefinition) -> FeatureDefinitionResponse:
@@ -75,6 +77,12 @@ def _apply_payload(feature: FeatureDefinition, data: FeatureDefinitionCreate | F
     feature.null_handling = data.null_handling
 
 
+def _mark_feature_changed(feature: FeatureDefinition, user_email: str) -> None:
+    feature.version = int(feature.version) + 1
+    feature.updated_by = user_email
+    feature.updated_at = datetime.now(UTC)
+
+
 def _get_feature(db: Any, o_id: int, feature_id: int) -> FeatureDefinition:
     feature = (
         db.query(FeatureDefinition)
@@ -103,6 +111,13 @@ def _ensure_unique_feature_path(
         query = query.filter(FeatureDefinition.fd_id != exclude_feature_id)
     if query.first() is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Feature path already exists")
+
+
+def _lock_feature_activation_quota(db: Any, o_id: int) -> None:
+    db.execute(
+        text("SELECT pg_advisory_xact_lock(:namespace, :org_id)"),
+        {"namespace": FEATURE_ACTIVATION_LOCK_NAMESPACE, "org_id": o_id},
+    )
 
 
 @router.get("", response_model=FeatureDefinitionListResponse)
@@ -175,8 +190,7 @@ def update_feature(
             detail="Active features used by rules cannot be edited incompatibly; deprecate and create a new feature.",
         )
     _apply_payload(feature, data)
-    feature.version = int(feature.version) + 1
-    feature.updated_by = str(user.email)
+    _mark_feature_changed(feature, str(user.email))
     save_feature_definition_history(
         db,
         fd_id=int(feature.fd_id),
@@ -202,17 +216,18 @@ def activate_feature(
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> FeatureMutationResponse:
-    active_count = (
-        db.query(FeatureDefinition)
-        .filter(FeatureDefinition.o_id == current_org_id, FeatureDefinition.status == "active")
-        .count()
-    )
-    if active_count >= MAX_ACTIVE_FEATURES_PER_ORG:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Active feature quota exceeded")
+    _lock_feature_activation_quota(db, current_org_id)
     feature = _get_feature(db, current_org_id, feature_id)
+    if str(feature.status) != FeatureStatus.ACTIVE.value:
+        active_count = (
+            db.query(FeatureDefinition)
+            .filter(FeatureDefinition.o_id == current_org_id, FeatureDefinition.status == "active")
+            .count()
+        )
+        if active_count >= MAX_ACTIVE_FEATURES_PER_ORG:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Active feature quota exceeded")
     feature.status = "active"
-    feature.version = int(feature.version) + 1
-    feature.updated_by = str(user.email)
+    _mark_feature_changed(feature, str(user.email))
     save_feature_definition_history(
         db,
         fd_id=int(feature.fd_id),
@@ -242,8 +257,7 @@ def deprecate_feature(
     if get_feature_dependencies(db, current_org_id, feature_path(feature)):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Feature is used by rules")
     feature.status = "deprecated"
-    feature.version = int(feature.version) + 1
-    feature.updated_by = str(user.email)
+    _mark_feature_changed(feature, str(user.email))
     save_feature_definition_history(
         db,
         fd_id=int(feature.fd_id),

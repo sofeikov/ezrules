@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy import (
     Enum as SQLEnum,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
@@ -326,6 +327,36 @@ class EventVersion(Base):
         ),
         Index("ix_event_versions_o_id_ingested_at", "o_id", "ingested_at"),
         Index("ix_event_versions_o_id_effective_at", "o_id", "effective_at"),
+        Index(
+            "ix_event_versions_o_id_customer_id_effective_at",
+            "o_id",
+            text("((event_data ->> 'customer_id'))"),
+            "effective_at",
+        ),
+        Index(
+            "ix_event_versions_o_id_sender_id_effective_at",
+            "o_id",
+            text("((event_data ->> 'sender_id'))"),
+            "effective_at",
+        ),
+        Index(
+            "ix_event_versions_o_id_account_id_effective_at",
+            "o_id",
+            text("((event_data ->> 'account_id'))"),
+            "effective_at",
+        ),
+        Index(
+            "ix_event_versions_o_id_customer_nested_id_effective_at",
+            "o_id",
+            text("((event_data #>> '{customer,id}'))"),
+            "effective_at",
+        ),
+        Index(
+            "ix_event_versions_o_id_sender_nested_id_effective_at",
+            "o_id",
+            text("((event_data #>> '{sender,id}'))"),
+            "effective_at",
+        ),
     )
 
     ev_id = Column(Integer, unique=True, primary_key=True)
@@ -334,7 +365,7 @@ class EventVersion(Base):
     event_version = Column(Integer, nullable=False)
     effective_at = Column(CoerceDateTime, nullable=False)
     observed_at = Column(CoerceDateTime, nullable=False)
-    event_data = Column(JSON, nullable=False)
+    event_data = Column(JSONB, nullable=False)
     payload_hash = Column(String(64), nullable=False)
     source = Column(String(32), nullable=False, default="evaluate")
     terminal_state = Column(Boolean, nullable=False, default=False)

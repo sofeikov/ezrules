@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy.exc import NoResultFound
 
@@ -18,17 +19,24 @@ class AbstractRuleExecutor(ABC):
     def _check_rule_config_is_fresh(self):
         """Ensure the rule config is fresh."""
 
-    def evaluate_rules(self, eval_object, *, as_of: datetime | None = None):
+    def get_rule_stats(self) -> set[str]:
+        self._check_rule_config_is_fresh()
+        if self.rule_engine is None:
+            return set()
+        return self.rule_engine.get_rule_stats()
+
+    def evaluate_rules(self, eval_object, *, as_of: datetime | None = None, stats: dict[str, Any] | None = None):
         self._check_rule_config_is_fresh()
         if self.rule_engine is None:
             return {"outcome_counters": {}, "outcome_set": set(), "rule_results": {}}
-        stats = {}
-        if as_of is not None:
+        if stats is None and as_of is not None:
             stats = FeatureResolver(self.db, self.o_id).resolve(
                 eval_object,
                 as_of,
                 self.rule_engine.get_rule_stats(),
             )
+        if stats is None:
+            stats = {}
         eval_result = self.rule_engine(eval_object, stats=stats)
         return eval_result
 

@@ -9,6 +9,7 @@ or a Bearer token.
 import hashlib
 import logging
 from collections import Counter
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -160,6 +161,35 @@ def _build_event_test_rule_results(db: Any, o_id: int, all_rule_results: dict[An
     return results
 
 
+def _get_rollout_stat_paths(
+    rollout_entries: list[dict[str, Any]],
+    list_provider: PersistentUserListManager,
+) -> set[str]:
+    stat_paths: set[str] = set()
+    for entry in rollout_entries:
+        try:
+            stat_paths.update(RuleFactory.from_json(entry, list_values_provider=list_provider).get_rule_stats())
+        except Exception:
+            logger.debug("Skipping stat pre-resolution for invalid rollout candidate", exc_info=True)
+    return stat_paths
+
+
+def _resolve_evaluation_stats(
+    *,
+    db: Any,
+    o_id: int,
+    event_data: dict[str, Any],
+    as_of: datetime,
+    lre: LocalRuleExecutorSQL,
+    rollout_entries: list[dict[str, Any]],
+    list_provider: PersistentUserListManager | None,
+) -> dict[str, Any]:
+    stat_paths = lre.get_rule_stats()
+    if rollout_entries and list_provider is not None:
+        stat_paths.update(_get_rollout_stat_paths(rollout_entries, list_provider))
+    return FeatureResolver(db, o_id).resolve(event_data, as_of, stat_paths)
+
+
 def _evaluate_rollout_result(
     *,
     event_data: dict[str, Any],
@@ -296,7 +326,18 @@ def evaluate(
                 superseded_evaluation_id=result.get("superseded_evaluation_id"),
             )
 
-        production_result = lre.evaluate_rules(event.event_data, as_of=event.effective_at)
+        rollout_entries = list_candidate_deployments(db, lre.o_id, ROLLOUT_CONFIG_LABEL)
+        list_provider = PersistentUserListManager(db, lre.o_id) if rollout_entries else None
+        stats = _resolve_evaluation_stats(
+            db=db,
+            o_id=lre.o_id,
+            event_data=event.event_data,
+            as_of=event.effective_at,
+            lre=lre,
+            rollout_entries=rollout_entries,
+            list_provider=list_provider,
+        )
+        production_result = lre.evaluate_rules(event.event_data, as_of=event.effective_at, stats=stats)
     except (FeatureResolutionError, MissingFieldLookupError, MissingStatLookupError) as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -308,16 +349,10 @@ def evaluate(
             detail="Evaluation failed",
         ) from exc
 
-    rollout_entries = list_candidate_deployments(db, lre.o_id, ROLLOUT_CONFIG_LABEL)
     rollout_logs: list[dict[str, Any]] = []
     if rollout_entries:
+        assert list_provider is not None
         assignment_key = _get_assignment_key(event)
-        list_provider = PersistentUserListManager(db, lre.o_id)
-        stats = FeatureResolver(db, lre.o_id).resolve(
-            event.event_data,
-            event.effective_at,
-            lre.rule_engine.get_rule_stats() if lre.rule_engine is not None else set(),
-        )
         result, rollout_logs = _evaluate_rollout_result(
             event_data=event.event_data,
             lre=lre,
@@ -442,20 +477,27 @@ def test_event(
             result = _build_response_from_all_results(dict(allowlist_result.get("all_rule_results", {})))
             skipped_main_rules = True
         else:
-            production_result = lre.evaluate_rules(event.event_data, as_of=event.effective_at)
             rollout_entries = list_candidate_deployments(db, lre.o_id, ROLLOUT_CONFIG_LABEL)
+            list_provider = PersistentUserListManager(db, lre.o_id) if rollout_entries else None
+            stats = _resolve_evaluation_stats(
+                db=db,
+                o_id=lre.o_id,
+                event_data=event.event_data,
+                as_of=event.effective_at,
+                lre=lre,
+                rollout_entries=rollout_entries,
+                list_provider=list_provider,
+            )
+            production_result = lre.evaluate_rules(event.event_data, as_of=event.effective_at, stats=stats)
             if rollout_entries:
+                assert list_provider is not None
                 result, rollout_logs = _evaluate_rollout_result(
                     event_data=event.event_data,
                     lre=lre,
                     rollout_entries=rollout_entries,
                     assignment_key=_get_assignment_key(event),
-                    list_provider=PersistentUserListManager(db, lre.o_id),
-                    stats=FeatureResolver(db, lre.o_id).resolve(
-                        event.event_data,
-                        event.effective_at,
-                        lre.rule_engine.get_rule_stats() if lre.rule_engine is not None else set(),
-                    ),
+                    list_provider=list_provider,
+                    stats=stats,
                 )
                 del rollout_logs
             else:

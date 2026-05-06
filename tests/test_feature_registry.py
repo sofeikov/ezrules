@@ -152,6 +152,42 @@ def test_deprecate_referenced_feature_is_rejected(feature_client):
     assert deprecate_response.json()["detail"] == "Feature is used by rules"
 
 
+def test_deprecate_ignores_comment_only_feature_dependency(feature_client):
+    token = feature_client.test_data["token"]
+    session = feature_client.test_data["session"]
+    org = feature_client.test_data["org"]
+    create_response = feature_client.post(
+        "/api/v2/features",
+        json=_feature_payload("sent_amount_sum_24h", name="Sender sent amount 24h"),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create_response.status_code == 201
+    feature_id = create_response.json()["feature"]["fd_id"]
+    activate_response = feature_client.post(
+        f"/api/v2/features/{feature_id}/activate",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert activate_response.status_code == 200
+    session.add(
+        Rule(
+            logic="# stat[sender.sent_amount_sum_24h]\nif $amount > 100:\n\treturn !HOLD",
+            description="Comment mentions the feature but rule does not use it",
+            rid="FEATURE:COMMENT",
+            o_id=org.o_id,
+            r_id=9202,
+        )
+    )
+    session.commit()
+
+    deprecate_response = feature_client.post(
+        f"/api/v2/features/{feature_id}/deprecate",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert deprecate_response.status_code == 200
+    assert deprecate_response.json()["feature"]["status"] == "deprecated"
+
+
 def test_feature_payload_rejects_unsupported_event_time_field(feature_client):
     token = feature_client.test_data["token"]
     payload = _feature_payload("sent_amount_sum_24h", name="Sender sent amount 24h")
@@ -165,6 +201,36 @@ def test_feature_payload_rejects_unsupported_event_time_field(feature_client):
 
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"] == ["body", "event_time_field"]
+
+
+def test_rule_test_reports_missing_feature_entity_key(feature_client):
+    token = feature_client.test_data["token"]
+    create_response = feature_client.post(
+        "/api/v2/features",
+        json=_feature_payload("sent_amount_sum_24h", name="Sender sent amount 24h"),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create_response.status_code == 201
+    feature_id = create_response.json()["feature"]["fd_id"]
+    activate_response = feature_client.post(
+        f"/api/v2/features/{feature_id}/activate",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert activate_response.status_code == 200
+
+    response = feature_client.post(
+        "/api/v2/rules/test",
+        json={
+            "test_object": {"amount": 125},
+            "rule_source": "if stat[sender.sent_amount_sum_24h] > 100:\n\treturn !HOLD",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "error"
+    assert "missing entity key 'sender_id'" in data["reason"]
 
 
 def test_rule_verify_requires_active_feature(feature_client):

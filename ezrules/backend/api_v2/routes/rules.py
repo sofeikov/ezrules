@@ -48,7 +48,7 @@ from ezrules.backend.api_v2.schemas.rules import (
     RuleVerifyResponse,
 )
 from ezrules.backend.api_v2.schemas.shadow import ShadowDeployRequest, ShadowDeployResponse
-from ezrules.backend.features import FeatureResolver
+from ezrules.backend.features import FeatureResolutionError, FeatureResolver
 from ezrules.backend.rule_validation import (
     build_outcome_notation_errors,
     get_list_provider,
@@ -58,7 +58,7 @@ from ezrules.backend.runtime_settings import get_auto_promote_active_rule_update
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.audit_helpers import save_ai_rule_authoring_history
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.core.rule import MissingFieldLookupError, OutcomeReturnSyntaxError, RuleFactory
+from ezrules.core.rule import MissingFieldLookupError, RuleFactory
 from ezrules.core.rule_updater import (
     ROLLOUT_CONFIG_LABEL,
     RULE_EVALUATION_LANE_ALLOWLIST,
@@ -1287,19 +1287,13 @@ def test_rule(
             rule_outcome=None,
         )
 
+    rule = validation.compiled_rule
     try:
-        rule = validation.compiled_rule
         stats = FeatureResolver(db, current_org_id).resolve(test_object, datetime.now(UTC), rule.get_rule_stats())
-    except OutcomeReturnSyntaxError as exc:
+    except FeatureResolutionError as exc:
         return RuleTestResponse(
             status="error",
             reason=str(exc),
-            rule_outcome=None,
-        )
-    except SyntaxError:
-        return RuleTestResponse(
-            status="error",
-            reason="Rule source is invalid",
             rule_outcome=None,
         )
 

@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
-from sqlalchemy import text
+from sqlalchemy import false, func, or_, text
 
 from ezrules.backend.api_v2.schemas.features import ALLOWED_WINDOW_SECONDS, FeatureAggregation
-from ezrules.core.field_paths import get_field_value
+from ezrules.core.field_paths import get_field_value, split_field_path
 from ezrules.core.rule_helpers import StatReferenceExtractor
 from ezrules.models.backend_core import EventVersion, FeatureDefinition
 from ezrules.models.backend_core import Rule as RuleModel
@@ -46,12 +46,13 @@ def extract_rule_stat_paths(rule_source: str) -> list[str]:
 
 def get_feature_dependencies(db: Any, o_id: int, stat_path: str) -> list[RuleModel]:
     token = f"stat[{stat_path}]"
-    return (
+    candidates = (
         db.query(RuleModel)
         .filter(RuleModel.o_id == o_id, RuleModel.logic.contains(token))
         .order_by(RuleModel.r_id.asc())
         .all()
     )
+    return [rule for rule in candidates if stat_path in extract_rule_stat_paths(str(rule.logic))]
 
 
 def validate_feature_reference_budget(stat_paths: set[str]) -> None:
@@ -78,6 +79,47 @@ def _filter_matches(event_data: dict[str, Any], filters: list[dict[str, Any]]) -
         if operator == "in" and value not in (expected if isinstance(expected, list) else []):
             return False
     return True
+
+
+def _jsonb_text_value(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _event_data_text_expression(path: str) -> Any:
+    return func.jsonb_extract_path_text(EventVersion.event_data, *split_field_path(path))
+
+
+def _apply_jsonb_filter(query: Any, filter_config: dict[str, Any]) -> Any:
+    field = str(filter_config.get("field") or "")
+    if not field:
+        return query
+
+    expression = _event_data_text_expression(field)
+    operator = filter_config.get("operator", "eq")
+    expected = filter_config.get("value")
+
+    if operator == "eq":
+        expected_value = _jsonb_text_value(expected)
+        return query.filter(expression.is_(None) if expected_value is None else expression == expected_value)
+
+    if operator == "in":
+        expected_values = expected if isinstance(expected, list) else []
+        if not expected_values:
+            return query.filter(false())
+        text_values = [_jsonb_text_value(item) for item in expected_values]
+        non_null_values = [item for item in text_values if item is not None]
+        predicates = []
+        if non_null_values:
+            predicates.append(expression.in_(non_null_values))
+        if None in text_values:
+            predicates.append(expression.is_(None))
+        return query.filter(or_(*predicates) if predicates else false())
+
+    return query
 
 
 def _coerce_number(value: Any, *, null_handling: str) -> float | None:
@@ -152,27 +194,24 @@ def compute_feature(
 
     window_start = as_of - timedelta(seconds=int(feature.window_seconds))
     try:
-        db.execute(text("SET LOCAL statement_timeout = :timeout_ms"), {"timeout_ms": FEATURE_STATEMENT_TIMEOUT_MS})
-    except Exception:
-        pass
-
-    candidates = (
-        db.query(EventVersion)
-        .filter(
-            EventVersion.o_id == o_id,
-            EventVersion.effective_at >= window_start,
-            EventVersion.effective_at < as_of,
+        db.execute(
+            text("SELECT set_config('statement_timeout', :timeout_ms, true)"),
+            {"timeout_ms": str(FEATURE_STATEMENT_TIMEOUT_MS)},
         )
-        .order_by(EventVersion.effective_at.asc(), EventVersion.ev_id.asc())
-        .all()
+    except Exception as exc:
+        raise FeatureResolutionError("Unable to apply feature query timeout") from exc
+
+    entity_text_value = _jsonb_text_value(entity_value)
+    query = db.query(EventVersion).filter(
+        EventVersion.o_id == o_id,
+        EventVersion.effective_at >= window_start,
+        EventVersion.effective_at < as_of,
+        _event_data_text_expression(str(feature.entity_key)) == entity_text_value,
     )
     filters = list(cast(list[dict[str, Any]], feature.filters or []))
-    matched_events = [
-        event
-        for event in candidates
-        if _safe_get(cast(dict[str, Any], event.event_data), str(feature.entity_key)) == entity_value
-        and _filter_matches(cast(dict[str, Any], event.event_data), filters)
-    ]
+    for filter_config in filters:
+        query = _apply_jsonb_filter(query, filter_config)
+    matched_events = query.order_by(EventVersion.effective_at.asc(), EventVersion.ev_id.asc()).all()
     return FeatureComputationResult(
         value=_compute_aggregate(feature, matched_events, as_of=as_of),
         matched_event_count=len(matched_events),
@@ -209,7 +248,12 @@ class FeatureResolver:
         as_of = normalize_as_utc(as_of)
         for stat_path in sorted(stat_paths):
             feature = by_path[stat_path]
-            entity_value = str(_safe_get(event_data, str(feature.entity_key)))
+            entity_value = _safe_get(event_data, str(feature.entity_key))
+            if entity_value is None:
+                raise FeatureResolutionError(
+                    f"Event is missing entity key '{feature.entity_key}' required for stat[{stat_path}]"
+                )
+            entity_value = str(entity_value)
             cache_key = (stat_path, entity_value, as_of)
             if cache_key not in self._cache:
                 self._cache[cache_key] = compute_feature(self.db, self.o_id, feature, event_data, as_of).value

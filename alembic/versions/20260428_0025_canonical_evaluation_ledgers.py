@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -27,7 +28,7 @@ def upgrade() -> None:
         sa.Column("event_version", sa.Integer(), nullable=False),
         sa.Column("effective_at", sa.DateTime(), nullable=False),
         sa.Column("observed_at", sa.DateTime(), nullable=False),
-        sa.Column("event_data", sa.JSON(), nullable=False),
+        sa.Column("event_data", postgresql.JSONB(), nullable=False),
         sa.Column("payload_hash", sa.String(length=64), nullable=False),
         sa.Column("source", sa.String(length=32), nullable=False),
         sa.Column("terminal_state", sa.Boolean(), nullable=False),
@@ -54,6 +55,26 @@ def upgrade() -> None:
     )
     op.create_index("ix_event_versions_o_id_effective_at", "event_versions", ["o_id", "effective_at"])
     op.create_index("ix_event_versions_o_id_ingested_at", "event_versions", ["o_id", "ingested_at"])
+    op.execute(
+        "CREATE INDEX ix_event_versions_o_id_customer_id_effective_at "
+        "ON event_versions (o_id, ((event_data ->> 'customer_id')), effective_at)"
+    )
+    op.execute(
+        "CREATE INDEX ix_event_versions_o_id_sender_id_effective_at "
+        "ON event_versions (o_id, ((event_data ->> 'sender_id')), effective_at)"
+    )
+    op.execute(
+        "CREATE INDEX ix_event_versions_o_id_account_id_effective_at "
+        "ON event_versions (o_id, ((event_data ->> 'account_id')), effective_at)"
+    )
+    op.execute(
+        "CREATE INDEX ix_event_versions_o_id_customer_nested_id_effective_at "
+        "ON event_versions (o_id, ((event_data #>> '{customer,id}')), effective_at)"
+    )
+    op.execute(
+        "CREATE INDEX ix_event_versions_o_id_sender_nested_id_effective_at "
+        "ON event_versions (o_id, ((event_data #>> '{sender,id}')), effective_at)"
+    )
 
     op.create_table(
         "evaluation_decisions",
@@ -202,6 +223,11 @@ def downgrade() -> None:
     op.drop_index("ix_evaluation_decisions_o_id_evaluated_at", table_name="evaluation_decisions")
     op.drop_table("evaluation_decisions")
 
+    op.drop_index("ix_event_versions_o_id_sender_nested_id_effective_at", table_name="event_versions")
+    op.drop_index("ix_event_versions_o_id_customer_nested_id_effective_at", table_name="event_versions")
+    op.drop_index("ix_event_versions_o_id_account_id_effective_at", table_name="event_versions")
+    op.drop_index("ix_event_versions_o_id_sender_id_effective_at", table_name="event_versions")
+    op.drop_index("ix_event_versions_o_id_customer_id_effective_at", table_name="event_versions")
     op.drop_index("ix_event_versions_o_id_ingested_at", table_name="event_versions")
     op.drop_index("ix_event_versions_o_id_effective_at", table_name="event_versions")
     op.drop_index("ix_event_versions_o_id_transaction_hash", table_name="event_versions")
