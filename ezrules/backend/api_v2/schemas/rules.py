@@ -235,6 +235,9 @@ class RuleVerifyResponse(BaseModel):
     referenced_outcomes: list[str] = Field(
         default_factory=list, description="Outcome references extracted from the rule"
     )
+    referenced_features: list[str] = Field(
+        default_factory=list, description="Computed stat references extracted from the rule"
+    )
     warnings: list[str] = Field(default_factory=list, description="Advisory warnings about referenced fields")
     errors: list[RuleVerifyError] = Field(default_factory=list, description="Structured validation failures")
 

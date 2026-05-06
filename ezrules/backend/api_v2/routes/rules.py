@@ -48,6 +48,7 @@ from ezrules.backend.api_v2.schemas.rules import (
     RuleVerifyResponse,
 )
 from ezrules.backend.api_v2.schemas.shadow import ShadowDeployRequest, ShadowDeployResponse
+from ezrules.backend.features import FeatureResolver
 from ezrules.backend.rule_validation import (
     build_outcome_notation_errors,
     get_list_provider,
@@ -57,7 +58,7 @@ from ezrules.backend.runtime_settings import get_auto_promote_active_rule_update
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.audit_helpers import save_ai_rule_authoring_history
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.core.rule import MissingFieldLookupError, OutcomeReturnSyntaxError, Rule, RuleFactory
+from ezrules.core.rule import MissingFieldLookupError, OutcomeReturnSyntaxError, RuleFactory
 from ezrules.core.rule_updater import (
     ROLLOUT_CONFIG_LABEL,
     RULE_EVALUATION_LANE_ALLOWLIST,
@@ -1275,13 +1276,20 @@ def test_rule(
             rule_outcome=None,
         )
 
-    # Compile the rule
-    try:
-        rule = Rule(
-            rid="",
-            logic=request.rule_source,
-            list_values_provider=get_list_provider(db, current_org_id),
+    validation = validate_rule_source(db, current_org_id, request.rule_source)
+    if not validation.response.valid or validation.compiled_rule is None:
+        reason = validation.response.errors[0].message if validation.response.errors else "Rule source is invalid"
+        if "invalid" not in reason.lower():
+            reason = f"Rule source is invalid: {reason}"
+        return RuleTestResponse(
+            status="error",
+            reason=reason,
+            rule_outcome=None,
         )
+
+    try:
+        rule = validation.compiled_rule
+        stats = FeatureResolver(db, current_org_id).resolve(test_object, datetime.now(UTC), rule.get_rule_stats())
     except OutcomeReturnSyntaxError as exc:
         return RuleTestResponse(
             status="error",
@@ -1297,7 +1305,7 @@ def test_rule(
 
     # Execute the rule
     try:
-        rule_outcome = rule(test_object)
+        rule_outcome = rule(test_object, stats=stats)
         return RuleTestResponse(
             status="ok",
             reason="ok",

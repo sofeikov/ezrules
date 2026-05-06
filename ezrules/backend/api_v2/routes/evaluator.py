@@ -23,6 +23,7 @@ from ezrules.backend.api_v2.schemas.evaluator import (
     EventTestRuleResult,
 )
 from ezrules.backend.data_utils import Event
+from ezrules.backend.features import FeatureResolutionError, FeatureResolver
 from ezrules.backend.observation_queue import enqueue_observations
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.runtime_settings import get_main_rule_execution_mode
@@ -30,7 +31,7 @@ from ezrules.backend.shadow_evaluation_queue import enqueue_shadow_evaluation
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.core.rule import MissingFieldLookupError, RuleFactory
+from ezrules.core.rule import MissingFieldLookupError, MissingStatLookupError, RuleFactory
 from ezrules.core.rule_engine import RULE_EXECUTION_MODE_FIRST_MATCH
 from ezrules.core.rule_updater import (
     ALLOWLIST_CONFIG_LABEL,
@@ -166,6 +167,7 @@ def _evaluate_rollout_result(
     rollout_entries: list[dict[str, Any]],
     assignment_key: str,
     list_provider: PersistentUserListManager,
+    stats: dict[str, Any],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     ordered_rules = list(lre.rule_engine.rules if lre.rule_engine is not None else [])
     rollout_by_rule_id = {int(entry["r_id"]): entry for entry in rollout_entries if "r_id" in entry}
@@ -174,7 +176,7 @@ def _evaluate_rollout_result(
 
     for control_rule in ordered_rules:
         rule_id = int(control_rule.r_id)
-        control_result = control_rule(event_data)
+        control_result = control_rule(event_data, stats=stats)
         returned_result = control_result
 
         entry = rollout_by_rule_id.get(rule_id)
@@ -185,7 +187,7 @@ def _evaluate_rollout_result(
             candidate_succeeded = False
             try:
                 candidate_rule = RuleFactory.from_json(entry, list_values_provider=list_provider)
-                candidate_result = candidate_rule(event_data)
+                candidate_result = candidate_rule(event_data, stats=stats)
                 candidate_succeeded = True
             except Exception:
                 candidate_result = None
@@ -270,7 +272,7 @@ def evaluate(
             superseded_evaluation_id=duplicate.get("superseded_evaluation_id"),
         )
     try:
-        allowlist_result = allowlist_lre.evaluate_rules(event.event_data)
+        allowlist_result = allowlist_lre.evaluate_rules(event.event_data, as_of=event.effective_at)
         if allowlist_result.get("rule_results"):
             result = _build_response_from_all_results(dict(allowlist_result.get("all_rule_results", {})))
             result, _ = data_utils.eval_and_store(lre, event, response=result)
@@ -294,8 +296,8 @@ def evaluate(
                 superseded_evaluation_id=result.get("superseded_evaluation_id"),
             )
 
-        production_result = lre.evaluate_rules(event.event_data)
-    except MissingFieldLookupError as exc:
+        production_result = lre.evaluate_rules(event.event_data, as_of=event.effective_at)
+    except (FeatureResolutionError, MissingFieldLookupError, MissingStatLookupError) as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
@@ -311,12 +313,18 @@ def evaluate(
     if rollout_entries:
         assignment_key = _get_assignment_key(event)
         list_provider = PersistentUserListManager(db, lre.o_id)
+        stats = FeatureResolver(db, lre.o_id).resolve(
+            event.event_data,
+            event.effective_at,
+            lre.rule_engine.get_rule_stats() if lre.rule_engine is not None else set(),
+        )
         result, rollout_logs = _evaluate_rollout_result(
             event_data=event.event_data,
             lre=lre,
             rollout_entries=rollout_entries,
             assignment_key=assignment_key,
             list_provider=list_provider,
+            stats=stats,
         )
     else:
         result = production_result
@@ -429,12 +437,12 @@ def test_event(
     skipped_main_rules = False
     result: dict[str, Any]
     try:
-        allowlist_result = allowlist_lre.evaluate_rules(event.event_data)
+        allowlist_result = allowlist_lre.evaluate_rules(event.event_data, as_of=event.effective_at)
         if allowlist_result.get("rule_results"):
             result = _build_response_from_all_results(dict(allowlist_result.get("all_rule_results", {})))
             skipped_main_rules = True
         else:
-            production_result = lre.evaluate_rules(event.event_data)
+            production_result = lre.evaluate_rules(event.event_data, as_of=event.effective_at)
             rollout_entries = list_candidate_deployments(db, lre.o_id, ROLLOUT_CONFIG_LABEL)
             if rollout_entries:
                 result, rollout_logs = _evaluate_rollout_result(
@@ -443,11 +451,16 @@ def test_event(
                     rollout_entries=rollout_entries,
                     assignment_key=_get_assignment_key(event),
                     list_provider=PersistentUserListManager(db, lre.o_id),
+                    stats=FeatureResolver(db, lre.o_id).resolve(
+                        event.event_data,
+                        event.effective_at,
+                        lre.rule_engine.get_rule_stats() if lre.rule_engine is not None else set(),
+                    ),
                 )
                 del rollout_logs
             else:
                 result = production_result
-    except MissingFieldLookupError as exc:
+    except (FeatureResolutionError, MissingFieldLookupError, MissingStatLookupError) as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),

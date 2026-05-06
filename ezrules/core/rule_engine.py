@@ -26,7 +26,13 @@ class RuleEngine:
         self.rules = rules
         self.execution_mode = execution_mode
 
-    def __call__(self, t: dict) -> Any:
+    def get_rule_stats(self) -> set[str]:
+        stat_paths: set[str] = set()
+        for rule in self.rules:
+            stat_paths.update(rule.get_rule_stats())
+        return stat_paths
+
+    def __call__(self, t: dict, stats: dict[str, Any] | None = None) -> Any:
         """
         Execute the rules and aggregated the results.
 
@@ -38,7 +44,7 @@ class RuleEngine:
         all_rule_results: dict[Any, Any] = {}
         for rule in self.rules:
             rule_id = rule.r_id or rule.rid
-            rule_result = rule(t)
+            rule_result = rule(t, stats=stats)
             all_rule_results[rule_id] = rule_result
             if self.execution_mode == RULE_EXECUTION_MODE_FIRST_MATCH and rule_result is not None:
                 break

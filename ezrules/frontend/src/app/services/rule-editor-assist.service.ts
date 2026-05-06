@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { combineLatest, Observable, of } from 'rxjs';
 import { catchError, map, shareReplay } from 'rxjs/operators';
 import { FieldTypeService } from './field-type.service';
+import { FeatureService } from './feature.service';
 import { OutcomeService } from './outcome.service';
 import { UserListService } from './user-list.service';
 
@@ -20,8 +21,16 @@ export interface RuleEditorOutcomeSuggestion {
   severityRank: number;
 }
 
+export interface RuleEditorFeatureSuggestion {
+  path: string;
+  aggregation: string;
+  entityKey: string;
+  windowLabel: string;
+}
+
 export interface RuleEditorAssistData {
   fields: RuleEditorFieldSuggestion[];
+  features: RuleEditorFeatureSuggestion[];
   lists: RuleEditorListSuggestion[];
   outcomes: RuleEditorOutcomeSuggestion[];
 }
@@ -34,6 +43,7 @@ export class RuleEditorAssistService {
 
   constructor(
     private fieldTypeService: FieldTypeService,
+    private featureService: FeatureService,
     private outcomeService: OutcomeService,
     private userListService: UserListService
   ) { }
@@ -42,10 +52,11 @@ export class RuleEditorAssistService {
     if (!this.assistData$) {
       this.assistData$ = combineLatest({
         observations: this.fieldTypeService.getObservations().pipe(catchError(() => of([]))),
+        features: this.featureService.getFeatures().pipe(catchError(() => of([]))),
         outcomes: this.outcomeService.getOutcomes().pipe(catchError(() => of({ outcomes: [] }))),
         lists: this.userListService.getUserLists().pipe(catchError(() => of([])))
       }).pipe(
-        map(({ observations, outcomes, lists }) => ({
+        map(({ observations, features, outcomes, lists }) => ({
           fields: observations
             .slice()
             .sort((left, right) => {
@@ -58,6 +69,15 @@ export class RuleEditorAssistService {
             .map((observation) => ({
               name: observation.field_name,
               observedJsonType: observation.observed_json_type,
+            })),
+          features: features
+            .filter((feature) => feature.status === 'active')
+            .sort((left, right) => left.available_as.localeCompare(right.available_as))
+            .map((feature) => ({
+              path: feature.available_as.replace(/^stat\[/, '').replace(/\]$/, ''),
+              aggregation: feature.aggregation_type,
+              entityKey: feature.entity_key,
+              windowLabel: feature.window_label,
             })),
           lists: lists
             .slice()

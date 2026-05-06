@@ -938,6 +938,68 @@ class FieldObservation(Base):
         return f"FieldObservation({self.field_name!r}, {self.observed_json_type!r}, o_id={self.o_id})"
 
 
+class FeatureDefinition(Base):
+    __tablename__ = "feature_definitions"
+    __table_args__ = (
+        UniqueConstraint("o_id", "entity", "feature_name", name="uq_feature_definitions_org_path"),
+        Index("ix_feature_definitions_o_id_status", "o_id", "status"),
+    )
+
+    fd_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    entity = Column(String(64), nullable=False)
+    feature_name = Column(String(128), nullable=False)
+    entity_key = Column(String(255), nullable=False)
+    event_time_field = Column(String(255), nullable=True)
+    aggregation_type = Column(String(32), nullable=False)
+    source_field = Column(String(255), nullable=True)
+    window_seconds = Column(Integer, nullable=False)
+    filters = Column(JSON, nullable=False, default=list)
+    inclusion_policy = Column(String(32), nullable=False, default="previous_events")
+    null_handling = Column(String(32), nullable=False, default="exclude")
+    status = Column(String(32), nullable=False, default="draft")
+    version = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.UTC),
+        onupdate=lambda: datetime.datetime.now(datetime.UTC),
+        nullable=False,
+    )
+    created_by = Column(String, nullable=True)
+    updated_by = Column(String, nullable=True)
+    org: Mapped["Organisation"] = relationship()
+
+    @property
+    def stat_path(self) -> str:
+        return f"{self.entity}.{self.feature_name}"
+
+    @property
+    def available_as(self) -> str:
+        return f"stat[{self.stat_path}]"
+
+
+class FeatureDefinitionHistory(Base):
+    __tablename__ = "feature_definition_history"
+    __table_args__ = (
+        Index("ix_feature_definition_history_o_id_changed", "o_id", "changed"),
+        Index("ix_feature_definition_history_o_id_fd_id", "o_id", "fd_id"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fd_id = Column(Integer, nullable=False, index=True)
+    entity = Column(String(64), nullable=False)
+    feature_name = Column(String(128), nullable=False)
+    action = Column(String, nullable=False)
+    version = Column(Integer, nullable=False)
+    details = Column(String, nullable=True)
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    changed_by = Column(String, nullable=True)
+
+
 class UserSession(Base):
     __tablename__ = "user_session"
 

@@ -1,5 +1,13 @@
 # What's New
 
+## v1.22.0
+
+* **Computed feature registry**: Added org-scoped feature definitions for history-aware rule inputs such as velocity counts, distinct counts, sums, averages, min/max, standard deviation, and days since first seen.
+* **Dedicated stat syntax**: Rules can now reference active computed features with `stat[entity.feature_name]`, keeping historical aggregates visually separate from raw `$event` fields.
+* **Point-in-time evaluation**: Live evaluation and dry runs resolve referenced stats as of the event timestamp using bounded historical windows, so backtesting and late-arriving events avoid future-data leakage.
+* **Feature guardrails**: Online features use preset windows, active-feature quotas, per-rule stat reference limits, statement timeouts, dependency checks, versioning, and audit history to limit accidental expensive definitions.
+* **Feature management UI**: Added a Features page and rule-editor autocomplete support for active `stat[...]` paths.
+
 ## v1.21.1
 
 * **Canonical business journey contract**: Added a deterministic evaluation universe with fixed outcomes, rules, user lists, and transaction scenarios that prove core `/api/v2/evaluate` behavior through the real PostgreSQL-backed API path.

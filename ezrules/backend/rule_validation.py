@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ezrules.backend.api_v2.schemas.rules import RuleVerifyError, RuleVerifyResponse
+from ezrules.backend.features import extract_rule_stat_paths, validate_feature_reference_budget
 from ezrules.backend.runtime_settings import get_neutral_outcome
 from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.rule import OutcomeReturnSyntaxError, Rule
@@ -12,7 +13,7 @@ from ezrules.core.rule_checkers import AllowedOutcomeReturnVisitor
 from ezrules.core.rule_helpers import OutcomeReferenceExtractor, UserListReferenceExtractor
 from ezrules.core.rule_updater import RULE_EVALUATION_LANE_ALLOWLIST, RULE_EVALUATION_LANE_MAIN
 from ezrules.core.user_lists import PersistentUserListManager
-from ezrules.models.backend_core import FieldObservation
+from ezrules.models.backend_core import FeatureDefinition, FieldObservation
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,10 @@ def extract_referenced_lists(rule_source: str) -> list[str]:
 
 def extract_referenced_outcomes(rule_source: str) -> list[str]:
     return [outcome.upper() for outcome in unique_preserving_order(OutcomeReferenceExtractor().extract(rule_source))]
+
+
+def extract_referenced_features(rule_source: str) -> list[str]:
+    return unique_preserving_order(extract_rule_stat_paths(rule_source))
 
 
 def find_reference_bounds(rule_source: str, reference: str) -> tuple[int, int, int, int] | None:
@@ -126,6 +131,27 @@ def build_outcome_notation_errors(db: Any, org_id: int, rule_source: str) -> lis
     return errors
 
 
+def build_feature_reference_errors(db: Any, org_id: int, referenced_features: list[str]) -> list[RuleVerifyError]:
+    try:
+        validate_feature_reference_budget(set(referenced_features))
+    except Exception as exc:
+        return [build_verify_error(message=str(exc))]
+    if not referenced_features:
+        return []
+
+    active_paths = {
+        f"{entity}.{feature_name}"
+        for entity, feature_name in db.query(FeatureDefinition.entity, FeatureDefinition.feature_name)
+        .filter(FeatureDefinition.o_id == org_id, FeatureDefinition.status == "active")
+        .all()
+    }
+    return [
+        build_verify_error(message=f"Computed stat 'stat[{stat_path}]' is not active in Features.")
+        for stat_path in referenced_features
+        if stat_path not in active_paths
+    ]
+
+
 def validate_allowlist_rule(rule: Rule, allowlist_outcome: str) -> str | None:
     visitor = AllowedOutcomeReturnVisitor()
     visitor.visit(rule._rule_ast)
@@ -153,8 +179,10 @@ def validate_rule_source(
 ) -> RuleValidationResult:
     referenced_lists = extract_referenced_lists(rule_source)
     referenced_outcomes = extract_referenced_outcomes(rule_source)
+    referenced_features = extract_referenced_features(rule_source)
     outcome_errors = build_outcome_notation_errors(db, org_id, rule_source)
-    if outcome_errors:
+    feature_errors = build_feature_reference_errors(db, org_id, referenced_features)
+    if outcome_errors or feature_errors:
         return RuleValidationResult(
             compiled_rule=None,
             response=RuleVerifyResponse(
@@ -162,8 +190,9 @@ def validate_rule_source(
                 params=[],
                 referenced_lists=referenced_lists,
                 referenced_outcomes=referenced_outcomes,
+                referenced_features=referenced_features,
                 warnings=[],
-                errors=outcome_errors,
+                errors=outcome_errors + feature_errors,
             ),
         )
 
@@ -186,6 +215,7 @@ def validate_rule_source(
                         params=params,
                         referenced_lists=referenced_lists,
                         referenced_outcomes=referenced_outcomes,
+                        referenced_features=referenced_features,
                         warnings=warnings,
                         errors=[build_verify_error(message=allowlist_error)],
                     ),
@@ -198,6 +228,7 @@ def validate_rule_source(
                 params=params,
                 referenced_lists=referenced_lists,
                 referenced_outcomes=referenced_outcomes,
+                referenced_features=referenced_features,
                 warnings=warnings,
                 errors=[],
             ),
@@ -210,6 +241,7 @@ def validate_rule_source(
                 params=[],
                 referenced_lists=referenced_lists,
                 referenced_outcomes=referenced_outcomes,
+                referenced_features=referenced_features,
                 warnings=[],
                 errors=[
                     build_verify_error(
@@ -231,6 +263,7 @@ def validate_rule_source(
                 params=[],
                 referenced_lists=referenced_lists,
                 referenced_outcomes=referenced_outcomes,
+                referenced_features=referenced_features,
                 warnings=[],
                 errors=[
                     build_verify_error(
@@ -256,6 +289,7 @@ def validate_rule_source(
                 params=[],
                 referenced_lists=referenced_lists,
                 referenced_outcomes=referenced_outcomes,
+                referenced_features=referenced_features,
                 warnings=[],
                 errors=[
                     build_verify_error(
@@ -276,6 +310,7 @@ def validate_rule_source(
                 params=[],
                 referenced_lists=referenced_lists,
                 referenced_outcomes=referenced_outcomes,
+                referenced_features=referenced_features,
                 warnings=[],
                 errors=[build_verify_error(message=str(exc) or "Rule source is invalid")],
             ),

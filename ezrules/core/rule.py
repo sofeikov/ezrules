@@ -7,10 +7,13 @@ from ezrules.core.field_paths import get_field_value
 from ezrules.core.rule_helpers import (
     FIELD_LOOKUP_HELPER_NAME,
     OUTCOME_HELPER_NAME,
+    STAT_LOOKUP_HELPER_NAME,
     AtNotationConverter,
     BangNotationConverter,
     DollarNotationConverter,
     RuleParamExtractor,
+    RuleStatExtractor,
+    StatNotationConverter,
     extract_outcome_helper_value,
 )
 from ezrules.core.user_lists import AbstractUserListManager
@@ -56,6 +59,7 @@ class Rule:
         # AST representation of the compiled function
         self._rule_ast = None
         self._rule_params: set[str] = set()
+        self._rule_stats: set[str] = set()
         # Trigger the rule compilation
         self._post_process_logic = None
         self.logic = logic
@@ -70,7 +74,7 @@ class Rule:
     def _wrap_with_function_header(logic: str) -> str:
         code = logic.split("\n")
         code = "\n".join(["\t" + line for line in code])
-        code = f"def rule(t):\n{code}"
+        code = f"def rule(t, stats=None):\n{code}"
         return code
 
     @staticmethod
@@ -81,6 +85,7 @@ class Rule:
         namespace = {
             FIELD_LOOKUP_HELPER_NAME: get_field_value,
             OUTCOME_HELPER_NAME: lambda outcome: outcome,
+            STAT_LOOKUP_HELPER_NAME: get_stat_value,
         }
         exec(compiled_code, namespace)
         return namespace["rule"], rule_ast
@@ -91,6 +96,7 @@ class Rule:
         # Build a fresh converter per compilation to avoid shared parser state
         # across concurrent API requests.
         post_proc_logic = DollarNotationConverter().transform_rule(logic)
+        post_proc_logic = StatNotationConverter().transform_rule(post_proc_logic)
         post_proc_logic = BangNotationConverter().transform_rule(post_proc_logic)
         # Get the list provider from application context
         list_provider = self._list_values_provider or get_user_list_manager()
@@ -101,6 +107,7 @@ class Rule:
         self._source = logic
         self._post_process_logic = code
         self._rule_params = self._extract_rule_params()
+        self._rule_stats = self._extract_rule_stats()
 
     def _extract_rule_params(self) -> set[str]:
         pe = RuleParamExtractor()
@@ -110,15 +117,28 @@ class Rule:
     def get_rule_params(self):
         return set(self._rule_params)
 
-    def __call__(self, t) -> Any:
+    def _extract_rule_stats(self) -> set[str]:
+        extractor = RuleStatExtractor()
+        extractor.visit(self._rule_ast)
+        return extractor.stats
+
+    def get_rule_stats(self):
+        return set(self._rule_stats)
+
+    def __call__(self, t, stats: dict[str, Any] | None = None) -> Any:
         """Executes rule logic."""
         try:
-            return self.logic(t)
+            return self.logic(t, stats or {})
         except KeyError as exc:
             missing_field = exc.args[0] if exc.args else None
             if isinstance(missing_field, str) and missing_field in self._rule_params:
                 raise MissingFieldLookupError(
                     field_name=missing_field,
+                    rule_identifier=self.rid or self.r_id,
+                ) from exc
+            if isinstance(missing_field, str) and missing_field in self._rule_stats:
+                raise MissingStatLookupError(
+                    stat_path=missing_field,
                     rule_identifier=self.rid or self.r_id,
                 ) from exc
             raise
@@ -180,6 +200,25 @@ class MissingFieldLookupError(Exception):
         else:
             message = f"Rule '{rule_identifier}' lookup failed: field '{field_name}' is missing from the event"
         super().__init__(message)
+
+
+class MissingStatLookupError(Exception):
+    """Raised when rule logic references a computed stat that was not resolved."""
+
+    def __init__(self, stat_path: str, rule_identifier: str | int | None = None):
+        self.stat_path = stat_path
+        self.rule_identifier = rule_identifier
+        if rule_identifier is None or rule_identifier == "":
+            message = f"Rule lookup failed: stat '{stat_path}' is unavailable"
+        else:
+            message = f"Rule '{rule_identifier}' lookup failed: stat '{stat_path}' is unavailable"
+        super().__init__(message)
+
+
+def get_stat_value(stats: dict[str, Any] | None, stat_path: str) -> Any:
+    if stats is None or stat_path not in stats:
+        raise KeyError(stat_path)
+    return stats[stat_path]
 
 
 class OutcomeReturnSyntaxError(SyntaxError):
