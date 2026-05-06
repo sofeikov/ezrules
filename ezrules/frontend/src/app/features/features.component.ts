@@ -213,9 +213,57 @@ export class FeaturesComponent implements OnInit {
         this.load();
       },
       error: (error) => {
-        this.saveError = error?.error?.detail || 'Failed to save feature.';
+        this.saveError = this.formatSaveError(error);
       }
     });
+  }
+
+  private formatSaveError(error: unknown): string {
+    const detail = (error as { error?: { detail?: unknown; error?: unknown } })?.error?.detail
+      ?? (error as { error?: { detail?: unknown; error?: unknown } })?.error?.error;
+    if (typeof detail === 'string') {
+      return detail;
+    }
+    if (Array.isArray(detail)) {
+      const messages = detail.map((item) => this.formatValidationIssue(item)).filter(Boolean);
+      if (messages.length > 0) {
+        return messages.join(' ');
+      }
+    }
+    return 'Failed to save feature.';
+  }
+
+  private formatValidationIssue(issue: unknown): string {
+    if (!issue || typeof issue !== 'object') {
+      return '';
+    }
+    const rawIssue = issue as { loc?: unknown; msg?: unknown };
+    const field = this.formatValidationField(rawIssue.loc);
+    const message = this.formatValidationMessage(String(rawIssue.msg || 'Invalid value'));
+    return field ? `${field}: ${message}` : message;
+  }
+
+  private formatValidationField(loc: unknown): string {
+    if (!Array.isArray(loc)) {
+      return '';
+    }
+    const field = loc.filter((part) => part !== 'body').pop();
+    if (typeof field !== 'string') {
+      return '';
+    }
+    return field
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (character) => character.toUpperCase());
+  }
+
+  private formatValidationMessage(message: string): string {
+    if (message.includes('String should match pattern')) {
+      return 'use letters, numbers, and underscores; start with a letter or underscore.';
+    }
+    if (message.includes('Field required')) {
+      return 'is required.';
+    }
+    return `${message}.`;
   }
 
   edit(feature: FeatureDefinition): void {
