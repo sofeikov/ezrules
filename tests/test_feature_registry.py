@@ -221,7 +221,7 @@ def test_rule_test_reports_missing_feature_entity_key(feature_client):
     response = feature_client.post(
         "/api/v2/rules/test",
         json={
-            "test_object": {"amount": 125},
+            "test_json": json.dumps({"amount": 125}),
             "rule_source": "if stat[sender.sent_amount_sum_24h] > 100:\n\treturn !HOLD",
         },
         headers={"Authorization": f"Bearer {token}"},
