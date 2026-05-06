@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ALLOWED_WINDOW_SECONDS = {
     600: "10m",
@@ -40,12 +40,13 @@ class FeatureFilter(BaseModel):
 
 
 class FeatureDefinitionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
     entity: str = Field(..., pattern=r"^[A-Za-z_][A-Za-z0-9_]*$", max_length=64)
     feature_name: str = Field(..., pattern=r"^[A-Za-z_][A-Za-z0-9_]*$", max_length=128)
     entity_key: str = Field(..., min_length=1)
-    event_time_field: str | None = None
     aggregation_type: FeatureAggregation
     source_field: str | None = None
     window_seconds: int = Field(..., gt=0, le=MAX_ONLINE_WINDOW_SECONDS)
@@ -90,7 +91,6 @@ class FeatureDefinitionResponse(BaseModel):
     feature_name: str
     available_as: str
     entity_key: str
-    event_time_field: str | None = None
     aggregation_type: str
     source_field: str | None = None
     window_seconds: int

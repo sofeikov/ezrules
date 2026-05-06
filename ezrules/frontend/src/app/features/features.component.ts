@@ -226,7 +226,6 @@ export class FeaturesComponent implements OnInit {
       entity: feature.entity,
       feature_name: feature.feature_name,
       entity_key: feature.entity_key,
-      event_time_field: feature.event_time_field,
       aggregation_type: feature.aggregation_type,
       source_field: feature.source_field,
       window_seconds: feature.window_seconds,

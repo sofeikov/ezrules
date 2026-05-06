@@ -27,7 +27,6 @@ def upgrade() -> None:
         sa.Column("entity", sa.String(length=64), nullable=False),
         sa.Column("feature_name", sa.String(length=128), nullable=False),
         sa.Column("entity_key", sa.String(length=255), nullable=False),
-        sa.Column("event_time_field", sa.String(length=255), nullable=True),
         sa.Column("aggregation_type", sa.String(length=32), nullable=False),
         sa.Column("source_field", sa.String(length=255), nullable=True),
         sa.Column("window_seconds", sa.Integer(), nullable=False),

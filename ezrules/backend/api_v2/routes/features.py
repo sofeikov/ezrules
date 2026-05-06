@@ -46,7 +46,6 @@ def _response(db: Any, o_id: int, feature: FeatureDefinition) -> FeatureDefiniti
         feature_name=str(feature.feature_name),
         available_as=f"stat[{stat_path}]",
         entity_key=str(feature.entity_key),
-        event_time_field=cast(str | None, feature.event_time_field),
         aggregation_type=str(feature.aggregation_type),
         source_field=cast(str | None, feature.source_field),
         window_seconds=int(feature.window_seconds),
@@ -68,7 +67,6 @@ def _apply_payload(feature: FeatureDefinition, data: FeatureDefinitionCreate | F
     feature.entity = data.entity
     feature.feature_name = data.feature_name
     feature.entity_key = data.entity_key
-    feature.event_time_field = data.event_time_field
     feature.aggregation_type = data.aggregation_type.value
     feature.source_field = data.source_field
     feature.window_seconds = data.window_seconds
@@ -86,6 +84,25 @@ def _get_feature(db: Any, o_id: int, feature_id: int) -> FeatureDefinition:
     if feature is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Feature not found")
     return feature
+
+
+def _ensure_unique_feature_path(
+    db: Any,
+    o_id: int,
+    *,
+    entity: str,
+    feature_name: str,
+    exclude_feature_id: int | None = None,
+) -> None:
+    query = db.query(FeatureDefinition).filter(
+        FeatureDefinition.o_id == o_id,
+        FeatureDefinition.entity == entity,
+        FeatureDefinition.feature_name == feature_name,
+    )
+    if exclude_feature_id is not None:
+        query = query.filter(FeatureDefinition.fd_id != exclude_feature_id)
+    if query.first() is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Feature path already exists")
 
 
 @router.get("", response_model=FeatureDefinitionListResponse)
@@ -112,17 +129,7 @@ def create_feature(
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> FeatureMutationResponse:
-    existing = (
-        db.query(FeatureDefinition)
-        .filter(
-            FeatureDefinition.o_id == current_org_id,
-            FeatureDefinition.entity == data.entity,
-            FeatureDefinition.feature_name == data.feature_name,
-        )
-        .first()
-    )
-    if existing is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Feature path already exists")
+    _ensure_unique_feature_path(db, current_org_id, entity=data.entity, feature_name=data.feature_name)
 
     feature = FeatureDefinition(o_id=current_org_id, created_by=str(user.email), updated_by=str(user.email))
     _apply_payload(feature, data)
@@ -155,6 +162,13 @@ def update_feature(
     db: Any = Depends(get_db),
 ) -> FeatureMutationResponse:
     feature = _get_feature(db, current_org_id, feature_id)
+    _ensure_unique_feature_path(
+        db,
+        current_org_id,
+        entity=data.entity,
+        feature_name=data.feature_name,
+        exclude_feature_id=feature_id,
+    )
     if feature.status == "active" and get_feature_dependencies(db, current_org_id, feature_path(feature)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -225,6 +239,8 @@ def deprecate_feature(
     db: Any = Depends(get_db),
 ) -> FeatureMutationResponse:
     feature = _get_feature(db, current_org_id, feature_id)
+    if get_feature_dependencies(db, current_org_id, feature_path(feature)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Feature is used by rules")
     feature.status = "deprecated"
     feature.version = int(feature.version) + 1
     feature.updated_by = str(user.email)

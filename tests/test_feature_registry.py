@@ -16,6 +16,18 @@ from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManage
 from ezrules.models.backend_core import EventVersion, FeatureDefinition, Organisation, Role, Rule, User
 
 
+def _feature_payload(feature_name: str, *, name: str | None = None) -> dict:
+    return {
+        "name": name or feature_name,
+        "entity": "sender",
+        "feature_name": feature_name,
+        "entity_key": "sender_id",
+        "aggregation_type": "sum",
+        "source_field": "amount",
+        "window_seconds": 86400,
+    }
+
+
 def _hash_payload(event_data: dict) -> str:
     serialized = json.dumps(event_data, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
@@ -55,15 +67,7 @@ def feature_client(session):
 
 def test_create_activate_and_list_feature(feature_client):
     token = feature_client.test_data["token"]
-    payload = {
-        "name": "Sender sent amount 24h",
-        "entity": "sender",
-        "feature_name": "sent_amount_sum_24h",
-        "entity_key": "sender_id",
-        "aggregation_type": "sum",
-        "source_field": "amount",
-        "window_seconds": 86400,
-    }
+    payload = _feature_payload("sent_amount_sum_24h", name="Sender sent amount 24h")
 
     create_response = feature_client.post(
         "/api/v2/features",
@@ -85,6 +89,82 @@ def test_create_activate_and_list_feature(feature_client):
     list_response = feature_client.get("/api/v2/features", headers={"Authorization": f"Bearer {token}"})
     assert list_response.status_code == 200
     assert list_response.json()["features"][0]["available_as"] == "stat[sender.sent_amount_sum_24h]"
+
+
+def test_update_feature_duplicate_path_returns_conflict(feature_client):
+    token = feature_client.test_data["token"]
+    first_response = feature_client.post(
+        "/api/v2/features",
+        json=_feature_payload("sent_amount_sum_24h", name="Sender sent amount 24h"),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    second_response = feature_client.post(
+        "/api/v2/features",
+        json=_feature_payload("sent_count_24h", name="Sender count 24h"),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert first_response.status_code == 201
+    assert second_response.status_code == 201
+
+    duplicate_response = feature_client.put(
+        f"/api/v2/features/{second_response.json()['feature']['fd_id']}",
+        json=_feature_payload("sent_amount_sum_24h", name="Renamed duplicate"),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert duplicate_response.status_code == 409
+    assert duplicate_response.json()["detail"] == "Feature path already exists"
+
+
+def test_deprecate_referenced_feature_is_rejected(feature_client):
+    token = feature_client.test_data["token"]
+    session = feature_client.test_data["session"]
+    org = feature_client.test_data["org"]
+    create_response = feature_client.post(
+        "/api/v2/features",
+        json=_feature_payload("sent_amount_sum_24h", name="Sender sent amount 24h"),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create_response.status_code == 201
+    feature_id = create_response.json()["feature"]["fd_id"]
+    activate_response = feature_client.post(
+        f"/api/v2/features/{feature_id}/activate",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert activate_response.status_code == 200
+    session.add(
+        Rule(
+            logic="if stat[sender.sent_amount_sum_24h] > 100:\n\treturn !HOLD",
+            description="Hold high 24h sender volume",
+            rid="FEATURE:DEPS",
+            o_id=org.o_id,
+            r_id=9201,
+        )
+    )
+    session.commit()
+
+    deprecate_response = feature_client.post(
+        f"/api/v2/features/{feature_id}/deprecate",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert deprecate_response.status_code == 400
+    assert deprecate_response.json()["detail"] == "Feature is used by rules"
+
+
+def test_feature_payload_rejects_unsupported_event_time_field(feature_client):
+    token = feature_client.test_data["token"]
+    payload = _feature_payload("sent_amount_sum_24h", name="Sender sent amount 24h")
+    payload["event_time_field"] = "created_at"
+
+    response = feature_client.post(
+        "/api/v2/features",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "event_time_field"]
 
 
 def test_rule_verify_requires_active_feature(feature_client):

@@ -952,7 +952,6 @@ class FeatureDefinition(Base):
     entity = Column(String(64), nullable=False)
     feature_name = Column(String(128), nullable=False)
     entity_key = Column(String(255), nullable=False)
-    event_time_field = Column(String(255), nullable=True)
     aggregation_type = Column(String(32), nullable=False)
     source_field = Column(String(255), nullable=True)
     window_seconds = Column(Integer, nullable=False)

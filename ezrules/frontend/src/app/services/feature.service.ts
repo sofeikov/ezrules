@@ -21,7 +21,6 @@ export interface FeatureDefinition {
   feature_name: string;
   available_as: string;
   entity_key: string;
-  event_time_field: string | null;
   aggregation_type: FeatureAggregation;
   source_field: string | null;
   window_seconds: number;
@@ -42,7 +41,6 @@ export interface FeatureDefinitionPayload {
   entity: string;
   feature_name: string;
   entity_key: string;
-  event_time_field?: string | null;
   aggregation_type: FeatureAggregation;
   source_field?: string | null;
   window_seconds: number;
