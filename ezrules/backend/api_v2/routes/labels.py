@@ -286,7 +286,7 @@ def delete_label(
 def mark_event(
     request_data: MarkEventRequest,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.CREATE_LABEL)),
+    _: None = Depends(require_permission(PermissionAction.MODIFY_LABEL)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> MarkEventResponse:
@@ -357,7 +357,7 @@ def _parse_row_error(error_str: str) -> UploadResultError:
 async def upload_labels(
     file: UploadFile,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.CREATE_LABEL)),
+    _: None = Depends(require_permission(PermissionAction.MODIFY_LABEL)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> UploadResult:

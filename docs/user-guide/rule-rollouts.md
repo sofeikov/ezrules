@@ -54,7 +54,7 @@ curl -X POST http://localhost:8888/api/v2/rules/{rule_id}/rollout \
   }'
 ```
 
-Rollouts are allowed only for active rules.
+Rollouts are allowed only for active rules. Starting a rollout for the current saved rule version requires `MANAGE_ROLLOUTS`. Supplying candidate `logic` or `description` in the request also requires `MODIFY_RULE`.
 
 ---
 
@@ -105,4 +105,4 @@ Promotion writes the candidate logic into the main rule record and production co
 
 - A rule can be in **shadow** or **rollout**, not both.
 - While a rollout or shadow deployment exists, direct edits to the base rule are blocked until you remove or promote the candidate deployment.
-- Rollouts use `PROMOTE_RULES` permission for create, remove, and promote actions because they change live traffic behavior.
+- Rollouts use `MANAGE_ROLLOUTS` permission for create, remove, and promote actions because they change live traffic behavior.

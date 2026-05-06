@@ -41,8 +41,8 @@ export class RolloutsComponent implements OnInit {
 
   actionSuccess: string | null = null;
   actionError: string | null = null;
+  canManageRollouts: boolean = false;
   canModifyRules: boolean = false;
-  canPromoteRules: boolean = false;
 
   constructor(
     private ruleService: RuleService,
@@ -58,12 +58,12 @@ export class RolloutsComponent implements OnInit {
   loadPermissions(): void {
     this.authService.getCurrentUser().subscribe({
       next: (user) => {
+        this.canManageRollouts = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.manageRollouts);
         this.canModifyRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyRule);
-        this.canPromoteRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.promoteRules);
       },
       error: () => {
+        this.canManageRollouts = false;
         this.canModifyRules = false;
-        this.canPromoteRules = false;
       }
     });
   }
@@ -94,7 +94,7 @@ export class RolloutsComponent implements OnInit {
   }
 
   openPromoteDialog(rule: RolloutRuleItem): void {
-    if (!this.canPromoteRules) {
+    if (!this.canManageRollouts) {
       return;
     }
 
@@ -134,6 +134,10 @@ export class RolloutsComponent implements OnInit {
   }
 
   openRemoveDialog(rule: RolloutRuleItem): void {
+    if (!this.canManageRollouts) {
+      return;
+    }
+
     this.showRemoveDialog = true;
     this.removeTarget = rule;
     this.removeError = null;
@@ -148,7 +152,7 @@ export class RolloutsComponent implements OnInit {
   }
 
   confirmRemove(): void {
-    if (!this.removeTarget) {
+    if (!this.canManageRollouts || !this.removeTarget) {
       return;
     }
 
@@ -175,7 +179,7 @@ export class RolloutsComponent implements OnInit {
   }
 
   confirmPromote(): void {
-    if (!this.promoteTarget) return;
+    if (!this.canManageRollouts || !this.promoteTarget) return;
 
     this.promoting = true;
     this.promoteError = null;
@@ -199,7 +203,7 @@ export class RolloutsComponent implements OnInit {
   }
 
   editRollout(rule: RolloutRuleItem): void {
-    if (!this.canModifyRules) {
+    if (!this.canManageRollouts || !this.canModifyRules) {
       return;
     }
 
@@ -214,7 +218,7 @@ export class RolloutsComponent implements OnInit {
   }
 
   removeFromRollout(rule: RolloutRuleItem): void {
-    if (!this.canPromoteRules) {
+    if (!this.canManageRollouts) {
       return;
     }
 
@@ -229,6 +233,6 @@ export class RolloutsComponent implements OnInit {
   }
 
   showReadOnlyNotice(): boolean {
-    return !this.canModifyRules && !this.canPromoteRules;
+    return !this.canManageRollouts;
   }
 }

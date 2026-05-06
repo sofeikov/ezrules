@@ -53,14 +53,14 @@
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <div *ngIf="canViewRoles" class="w-48">
+            <div *ngIf="canManageUserRoles && canViewRoles" class="w-48">
               <label class="block text-sm font-medium text-gray-700 mb-1">Role (optional)</label>
               <select
                 [(ngModel)]="selectedRoleId"
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
               >
                 <option [ngValue]="null">No role</option>
-                <option *ngFor="let role of roles" [ngValue]="role.id">{{ role.name }}</option>
+                <option *ngFor="let role of getAssignableRoles()" [ngValue]="role.id">{{ role.name }}</option>
               </select>
             </div>
             <button
@@ -86,14 +86,14 @@
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <div *ngIf="canViewRoles" class="w-48">
+            <div *ngIf="canManageUserRoles && canViewRoles" class="w-48">
               <label class="block text-sm font-medium text-gray-700 mb-1">Role (optional)</label>
               <select
                 [(ngModel)]="inviteRoleId"
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
               >
                 <option [ngValue]="null">No role</option>
-                <option *ngFor="let role of roles" [ngValue]="role.id">{{ role.name }}</option>
+                <option *ngFor="let role of getAssignableRoles()" [ngValue]="role.id">{{ role.name }}</option>
               </select>
             </div>
             <button
@@ -159,7 +159,7 @@
                     >
                       {{ role.name }}
                       <button
-                        *ngIf="canManageUserRoles"
+                        *ngIf="canManageUserRoles && !isCurrentUser(user.id) && isAssignableRole(role.id)"
                         (click)="removeRole(user.id, role.id, role.name, user.email)"
                         class="ml-1 text-blue-600 hover:text-blue-900"
                         title="Remove role"
@@ -168,7 +168,7 @@
                       </button>
                     </span>
                     <select
-                      *ngIf="canManageUserRoles && canViewRoles && getAvailableRoles(user).length > 0"
+                      *ngIf="canManageUserRoles && canViewRoles && !isCurrentUser(user.id) && getAvailableRoles(user).length > 0"
                       (change)="assignRole(user.id, $event)"
                       class="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-600"
                     >

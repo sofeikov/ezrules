@@ -82,6 +82,7 @@ def rules_test_client(session):
     PermissionManager.db_session = session
     PermissionManager.init_default_actions()
     PermissionManager.grant_permission(rule_role.id, PermissionAction.VIEW_RULES)
+    PermissionManager.grant_permission(rule_role.id, PermissionAction.SUBMIT_TEST_EVENTS)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.CREATE_RULE)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.MODIFY_RULE)
     PermissionManager.grant_permission(rule_role.id, PermissionAction.REORDER_RULES)

@@ -139,14 +139,14 @@
               </p>
             </div>
             <button
-              *ngIf="incident.status === 'open'"
+              *ngIf="incident.status === 'open' && canManageAlerts"
               type="button"
               class="rounded-md border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-700"
               (click)="acknowledgeIncident(incident)"
             >
               Acknowledge
             </button>
-            <span *ngIf="incident.status !== 'open'" class="text-sm font-medium text-gray-500">
+            <span *ngIf="incident.status !== 'open' || !canManageAlerts" class="text-sm font-medium text-gray-500">
               {{ incident.status }}
             </span>
           </li>

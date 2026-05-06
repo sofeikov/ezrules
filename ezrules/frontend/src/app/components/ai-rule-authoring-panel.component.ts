@@ -373,6 +373,7 @@ export class AiRuleAuthoringPanelComponent implements OnDestroy {
   @Input() listSuggestions: RuleEditorListSuggestion[] = [];
   @Input() outcomeSuggestions: RuleEditorOutcomeSuggestion[] = [];
   @Input() backtestRunning = false;
+  @Input() backtestAllowed = false;
   @Output() draftApplied = new EventEmitter<string>();
   @Output() pendingDraftChange = new EventEmitter<boolean>();
   @Output() backtestRequested = new EventEmitter<string>();
@@ -424,7 +425,7 @@ export class AiRuleAuthoringPanelComponent implements OnDestroy {
   }
 
   canRequestBacktest(): boolean {
-    return this.mode === 'edit' && this.ruleId !== null && !!this.result?.applyable;
+    return this.backtestAllowed && this.mode === 'edit' && this.ruleId !== null && !!this.result?.applyable;
   }
 
   requestBacktest(): void {

@@ -43,12 +43,17 @@ export class AlertsComponent implements OnInit {
     this.authService.getCurrentUser().subscribe({
       next: (user) => {
         this.canManageAlerts = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.manageAlerts);
+        if (this.canManageAlerts) {
+          this.loadOutcomes();
+        } else {
+          this.outcomesLoading = false;
+        }
       },
       error: () => {
         this.canManageAlerts = false;
+        this.outcomesLoading = false;
       }
     });
-    this.loadOutcomes();
     this.loadAlerts();
   }
 
@@ -134,6 +139,10 @@ export class AlertsComponent implements OnInit {
   }
 
   acknowledgeIncident(incident: AlertIncident): void {
+    if (!this.canManageAlerts) {
+      return;
+    }
+
     this.alertService.acknowledgeIncident(incident.id).subscribe({
       next: () => this.loadAlerts(),
       error: () => {

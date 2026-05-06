@@ -37,8 +37,9 @@ export class ShadowRulesComponent implements OnInit {
   // Action feedback
   actionSuccess: string | null = null;
   actionError: string | null = null;
-  canModifyRules: boolean = false;
+  canManageShadowDeployments: boolean = false;
   canPromoteRules: boolean = false;
+  canModifyRules: boolean = false;
 
   constructor(
     private ruleService: RuleService,
@@ -54,12 +55,17 @@ export class ShadowRulesComponent implements OnInit {
   loadPermissions(): void {
     this.authService.getCurrentUser().subscribe({
       next: (user) => {
-        this.canModifyRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyRule);
+        this.canManageShadowDeployments = hasPermissionRequirement(
+          user.permissions,
+          ACTION_PERMISSION_REQUIREMENTS.manageShadowDeployments,
+        );
         this.canPromoteRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.promoteRules);
+        this.canModifyRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyRule);
       },
       error: () => {
-        this.canModifyRules = false;
+        this.canManageShadowDeployments = false;
         this.canPromoteRules = false;
+        this.canModifyRules = false;
       }
     });
   }
@@ -146,7 +152,7 @@ export class ShadowRulesComponent implements OnInit {
   }
 
   editShadowRule(rule: ShadowRuleItem): void {
-    if (!this.canModifyRules) {
+    if (!this.canManageShadowDeployments || !this.canModifyRules) {
       return;
     }
 
@@ -156,7 +162,7 @@ export class ShadowRulesComponent implements OnInit {
   }
 
   removeFromShadow(rule: ShadowRuleItem): void {
-    if (!this.canModifyRules) {
+    if (!this.canManageShadowDeployments) {
       return;
     }
 
@@ -185,6 +191,6 @@ export class ShadowRulesComponent implements OnInit {
   }
 
   showReadOnlyNotice(): boolean {
-    return !this.canModifyRules && !this.canPromoteRules;
+    return !this.canManageShadowDeployments && !this.canPromoteRules;
   }
 }

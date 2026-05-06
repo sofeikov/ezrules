@@ -54,8 +54,11 @@ def settings_test_client(session):
 
     PermissionManager.db_session = session
     PermissionManager.init_default_actions()
-    PermissionManager.grant_permission(role.id, PermissionAction.VIEW_ROLES)
-    PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_PERMISSIONS)
+    PermissionManager.grant_permission(role.id, PermissionAction.VIEW_SETTINGS)
+    PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_RUNTIME_SETTINGS)
+    PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_AI_AUTHORING_SETTINGS)
+    PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_OUTCOME_HIERARCHY)
+    PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_RULE_QUALITY_SETTINGS)
     PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_NEUTRAL_OUTCOME)
 
     token = create_access_token(
@@ -141,7 +144,7 @@ class TestRuntimeSettings:
 
         PermissionManager.db_session = session
         PermissionManager.init_default_actions()
-        PermissionManager.grant_permission(role.id, PermissionAction.VIEW_ROLES)
+        PermissionManager.grant_permission(role.id, PermissionAction.VIEW_SETTINGS)
 
         token = create_access_token(
             user_id=int(user.id),
@@ -180,7 +183,7 @@ class TestRuntimeSettings:
 
         PermissionManager.db_session = session
         PermissionManager.init_default_actions()
-        PermissionManager.grant_permission(role.id, PermissionAction.VIEW_ROLES)
+        PermissionManager.grant_permission(role.id, PermissionAction.VIEW_SETTINGS)
 
         token = create_access_token(
             user_id=int(user.id),
@@ -638,7 +641,7 @@ class TestRuleQualityPairsSettings:
             )
             assert response.status_code == 403
 
-    def test_mutate_rule_quality_pairs_requires_manage_permissions(self, session):
+    def test_mutate_rule_quality_pairs_requires_rule_quality_permission(self, session):
         hashed_password = bcrypt.hashpw("pairsviewonlypass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         org = _get_org(session)
         role = Role(name="pairs_view_only", description="Can view settings only", o_id=int(org.o_id))
@@ -658,7 +661,7 @@ class TestRuleQualityPairsSettings:
 
         PermissionManager.db_session = session
         PermissionManager.init_default_actions()
-        PermissionManager.grant_permission(role.id, PermissionAction.VIEW_ROLES)
+        PermissionManager.grant_permission(role.id, PermissionAction.VIEW_SETTINGS)
 
         outcome = AllowedOutcome(
             outcome_name="SETTINGS_OUTCOME_PERM",

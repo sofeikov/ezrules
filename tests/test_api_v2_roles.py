@@ -183,6 +183,44 @@ class TestListRoles:
         assert "user_count" in admin_role
         assert admin_role["user_count"] >= 1
 
+    def test_list_roles_includes_permissions(self, roles_test_client):
+        """Should include role permissions so clients can gate assignment choices."""
+        token = roles_test_client.test_data["token"]
+
+        response = roles_test_client.get(
+            "/api/v2/roles",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        role = response.json()["roles"][0]
+        assert "permissions" in role
+        assert isinstance(role["permissions"], list)
+
+    def test_list_roles_preserves_scoped_permission_grants(self, roles_test_client, sample_role, session):
+        """Should expose permission resource scope for client-side privilege ceilings."""
+        token = roles_test_client.test_data["token"]
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+        action = session.query(Action).filter(Action.name == PermissionAction.VIEW_RULES.value).one()
+        session.add(RoleActions(role_id=sample_role.id, action_id=action.id, resource_id=5151))
+        session.commit()
+
+        response = roles_test_client.get(
+            "/api/v2/roles",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        role = next(role for role in response.json()["roles"] if role["id"] == sample_role.id)
+        assert {
+            "id": action.id,
+            "name": PermissionAction.VIEW_RULES.value,
+            "description": action.description,
+            "resource_type": action.resource_type,
+            "resource_id": 5151,
+        } in role["permissions"]
+
     def test_list_roles_unauthorized(self, roles_test_client):
         """Should return 401 without token."""
         response = roles_test_client.get("/api/v2/roles")

@@ -136,7 +136,7 @@ def test_labels_and_rule_quality_options_are_org_scoped(session):
         permissions=[
             PermissionAction.VIEW_LABELS,
             PermissionAction.CREATE_LABEL,
-            PermissionAction.VIEW_ROLES,
+            PermissionAction.VIEW_SETTINGS,
         ],
         email_prefix="phase3-labels-admin",
     )
@@ -249,7 +249,7 @@ def test_backtesting_endpoints_hide_other_org_rules(session):
     user = _create_user(
         session,
         org_id=int(org.o_id),
-        permissions=[PermissionAction.VIEW_RULES, PermissionAction.MODIFY_RULE],
+        permissions=[PermissionAction.VIEW_RULES, PermissionAction.MANAGE_BACKTESTS],
         email_prefix="phase3-backtesting-admin",
     )
     other_rule = Rule(

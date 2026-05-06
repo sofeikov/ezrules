@@ -67,6 +67,7 @@ def labels_test_client(session):
     PermissionManager.init_default_actions()
     PermissionManager.grant_permission(label_role.id, PermissionAction.VIEW_LABELS)
     PermissionManager.grant_permission(label_role.id, PermissionAction.CREATE_LABEL)
+    PermissionManager.grant_permission(label_role.id, PermissionAction.MODIFY_LABEL)
     PermissionManager.grant_permission(label_role.id, PermissionAction.DELETE_LABEL)
 
     # Create a token for the user

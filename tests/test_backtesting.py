@@ -50,7 +50,7 @@ def backtesting_test_client(session):
     PermissionManager.db_session = session
     PermissionManager.init_default_actions()
     PermissionManager.grant_permission(role.id, PermissionAction.VIEW_RULES)
-    PermissionManager.grant_permission(role.id, PermissionAction.MODIFY_RULE)
+    PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_BACKTESTS)
 
     roles = [r.name for r in user.roles]
     token = create_access_token(

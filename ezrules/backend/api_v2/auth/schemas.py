@@ -121,6 +121,13 @@ class RoleResponse(BaseModel):
     description: str | None = None
 
 
+class PermissionGrantResponse(BaseModel):
+    """Effective permission grant, including optional resource scope."""
+
+    name: str
+    resource_id: int | None = None
+
+
 class UserResponse(BaseModel):
     """
     User information response (for /auth/me endpoint).
@@ -146,6 +153,7 @@ class UserResponse(BaseModel):
     active: bool
     roles: list[RoleResponse]
     permissions: list[str] = []
+    permission_grants: list[PermissionGrantResponse] = []
     last_login_at: datetime | None = None
 
     class Config:

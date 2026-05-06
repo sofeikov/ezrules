@@ -188,7 +188,7 @@ def _user_has_permission(db: Any, user: User, action: PermissionAction) -> bool:
 @router.get("/runtime", response_model=RuntimeSettingsResponse)
 def get_runtime_settings(
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    _: None = Depends(require_permission(PermissionAction.VIEW_SETTINGS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuntimeSettingsResponse:
@@ -233,10 +233,10 @@ def update_runtime_settings(
         or request_data.auto_promote_active_rule_updates is not None
         or request_data.strict_mode_enabled is not None
         or request_data.main_rule_execution_mode is not None
-    ) and not _user_has_permission(db, user, PermissionAction.MANAGE_PERMISSIONS):
+    ) and not _user_has_permission(db, user, PermissionAction.MANAGE_RUNTIME_SETTINGS):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="MANAGE_PERMISSIONS permission is required to update runtime settings",
+            detail="MANAGE_RUNTIME_SETTINGS permission is required to update runtime settings",
         )
 
     if request_data.rule_quality_lookback_days is not None:
@@ -297,7 +297,7 @@ def update_runtime_settings(
 @router.get("/ai-authoring", response_model=AIAuthoringSettingsResponse)
 def get_ai_authoring_settings(
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    _: None = Depends(require_permission(PermissionAction.VIEW_SETTINGS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> AIAuthoringSettingsResponse:
@@ -329,10 +329,10 @@ def update_ai_authoring_settings(
     if not updates_requested:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No AI authoring setting changes requested")
 
-    if not _user_has_permission(db, user, PermissionAction.MANAGE_PERMISSIONS):
+    if not _user_has_permission(db, user, PermissionAction.MANAGE_AI_AUTHORING_SETTINGS):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="MANAGE_PERMISSIONS permission is required to update AI authoring settings",
+            detail="MANAGE_AI_AUTHORING_SETTINGS permission is required to update AI authoring settings",
         )
 
     if request_data.provider is not None:
@@ -387,7 +387,7 @@ def update_ai_authoring_settings(
 @router.get("/outcome-hierarchy", response_model=OutcomeHierarchyResponse)
 def get_outcome_hierarchy(
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    _: None = Depends(require_permission(PermissionAction.VIEW_SETTINGS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> OutcomeHierarchyResponse:
@@ -401,7 +401,7 @@ def get_outcome_hierarchy(
 def update_outcome_hierarchy(
     request_data: OutcomeHierarchyUpdateRequest,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.MANAGE_PERMISSIONS)),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_OUTCOME_HIERARCHY)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> OutcomeHierarchyResponse:
@@ -456,7 +456,7 @@ def update_outcome_hierarchy(
 @router.get("/rule-quality-pairs", response_model=RuleQualityPairsListResponse)
 def list_rule_quality_pairs(
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    _: None = Depends(require_permission(PermissionAction.VIEW_SETTINGS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleQualityPairsListResponse:
@@ -474,7 +474,7 @@ def list_rule_quality_pairs(
 @router.get("/rule-quality-pairs/options", response_model=RuleQualityPairOptionsResponse)
 def get_rule_quality_pair_options(
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.VIEW_ROLES)),
+    _: None = Depends(require_permission(PermissionAction.VIEW_SETTINGS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleQualityPairOptionsResponse:
@@ -499,7 +499,7 @@ def get_rule_quality_pair_options(
 def create_rule_quality_pair(
     request_data: RuleQualityPairCreateRequest,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.MANAGE_PERMISSIONS)),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_RULE_QUALITY_SETTINGS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleQualityPairResponse:
@@ -565,7 +565,7 @@ def update_rule_quality_pair(
     pair_id: int,
     request_data: RuleQualityPairUpdateRequest,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.MANAGE_PERMISSIONS)),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_RULE_QUALITY_SETTINGS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleQualityPairResponse:
@@ -588,7 +588,7 @@ def update_rule_quality_pair(
 def delete_rule_quality_pair(
     pair_id: int,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.MANAGE_PERMISSIONS)),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_RULE_QUALITY_SETTINGS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> Response:

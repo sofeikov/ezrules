@@ -10,6 +10,9 @@ class PermissionAction(Enum):
     REORDER_RULES = "reorder_rules"
     PAUSE_RULES = "pause_rules"
     PROMOTE_RULES = "promote_rules"
+    MANAGE_BACKTESTS = "manage_backtests"
+    MANAGE_SHADOW_DEPLOYMENTS = "manage_shadow_deployments"
+    MANAGE_ROLLOUTS = "manage_rollouts"
     DELETE_RULE = "delete_rule"
     VIEW_RULES = "view_rules"
     SUBMIT_TEST_EVENTS = "submit_test_events"
@@ -50,6 +53,13 @@ class PermissionAction(Enum):
     DELETE_ROLE = "delete_role"
     MANAGE_PERMISSIONS = "manage_permissions"
 
+    # Settings Management
+    VIEW_SETTINGS = "view_settings"
+    MANAGE_RUNTIME_SETTINGS = "manage_runtime_settings"
+    MANAGE_AI_AUTHORING_SETTINGS = "manage_ai_authoring_settings"
+    MANAGE_OUTCOME_HIERARCHY = "manage_outcome_hierarchy"
+    MANAGE_RULE_QUALITY_SETTINGS = "manage_rule_quality_settings"
+
     # Field Type Management
     VIEW_FIELD_TYPES = "view_field_types"
     MODIFY_FIELD_TYPES = "modify_field_types"
@@ -71,6 +81,9 @@ class PermissionAction(Enum):
             (cls.REORDER_RULES.value, "Reorder main rules", "rule"),
             (cls.PAUSE_RULES.value, "Pause active rules without archiving them", "rule"),
             (cls.PROMOTE_RULES.value, "Promote draft or shadow rules to production", "rule"),
+            (cls.MANAGE_BACKTESTS.value, "Start, cancel, and retry rule backtests", "rule"),
+            (cls.MANAGE_SHADOW_DEPLOYMENTS.value, "Deploy and remove rules from shadow evaluation", "rule"),
+            (cls.MANAGE_ROLLOUTS.value, "Create, update, remove, and promote rule rollouts", "rule"),
             (cls.DELETE_RULE.value, "Delete rules", "rule"),
             (cls.VIEW_RULES.value, "View rules", "rule"),
             (cls.SUBMIT_TEST_EVENTS.value, "Submit dry-run test events", "rule"),
@@ -98,6 +111,15 @@ class PermissionAction(Enum):
             (cls.MODIFY_ROLE.value, "Modify existing roles", "role"),
             (cls.DELETE_ROLE.value, "Delete roles", "role"),
             (cls.MANAGE_PERMISSIONS.value, "Manage role permissions", "permission"),
+            (cls.VIEW_SETTINGS.value, "View runtime and product settings", "settings"),
+            (cls.MANAGE_RUNTIME_SETTINGS.value, "Manage runtime behavior settings", "settings"),
+            (
+                cls.MANAGE_AI_AUTHORING_SETTINGS.value,
+                "Manage AI authoring provider, model, and key settings",
+                "settings",
+            ),
+            (cls.MANAGE_OUTCOME_HIERARCHY.value, "Manage outcome severity ordering", "settings"),
+            (cls.MANAGE_RULE_QUALITY_SETTINGS.value, "Manage curated rule quality settings", "settings"),
             (cls.VIEW_FIELD_TYPES.value, "View field type configurations and observations", "field_type"),
             (cls.MODIFY_FIELD_TYPES.value, "Create and update field type configurations", "field_type"),
             (cls.DELETE_FIELD_TYPE.value, "Delete field type configurations", "field_type"),
@@ -131,10 +153,14 @@ class RoleType(Enum):
                 PermissionAction.CREATE_RULE,
                 PermissionAction.MODIFY_RULE,
                 PermissionAction.REORDER_RULES,
+                PermissionAction.MANAGE_BACKTESTS,
                 PermissionAction.VIEW_RULES,
+                PermissionAction.SUBMIT_TEST_EVENTS,
+                PermissionAction.VIEW_SETTINGS,
                 PermissionAction.VIEW_OUTCOMES,
                 PermissionAction.VIEW_LISTS,
                 PermissionAction.CREATE_LABEL,
+                PermissionAction.MODIFY_LABEL,
                 PermissionAction.VIEW_LABELS,
                 PermissionAction.VIEW_FIELD_TYPES,
             ]

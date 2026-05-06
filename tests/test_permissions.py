@@ -12,6 +12,8 @@ class TestPermissionAction:
         assert PermissionAction.CREATE_RULE.value == "create_rule"
         assert PermissionAction.PAUSE_RULES.value == "pause_rules"
         assert PermissionAction.PROMOTE_RULES.value == "promote_rules"
+        assert PermissionAction.MANAGE_BACKTESTS.value == "manage_backtests"
+        assert PermissionAction.VIEW_SETTINGS.value == "view_settings"
         assert PermissionAction.VIEW_RULES.value == "view_rules"
         assert PermissionAction.ACCESS_AUDIT_TRAIL.value == "access_audit_trail"
 
@@ -32,6 +34,8 @@ class TestPermissionAction:
         assert "create_rule" in action_names
         assert "pause_rules" in action_names
         assert "promote_rules" in action_names
+        assert "manage_backtests" in action_names
+        assert "view_settings" in action_names
         assert "view_rules" in action_names
         assert "access_audit_trail" in action_names
 
@@ -64,10 +68,14 @@ class TestRoleType:
             PermissionAction.CREATE_RULE,
             PermissionAction.MODIFY_RULE,
             PermissionAction.REORDER_RULES,
+            PermissionAction.MANAGE_BACKTESTS,
             PermissionAction.VIEW_RULES,
+            PermissionAction.SUBMIT_TEST_EVENTS,
+            PermissionAction.VIEW_SETTINGS,
             PermissionAction.VIEW_OUTCOMES,
             PermissionAction.VIEW_LISTS,
             PermissionAction.CREATE_LABEL,
+            PermissionAction.MODIFY_LABEL,
             PermissionAction.VIEW_LABELS,
             PermissionAction.VIEW_FIELD_TYPES,
         ]

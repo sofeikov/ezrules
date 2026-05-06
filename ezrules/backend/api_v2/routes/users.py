@@ -37,7 +37,7 @@ from ezrules.backend.api_v2.schemas.users import (
 from ezrules.backend.email_service import send_invitation_email
 from ezrules.core.audit_helpers import save_user_account_history
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Invitation, PasswordResetToken, Role, User, UserSession
+from ezrules.models.backend_core import Action, Invitation, PasswordResetToken, Role, RoleActions, User, UserSession
 from ezrules.settings import app_settings
 
 router = APIRouter(prefix="/api/v2/users", tags=["Users"])
@@ -106,6 +106,79 @@ def hash_token(token: str) -> str:
 def now_utc_naive() -> datetime:
     """Get current UTC timestamp without tzinfo for DB compatibility."""
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+PermissionGrant = tuple[str, int | None]
+
+
+def _effective_permission_grants(db: Any, user: User) -> set[PermissionGrant]:
+    role_ids = [int(role.id) for role in user.roles]
+    if not role_ids:
+        return set()
+    rows = (
+        db.query(Action.name, RoleActions.resource_id)
+        .join(RoleActions, RoleActions.action_id == Action.id)
+        .filter(RoleActions.role_id.in_(role_ids))
+        .all()
+    )
+    return {(str(row[0]), int(row[1]) if row[1] is not None else None) for row in rows}
+
+
+def _role_permission_grants(db: Any, role_ids: list[int]) -> set[PermissionGrant]:
+    if not role_ids:
+        return set()
+    rows = (
+        db.query(Action.name, RoleActions.resource_id)
+        .join(RoleActions, RoleActions.action_id == Action.id)
+        .filter(RoleActions.role_id.in_(role_ids))
+        .all()
+    )
+    return {(str(row[0]), int(row[1]) if row[1] is not None else None) for row in rows}
+
+
+def _grant_is_covered(actor_grants: set[PermissionGrant], target_grant: PermissionGrant) -> bool:
+    action_name, resource_id = target_grant
+    if (action_name, None) in actor_grants:
+        return True
+    return resource_id is not None and target_grant in actor_grants
+
+
+def _user_has_permission(db: Any, user: User, action: PermissionAction) -> bool:
+    return (action.value, None) in _effective_permission_grants(db, user)
+
+
+def _ensure_can_assign_roles(db: Any, actor: User, role_ids: list[int]) -> None:
+    """Prevent role-assignment flows from granting permissions the actor does not hold."""
+    if not role_ids:
+        return
+    if not _user_has_permission(db, actor, PermissionAction.MANAGE_USER_ROLES):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="MANAGE_USER_ROLES permission is required to assign roles",
+        )
+    actor_permissions = _effective_permission_grants(db, actor)
+    target_permissions = _role_permission_grants(db, role_ids)
+    missing_permissions = sorted(
+        grant for grant in target_permissions if not _grant_is_covered(actor_permissions, grant)
+    )
+    if missing_permissions:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot assign roles with permissions you do not hold",
+        )
+
+
+def _get_org_roles_or_error(db: Any, role_ids: list[int], current_org_id: int) -> tuple[list[Role] | None, list[int]]:
+    """Resolve requested roles inside the current organisation only."""
+    if not role_ids:
+        return [], []
+
+    roles = db.query(Role).filter(Role.o_id == current_org_id, Role.id.in_(role_ids)).all()
+    found_ids = {int(role.id) for role in roles}
+    missing_ids = [role_id for role_id in role_ids if role_id not in found_ids]
+    if missing_ids:
+        return None, missing_ids
+    return roles, []
 
 
 # =============================================================================
@@ -189,6 +262,18 @@ def create_user(
             error=f"A user with email '{user_data.email}' already exists",
         )
 
+    roles: list[Role] = []
+    if user_data.role_ids:
+        resolved_roles, missing_ids = _get_org_roles_or_error(db, user_data.role_ids, current_org_id)
+        if resolved_roles is None:
+            return UserMutationResponse(
+                success=False,
+                message="Some roles not found",
+                error=f"Role IDs not found: {missing_ids}",
+            )
+        roles = resolved_roles
+        _ensure_can_assign_roles(db, user, [int(role.id) for role in roles])
+
     # Create the new user
     new_user = User(
         email=user_data.email,
@@ -199,16 +284,7 @@ def create_user(
     )
 
     # Assign roles if provided
-    if user_data.role_ids:
-        roles = db.query(Role).filter(Role.o_id == current_org_id, Role.id.in_(user_data.role_ids)).all()
-        if len(roles) != len(user_data.role_ids):
-            found_ids = {r.id for r in roles}
-            missing_ids = [rid for rid in user_data.role_ids if rid not in found_ids]
-            return UserMutationResponse(
-                success=False,
-                message="Some roles not found",
-                error=f"Role IDs not found: {missing_ids}",
-            )
+    if roles:
         new_user.roles = roles
 
     db.add(new_user)
@@ -268,6 +344,18 @@ def invite_user(
             error=f"A user with email '{email}' already exists and is active",
         )
 
+    roles: list[Role] = []
+    if invite_data.role_ids:
+        resolved_roles, missing_ids = _get_org_roles_or_error(db, invite_data.role_ids, current_org_id)
+        if resolved_roles is None:
+            return UserInviteResponse(
+                success=False,
+                message="Some roles not found",
+                error=f"Role IDs not found: {missing_ids}",
+            )
+        roles = resolved_roles
+        _ensure_can_assign_roles(db, user, [int(role.id) for role in roles])
+
     target_user = existing_user
     if target_user is None:
         target_user = User(
@@ -282,16 +370,7 @@ def invite_user(
     else:
         target_user.active = False
 
-    if invite_data.role_ids:
-        roles = db.query(Role).filter(Role.o_id == current_org_id, Role.id.in_(invite_data.role_ids)).all()
-        if len(roles) != len(invite_data.role_ids):
-            found_ids = {int(r.id) for r in roles}
-            missing_ids = [rid for rid in invite_data.role_ids if rid not in found_ids]
-            return UserInviteResponse(
-                success=False,
-                message="Some roles not found",
-                error=f"Role IDs not found: {missing_ids}",
-            )
+    if roles:
         for role in roles:
             if role not in target_user.roles:
                 target_user.roles.append(role)
@@ -510,6 +589,12 @@ def assign_role(
 
     Requires MANAGE_USER_ROLES permission.
     """
+    if int(user.id) == int(user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot change your own role assignments",
+        )
+
     target_user = db.query(User).filter(User.id == user_id, User.o_id == current_org_id).first()
 
     if not target_user:
@@ -525,6 +610,8 @@ def assign_role(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Role with id {role_data.role_id} not found",
         )
+
+    _ensure_can_assign_roles(db, user, [int(role.id)])
 
     # Check if user already has this role
     if role in target_user.roles:
@@ -576,6 +663,12 @@ def remove_role(
 
     Requires MANAGE_USER_ROLES permission.
     """
+    if int(user.id) == int(user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot change your own role assignments",
+        )
+
     target_user = db.query(User).filter(User.id == user_id, User.o_id == current_org_id).first()
 
     if not target_user:
@@ -591,6 +684,8 @@ def remove_role(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Role with id {role_id} not found",
         )
+
+    _ensure_can_assign_roles(db, user, [int(role.id)])
 
     # Check if user has this role
     if role not in target_user.roles:

@@ -44,21 +44,22 @@ PROTECTED_ROLES = {"admin", "readonly", "rule_editor"}
 
 def get_role_permissions(role: Role, db: Any) -> list[PermissionResponse]:
     """Get list of permissions for a role."""
-    role_actions = db.query(RoleActions).filter(RoleActions.role_id == role.id).all()
-    action_ids = [ra.action_id for ra in role_actions]
-
-    if not action_ids:
-        return []
-
-    actions = db.query(Action).filter(Action.id.in_(action_ids)).all()
+    rows = (
+        db.query(Action, RoleActions.resource_id)
+        .join(RoleActions, RoleActions.action_id == Action.id)
+        .filter(RoleActions.role_id == role.id)
+        .order_by(Action.name, RoleActions.resource_id)
+        .all()
+    )
     return [
         PermissionResponse(
             id=int(action.id),
             name=str(action.name),
             description=action.description,
             resource_type=action.resource_type,
+            resource_id=int(resource_id) if resource_id is not None else None,
         )
-        for action in actions
+        for action, resource_id in rows
     ]
 
 
@@ -78,9 +79,10 @@ def role_to_response(role: Role, db: Any) -> RoleResponse:
     )
 
 
-def role_to_list_item(role: Role) -> RoleListItem:
+def role_to_list_item(role: Role, db: Any) -> RoleListItem:
     """Convert a database role model to list item response."""
     user_count = len(list(role.users))
+    permissions = get_role_permissions(role, db)
     # Cast description - it's either a string or None
     description = str(role.description) if role.description is not None else None
 
@@ -89,6 +91,7 @@ def role_to_list_item(role: Role) -> RoleListItem:
         name=str(role.name),
         description=description,
         user_count=user_count,
+        permissions=permissions,
     )
 
 
@@ -117,6 +120,7 @@ def list_permissions(
             name=str(action.name),
             description=action.description,
             resource_type=action.resource_type,
+            resource_id=None,
         )
         for action in actions
     ]
@@ -143,7 +147,7 @@ def list_roles(
     Requires VIEW_ROLES permission.
     """
     roles = db.query(Role).filter(Role.o_id == current_org_id).all()
-    roles_data = [role_to_list_item(r) for r in roles]
+    roles_data = [role_to_list_item(r, db) for r in roles]
     return RolesListResponse(roles=roles_data)
 
 

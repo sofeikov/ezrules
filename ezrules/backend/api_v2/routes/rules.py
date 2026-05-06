@@ -141,6 +141,24 @@ def user_has_permission(db: Any, user: User, action: PermissionAction) -> bool:
     return False
 
 
+def require_modify_rule_for_overrides(
+    db: Any,
+    user: User,
+    *,
+    logic: str | None,
+    description: str | None,
+) -> None:
+    """Require rule modification permission when deploy payloads alter rule content."""
+    if logic is None and description is None:
+        return
+    if user_has_permission(db, user, PermissionAction.MODIFY_RULE):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="MODIFY_RULE permission is required to deploy rule logic or description overrides",
+    )
+
+
 def get_status(status_value: RuleStatus | str) -> RuleStatus:
     """Normalize a status value from ORM objects for schema responses."""
     if isinstance(status_value, RuleStatus):
@@ -1230,7 +1248,7 @@ def record_ai_rule_draft_applied(
 def test_rule(
     request: RuleTestRequest,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    _: None = Depends(require_permission(PermissionAction.SUBMIT_TEST_EVENTS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleTestResponse:
@@ -1327,7 +1345,7 @@ def deploy_to_shadow(
     rule_id: int,
     request: ShadowDeployRequest = None,  # type: ignore[assignment]
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_SHADOW_DEPLOYMENTS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> ShadowDeployResponse:
@@ -1353,6 +1371,7 @@ def deploy_to_shadow(
         RULE_EVALUATION_LANE_ALLOWLIST
     ):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Allowlist rules cannot be deployed")
+    require_modify_rule_for_overrides(db, user, logic=request.logic, description=request.description)
     if request.logic is not None:
         outcome_errors = build_outcome_notation_errors(db, current_org_id, request.logic)
         if outcome_errors:
@@ -1380,7 +1399,7 @@ def deploy_to_shadow(
 def remove_from_shadow(
     rule_id: int,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_SHADOW_DEPLOYMENTS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> ShadowDeployResponse:
@@ -1429,7 +1448,7 @@ def deploy_to_rollout(
     rule_id: int,
     request: RolloutDeployRequest,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.PROMOTE_RULES)),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_ROLLOUTS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RolloutDeployResponse:
@@ -1446,6 +1465,7 @@ def deploy_to_rollout(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Allowlist rules cannot be rolled out",
         )
+    require_modify_rule_for_overrides(db, user, logic=request.logic, description=request.description)
     if request.logic is not None:
         outcome_errors = build_outcome_notation_errors(db, current_org_id, request.logic)
         if outcome_errors:
@@ -1474,7 +1494,7 @@ def deploy_to_rollout(
 def remove_from_rollout(
     rule_id: int,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.PROMOTE_RULES)),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_ROLLOUTS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RolloutDeployResponse:
@@ -1486,7 +1506,7 @@ def remove_from_rollout(
 def promote_rollout_to_production(
     rule_id: int,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.PROMOTE_RULES)),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_ROLLOUTS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RolloutDeployResponse:

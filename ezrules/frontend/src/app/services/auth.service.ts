@@ -4,6 +4,7 @@ import { Observable, BehaviorSubject, tap, catchError, throwError, of } from 'rx
 import { finalize, map, shareReplay, switchMap } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { environment } from '../../environments/environment';
+import { PermissionGrant } from '../auth/permissions';
 
 export interface TokenResponse {
   access_token: string;
@@ -18,6 +19,7 @@ export interface AuthUser {
   active: boolean;
   roles: { id: number; name: string; description: string | null }[];
   permissions: string[];
+  permission_grants?: PermissionGrant[];
   last_login_at: string | null;
 }
 

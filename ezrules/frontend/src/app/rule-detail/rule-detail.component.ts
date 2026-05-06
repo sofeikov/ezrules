@@ -149,6 +149,10 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   canModifyRules: boolean = false;
   canPauseRules: boolean = false;
   canPromoteRules: boolean = false;
+  canSubmitTestEvents: boolean = false;
+  canManageBacktests: boolean = false;
+  canManageShadowDeployments: boolean = false;
+  canManageRollouts: boolean = false;
   lifecycleActionLoading: 'pause' | 'resume' | null = null;
 
   // Backtesting properties
@@ -244,6 +248,13 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         this.canModifyRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyRule);
         this.canPauseRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.pauseRules);
         this.canPromoteRules = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.promoteRules);
+        this.canSubmitTestEvents = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.submitTestEvents);
+        this.canManageBacktests = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.manageBacktests);
+        this.canManageShadowDeployments = hasPermissionRequirement(
+          user.permissions,
+          ACTION_PERMISSION_REQUIREMENTS.manageShadowDeployments,
+        );
+        this.canManageRollouts = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.manageRollouts);
         if (!this.canModifyRules) {
           this.isEditMode = false;
         }
@@ -252,6 +263,10 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         this.canModifyRules = false;
         this.canPauseRules = false;
         this.canPromoteRules = false;
+        this.canSubmitTestEvents = false;
+        this.canManageBacktests = false;
+        this.canManageShadowDeployments = false;
+        this.canManageRollouts = false;
         this.isEditMode = false;
       }
     });
@@ -527,6 +542,10 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   testRule(): void {
+    if (!this.canSubmitTestEvents) {
+      return;
+    }
+
     if (!this.rule) return;
 
     this.testing = true;
@@ -727,11 +746,16 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   openDeployToShadowDialog(): void {
-    if (!this.canModifyRules) {
+    if (!this.canManageShadowDeployments) {
       return;
     }
     if (this.isAllowlistRule()) {
       return;
+    }
+    if (!this.isEditMode && this.rule) {
+      this.editedLogic = this.rule.logic;
+      this.editedDescription = this.rule.description;
+      this.editedEvaluationLane = this.rule.evaluation_lane;
     }
 
     this.showDeployToShadowDialog = true;
@@ -746,13 +770,18 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   confirmDeployToShadow(): void {
+    if (!this.canManageShadowDeployments) return;
     if (!this.rule) return;
 
     this.deployingToShadow = true;
     this.shadowDeploySuccess = false;
     this.shadowDeployError = null;
 
-    this.ruleService.deployToShadow(this.rule.r_id, this.editedLogic, this.editedDescription).subscribe({
+    const shouldDeployDraftOverride = this.canModifyRules && this.isEditMode;
+    const logicOverride = shouldDeployDraftOverride ? this.editedLogic : undefined;
+    const descriptionOverride = shouldDeployDraftOverride ? this.editedDescription : undefined;
+
+    this.ruleService.deployToShadow(this.rule.r_id, logicOverride, descriptionOverride).subscribe({
       next: (response: ShadowDeployResponse) => {
         this.deployingToShadow = false;
         this.closeDeployToShadowDialog();
@@ -783,8 +812,17 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   openRolloutDialog(): void {
+    if (!this.canManageRollouts) {
+      return;
+    }
     if (this.isAllowlistRule()) {
       return;
+    }
+    if (!this.isEditMode && this.rule) {
+      this.editedLogic = this.rule.logic;
+      this.editedDescription = this.rule.description;
+      this.editedEvaluationLane = this.rule.evaluation_lane;
+      this.rolloutTrafficPercent = this.rolloutEntry?.traffic_percent ?? 10;
     }
     this.showRolloutDialog = true;
   }
@@ -798,14 +836,22 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   confirmDeployToRollout(): void {
+    if (!this.canManageRollouts) return;
     if (!this.rule) return;
 
     this.deployingToRollout = true;
     this.rolloutDeploySuccess = false;
     this.rolloutDeployError = null;
 
+    const shouldDeployDraftOverride = this.canModifyRules && this.isEditMode;
+
     this.ruleService
-      .deployToRollout(this.rule.r_id, this.editedLogic, this.editedDescription, this.rolloutTrafficPercent)
+      .deployToRollout(
+        this.rule.r_id,
+        shouldDeployDraftOverride ? this.editedLogic : undefined,
+        shouldDeployDraftOverride ? this.editedDescription : undefined,
+        this.rolloutTrafficPercent
+      )
       .subscribe({
         next: (response: RolloutDeployResponse) => {
           this.deployingToRollout = false;
@@ -836,7 +882,7 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private triggerBacktestForLogic(logic: string): void {
-    if (!this.canModifyRules) return;
+    if (!this.canManageBacktests) return;
     if (!this.rule || !logic) return;
 
     this.backtesting = true;
@@ -988,11 +1034,17 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   canCancelBacktest(taskId: string, item?: BacktestResultItem): boolean {
+    if (!this.canManageBacktests) {
+      return false;
+    }
     const queueStatus = this.getBacktestQueueStatus(taskId, item);
     return queueStatus === 'pending' || queueStatus === 'running';
   }
 
   canRetryBacktest(taskId: string, item?: BacktestResultItem): boolean {
+    if (!this.canManageBacktests) {
+      return false;
+    }
     const queueStatus = this.getBacktestQueueStatus(taskId, item);
     return queueStatus === 'failed' || queueStatus === 'cancelled';
   }
@@ -1088,7 +1140,7 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
 
   cancelBacktest(taskId: string, event?: Event): void {
     event?.stopPropagation();
-    if (!this.rule || this.isBacktestActionPending(taskId, 'cancel')) {
+    if (!this.canManageBacktests || !this.rule || this.isBacktestActionPending(taskId, 'cancel')) {
       return;
     }
 
@@ -1110,7 +1162,7 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
 
   retryBacktest(taskId: string, event?: Event): void {
     event?.stopPropagation();
-    if (!this.rule || this.isBacktestActionPending(taskId, 'retry')) {
+    if (!this.canManageBacktests || !this.rule || this.isBacktestActionPending(taskId, 'retry')) {
       return;
     }
 
@@ -1251,7 +1303,15 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   showReadOnlyNotice(): boolean {
-    return !this.isRevisionView && !this.canModifyRules && !this.canPauseRules && !this.canPromoteRules;
+    return (
+      !this.isRevisionView &&
+      !this.canModifyRules &&
+      !this.canPauseRules &&
+      !this.canPromoteRules &&
+      !this.canManageBacktests &&
+      !this.canManageShadowDeployments &&
+      !this.canManageRollouts
+    );
   }
 
   isLifecycleActionLoading(action: 'pause' | 'resume'): boolean {

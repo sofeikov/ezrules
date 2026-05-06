@@ -201,7 +201,7 @@ def _enqueue_backtest(rule_id: int, new_rule_logic: str, org_id: int, task_id: s
 def trigger_backtest(
     request: BacktestRequest,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_BACKTESTS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> BacktestTriggerResponse:
@@ -299,7 +299,7 @@ def get_task_result(
 def cancel_backtest(
     task_id: str,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_BACKTESTS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> BacktestTriggerResponse:
@@ -348,7 +348,7 @@ def cancel_backtest(
 def retry_backtest(
     task_id: str,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.MODIFY_RULE)),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_BACKTESTS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> BacktestTriggerResponse:

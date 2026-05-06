@@ -207,7 +207,7 @@ def list_alert_incidents(
 def acknowledge_alert_incident(
     incident_id: int,
     user: User = Depends(get_current_active_user),
-    _: None = Depends(require_permission(PermissionAction.VIEW_ALERTS)),
+    _: None = Depends(require_permission(PermissionAction.MANAGE_ALERTS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> AlertMutationResponse:

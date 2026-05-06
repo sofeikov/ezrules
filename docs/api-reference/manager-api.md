@@ -68,7 +68,7 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 | `POST` | `/api/v2/auth/reset-password` | No | Reset password using one-time token |
 | `POST` | `/api/v2/auth/refresh` | No (refresh token in body) | Exchanges refresh token (rotation — one-time use) |
 | `POST` | `/api/v2/auth/logout` | Bearer + refresh token in body | Revokes refresh token server-side |
-| `GET` | `/api/v2/auth/me` | Bearer | Current user profile, including effective permission names |
+| `GET` | `/api/v2/auth/me` | Bearer | Current user profile, including global effective permission names and scoped `permission_grants` |
 
 ### Rules
 
@@ -86,17 +86,17 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 | `POST` | `/api/v2/rules/{rule_id}/resume` | Bearer + `PROMOTE_RULES` | Resume paused rule to active |
 | `POST` | `/api/v2/rules/{rule_id}/archive` | Bearer + `MODIFY_RULE` | Archive rule |
 | `POST` | `/api/v2/rules/{rule_id}/rollback` | Bearer + `MODIFY_RULE` | Create a new draft version from a historical revision (`revision_number` in body) |
-| `POST` | `/api/v2/rules/verify` | Bearer + permission | Verify rule source, extracted params, and advisory warnings for unseen fields |
+| `POST` | `/api/v2/rules/verify` | Bearer + `VIEW_RULES` | Verify rule source, extracted params, and advisory warnings for unseen fields |
 | `POST` | `/api/v2/rules/ai/draft` | Bearer + `CREATE_RULE` or `MODIFY_RULE` | Generate an AI-assisted rule draft (`mode=create|edit`) |
 | `POST` | `/api/v2/rules/ai/apply` | Bearer + `CREATE_RULE` or `MODIFY_RULE` | Record that an AI draft was explicitly applied in the editor |
-| `POST` | `/api/v2/rules/test` | Bearer + permission | Test rule payload |
-| `GET` | `/api/v2/rules/{rule_id}/history` | Bearer + permission | Revision list |
-| `POST` | `/api/v2/rules/{rule_id}/shadow` | Bearer + `MODIFY_RULE` | Deploy rule to shadow |
-| `DELETE` | `/api/v2/rules/{rule_id}/shadow` | Bearer + `MODIFY_RULE` | Remove rule from shadow |
+| `POST` | `/api/v2/rules/test` | Bearer + `SUBMIT_TEST_EVENTS` | Test rule payload and record field observations |
+| `GET` | `/api/v2/rules/{rule_id}/history` | Bearer + `VIEW_RULES` | Revision list |
+| `POST` | `/api/v2/rules/{rule_id}/shadow` | Bearer + `MANAGE_SHADOW_DEPLOYMENTS`; add `MODIFY_RULE` when sending `logic` or `description` | Deploy rule to shadow |
+| `DELETE` | `/api/v2/rules/{rule_id}/shadow` | Bearer + `MANAGE_SHADOW_DEPLOYMENTS` | Remove rule from shadow |
 | `POST` | `/api/v2/rules/{rule_id}/shadow/promote` | Bearer + `PROMOTE_RULES` | Promote shadow rule to production |
-| `POST` | `/api/v2/rules/{rule_id}/rollout` | Bearer + `PROMOTE_RULES` | Start or update a live traffic rollout for an active rule |
-| `DELETE` | `/api/v2/rules/{rule_id}/rollout` | Bearer + `PROMOTE_RULES` | Remove a rollout |
-| `POST` | `/api/v2/rules/{rule_id}/rollout/promote` | Bearer + `PROMOTE_RULES` | Promote rollout candidate to full production |
+| `POST` | `/api/v2/rules/{rule_id}/rollout` | Bearer + `MANAGE_ROLLOUTS`; add `MODIFY_RULE` when sending `logic` or `description` | Start or update a live traffic rollout for an active rule |
+| `DELETE` | `/api/v2/rules/{rule_id}/rollout` | Bearer + `MANAGE_ROLLOUTS` | Remove a rollout |
+| `POST` | `/api/v2/rules/{rule_id}/rollout/promote` | Bearer + `MANAGE_ROLLOUTS` | Promote rollout candidate to full production |
 
 Rule lifecycle fields on rule responses:
 - `status`: `draft`, `active`, `paused`, or `archived`
@@ -176,8 +176,8 @@ Rule lifecycle fields on rule responses:
 | `GET` | `/api/v2/labels` | Bearer + permission | List labels in the caller's org |
 | `POST` | `/api/v2/labels` | Bearer + permission | Create label in the caller's org |
 | `POST` | `/api/v2/labels/bulk` | Bearer + permission | Create labels in bulk in the caller's org |
-| `POST` | `/api/v2/labels/mark-event` | Bearer + permission | Mark a canonical served transaction version in the caller's org; omitting `event_version` labels the current served version for that `transaction_id` |
-| `POST` | `/api/v2/labels/upload` | Bearer + permission | CSV upload for canonical served transaction versions in the caller's org (`transaction_id,label_name` or `transaction_id,event_version,label_name`) with row-level success/error reporting |
+| `POST` | `/api/v2/labels/mark-event` | Bearer + `MODIFY_LABEL` | Mark a canonical served transaction version in the caller's org; omitting `event_version` labels the current served version for that `transaction_id` |
+| `POST` | `/api/v2/labels/upload` | Bearer + `MODIFY_LABEL` | CSV upload for canonical served transaction versions in the caller's org (`transaction_id,label_name` or `transaction_id,event_version,label_name`) with row-level success/error reporting |
 | `DELETE` | `/api/v2/labels/{label_name}` | Bearer + permission | Delete label from the caller's org |
 
 ### Analytics
@@ -223,7 +223,7 @@ Dashboard analytics source of truth:
 | `POST` | `/api/v2/alerts/rules` | Bearer + `MANAGE_ALERTS` | Create an alert rule such as `CANCEL > 50` in a rolling window |
 | `PATCH` | `/api/v2/alerts/rules/{rule_id}` | Bearer + `MANAGE_ALERTS` | Update an alert rule's threshold, window, cooldown, outcome, or enabled state |
 | `GET` | `/api/v2/alerts/incidents` | Bearer + `VIEW_ALERTS` | List recent alert incidents for the caller's org |
-| `POST` | `/api/v2/alerts/incidents/{incident_id}/acknowledge` | Bearer + `VIEW_ALERTS` | Acknowledge an open incident |
+| `POST` | `/api/v2/alerts/incidents/{incident_id}/acknowledge` | Bearer + `MANAGE_ALERTS` | Acknowledge an open incident |
 | `GET` | `/api/v2/notifications` | Bearer + `VIEW_ALERTS` | List in-app notifications with per-user read state |
 | `GET` | `/api/v2/notifications/unread-count` | Bearer + `VIEW_ALERTS` | Return the caller's unread notification count |
 | `POST` | `/api/v2/notifications/{notification_id}/read` | Bearer + `VIEW_ALERTS` | Mark one in-app notification as read for the caller |
@@ -238,17 +238,17 @@ Alert detection source of truth:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/settings/runtime` | Bearer + `VIEW_ROLES` | Read runtime settings |
-| `PUT` | `/api/v2/settings/runtime` | Bearer + field-specific permission | Update runtime settings. `MANAGE_PERMISSIONS` covers general runtime settings; `MANAGE_NEUTRAL_OUTCOME` is required when changing `neutral_outcome`. |
-| `GET` | `/api/v2/settings/ai-authoring` | Bearer + `VIEW_ROLES` | Read AI authoring provider settings for the caller's org |
-| `PUT` | `/api/v2/settings/ai-authoring` | Bearer + `MANAGE_PERMISSIONS` | Update AI authoring provider/model/key settings for the caller's org |
-| `GET` | `/api/v2/settings/outcome-hierarchy` | Bearer + `VIEW_ROLES` | Read ordered outcome severity hierarchy |
-| `PUT` | `/api/v2/settings/outcome-hierarchy` | Bearer + `MANAGE_PERMISSIONS` | Replace ordered outcome severity hierarchy |
-| `GET` | `/api/v2/settings/rule-quality-pairs` | Bearer + `VIEW_ROLES` | List configured curated outcome→label pairs |
-| `GET` | `/api/v2/settings/rule-quality-pairs/options` | Bearer + `VIEW_ROLES` | List available outcomes and labels for pair creation in the caller's org |
-| `POST` | `/api/v2/settings/rule-quality-pairs` | Bearer + `MANAGE_PERMISSIONS` | Create curated pair |
-| `PUT` | `/api/v2/settings/rule-quality-pairs/{pair_id}` | Bearer + `MANAGE_PERMISSIONS` | Toggle pair active/inactive |
-| `DELETE` | `/api/v2/settings/rule-quality-pairs/{pair_id}` | Bearer + `MANAGE_PERMISSIONS` | Delete curated pair |
+| `GET` | `/api/v2/settings/runtime` | Bearer + `VIEW_SETTINGS` | Read runtime settings |
+| `PUT` | `/api/v2/settings/runtime` | Bearer + field-specific permission | Update runtime settings. `MANAGE_RUNTIME_SETTINGS` covers general runtime settings; `MANAGE_NEUTRAL_OUTCOME` is required when changing `neutral_outcome`. |
+| `GET` | `/api/v2/settings/ai-authoring` | Bearer + `VIEW_SETTINGS` | Read AI authoring provider settings for the caller's org |
+| `PUT` | `/api/v2/settings/ai-authoring` | Bearer + `MANAGE_AI_AUTHORING_SETTINGS` | Update AI authoring provider/model/key settings for the caller's org |
+| `GET` | `/api/v2/settings/outcome-hierarchy` | Bearer + `VIEW_SETTINGS` | Read ordered outcome severity hierarchy |
+| `PUT` | `/api/v2/settings/outcome-hierarchy` | Bearer + `MANAGE_OUTCOME_HIERARCHY` | Replace ordered outcome severity hierarchy |
+| `GET` | `/api/v2/settings/rule-quality-pairs` | Bearer + `VIEW_SETTINGS` | List configured curated outcome→label pairs |
+| `GET` | `/api/v2/settings/rule-quality-pairs/options` | Bearer + `VIEW_SETTINGS` | List available outcomes and labels for pair creation in the caller's org |
+| `POST` | `/api/v2/settings/rule-quality-pairs` | Bearer + `MANAGE_RULE_QUALITY_SETTINGS` | Create curated pair |
+| `PUT` | `/api/v2/settings/rule-quality-pairs/{pair_id}` | Bearer + `MANAGE_RULE_QUALITY_SETTINGS` | Toggle pair active/inactive |
+| `DELETE` | `/api/v2/settings/rule-quality-pairs/{pair_id}` | Bearer + `MANAGE_RULE_QUALITY_SETTINGS` | Delete curated pair |
 
 Outcome hierarchy notes:
 - Outcome hierarchy is ordered from highest severity to lowest severity.
@@ -277,14 +277,14 @@ AI authoring settings notes:
 |---|---|---|---|
 | `GET` | `/api/v2/users` | Bearer + permission | List users in the caller's org |
 | `GET` | `/api/v2/users/{user_id}` | Bearer + permission | Get user details in the caller's org |
-| `POST` | `/api/v2/users` | Bearer + permission | Create user in the caller's org |
-| `POST` | `/api/v2/users/invite` | Bearer + permission | Invite user into the caller's org and send activation link |
+| `POST` | `/api/v2/users` | Bearer + permission | Create user in the caller's org. Supplying `role_ids` also requires `MANAGE_USER_ROLES`, and the caller must already hold all scoped permission grants in each role. |
+| `POST` | `/api/v2/users/invite` | Bearer + permission | Invite user into the caller's org and send activation link. Supplying `role_ids` also requires `MANAGE_USER_ROLES`, and the caller must already hold all scoped permission grants in each role. |
 | `PUT` | `/api/v2/users/{user_id}` | Bearer + permission | Update user in the caller's org |
 | `DELETE` | `/api/v2/users/{user_id}` | Bearer + permission | Delete user in the caller's org |
-| `POST` | `/api/v2/users/{user_id}/roles` | Bearer + permission | Assign role to user in the caller's org (cross-org role IDs return `404`) |
-| `DELETE` | `/api/v2/users/{user_id}/roles/{role_id}` | Bearer + permission | Remove role from user in the caller's org |
+| `POST` | `/api/v2/users/{user_id}/roles` | Bearer + `MANAGE_USER_ROLES` | Assign role to user in the caller's org. Self-assignment is blocked, cross-org role IDs return `404`, and the caller must already hold all scoped permission grants in the role. |
+| `DELETE` | `/api/v2/users/{user_id}/roles/{role_id}` | Bearer + `MANAGE_USER_ROLES` | Remove role from user in the caller's org. Self-removal is blocked and the caller must already hold all scoped permission grants in the role being removed. |
 | `GET` | `/api/v2/roles/permissions` | Bearer + permission | List all available permissions |
-| `GET` | `/api/v2/roles` | Bearer + permission | List roles in the caller's org |
+| `GET` | `/api/v2/roles` | Bearer + permission | List roles in the caller's org, including each role's scoped permissions for assignment gating |
 | `GET` | `/api/v2/roles/{role_id}` | Bearer + permission | Get role details in the caller's org |
 | `POST` | `/api/v2/roles` | Bearer + permission | Create role in the caller's org |
 | `PUT` | `/api/v2/roles/{role_id}` | Bearer + permission | Update role in the caller's org |
@@ -341,11 +341,11 @@ Field type config note:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `POST` | `/api/v2/backtesting` | Bearer + permission | Trigger async backtest for a rule in the caller's org |
-| `DELETE` | `/api/v2/backtesting/{task_id}` | Bearer + permission | Cancel a queued or running backtest task and persist it as `cancelled` |
-| `POST` | `/api/v2/backtesting/{task_id}/retry` | Bearer + permission | Retry a failed/cancelled backtest using the stored logic snapshot |
-| `GET` | `/api/v2/backtesting/task/{task_id}` | Bearer + permission | Task status/result, including outcome counts/rates, `eligible_records`, `skipped_records`, warnings, plus label counts and quality metrics for labeled history |
-| `GET` | `/api/v2/backtesting/{rule_id}` | Bearer + permission | Backtest history for a rule visible to the caller's org |
+| `POST` | `/api/v2/backtesting` | Bearer + `MANAGE_BACKTESTS` | Trigger async backtest for a rule in the caller's org |
+| `DELETE` | `/api/v2/backtesting/{task_id}` | Bearer + `MANAGE_BACKTESTS` | Cancel a queued or running backtest task and persist it as `cancelled` |
+| `POST` | `/api/v2/backtesting/{task_id}/retry` | Bearer + `MANAGE_BACKTESTS` | Retry a failed/cancelled backtest using the stored logic snapshot |
+| `GET` | `/api/v2/backtesting/task/{task_id}` | Bearer + `VIEW_RULES` | Task status/result, including outcome counts/rates, `eligible_records`, `skipped_records`, warnings, plus label counts and quality metrics for labeled history |
+| `GET` | `/api/v2/backtesting/{rule_id}` | Bearer + `VIEW_RULES` | Backtest history for a rule visible to the caller's org |
 
 Backtest task result note:
 - `GET /api/v2/backtesting/task/{task_id}` now returns both the legacy terminal `status` (`PENDING`, `SUCCESS`, `FAILURE`, `CANCELLED`) and a persisted `queue_status` (`pending`, `running`, `done`, `failed`, `cancelled`) so UI clients can distinguish queued work from active execution.

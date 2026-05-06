@@ -212,7 +212,7 @@
 
               <button
                 (click)="testRule()"
-                [disabled]="testing || !logic || !testJson"
+                [disabled]="testing || !logic || !testJson || !canSubmitTestEvents"
                 class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 <span *ngIf="!testing">Test Rule</span>

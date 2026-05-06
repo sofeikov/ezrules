@@ -9,6 +9,7 @@ export interface PermissionItem {
   name: string;
   description: string | null;
   resource_type: string | null;
+  resource_id?: number | null;
 }
 
 export interface RoleListItem {
@@ -16,6 +17,7 @@ export interface RoleListItem {
   name: string;
   description: string | null;
   user_count: number;
+  permissions?: PermissionItem[];
 }
 
 export interface RoleDetail {
@@ -72,6 +74,10 @@ export class RoleService {
       body.description = description;
     }
     return this.http.post<RoleMutationResponse>(this.rolesUrl, body);
+  }
+
+  updateRole(roleId: number, name: string, description: string | null): Observable<RoleMutationResponse> {
+    return this.http.put<RoleMutationResponse>(`${this.rolesUrl}/${roleId}`, { name, description });
   }
 
   deleteRole(roleId: number): Observable<RoleMutationResponse> {

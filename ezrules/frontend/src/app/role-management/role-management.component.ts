@@ -5,7 +5,13 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../services/auth.service';
 import { RoleService, RoleListItem } from '../services/role.service';
 import { UserService, UserListItem } from '../services/user.service';
-import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
+import {
+  ACTION_PERMISSION_REQUIREMENTS,
+  PermissionGrant,
+  grantsFromPermissionNames,
+  hasPermissionRequirement,
+  permissionGrantIsCovered
+} from '../auth/permissions';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -26,14 +32,22 @@ export class RoleManagementComponent implements OnInit {
   loading: boolean = true;
   error: string | null = null;
   createRoleError: string | null = null;
+  editRoleError: string | null = null;
   deleteRoleError: string | null = null;
   assignError: string | null = null;
   removeRoleError: string | null = null;
   canViewUsers: boolean = false;
   canCreateRole: boolean = false;
+  canModifyRole: boolean = false;
   canDeleteRole: boolean = false;
   canManageUserRoles: boolean = false;
   canManagePermissions: boolean = false;
+  currentUserId: number | null = null;
+  currentPermissions: string[] = [];
+  currentPermissionGrants: PermissionGrant[] = [];
+  editingRoleId: number | null = null;
+  editRoleName: string = '';
+  editRoleDescription: string = '';
 
   constructor(
     private roleService: RoleService,
@@ -48,16 +62,24 @@ export class RoleManagementComponent implements OnInit {
   loadPermissions(): void {
     this.authService.getCurrentUser().subscribe({
       next: (user) => {
+        this.currentUserId = user.id;
+        this.currentPermissions = user.permissions;
+        this.currentPermissionGrants = user.permission_grants ?? grantsFromPermissionNames(user.permissions);
         this.canViewUsers = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.viewUsers);
         this.canCreateRole = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.createRole);
+        this.canModifyRole = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyRole);
         this.canDeleteRole = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.deleteRole);
         this.canManageUserRoles = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.manageUserRoles);
         this.canManagePermissions = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.managePermissions);
         this.loadData();
       },
       error: () => {
+        this.currentUserId = null;
+        this.currentPermissions = [];
+        this.currentPermissionGrants = [];
         this.canViewUsers = false;
         this.canCreateRole = false;
+        this.canModifyRole = false;
         this.canDeleteRole = false;
         this.canManageUserRoles = false;
         this.canManagePermissions = false;
@@ -112,6 +134,7 @@ export class RoleManagementComponent implements OnInit {
   }
 
   createRole(): void {
+    if (!this.canCreateRole) return;
     if (!this.newRoleName.trim()) return;
 
     this.createRoleError = null;
@@ -134,6 +157,7 @@ export class RoleManagementComponent implements OnInit {
   }
 
   deleteRole(roleId: number, roleName: string): void {
+    if (!this.canDeleteRole) return;
     if (!confirm(`Are you sure you want to delete role "${roleName}"?`)) return;
 
     this.deleteRoleError = null;
@@ -152,7 +176,9 @@ export class RoleManagementComponent implements OnInit {
   }
 
   assignRole(): void {
+    if (!this.canManageUserRoles) return;
     if (!this.assignUserId || !this.assignRoleId) return;
+    if (this.isCurrentUser(this.assignUserId) || !this.getAssignableRoles().some(role => role.id === this.assignRoleId)) return;
 
     this.assignError = null;
     this.userService.assignRole(this.assignUserId, this.assignRoleId).subscribe({
@@ -172,6 +198,8 @@ export class RoleManagementComponent implements OnInit {
   }
 
   removeRoleFromUser(userId: number, roleId: number, roleName: string, email: string): void {
+    if (!this.canManageUserRoles) return;
+    if (this.isCurrentUser(userId) || !this.getAssignableRoles().some(role => role.id === roleId)) return;
     if (!confirm(`Remove role "${roleName}" from user "${email}"?`)) return;
 
     this.removeRoleError = null;
@@ -193,8 +221,71 @@ export class RoleManagementComponent implements OnInit {
     return this.users.filter(u => u.roles.length > 0);
   }
 
+  getAssignableUsers(): UserListItem[] {
+    return this.users.filter(user => !this.isCurrentUser(user.id));
+  }
+
+  getAssignableRoles(): RoleListItem[] {
+    return this.roles.filter(role =>
+      (role.permissions ?? []).every(permission => permissionGrantIsCovered(this.currentPermissionGrants, permission))
+    );
+  }
+
+  isAssignableRole(roleId: number): boolean {
+    return this.getAssignableRoles().some(role => role.id === roleId);
+  }
+
+  isCurrentUser(userId: number): boolean {
+    return this.currentUserId === userId;
+  }
+
+  startEditRole(role: RoleListItem): void {
+    if (!this.canModifyRole) return;
+
+    this.editingRoleId = role.id;
+    this.editRoleName = role.name;
+    this.editRoleDescription = role.description || '';
+    this.editRoleError = null;
+  }
+
+  cancelEditRole(): void {
+    this.editingRoleId = null;
+    this.editRoleName = '';
+    this.editRoleDescription = '';
+    this.editRoleError = null;
+  }
+
+  saveRoleEdit(roleId: number): void {
+    if (!this.canModifyRole) return;
+    if (!this.editRoleName.trim()) {
+      this.editRoleError = 'Role name is required.';
+      return;
+    }
+
+    this.editRoleError = null;
+    this.roleService.updateRole(roleId, this.editRoleName.trim(), this.editRoleDescription.trim() || null).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.cancelEditRole();
+          this.loadData();
+        } else {
+          this.editRoleError = response.error ?? 'Failed to update role.';
+        }
+      },
+      error: (err: HttpErrorResponse) => {
+        this.editRoleError = err.error?.detail ?? err.error?.error ?? 'Failed to update role. Please try again.';
+      }
+    });
+  }
+
   showReadOnlyNotice(): boolean {
-    return !this.canCreateRole && !this.canDeleteRole && !this.canManageUserRoles && !this.canManagePermissions;
+    return (
+      !this.canCreateRole &&
+      !this.canModifyRole &&
+      !this.canDeleteRole &&
+      !this.canManageUserRoles &&
+      !this.canManagePermissions
+    );
   }
 
   permissionsLinkLabel(): string {

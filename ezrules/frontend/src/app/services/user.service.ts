@@ -51,6 +51,13 @@ export interface RoleListItem {
   name: string;
   description: string | null;
   user_count: number;
+  permissions?: {
+    id: number;
+    name: string;
+    description: string | null;
+    resource_type: string | null;
+    resource_id?: number | null;
+  }[];
 }
 
 interface UsersListResponse {

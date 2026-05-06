@@ -24,7 +24,18 @@ from ezrules.backend.api_v2.auth.jwt import (
 )
 from ezrules.backend.api_v2.main import app
 from ezrules.backend.api_v2.routes import auth as auth_routes
-from ezrules.models.backend_core import Invitation, Organisation, PasswordResetToken, Role, User, UserSession
+from ezrules.core.permissions import PermissionManager
+from ezrules.core.permissions_constants import PermissionAction
+from ezrules.models.backend_core import (
+    Action,
+    Invitation,
+    Organisation,
+    PasswordResetToken,
+    Role,
+    RoleActions,
+    User,
+    UserSession,
+)
 
 
 @pytest.fixture(scope="function")
@@ -556,6 +567,51 @@ class TestMeEndpoint:
 
         assert len(data["roles"]) > 0
         assert any(role["name"] == "test_admin" for role in data["roles"])
+
+    def test_me_includes_scoped_permission_grants(self, api_client, session):
+        """Should include scoped grants while preserving the flat permission list."""
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+
+        user = session.query(User).filter(User.email == "testuser@example.com").one()
+        role = Role(name=f"scoped_me_role_{uuid.uuid4().hex[:8]}", description="Scoped me role")
+        session.add(role)
+        session.flush()
+
+        manage_user_roles = session.query(Action).filter(Action.name == PermissionAction.MANAGE_USER_ROLES.value).one()
+        view_rules = session.query(Action).filter(Action.name == PermissionAction.VIEW_RULES.value).one()
+        session.add_all(
+            [
+                RoleActions(role_id=role.id, action_id=manage_user_roles.id),
+                RoleActions(role_id=role.id, action_id=view_rules.id, resource_id=4242),
+            ]
+        )
+        user.roles.append(role)
+        session.commit()
+
+        login_response = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        tokens = login_response.json()
+
+        response = api_client.get(
+            "/api/v2/auth/me",
+            headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert PermissionAction.MANAGE_USER_ROLES.value in data["permissions"]
+        assert PermissionAction.VIEW_RULES.value not in data["permissions"]
+        assert {
+            "name": PermissionAction.MANAGE_USER_ROLES.value,
+            "resource_id": None,
+        } in data["permission_grants"]
+        assert {
+            "name": PermissionAction.VIEW_RULES.value,
+            "resource_id": 4242,
+        } in data["permission_grants"]
 
 
 # =============================================================================

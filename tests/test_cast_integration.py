@@ -68,6 +68,7 @@ def rules_client(session):
     PermissionManager.db_session = session
     PermissionManager.init_default_actions()
     PermissionManager.grant_permission(role.id, PermissionAction.VIEW_RULES)
+    PermissionManager.grant_permission(role.id, PermissionAction.SUBMIT_TEST_EVENTS)
 
     token = create_access_token(user_id=int(user.id), email=str(user.email), roles=[role.name], org_id=int(user.o_id))
 

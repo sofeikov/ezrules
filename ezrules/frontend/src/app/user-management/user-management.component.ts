@@ -4,7 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../services/auth.service';
 import { UserService, UserListItem, RoleListItem } from '../services/user.service';
-import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
+import {
+  ACTION_PERMISSION_REQUIREMENTS,
+  PermissionGrant,
+  grantsFromPermissionNames,
+  hasPermissionRequirement,
+  permissionGrantIsCovered
+} from '../auth/permissions';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -35,6 +41,9 @@ export class UserManagementComponent implements OnInit {
   canModifyUser: boolean = false;
   canDeleteUser: boolean = false;
   canManageUserRoles: boolean = false;
+  currentUserId: number | null = null;
+  currentPermissions: string[] = [];
+  currentPermissionGrants: PermissionGrant[] = [];
 
   constructor(private userService: UserService, private authService: AuthService) { }
 
@@ -46,6 +55,9 @@ export class UserManagementComponent implements OnInit {
   loadPermissions(): void {
     this.authService.getCurrentUser().subscribe({
       next: (user) => {
+        this.currentUserId = user.id;
+        this.currentPermissions = user.permissions;
+        this.currentPermissionGrants = user.permission_grants ?? grantsFromPermissionNames(user.permissions);
         this.canViewRoles = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.viewRoles);
         this.canCreateUser = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.createUser);
         this.canModifyUser = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyUser);
@@ -57,6 +69,9 @@ export class UserManagementComponent implements OnInit {
         }
       },
       error: () => {
+        this.currentUserId = null;
+        this.currentPermissions = [];
+        this.currentPermissionGrants = [];
         this.canViewRoles = false;
         this.canCreateUser = false;
         this.canModifyUser = false;
@@ -98,7 +113,7 @@ export class UserManagementComponent implements OnInit {
 
     this.createError = null;
     this.inviteMessage = null;
-    const roleIds = this.selectedRoleId ? [this.selectedRoleId] : undefined;
+    const roleIds = this.canManageUserRoles && this.selectedRoleId ? [this.selectedRoleId] : undefined;
 
     this.userService.createUser(this.newEmail.trim(), this.newPassword, roleIds).subscribe({
       next: (response) => {
@@ -122,7 +137,7 @@ export class UserManagementComponent implements OnInit {
 
     this.inviteError = null;
     this.inviteMessage = null;
-    const roleIds = this.inviteRoleId ? [this.inviteRoleId] : undefined;
+    const roleIds = this.canManageUserRoles && this.inviteRoleId ? [this.inviteRoleId] : undefined;
 
     this.userService.inviteUser(this.inviteEmail.trim(), roleIds).subscribe({
       next: (response) => {
@@ -206,7 +221,8 @@ export class UserManagementComponent implements OnInit {
   assignRole(userId: number, event: Event): void {
     const select = event.target as HTMLSelectElement;
     const roleId = parseInt(select.value, 10);
-    if (isNaN(roleId)) return;
+    if (!this.canManageUserRoles || this.isCurrentUser(userId) || isNaN(roleId)) return;
+    if (!this.isAssignableRole(roleId)) return;
 
     this.actionError = null;
     this.userService.assignRole(userId, roleId).subscribe({
@@ -226,6 +242,7 @@ export class UserManagementComponent implements OnInit {
   }
 
   removeRole(userId: number, roleId: number, roleName: string, email: string): void {
+    if (!this.canManageUserRoles || this.isCurrentUser(userId) || !this.isAssignableRole(roleId)) return;
     if (!confirm(`Remove role "${roleName}" from user "${email}"?`)) return;
 
     this.actionError = null;
@@ -245,7 +262,21 @@ export class UserManagementComponent implements OnInit {
 
   getAvailableRoles(user: UserListItem): RoleListItem[] {
     const assignedIds = new Set(user.roles.map(r => r.id));
-    return this.roles.filter(r => !assignedIds.has(r.id));
+    return this.getAssignableRoles().filter(r => !assignedIds.has(r.id));
+  }
+
+  getAssignableRoles(): RoleListItem[] {
+    return this.roles.filter(role =>
+      (role.permissions ?? []).every(permission => permissionGrantIsCovered(this.currentPermissionGrants, permission))
+    );
+  }
+
+  isAssignableRole(roleId: number): boolean {
+    return this.getAssignableRoles().some(role => role.id === roleId);
+  }
+
+  isCurrentUser(userId: number): boolean {
+    return this.currentUserId === userId;
   }
 
   showReadOnlyNotice(): boolean {

@@ -325,8 +325,11 @@ export class RuleService {
     return this.http.put<RuleReorderResponse>(`${this.apiUrl}/main-order`, data);
   }
 
-  deployToShadow(ruleId: number, logic: string, description: string): Observable<ShadowDeployResponse> {
-    return this.http.post<ShadowDeployResponse>(`${this.apiUrl}/${ruleId}/shadow`, { logic, description });
+  deployToShadow(ruleId: number, logic?: string, description?: string): Observable<ShadowDeployResponse> {
+    const body: { logic?: string; description?: string } = {};
+    if (logic !== undefined) body.logic = logic;
+    if (description !== undefined) body.description = description;
+    return this.http.post<ShadowDeployResponse>(`${this.apiUrl}/${ruleId}/shadow`, body);
   }
 
   removeFromShadow(ruleId: number): Observable<ShadowDeployResponse> {
@@ -339,15 +342,16 @@ export class RuleService {
 
   deployToRollout(
     ruleId: number,
-    logic: string,
-    description: string,
+    logic: string | undefined,
+    description: string | undefined,
     trafficPercent: number
   ): Observable<RolloutDeployResponse> {
-    return this.http.post<RolloutDeployResponse>(`${this.apiUrl}/${ruleId}/rollout`, {
-      logic,
-      description,
-      traffic_percent: trafficPercent
-    });
+    const body: { logic?: string; description?: string; traffic_percent: number } = {
+      traffic_percent: trafficPercent,
+    };
+    if (logic !== undefined) body.logic = logic;
+    if (description !== undefined) body.description = description;
+    return this.http.post<RolloutDeployResponse>(`${this.apiUrl}/${ruleId}/rollout`, body);
   }
 
   removeFromRollout(ruleId: number): Observable<RolloutDeployResponse> {

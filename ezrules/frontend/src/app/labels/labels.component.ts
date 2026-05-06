@@ -26,6 +26,7 @@ export class LabelsComponent implements OnInit {
   selectedCsvFile: File | null = null;
   uploading: boolean = false;
   canCreateLabel: boolean = false;
+  canModifyLabel: boolean = false;
   canDeleteLabel: boolean = false;
 
   constructor(private labelService: LabelService, private authService: AuthService) { }
@@ -39,10 +40,12 @@ export class LabelsComponent implements OnInit {
     this.authService.getCurrentUser().subscribe({
       next: (user) => {
         this.canCreateLabel = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.createLabel);
+        this.canModifyLabel = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyLabel);
         this.canDeleteLabel = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.deleteLabel);
       },
       error: () => {
         this.canCreateLabel = false;
+        this.canModifyLabel = false;
         this.canDeleteLabel = false;
       }
     });
@@ -65,6 +68,7 @@ export class LabelsComponent implements OnInit {
   }
 
   createLabel(): void {
+    if (!this.canCreateLabel) return;
     if (!this.newLabel.trim()) return;
 
     this.createError = null;
@@ -84,6 +88,7 @@ export class LabelsComponent implements OnInit {
   }
 
   deleteLabel(labelName: string): void {
+    if (!this.canDeleteLabel) return;
     if (!confirm(`Are you sure you want to delete "${labelName}"?`)) return;
 
     this.deleteError = null;
@@ -98,6 +103,7 @@ export class LabelsComponent implements OnInit {
   }
 
   onCsvFileSelected(event: Event): void {
+    if (!this.canModifyLabel) return;
     const input = event.target as HTMLInputElement;
     this.selectedCsvFile = input.files?.item(0) ?? null;
     this.uploadError = null;
@@ -105,6 +111,7 @@ export class LabelsComponent implements OnInit {
   }
 
   uploadLabelsCsv(): void {
+    if (!this.canModifyLabel) return;
     if (!this.selectedCsvFile || this.uploading) return;
 
     this.uploading = true;
@@ -136,6 +143,6 @@ export class LabelsComponent implements OnInit {
   }
 
   showReadOnlyNotice(): boolean {
-    return !this.canCreateLabel && !this.canDeleteLabel;
+    return !this.canCreateLabel && !this.canModifyLabel && !this.canDeleteLabel;
   }
 }

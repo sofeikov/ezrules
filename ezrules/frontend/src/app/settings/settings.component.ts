@@ -60,7 +60,10 @@ export class SettingsComponent implements OnInit {
   newPairOutcome: string = '';
   newPairLabel: string = '';
   hierarchyDirty: boolean = false;
-  canManagePermissions: boolean = false;
+  canManageRuntimeSettings: boolean = false;
+  canManageAIAuthoringSettings: boolean = false;
+  canManageOutcomeHierarchy: boolean = false;
+  canManageRuleQualitySettings: boolean = false;
   canManageNeutralOutcome: boolean = false;
 
   constructor(
@@ -76,14 +79,32 @@ export class SettingsComponent implements OnInit {
   loadPermissions(): void {
     this.authService.getCurrentUser().subscribe({
       next: (user) => {
-        this.canManagePermissions = hasPermissionRequirement(user.permissions, ACTION_PERMISSION_REQUIREMENTS.managePermissions);
+        this.canManageRuntimeSettings = hasPermissionRequirement(
+          user.permissions,
+          ACTION_PERMISSION_REQUIREMENTS.manageRuntimeSettings,
+        );
+        this.canManageAIAuthoringSettings = hasPermissionRequirement(
+          user.permissions,
+          ACTION_PERMISSION_REQUIREMENTS.manageAiAuthoringSettings,
+        );
+        this.canManageOutcomeHierarchy = hasPermissionRequirement(
+          user.permissions,
+          ACTION_PERMISSION_REQUIREMENTS.manageOutcomeHierarchy,
+        );
+        this.canManageRuleQualitySettings = hasPermissionRequirement(
+          user.permissions,
+          ACTION_PERMISSION_REQUIREMENTS.manageRuleQualitySettings,
+        );
         this.canManageNeutralOutcome = hasPermissionRequirement(
           user.permissions,
           ACTION_PERMISSION_REQUIREMENTS.manageNeutralOutcome,
         );
       },
       error: () => {
-        this.canManagePermissions = false;
+        this.canManageRuntimeSettings = false;
+        this.canManageAIAuthoringSettings = false;
+        this.canManageOutcomeHierarchy = false;
+        this.canManageRuleQualitySettings = false;
         this.canManageNeutralOutcome = false;
       }
     });
@@ -129,7 +150,7 @@ export class SettingsComponent implements OnInit {
   }
 
   saveAIAuthoringSettings(): void {
-    if (!this.canManagePermissions) {
+    if (!this.canManageAIAuthoringSettings) {
       return;
     }
 
@@ -185,7 +206,7 @@ export class SettingsComponent implements OnInit {
   }
 
   clearStoredAiAuthoringApiKey(): void {
-    if (!this.canManagePermissions || !this.aiAuthoringSettings?.apiKeyConfigured || this.aiAuthoringSaving) {
+    if (!this.canManageAIAuthoringSettings || !this.aiAuthoringSettings?.apiKeyConfigured || this.aiAuthoringSaving) {
       return;
     }
 
@@ -224,14 +245,14 @@ export class SettingsComponent implements OnInit {
   }
 
   save(): void {
-    if (!this.canManagePermissions && !this.canManageNeutralOutcome) {
+    if (!this.canManageRuntimeSettings && !this.canManageNeutralOutcome) {
       return;
     }
 
     this.error = null;
     this.success = null;
 
-    if (this.canManagePermissions && (!Number.isFinite(this.ruleQualityLookbackDays) || this.ruleQualityLookbackDays < 1)) {
+    if (this.canManageRuntimeSettings && (!Number.isFinite(this.ruleQualityLookbackDays) || this.ruleQualityLookbackDays < 1)) {
       this.error = 'Lookback days must be at least 1.';
       return;
     }
@@ -242,9 +263,9 @@ export class SettingsComponent implements OnInit {
 
     this.saving = true;
     const updateRequest = {
-      autoPromoteActiveRuleUpdates: this.canManagePermissions ? this.autoPromoteActiveRuleUpdates : undefined,
-      mainRuleExecutionMode: this.canManagePermissions ? this.mainRuleExecutionMode : undefined,
-      ruleQualityLookbackDays: this.canManagePermissions ? Math.floor(this.ruleQualityLookbackDays) : undefined,
+      autoPromoteActiveRuleUpdates: this.canManageRuntimeSettings ? this.autoPromoteActiveRuleUpdates : undefined,
+      mainRuleExecutionMode: this.canManageRuntimeSettings ? this.mainRuleExecutionMode : undefined,
+      ruleQualityLookbackDays: this.canManageRuntimeSettings ? Math.floor(this.ruleQualityLookbackDays) : undefined,
       neutralOutcome: this.canManageNeutralOutcome ? this.neutralOutcome : undefined,
     };
     this.runtimeSettingsService.updateRuntimeSettings(updateRequest).subscribe({
@@ -261,7 +282,7 @@ export class SettingsComponent implements OnInit {
   }
 
   addPair(): void {
-    if (!this.canManagePermissions) {
+    if (!this.canManageRuleQualitySettings) {
       return;
     }
 
@@ -289,7 +310,7 @@ export class SettingsComponent implements OnInit {
   }
 
   onPairActiveChange(pair: RuleQualityPair, event: Event): void {
-    if (!this.canManagePermissions) {
+    if (!this.canManageRuleQualitySettings) {
       return;
     }
 
@@ -311,7 +332,7 @@ export class SettingsComponent implements OnInit {
   }
 
   deletePair(pair: RuleQualityPair): void {
-    if (!this.canManagePermissions) {
+    if (!this.canManageRuleQualitySettings) {
       return;
     }
 
@@ -352,7 +373,7 @@ export class SettingsComponent implements OnInit {
   }
 
   saveOutcomeHierarchy(): void {
-    if (!this.canManagePermissions) {
+    if (!this.canManageOutcomeHierarchy) {
       return;
     }
 
@@ -381,7 +402,13 @@ export class SettingsComponent implements OnInit {
   }
 
   showReadOnlyNotice(): boolean {
-    return !this.canManagePermissions && !this.canManageNeutralOutcome;
+    return (
+      !this.canManageRuntimeSettings &&
+      !this.canManageAIAuthoringSettings &&
+      !this.canManageOutcomeHierarchy &&
+      !this.canManageRuleQualitySettings &&
+      !this.canManageNeutralOutcome
+    );
   }
 
   showNeutralOutcomeSelector(): boolean {

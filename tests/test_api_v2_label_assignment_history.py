@@ -50,6 +50,7 @@ def label_audit_client(session):
     PermissionManager.init_default_actions()
     PermissionManager.grant_permission(role.id, PermissionAction.VIEW_LABELS)
     PermissionManager.grant_permission(role.id, PermissionAction.CREATE_LABEL)
+    PermissionManager.grant_permission(role.id, PermissionAction.MODIFY_LABEL)
     PermissionManager.grant_permission(role.id, PermissionAction.ACCESS_AUDIT_TRAIL)
 
     token = create_access_token(

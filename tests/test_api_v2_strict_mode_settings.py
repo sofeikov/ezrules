@@ -39,8 +39,8 @@ def strict_mode_client(session):
 
     PermissionManager.db_session = session
     PermissionManager.init_default_actions()
-    PermissionManager.grant_permission(role.id, PermissionAction.VIEW_ROLES)
-    PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_PERMISSIONS)
+    PermissionManager.grant_permission(role.id, PermissionAction.VIEW_SETTINGS)
+    PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_RUNTIME_SETTINGS)
     PermissionManager.grant_permission(role.id, PermissionAction.ACCESS_AUDIT_TRAIL)
 
     token = create_access_token(

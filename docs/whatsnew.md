@@ -1,5 +1,12 @@
 # What's New
 
+## v1.22.0
+
+* **Finer-grained operator permissions**: Split backtests, shadow deployments, rollouts, settings groups, and label assignment into dedicated permissions so roles no longer need broad rule, role, or label powers for unrelated workflows.
+* **Safer role assignment**: User provisioning and role assignment now require role-management authority for any provided roles, block self role changes, and prevent role managers from granting permission grants, including scoped grants, they do not already hold.
+* **Deployment permission ceilings**: Shadow and rollout managers can deploy saved rule versions without edit rights, but draft logic or description overrides now require rule modification permission.
+* **Permission-aware UI controls**: Settings, labels, rule detail, backtesting, shadow, rollout, and role-management screens now hide or disable actions according to the new backend permission checks.
+
 ## v1.21.1
 
 * **Canonical business journey contract**: Added a deterministic evaluation universe with fixed outcomes, rules, user lists, and transaction scenarios that prove core `/api/v2/evaluate` behavior through the real PostgreSQL-backed API path.

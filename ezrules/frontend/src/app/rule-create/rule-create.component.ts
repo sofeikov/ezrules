@@ -15,6 +15,8 @@ import {
   RuleEditorOutcomeSuggestion,
 } from '../services/rule-editor-assist.service';
 import { RuntimeSettingsService } from '../services/runtime-settings.service';
+import { AuthService } from '../services/auth.service';
+import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { SidebarComponent } from '../components/sidebar.component';
 
 @Component({
@@ -47,6 +49,7 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
   outcomeSuggestions: RuleEditorOutcomeSuggestion[] = [];
   testing: boolean = false;
   saving: boolean = false;
+  canSubmitTestEvents: boolean = false;
   pendingAIDraft: boolean = false;
   saveError: string | null = null;
   private assistSubscription: Subscription | null = null;
@@ -60,6 +63,7 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
     private ruleTestDataService: RuleTestDataService,
     private ruleEditorAssistService: RuleEditorAssistService,
     private runtimeSettingsService: RuntimeSettingsService,
+    private authService: AuthService,
   ) { }
 
   ngOnInit(): void {
@@ -74,6 +78,21 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.neutralOutcomeLabel = 'RELEASE';
+      }
+    });
+    this.loadPermissions();
+  }
+
+  loadPermissions(): void {
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        this.canSubmitTestEvents = hasPermissionRequirement(
+          user.permissions,
+          ACTION_PERMISSION_REQUIREMENTS.submitTestEvents,
+        );
+      },
+      error: () => {
+        this.canSubmitTestEvents = false;
       }
     });
   }
@@ -214,6 +233,10 @@ export class RuleCreateComponent implements OnInit, OnDestroy {
   }
 
   testRule(): void {
+    if (!this.canSubmitTestEvents) {
+      return;
+    }
+
     this.testing = true;
     this.testError = null;
     this.testResult = null;

@@ -67,6 +67,7 @@ class PermissionResponse(BaseModel):
     name: str = Field(..., description="Permission action name")
     description: str | None = Field(default=None, description="Permission description")
     resource_type: str | None = Field(default=None, description="Resource type this permission applies to")
+    resource_id: int | None = Field(default=None, description="Specific resource scope for this role grant")
 
     model_config = {"from_attributes": True}
 
@@ -96,6 +97,7 @@ class RoleListItem(BaseModel):
     name: str
     description: str | None = None
     user_count: int = 0
+    permissions: list[PermissionResponse] = Field(default_factory=list, description="Assigned permissions")
 
     model_config = {"from_attributes": True}
 

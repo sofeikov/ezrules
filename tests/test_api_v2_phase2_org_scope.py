@@ -159,13 +159,13 @@ def test_rules_use_auth_org_context_for_lists_and_rule_queries(session):
         session,
         org_id=int(org.o_id),
         email=_unique_email("phase2-rules-admin"),
-        permissions=[PermissionAction.VIEW_RULES],
+        permissions=[PermissionAction.VIEW_RULES, PermissionAction.SUBMIT_TEST_EVENTS],
     )
     other_user = _create_user(
         session,
         org_id=int(other_org.o_id),
         email=_unique_email("phase2-rules-other"),
-        permissions=[PermissionAction.VIEW_RULES],
+        permissions=[PermissionAction.VIEW_RULES, PermissionAction.SUBMIT_TEST_EVENTS],
     )
 
     _create_user_list(session, org_id=int(org.o_id), list_name="Phase2Countries", entries=["GB"])
@@ -263,7 +263,7 @@ def test_shadow_routes_and_tested_events_are_org_scoped(session):
         session,
         org_id=int(org.o_id),
         email=_unique_email("phase2-shadow-admin"),
-        permissions=[PermissionAction.VIEW_RULES, PermissionAction.MODIFY_RULE],
+        permissions=[PermissionAction.VIEW_RULES, PermissionAction.MANAGE_SHADOW_DEPLOYMENTS],
     )
 
     org_rule = _create_rule(
@@ -468,7 +468,11 @@ def test_settings_runtime_and_rule_quality_pairs_are_org_scoped(session):
         session,
         org_id=int(org.o_id),
         email=_unique_email("phase2-settings-admin"),
-        permissions=[PermissionAction.VIEW_ROLES, PermissionAction.MANAGE_PERMISSIONS],
+        permissions=[
+            PermissionAction.VIEW_SETTINGS,
+            PermissionAction.MANAGE_RUNTIME_SETTINGS,
+            PermissionAction.MANAGE_RULE_QUALITY_SETTINGS,
+        ],
     )
 
     label = Label(label=f"PHASE2_SETTINGS_LABEL_{uuid.uuid4().hex[:6].upper()}")

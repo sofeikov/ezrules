@@ -20,7 +20,16 @@ from ezrules.backend.api_v2.main import app
 from ezrules.backend.api_v2.routes import users as users_routes
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.models.backend_core import Invitation, Organisation, PasswordResetToken, Role, User, UserSession
+from ezrules.models.backend_core import (
+    Action,
+    Invitation,
+    Organisation,
+    PasswordResetToken,
+    Role,
+    RoleActions,
+    User,
+    UserSession,
+)
 
 
 @pytest.fixture(scope="function")
@@ -114,6 +123,49 @@ def sample_role(session):
         role = Role(name="test_role", description="Test role for user tests")
         session.add(role)
         session.commit()
+    return role
+
+
+def create_scoped_permission_role(
+    session,
+    *,
+    action: PermissionAction = PermissionAction.VIEW_RULES,
+    resource_id: int = 42,
+) -> Role:
+    """Create a role with a resource-scoped permission grant."""
+    role = Role(
+        name=f"scoped_{action.value}_{resource_id}_{uuid.uuid4().hex[:8]}",
+        description="Role with scoped permission",
+        o_id=1,
+    )
+    session.add(role)
+    session.commit()
+
+    db_action = session.query(Action).filter(Action.name == action.value).one()
+    session.add(RoleActions(role_id=role.id, action_id=db_action.id, resource_id=resource_id))
+    session.commit()
+    return role
+
+
+def create_cross_org_privileged_role(session) -> Role:
+    """Create an out-of-org role whose permissions must not affect error shape."""
+    org = session.query(Organisation).filter(Organisation.o_id == 2).first()
+    if org is None:
+        org = Organisation(o_id=2, name="Other Org")
+        session.add(org)
+        session.flush()
+
+    role = Role(
+        name=f"cross_org_privileged_{uuid.uuid4().hex[:8]}",
+        description="Out-of-org role with unheld permission",
+        o_id=2,
+    )
+    session.add(role)
+    session.flush()
+
+    action = session.query(Action).filter(Action.name == PermissionAction.MANAGE_PERMISSIONS.value).one()
+    session.add(RoleActions(role_id=role.id, action_id=action.id))
+    session.commit()
     return role
 
 
@@ -246,6 +298,84 @@ class TestCreateUser:
         assert len(data["user"]["roles"]) == 1
         assert data["user"]["roles"][0]["name"] == "test_role"
 
+    def test_create_user_with_roles_requires_manage_user_roles(self, session, sample_role):
+        """CREATE_USER alone should not allow initial role assignment."""
+        role = Role(name=f"creator_only_{uuid.uuid4().hex[:8]}", description="Can create users only", o_id=1)
+        actor = User(
+            email=f"creator_{uuid.uuid4().hex[:8]}@example.com",
+            password=bcrypt.hashpw("creatorpass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
+            active=True,
+            fs_uniquifier=f"creator_{uuid.uuid4().hex}",
+            o_id=1,
+        )
+        actor.roles.append(role)
+        session.add_all([role, actor])
+        session.commit()
+
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+        PermissionManager.grant_permission(role.id, PermissionAction.CREATE_USER)
+
+        token = create_access_token(
+            user_id=int(actor.id),
+            email=str(actor.email),
+            roles=[role.name],
+            org_id=int(actor.o_id),
+        )
+
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v2/users",
+                headers={"Authorization": f"Bearer {token}"},
+                json={
+                    "email": "creator-assigned@example.com",
+                    "password": "password123",
+                    "role_ids": [sample_role.id],
+                },
+            )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "MANAGE_USER_ROLES permission is required to assign roles"
+
+    def test_create_user_with_scoped_role_requires_matching_permission_ceiling(self, users_test_client, session):
+        """Role managers cannot create users with scoped grants they do not hold."""
+        token = users_test_client.test_data["token"]
+        scoped_role = create_scoped_permission_role(session, resource_id=4242)
+
+        response = users_test_client.post(
+            "/api/v2/users",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "email": f"scoped-create-{uuid.uuid4().hex[:8]}@example.com",
+                "password": "password123",
+                "role_ids": [scoped_role.id],
+            },
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Cannot assign roles with permissions you do not hold"
+
+    def test_create_user_with_cross_org_role_returns_not_found_before_ceiling(self, users_test_client, session):
+        """Out-of-org role IDs should not leak privilege-ceiling details."""
+        token = users_test_client.test_data["token"]
+        cross_org_role = create_cross_org_privileged_role(session)
+
+        response = users_test_client.post(
+            "/api/v2/users",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "email": f"cross-org-create-{uuid.uuid4().hex[:8]}@example.com",
+                "password": "password123",
+                "role_ids": [cross_org_role.id],
+            },
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["success"] is False
+        assert data["message"] == "Some roles not found"
+        assert str(cross_org_role.id) in data["error"]
+
     def test_create_user_duplicate_email(self, users_test_client, sample_user):
         """Should return error for duplicate email."""
         token = users_test_client.test_data["token"]
@@ -351,6 +481,102 @@ class TestInviteUser:
         assert sent_email["email"] == "invited@example.com"
         assert invitation.token_hash != sent_email["token"]
         assert len(invitation.token_hash) == 64
+
+    def test_invite_user_with_roles_requires_manage_user_roles(self, session, sample_role, monkeypatch):
+        """CREATE_USER alone should not allow invite-time role assignment."""
+        role = Role(name=f"inviter_only_{uuid.uuid4().hex[:8]}", description="Can invite users only", o_id=1)
+        actor = User(
+            email=f"inviter_{uuid.uuid4().hex[:8]}@example.com",
+            password=bcrypt.hashpw("inviterpass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
+            active=True,
+            fs_uniquifier=f"inviter_{uuid.uuid4().hex}",
+            o_id=1,
+        )
+        actor.roles.append(role)
+        session.add_all([role, actor])
+        session.commit()
+
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+        PermissionManager.grant_permission(role.id, PermissionAction.CREATE_USER)
+
+        def fake_send_invitation_email(email: str, raw_token: str) -> None:
+            raise AssertionError("email send should not be called")
+
+        monkeypatch.setattr(users_routes, "send_invitation_email", fake_send_invitation_email)
+        token = create_access_token(
+            user_id=int(actor.id),
+            email=str(actor.email),
+            roles=[role.name],
+            org_id=int(actor.o_id),
+        )
+
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v2/users/invite",
+                headers={"Authorization": f"Bearer {token}"},
+                json={
+                    "email": "invite-assigned@example.com",
+                    "role_ids": [sample_role.id],
+                },
+            )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "MANAGE_USER_ROLES permission is required to assign roles"
+
+    def test_invite_user_with_scoped_role_requires_matching_permission_ceiling(
+        self, users_test_client, session, monkeypatch
+    ):
+        """Role managers cannot invite users into scoped grants they do not hold."""
+        token = users_test_client.test_data["token"]
+        scoped_role = create_scoped_permission_role(session, resource_id=5151)
+
+        def fake_send_invitation_email(email: str, raw_token: str) -> None:
+            raise AssertionError("email send should not be called")
+
+        monkeypatch.setattr(users_routes, "send_invitation_email", fake_send_invitation_email)
+
+        response = users_test_client.post(
+            "/api/v2/users/invite",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "email": f"scoped-invite-{uuid.uuid4().hex[:8]}@example.com",
+                "role_ids": [scoped_role.id],
+            },
+        )
+        session.rollback()
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Cannot assign roles with permissions you do not hold"
+
+    def test_invite_user_with_cross_org_role_returns_not_found_before_ceiling(
+        self, users_test_client, session, monkeypatch
+    ):
+        """Out-of-org invite role IDs should not leak privilege-ceiling details."""
+        token = users_test_client.test_data["token"]
+        cross_org_role = create_cross_org_privileged_role(session)
+        invite_email = f"cross-org-invite-{uuid.uuid4().hex[:8]}@example.com"
+
+        def fake_send_invitation_email(email: str, raw_token: str) -> None:
+            raise AssertionError("email send should not be called")
+
+        monkeypatch.setattr(users_routes, "send_invitation_email", fake_send_invitation_email)
+
+        response = users_test_client.post(
+            "/api/v2/users/invite",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "email": invite_email,
+                "role_ids": [cross_org_role.id],
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert data["message"] == "Some roles not found"
+        assert str(cross_org_role.id) in data["error"]
+        assert session.query(User).filter(User.email == invite_email).first() is None
 
     def test_invite_active_user_returns_error(self, users_test_client, sample_user, monkeypatch):
         """Should reject invitations for already active users."""
@@ -631,6 +857,57 @@ class TestRoleAssignment:
 
         assert response.status_code == 404
 
+    def test_assign_role_to_self_returns_403(self, users_test_client, sample_role):
+        """Role managers should not be able to change their own role set."""
+        token = users_test_client.test_data["token"]
+        admin_user = users_test_client.test_data["user"]
+
+        response = users_test_client.post(
+            f"/api/v2/users/{admin_user.id}/roles",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"role_id": sample_role.id},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Cannot change your own role assignments"
+
+    def test_assign_role_with_unheld_permissions_returns_403(self, users_test_client, sample_user, session):
+        """Role managers cannot grant permissions they do not already hold."""
+        token = users_test_client.test_data["token"]
+
+        privileged_role = Role(name=f"privileged_{uuid.uuid4().hex[:8]}", description="Privileged test role", o_id=1)
+        session.add(privileged_role)
+        session.commit()
+
+        manage_permissions_action = (
+            session.query(Action).filter(Action.name == PermissionAction.MANAGE_PERMISSIONS.value).one()
+        )
+        session.add(RoleActions(role_id=privileged_role.id, action_id=manage_permissions_action.id))
+        session.commit()
+
+        response = users_test_client.post(
+            f"/api/v2/users/{sample_user.id}/roles",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"role_id": privileged_role.id},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Cannot assign roles with permissions you do not hold"
+
+    def test_assign_role_with_unheld_scoped_permission_returns_403(self, users_test_client, sample_user, session):
+        """Role managers cannot grant scoped permissions they do not already hold."""
+        token = users_test_client.test_data["token"]
+        scoped_role = create_scoped_permission_role(session, resource_id=6262)
+
+        response = users_test_client.post(
+            f"/api/v2/users/{sample_user.id}/roles",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"role_id": scoped_role.id},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Cannot assign roles with permissions you do not hold"
+
     def test_remove_role_success(self, users_test_client, sample_user, sample_role):
         """Should remove role from user."""
         token = users_test_client.test_data["token"]
@@ -649,6 +926,23 @@ class TestRoleAssignment:
         data = response.json()
         assert data["success"] is True
         assert all(r["name"] != "test_role" for r in data["user"]["roles"])
+
+    def test_remove_role_with_unheld_scoped_permission_returns_403(self, users_test_client, sample_user, session):
+        """Role managers cannot remove scoped permissions they do not already hold."""
+        token = users_test_client.test_data["token"]
+        scoped_role = create_scoped_permission_role(session, resource_id=7373)
+        sample_user.roles.append(scoped_role)
+        session.commit()
+
+        response = users_test_client.delete(
+            f"/api/v2/users/{sample_user.id}/roles/{scoped_role.id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Cannot assign roles with permissions you do not hold"
+        session.refresh(sample_user)
+        assert scoped_role in sample_user.roles
 
     def test_remove_role_not_assigned(self, users_test_client, sample_user, sample_role):
         """Should return error if role not assigned."""

@@ -45,7 +45,7 @@
       <div *ngIf="!loading && !error">
         <div *ngIf="showReadOnlyNotice()" class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
           <p class="text-sm font-medium text-amber-800">
-            Read-only mode. Shadow edit, removal, and promotion controls are hidden for your current permissions.
+            Read-only mode. Shadow controls are hidden for your current permissions.
           </p>
         </div>
 
@@ -83,7 +83,7 @@
                 </div>
                 <div class="flex items-center gap-3 shrink-0">
                   <button
-                    *ngIf="canModifyRules"
+                    *ngIf="canManageShadowDeployments && canModifyRules"
                     (click)="editShadowRule(item.rule)"
                     class="px-3 py-1.5 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
                   >
@@ -98,7 +98,7 @@
                     Promote
                   </button>
                   <button
-                    *ngIf="canModifyRules"
+                    *ngIf="canManageShadowDeployments"
                     (click)="removeFromShadow(item.rule)"
                     class="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
                     data-testid="remove-shadow-button"

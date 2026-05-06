@@ -27,7 +27,7 @@
       <div *ngIf="!loading && !error">
         <div *ngIf="showReadOnlyNotice()" class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
           <p class="text-sm font-medium text-amber-800">
-            Read-only mode. Role creation, assignment, deletion, and permission changes are hidden for your current permissions.
+            Read-only mode. Role create/edit/delete, assignment, and permission changes are hidden for your current permissions.
           </p>
         </div>
 
@@ -76,7 +76,7 @@
                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                 >
                   <option [ngValue]="null">Select a user...</option>
-                  <option *ngFor="let user of users" [ngValue]="user.id">{{ user.email }}</option>
+                  <option *ngFor="let user of getAssignableUsers()" [ngValue]="user.id">{{ user.email }}</option>
                 </select>
               </div>
               <div>
@@ -86,7 +86,7 @@
                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                 >
                   <option [ngValue]="null">Select a role...</option>
-                  <option *ngFor="let role of roles" [ngValue]="role.id">{{ role.name }}</option>
+                  <option *ngFor="let role of getAssignableRoles()" [ngValue]="role.id">{{ role.name }}</option>
                 </select>
               </div>
               <button
@@ -103,6 +103,10 @@
         <!-- Delete Role Error -->
         <div *ngIf="deleteRoleError" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <p class="text-sm font-medium text-red-800">{{ deleteRoleError }}</p>
+        </div>
+
+        <div *ngIf="editRoleError" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p class="text-sm font-medium text-red-800">{{ editRoleError }}</p>
         </div>
 
         <!-- Existing Roles Table -->
@@ -133,19 +137,57 @@
             <tbody class="divide-y divide-gray-200">
               <tr *ngFor="let role of roles" class="hover:bg-gray-50">
                 <td class="px-6 py-4 text-sm text-gray-500">{{ role.id }}</td>
-                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ role.name }}</td>
-                <td class="px-6 py-4 text-sm text-gray-500">{{ role.description || '—' }}</td>
+                <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                  <input
+                    *ngIf="editingRoleId === role.id; else roleName"
+                    type="text"
+                    [(ngModel)]="editRoleName"
+                    class="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                  />
+                  <ng-template #roleName>{{ role.name }}</ng-template>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500">
+                  <input
+                    *ngIf="editingRoleId === role.id; else roleDescription"
+                    type="text"
+                    [(ngModel)]="editRoleDescription"
+                    class="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                  />
+                  <ng-template #roleDescription>{{ role.description || '—' }}</ng-template>
+                </td>
                 <td class="px-6 py-4 text-sm text-gray-500">{{ role.user_count }}</td>
                 <td class="px-6 py-4 text-right">
                   <div class="flex justify-end gap-2">
                     <a
+                      *ngIf="editingRoleId !== role.id"
                       [href]="'/role_management/' + role.id + '/permissions'"
                       class="px-3 py-1 text-xs border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
                     >
                       {{ permissionsLinkLabel() }}
                     </a>
                     <button
-                      *ngIf="canDeleteRole"
+                      *ngIf="canModifyRole && editingRoleId !== role.id"
+                      (click)="startEditRole(role)"
+                      class="px-3 py-1 text-xs border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      *ngIf="editingRoleId === role.id"
+                      (click)="saveRoleEdit(role.id)"
+                      class="px-3 py-1 text-xs border border-green-300 text-green-700 rounded hover:bg-green-50 transition-colors"
+                    >
+                      Save
+                    </button>
+                    <button
+                      *ngIf="editingRoleId === role.id"
+                      (click)="cancelEditRole()"
+                      class="px-3 py-1 text-xs border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      *ngIf="canDeleteRole && editingRoleId !== role.id"
                       (click)="deleteRole(role.id, role.name)"
                       [disabled]="role.user_count > 0"
                       [ngClass]="{
@@ -200,7 +242,7 @@
                     >
                       {{ role.name }}
                       <button
-                        *ngIf="canManageUserRoles"
+                        *ngIf="canManageUserRoles && !isCurrentUser(user.id) && isAssignableRole(role.id)"
                         (click)="removeRoleFromUser(user.id, role.id, role.name, user.email)"
                         class="ml-1 text-blue-600 hover:text-blue-900"
                         title="Remove role"

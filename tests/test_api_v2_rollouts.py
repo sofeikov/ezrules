@@ -85,7 +85,7 @@ def rollout_test_client(session):
     PermissionManager.init_default_actions()
     PermissionManager.grant_permission(role.id, PermissionAction.VIEW_RULES)
     PermissionManager.grant_permission(role.id, PermissionAction.MODIFY_RULE)
-    PermissionManager.grant_permission(role.id, PermissionAction.PROMOTE_RULES)
+    PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_ROLLOUTS)
 
     token = create_access_token(
         user_id=int(user.id),
@@ -149,6 +149,106 @@ class TestRolloutEndpoints:
         assert rollout_entry["logic"] == "return !CANDIDATE"
         assert rollout_entry["traffic_percent"] == 25
         assert rollout_entry["control"]["logic"] == "return !CONTROL"
+
+    def test_deploy_saved_rule_to_rollout_does_not_require_modify_rule(self, session, active_rollout_rule):
+        hashed_password = bcrypt.hashpw("rolloutdeployonly".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+        role = session.query(Role).filter(Role.name == "rollout_deployer_no_modify").first()
+        if not role:
+            role = Role(name="rollout_deployer_no_modify", description="Can deploy saved rollout candidates")
+            session.add(role)
+            session.commit()
+
+        user = session.query(User).filter(User.email == "rollout-deployer-no-modify@example.com").first()
+        if not user:
+            user = User(
+                email="rollout-deployer-no-modify@example.com",
+                password=hashed_password,
+                active=True,
+                fs_uniquifier="rollout-deployer-no-modify@example.com",
+                o_id=1,
+            )
+            user.roles.append(role)
+            session.add(user)
+            session.commit()
+
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+        PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_ROLLOUTS)
+
+        token = create_access_token(
+            user_id=int(user.id),
+            email=str(user.email),
+            roles=[role.name for role in user.roles],
+            org_id=int(user.o_id),
+        )
+
+        with TestClient(app) as client:
+            response = client.post(
+                f"/api/v2/rules/{active_rollout_rule.r_id}/rollout",
+                json={"traffic_percent": 25},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert response.status_code == 200
+        session.expire_all()
+
+        rollout_config = (
+            session.query(RuleEngineConfig)
+            .filter(RuleEngineConfig.label == "rollout", RuleEngineConfig.o_id == 1)
+            .first()
+        )
+        rollout_entry = next(entry for entry in rollout_config.config if entry["r_id"] == active_rollout_rule.r_id)
+        assert rollout_entry["logic"] == "return !CONTROL"
+        assert rollout_entry["traffic_percent"] == 25
+
+    def test_deploy_rollout_logic_override_requires_modify_rule(self, session, active_rollout_rule):
+        hashed_password = bcrypt.hashpw("rolloutdeployonlyoverride".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+        role = session.query(Role).filter(Role.name == "rollout_deployer_override_no_modify").first()
+        if not role:
+            role = Role(
+                name="rollout_deployer_override_no_modify",
+                description="Can deploy rollouts but not edit candidates",
+            )
+            session.add(role)
+            session.commit()
+
+        user = session.query(User).filter(User.email == "rollout-override-no-modify@example.com").first()
+        if not user:
+            user = User(
+                email="rollout-override-no-modify@example.com",
+                password=hashed_password,
+                active=True,
+                fs_uniquifier="rollout-override-no-modify@example.com",
+                o_id=1,
+            )
+            user.roles.append(role)
+            session.add(user)
+            session.commit()
+
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+        PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_ROLLOUTS)
+
+        token = create_access_token(
+            user_id=int(user.id),
+            email=str(user.email),
+            roles=[role.name for role in user.roles],
+            org_id=int(user.o_id),
+        )
+
+        with TestClient(app) as client:
+            response = client.post(
+                f"/api/v2/rules/{active_rollout_rule.r_id}/rollout",
+                json={"logic": "return !CANDIDATE", "description": "Candidate", "traffic_percent": 25},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == (
+            "MODIFY_RULE permission is required to deploy rule logic or description overrides"
+        )
 
     def test_rollout_requires_active_rule(self, rollout_test_client, session):
         token = rollout_test_client.test_data["token"]

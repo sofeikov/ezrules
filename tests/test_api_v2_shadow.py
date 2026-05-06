@@ -131,6 +131,7 @@ def shadow_test_client(session):
     PermissionManager.init_default_actions()
     PermissionManager.grant_permission(shadow_role.id, PermissionAction.VIEW_RULES)
     PermissionManager.grant_permission(shadow_role.id, PermissionAction.MODIFY_RULE)
+    PermissionManager.grant_permission(shadow_role.id, PermissionAction.MANAGE_SHADOW_DEPLOYMENTS)
     PermissionManager.grant_permission(shadow_role.id, PermissionAction.PROMOTE_RULES)
 
     roles = [role.name for role in shadow_user.roles]
@@ -268,6 +269,58 @@ class TestDeployToShadow:
         # Rules table is unchanged
         rule_in_db = session.get(RuleModel, shadow_rule.r_id)
         assert rule_in_db.logic == original_logic
+
+    def test_deploy_logic_override_requires_modify_rule(self, session, shadow_rule):
+        """Shadow managers without rule edit permission can deploy saved logic, but not draft overrides."""
+        hashed_password = bcrypt.hashpw("shadowdeployonly".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+        role = session.query(Role).filter(Role.name == "shadow_deployer_no_modify").first()
+        if not role:
+            role = Role(name="shadow_deployer_no_modify", description="Can deploy saved rules to shadow")
+            session.add(role)
+            session.commit()
+
+        user = session.query(User).filter(User.email == "shadow-deployer-no-modify@example.com").first()
+        if not user:
+            user = User(
+                email="shadow-deployer-no-modify@example.com",
+                password=hashed_password,
+                active=True,
+                fs_uniquifier="shadow-deployer-no-modify@example.com",
+                o_id=1,
+            )
+            user.roles.append(role)
+            session.add(user)
+            session.commit()
+
+        PermissionManager.db_session = session
+        PermissionManager.init_default_actions()
+        PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_SHADOW_DEPLOYMENTS)
+
+        token = create_access_token(
+            user_id=int(user.id),
+            email=str(user.email),
+            roles=[role.name for role in user.roles],
+            org_id=int(user.o_id),
+        )
+
+        with TestClient(app) as client:
+            saved_logic_response = client.post(
+                f"/api/v2/rules/{shadow_rule.r_id}/shadow",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert saved_logic_response.status_code == 200
+
+            draft_response = client.post(
+                f"/api/v2/rules/{shadow_rule.r_id}/shadow",
+                json={"logic": "return !SHADOW_OUTCOME", "description": "Draft override"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert draft_response.status_code == 403
+        assert draft_response.json()["detail"] == (
+            "MODIFY_RULE permission is required to deploy rule logic or description overrides"
+        )
 
     def test_deploy_nonexistent_rule_returns_404(self, shadow_test_client):
         """Deploying a non-existent rule should return 404."""
@@ -504,7 +557,7 @@ class TestPromoteFromShadow:
         assert response.status_code == 400
 
     def test_promote_rule_without_promote_permission_returns_403(self, session, shadow_rule):
-        """MODIFY_RULE alone should not allow promoting a shadow rule."""
+        """Shadow deployment access alone should not allow promoting a shadow rule."""
         hashed_password = bcrypt.hashpw("shadownopromote".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
         role = session.query(Role).filter(Role.name == "shadow_modify_only").first()
@@ -529,7 +582,7 @@ class TestPromoteFromShadow:
         PermissionManager.db_session = session
         PermissionManager.init_default_actions()
         PermissionManager.grant_permission(role.id, PermissionAction.VIEW_RULES)
-        PermissionManager.grant_permission(role.id, PermissionAction.MODIFY_RULE)
+        PermissionManager.grant_permission(role.id, PermissionAction.MANAGE_SHADOW_DEPLOYMENTS)
 
         token = create_access_token(
             user_id=int(user.id),

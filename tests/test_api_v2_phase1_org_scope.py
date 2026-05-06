@@ -274,7 +274,7 @@ def test_label_usage_and_label_analytics_are_org_scoped(session):
         session,
         org_id=int(org.o_id),
         email=_unique_email("phase1-labels-admin"),
-        permissions=[PermissionAction.CREATE_LABEL, PermissionAction.VIEW_LABELS],
+        permissions=[PermissionAction.CREATE_LABEL, PermissionAction.MODIFY_LABEL, PermissionAction.VIEW_LABELS],
     )
     label_fraud = Label(label=f"PHASE1_FRAUD_{uuid.uuid4().hex[:6]}", o_id=int(org.o_id))
     label_normal = Label(label=f"PHASE1_NORMAL_{uuid.uuid4().hex[:6]}", o_id=int(org.o_id))

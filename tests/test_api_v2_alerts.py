@@ -131,6 +131,71 @@ def test_create_and_list_alert_rule(alerts_test_client):
     assert list_response.json()["rules"][0]["name"] == "Cancel spike"
 
 
+def test_view_alerts_can_list_rules_without_manage_alerts(alerts_test_client):
+    token = alerts_test_client.test_data["token"]
+    role = alerts_test_client.test_data["user"].roles[0]
+    session = alerts_test_client.test_data["session"]
+    PermissionManager.db_session = session
+    PermissionManager.revoke_permission(role.id, PermissionAction.MANAGE_ALERTS)
+    session.add(
+        AlertRule(
+            o_id=1,
+            name="Viewer-visible alert",
+            outcome="CANCEL",
+            threshold=10,
+            window_seconds=3600,
+            cooldown_seconds=1800,
+            enabled=True,
+        )
+    )
+    session.commit()
+
+    response = alerts_test_client.get("/api/v2/alerts/rules", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert response.json()["rules"][0]["name"] == "Viewer-visible alert"
+
+
+def test_view_alerts_cannot_acknowledge_incident_without_manage_alerts(alerts_test_client):
+    token = alerts_test_client.test_data["token"]
+    role = alerts_test_client.test_data["user"].roles[0]
+    session = alerts_test_client.test_data["session"]
+    PermissionManager.db_session = session
+    PermissionManager.revoke_permission(role.id, PermissionAction.MANAGE_ALERTS)
+    rule = AlertRule(
+        o_id=1,
+        name="Viewer incident source",
+        outcome="CANCEL",
+        threshold=10,
+        window_seconds=3600,
+        cooldown_seconds=1800,
+        enabled=True,
+    )
+    session.add(rule)
+    session.flush()
+    incident = AlertIncident(
+        o_id=1,
+        alert_rule_id=int(rule.ar_id),
+        outcome="CANCEL",
+        observed_count=12,
+        threshold=10,
+        window_start=datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=1),
+        window_end=datetime.datetime.now(datetime.UTC),
+        dedupe_key="viewer-ack-denied",
+        status="open",
+        triggered_at=datetime.datetime.now(datetime.UTC),
+    )
+    session.add(incident)
+    session.commit()
+
+    response = alerts_test_client.post(
+        f"/api/v2/alerts/incidents/{incident.ai_id}/acknowledge",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 403
+
+
 def test_create_alert_rule_rejects_unknown_outcome(alerts_test_client):
     token = alerts_test_client.test_data["token"]
 

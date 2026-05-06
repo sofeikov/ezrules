@@ -22,7 +22,7 @@
 
       <div *ngIf="!loading" class="space-y-6">
         <div *ngIf="showReadOnlyNotice()" class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4">
-          Settings are in read-only mode. Changing the neutral outcome requires neutral-outcome access, and other settings changes require permission-management access.
+          Settings are in read-only mode. Each settings group requires its matching management permission.
         </div>
 
         <div class="bg-white rounded-lg shadow border border-gray-200">
@@ -64,7 +64,7 @@
                   id="settings-mainRuleExecutionMode"
                   class="border border-gray-300 rounded-md px-3 py-2 text-sm w-full md:w-72 disabled:bg-gray-100"
                   [(ngModel)]="mainRuleExecutionMode"
-                  [disabled]="!canManagePermissions || saving"
+                  [disabled]="!canManageRuntimeSettings || saving"
                 >
                   <option *ngFor="let option of mainRuleExecutionModeOptions" [value]="option.value">{{ option.label }}</option>
                 </select>
@@ -127,7 +127,7 @@
                   </div>
                 </div>
 
-                <div *ngIf="canManagePermissions" class="flex items-center gap-2">
+                <div *ngIf="canManageOutcomeHierarchy" class="flex items-center gap-2">
                   <button
                     type="button"
                     class="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
@@ -155,7 +155,7 @@
                 Top of the list is the most severe outcome. New outcomes are appended to the bottom by default.
               </p>
               <button
-                *ngIf="canManagePermissions"
+                *ngIf="canManageOutcomeHierarchy"
                 id="settings-saveOutcomeHierarchy"
                 type="button"
                 class="bg-amber-600 text-white px-4 py-2 rounded-md hover:bg-amber-700 disabled:opacity-50"
@@ -183,8 +183,9 @@
                 id="settings-ruleQualityLookbackDays"
                 type="number"
                 min="1"
-                class="border border-gray-300 rounded-md px-3 py-2 text-sm w-48"
+                class="border border-gray-300 rounded-md px-3 py-2 text-sm w-48 disabled:bg-gray-100"
                 [(ngModel)]="ruleQualityLookbackDays"
+                [disabled]="!canManageRuntimeSettings || saving"
               />
             </div>
 
@@ -194,7 +195,7 @@
 
             <div class="pt-2">
               <button
-                *ngIf="canManagePermissions"
+                *ngIf="canManageRuntimeSettings"
                 id="settings-saveRuntimeSettings"
                 type="button"
                 class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
@@ -220,6 +221,7 @@
                 type="checkbox"
                 class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 [(ngModel)]="autoPromoteActiveRuleUpdates"
+                [disabled]="!canManageRuntimeSettings || saving"
               />
               <div>
                 <p class="text-sm font-medium text-gray-900">Auto-promote edits to active rules</p>
@@ -238,7 +240,7 @@
 
             <div class="pt-2">
               <button
-                *ngIf="canManagePermissions"
+                *ngIf="canManageRuntimeSettings"
                 id="settings-saveLifecycleSettings"
                 type="button"
                 class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
@@ -267,7 +269,7 @@
                   id="settings-aiProvider"
                   class="border border-gray-300 rounded-md px-3 py-2 text-sm w-full disabled:bg-gray-100"
                   [(ngModel)]="aiAuthoringProvider"
-                  [disabled]="!canManagePermissions || aiAuthoringSaving"
+                  [disabled]="!canManageAIAuthoringSettings || aiAuthoringSaving"
                 >
                   <option *ngFor="let provider of aiAuthoringSettings?.supportedProviders || []" [value]="provider">
                     {{ provider === 'openai' ? 'OpenAI' : provider }}
@@ -288,7 +290,7 @@
                   list="settings-aiModelOptions"
                   class="border border-gray-300 rounded-md px-3 py-2 text-sm w-full disabled:bg-gray-100"
                   [(ngModel)]="aiAuthoringModel"
-                  [disabled]="!canManagePermissions || aiAuthoringSaving"
+                  [disabled]="!canManageAIAuthoringSettings || aiAuthoringSaving"
                   placeholder="{{ aiAuthoringModelOptions[0].value }}"
                 />
                 <datalist id="settings-aiModelOptions">
@@ -299,7 +301,7 @@
                     *ngFor="let option of aiAuthoringModelOptions"
                     type="button"
                     class="rounded-full border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                    [disabled]="!canManagePermissions || aiAuthoringSaving"
+                    [disabled]="!canManageAIAuthoringSettings || aiAuthoringSaving"
                     (click)="useAiAuthoringModelOption(option.value)"
                   >
                     {{ option.value }}
@@ -322,7 +324,7 @@
                 type="password"
                 class="border border-gray-300 rounded-md px-3 py-2 text-sm w-full disabled:bg-gray-100"
                 [(ngModel)]="aiAuthoringApiKey"
-                [disabled]="!canManagePermissions || aiAuthoringSaving"
+                [disabled]="!canManageAIAuthoringSettings || aiAuthoringSaving"
                 placeholder="{{ aiAuthoringSettings?.apiKeyConfigured ? 'Leave blank to keep current key' : 'sk-...' }}"
               />
               <p class="text-xs text-gray-500 mt-2">
@@ -346,7 +348,7 @@
                   id="settings-clearAiApiKey"
                   type="button"
                   class="inline-flex items-center rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
-                  [disabled]="!canManagePermissions || aiAuthoringSaving"
+                  [disabled]="!canManageAIAuthoringSettings || aiAuthoringSaving"
                   (click)="clearStoredAiAuthoringApiKey()"
                 >
                   Clear Stored API Key
@@ -360,7 +362,7 @@
                 type="checkbox"
                 class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 [(ngModel)]="aiAuthoringEnabled"
-                [disabled]="!canManagePermissions || aiAuthoringSaving"
+                [disabled]="!canManageAIAuthoringSettings || aiAuthoringSaving"
               />
               <div>
                 <p class="text-sm font-medium text-gray-900">Enable AI rule authoring</p>
@@ -372,7 +374,7 @@
 
             <div class="pt-2">
               <button
-                *ngIf="canManagePermissions"
+                *ngIf="canManageAIAuthoringSettings"
                 id="settings-saveAiAuthoring"
                 type="button"
                 class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
@@ -392,7 +394,7 @@
           </div>
 
           <div class="p-6">
-            <div *ngIf="canManagePermissions" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end mb-5">
+            <div *ngIf="canManageRuleQualitySettings" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end mb-5">
               <div>
                 <label for="settings-pairOutcome" class="block text-sm font-medium text-gray-700 mb-2">Outcome</label>
                 <select
@@ -445,13 +447,13 @@
                         [id]="'settings-pair-active-' + pair.rqpId"
                         type="checkbox"
                         [checked]="pair.active"
-                        [disabled]="isPairBusy(pair.rqpId) || !canManagePermissions"
+                        [disabled]="isPairBusy(pair.rqpId) || !canManageRuleQualitySettings"
                         (change)="onPairActiveChange(pair, $event)"
                       />
                     </td>
                     <td class="px-4 py-3">
                       <button
-                        *ngIf="canManagePermissions"
+                        *ngIf="canManageRuleQualitySettings"
                         [id]="'settings-pair-delete-' + pair.rqpId"
                         type="button"
                         class="text-red-600 hover:text-red-700 disabled:opacity-50"

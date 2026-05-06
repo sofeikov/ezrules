@@ -3,6 +3,11 @@ export interface PermissionRequirement {
   anyOf?: string[];
 }
 
+export interface PermissionGrant {
+  name: string;
+  resource_id?: number | null;
+}
+
 export const ROUTE_PERMISSION_REQUIREMENTS = {
   dashboard: { allOf: ['view_rules', 'view_outcomes'] },
   rules: { allOf: ['view_rules'] },
@@ -14,7 +19,7 @@ export const ROUTE_PERMISSION_REQUIREMENTS = {
   userLists: { allOf: ['view_lists'] },
   labelAnalytics: { allOf: ['view_labels'] },
   ruleQuality: { allOf: ['view_rules', 'view_labels'] },
-  settings: { allOf: ['view_roles'] },
+  settings: { allOf: ['view_settings'] },
   users: { allOf: ['view_users'] },
   roles: { allOf: ['view_roles'] },
   audit: { allOf: ['access_audit_trail'] },
@@ -31,8 +36,12 @@ export const ACTION_PERMISSION_REQUIREMENTS = {
   reorderRules: { allOf: ['reorder_rules'] },
   pauseRules: { allOf: ['pause_rules'] },
   promoteRules: { allOf: ['promote_rules'] },
+  manageBacktests: { allOf: ['manage_backtests'] },
+  manageShadowDeployments: { allOf: ['manage_shadow_deployments'] },
+  manageRollouts: { allOf: ['manage_rollouts'] },
   deleteRule: { allOf: ['delete_rule'] },
   createLabel: { allOf: ['create_label'] },
+  modifyLabel: { allOf: ['modify_label'] },
   deleteLabel: { allOf: ['delete_label'] },
   createOutcome: { allOf: ['create_outcome'] },
   deleteOutcome: { allOf: ['delete_outcome'] },
@@ -47,8 +56,14 @@ export const ACTION_PERMISSION_REQUIREMENTS = {
   manageUserRoles: { allOf: ['manage_user_roles'] },
   viewRoles: { allOf: ['view_roles'] },
   createRole: { allOf: ['create_role'] },
+  modifyRole: { allOf: ['modify_role'] },
   deleteRole: { allOf: ['delete_role'] },
   managePermissions: { allOf: ['manage_permissions'] },
+  viewSettings: { allOf: ['view_settings'] },
+  manageRuntimeSettings: { allOf: ['manage_runtime_settings'] },
+  manageAiAuthoringSettings: { allOf: ['manage_ai_authoring_settings'] },
+  manageOutcomeHierarchy: { allOf: ['manage_outcome_hierarchy'] },
+  manageRuleQualitySettings: { allOf: ['manage_rule_quality_settings'] },
   modifyFieldTypes: { allOf: ['modify_field_types'] },
   deleteFieldType: { allOf: ['delete_field_type'] },
   manageApiKeys: { allOf: ['manage_api_keys'] },
@@ -62,6 +77,9 @@ export const PERMISSION_LABELS: Record<string, string> = {
   reorder_rules: 'Reorder rules',
   pause_rules: 'Pause rules',
   promote_rules: 'Promote rules',
+  manage_backtests: 'Manage backtests',
+  manage_shadow_deployments: 'Manage shadow deployments',
+  manage_rollouts: 'Manage rollouts',
   delete_rule: 'Delete rules',
   view_rules: 'View rules',
   submit_test_events: 'Submit test events',
@@ -89,6 +107,11 @@ export const PERMISSION_LABELS: Record<string, string> = {
   modify_role: 'Modify roles',
   delete_role: 'Delete roles',
   manage_permissions: 'Manage permissions',
+  view_settings: 'View settings',
+  manage_runtime_settings: 'Manage runtime settings',
+  manage_ai_authoring_settings: 'Manage AI authoring settings',
+  manage_outcome_hierarchy: 'Manage outcome hierarchy',
+  manage_rule_quality_settings: 'Manage rule quality settings',
   view_field_types: 'View field types',
   modify_field_types: 'Modify field types',
   delete_field_type: 'Delete field types',
@@ -118,4 +141,21 @@ export function hasPermissionRequirement(
 
 export function describePermissions(permissions: readonly string[]): string[] {
   return permissions.map((permission) => PERMISSION_LABELS[permission] ?? permission.replace(/_/g, ' '));
+}
+
+export function permissionGrantIsCovered(
+  actorGrants: readonly PermissionGrant[],
+  targetGrant: PermissionGrant
+): boolean {
+  if (actorGrants.some(grant => grant.name === targetGrant.name && grant.resource_id == null)) {
+    return true;
+  }
+  if (targetGrant.resource_id == null) {
+    return false;
+  }
+  return actorGrants.some(grant => grant.name === targetGrant.name && grant.resource_id === targetGrant.resource_id);
+}
+
+export function grantsFromPermissionNames(permissions: readonly string[]): PermissionGrant[] {
+  return permissions.map(name => ({ name, resource_id: null }));
 }

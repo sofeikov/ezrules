@@ -34,6 +34,7 @@ from ezrules.backend.api_v2.auth.schemas import (
     AcceptInviteRequest,
     ForgotPasswordRequest,
     MessageResponse,
+    PermissionGrantResponse,
     RefreshRequest,
     ResetPasswordRequest,
     RoleResponse,
@@ -556,17 +557,26 @@ def get_current_user_info(
     last_login = user.last_login_at if user.last_login_at is not None else None
     role_ids = [int(role.id) for role in user.roles]
     permissions: list[str] = []
+    permission_grants: list[PermissionGrantResponse] = []
 
     if role_ids:
         permission_rows = (
-            db.query(Action.name)
+            db.query(Action.name, RoleActions.resource_id)
             .join(RoleActions, RoleActions.action_id == Action.id)
             .filter(RoleActions.role_id.in_(role_ids))
             .distinct()
-            .order_by(Action.name)
+            .order_by(Action.name, RoleActions.resource_id)
             .all()
         )
-        permissions = [str(name) for (name,) in permission_rows]
+        permission_names = {str(name) for name, resource_id in permission_rows if resource_id is None}
+        permissions = sorted(permission_names)
+        permission_grants = [
+            PermissionGrantResponse(
+                name=str(name),
+                resource_id=int(resource_id) if resource_id is not None else None,
+            )
+            for name, resource_id in permission_rows
+        ]
 
     return UserResponse(
         id=int(user.id),
@@ -574,5 +584,6 @@ def get_current_user_info(
         active=bool(user.active),
         roles=[RoleResponse(id=int(role.id), name=str(role.name), description=role.description) for role in user.roles],
         permissions=permissions,
+        permission_grants=permission_grants,
         last_login_at=last_login,  # type: ignore[arg-type]
     )
