@@ -33,6 +33,7 @@ import { RuleTestDataService } from '../services/rule-test-data.service';
 import {
   RuleEditorAssistService,
   RuleEditorFieldSuggestion,
+  RuleEditorFeatureSuggestion,
   RuleEditorListSuggestion,
   RuleEditorOutcomeSuggestion,
 } from '../services/rule-editor-assist.service';
@@ -109,6 +110,7 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   referencedLists: string[] = [];
   referencedOutcomes: string[] = [];
   fieldSuggestions: RuleEditorFieldSuggestion[] = [];
+  featureSuggestions: RuleEditorFeatureSuggestion[] = [];
   listSuggestions: RuleEditorListSuggestion[] = [];
   outcomeSuggestions: RuleEditorOutcomeSuggestion[] = [];
   testing: boolean = false;
@@ -184,6 +186,7 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     this.assistSubscription = this.ruleEditorAssistService.getAssistData().subscribe((assistData) => {
       this.fieldSuggestions = assistData.fields;
+      this.featureSuggestions = assistData.features;
       this.listSuggestions = assistData.lists;
       this.outcomeSuggestions = assistData.outcomes;
     });

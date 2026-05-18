@@ -55,6 +55,11 @@ class PermissionAction(Enum):
     MODIFY_FIELD_TYPES = "modify_field_types"
     DELETE_FIELD_TYPE = "delete_field_type"
 
+    # Feature Registry
+    VIEW_FEATURES = "view_features"
+    MODIFY_FEATURES = "modify_features"
+    DELETE_FEATURE = "delete_feature"
+
     # API Key Management
     MANAGE_API_KEYS = "manage_api_keys"
 
@@ -101,6 +106,9 @@ class PermissionAction(Enum):
             (cls.VIEW_FIELD_TYPES.value, "View field type configurations and observations", "field_type"),
             (cls.MODIFY_FIELD_TYPES.value, "Create and update field type configurations", "field_type"),
             (cls.DELETE_FIELD_TYPE.value, "Delete field type configurations", "field_type"),
+            (cls.VIEW_FEATURES.value, "View computed feature definitions", "feature"),
+            (cls.MODIFY_FEATURES.value, "Create and activate computed feature definitions", "feature"),
+            (cls.DELETE_FEATURE.value, "Delete unused computed feature definitions", "feature"),
             (cls.MANAGE_API_KEYS.value, "Manage API keys for service integration", "api_key"),
             (cls.VIEW_ALERTS.value, "View alert rules, incidents, and notifications", "alert"),
             (cls.MANAGE_ALERTS.value, "Create and update alert rules and notification policies", "alert"),

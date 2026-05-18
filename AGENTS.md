@@ -3,6 +3,16 @@
 2. Code quality checks: `uv run poe check` (ruff format check, ty type check, ruff linting).
 3. CLI test helper: `./test_cli.sh`.
 
+# Verification Policy
+Default to GitHub-hosted verification instead of local test execution.
+
+- Always run `uv run poe check` locally before pushing a branch, opening a PR, or updating a PR. Fix any failures locally first so GitHub Actions does not get noisy code-quality/type/lint failures.
+- Do not run local test suites, local Playwright runs, local backend suites, or local docs builds unless the user explicitly asks for local verification or the task is specifically about diagnosing a local-only bug.
+- For normal feature/fix work, implement the change, run `uv run poe check`, create or update the PR, push it, and use GitHub Actions/PR checks as the verification source of truth for tests and full infra validation.
+- Do not bring up local Postgres, Redis, Mailpit, API, Celery, Angular, or Docker demo stacks just to verify code before opening a PR. Use CI/CD infrastructure for that.
+- If GitHub checks fail, inspect the failing CI logs, make a focused fix, push again, and let CI rerun.
+- Local infra is still appropriate when the user explicitly asks to run the app for manual testing, requests a local demo recording, or reports a bug that only reproduces in their local topology.
+
 # Backend Tests (Canonical)
 Use this as the single source of truth for backend test runs.
 
@@ -93,12 +103,12 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 
 # Writing New Code
 1. You may add new test files without asking. Do not modify existing test files unless explicitly allowed.
-2. Before reporting task completion, ensure `uv run poe check` completes successfully.
+2. Before pushing or reporting task completion, ensure `uv run poe check` passes locally, then create or update the PR and confirm the relevant GitHub Actions checks have passed unless the user explicitly requested local-only work.
 3. Any new imports must go to the top of the file (no inline imports in functions).
 4. Any new functionality must be covered with tests.
 5. When implementing new functionality, explicitly ask the user whether permissions and audit logging should be included in scope.
 6. **FOR ANGULAR FRONTEND CHANGES**: Any new pages/navigation must have Playwright e2e tests in `ezrules/frontend/e2e/tests/` plus corresponding page objects in `e2e/pages/*.page.ts`. New or modified Playwright coverage must follow the repeated targeted verification rules below.
-7. **FOR USER-VISIBLE UI FEATURES OR WORKFLOWS**: Record a browser demonstration against a live local stack that proves the feature works end to end. Use a private dev DB, run the backend/frontend on random high ports, save the recording artifact under `artifacts/` in the worktree, and keep the proof focused on the implemented behavior. Pace demo recordings for human viewing and social sharing: move slowly, pause 1-2 seconds before and after each meaningful click/type/navigation, keep key UI states visible long enough to understand, and avoid ultra-short recordings where the workflow cannot be followed.
+7. **FOR USER-VISIBLE UI FEATURES OR WORKFLOWS**: When explicitly recording a browser demonstration, use a pre-authenticated browser/session and skip the login page entirely. Use human-readable demo data and UI names that look realistic, for example "High Value Sender Volume" or "Premium Customer Review", never throwaway names such as `test_shit_23`, `foo`, `asdf`, or random-looking identifiers. Record against a live local stack only when a demo is requested or clearly required. Use a private dev DB, run the backend/frontend on random high ports, save the recording artifact under `artifacts/` in the worktree, and keep the proof focused on the implemented behavior. Pace demo recordings for human viewing and social sharing: move slowly, pause 1-2 seconds before and after each meaningful click/type/navigation, keep key UI states visible long enough to understand, and avoid ultra-short recordings where the workflow cannot be followed.
 8. **FOR NEW OR UPDATED FUNCTIONALITY**: Check whether `README.md`, docs pages, and `docs/assets/readme/` screenshots or GIF demos need to be updated. If the change affects a captured UI surface or a documented workflow, regenerate the relevant asset from a live local stack and zoom into the specific UI area that proves the behavior; if not, mention in the final report that screenshots/GIFs were reviewed and did not need changes.
 9. When the browser recording is generated as `.webm`, convert it to a shareable `.mp4` using H.264 + `yuv420p` + `faststart` so it can be uploaded to services such as X/Twitter. Preferred command: `ffmpeg -y -i input.webm -c:v libx264 -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k output.mp4`. File must be named accorind to the feature it demos.
 10. If a new endpoint is implemented, restart the API server if needed.

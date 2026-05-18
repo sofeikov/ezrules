@@ -23,6 +23,8 @@ from ezrules.backend.api_v2.schemas.audit import (
     ApiKeyHistoryEntry,
     AuditSummaryResponse,
     ConfigAuditListResponse,
+    FeatureDefinitionAuditListResponse,
+    FeatureDefinitionHistoryEntry,
     FieldTypeAuditListResponse,
     FieldTypeHistoryEntry,
     LabelAuditListResponse,
@@ -46,6 +48,7 @@ from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
     AIRuleAuthoringHistory,
     ApiKeyHistory,
+    FeatureDefinitionHistory,
     FieldTypeHistory,
     LabelHistory,
     OutcomeHistory,
@@ -167,6 +170,21 @@ def field_type_history_to_response(history: FieldTypeHistory) -> FieldTypeHistor
     )
 
 
+def feature_definition_history_to_response(history: FeatureDefinitionHistory) -> FeatureDefinitionHistoryEntry:
+    """Convert a feature definition history record to API response."""
+    return FeatureDefinitionHistoryEntry(
+        id=int(history.id),
+        fd_id=int(history.fd_id),
+        entity=str(history.entity),
+        feature_name=str(history.feature_name),
+        action=str(history.action),
+        version=int(history.version),
+        details=str(history.details) if history.details else None,
+        changed=history.changed if history.changed is not None else None,  # type: ignore[arg-type]
+        changed_by=str(history.changed_by) if history.changed_by else None,
+    )
+
+
 def api_key_history_to_response(history: ApiKeyHistory) -> ApiKeyHistoryEntry:
     """Convert an API key history record to API response."""
     return ApiKeyHistoryEntry(
@@ -265,6 +283,9 @@ def get_audit_summary(
         db.query(RolePermissionHistory).filter(RolePermissionHistory.o_id == current_org_id).count()
     )
     total_field_type_actions = db.query(FieldTypeHistory).filter(FieldTypeHistory.o_id == current_org_id).count()
+    total_feature_definition_actions = (
+        db.query(FeatureDefinitionHistory).filter(FeatureDefinitionHistory.o_id == current_org_id).count()
+    )
     total_api_key_actions = db.query(ApiKeyHistory).filter(ApiKeyHistory.o_id == current_org_id).count()
     total_ai_rule_authoring_actions = (
         db.query(AIRuleAuthoringHistory).filter(AIRuleAuthoringHistory.o_id == current_org_id).count()
@@ -282,6 +303,7 @@ def get_audit_summary(
         total_user_account_actions=total_user_account_actions,
         total_role_permission_actions=total_role_permission_actions,
         total_field_type_actions=total_field_type_actions,
+        total_feature_definition_actions=total_feature_definition_actions,
         total_api_key_actions=total_api_key_actions,
         total_ai_rule_authoring_actions=total_ai_rule_authoring_actions,
         total_strict_mode_actions=total_strict_mode_actions,
@@ -705,6 +727,39 @@ def list_field_type_history(
     return FieldTypeAuditListResponse(
         total=total,
         items=[field_type_history_to_response(h) for h in items],
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/features", response_model=FeatureDefinitionAuditListResponse)
+def list_feature_definition_history(
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.ACCESS_AUDIT_TRAIL)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+    start_date: datetime | None = Query(default=None, description="Filter by start date"),
+    end_date: datetime | None = Query(default=None, description="Filter by end date"),
+    fd_id: int | None = Query(default=None, description="Filter by feature definition ID"),
+    limit: int = Query(default=50, ge=1, le=100, description="Page size"),
+    offset: int = Query(default=0, ge=0, description="Offset"),
+) -> FeatureDefinitionAuditListResponse:
+    """Get paginated feature definition action history."""
+    query = db.query(FeatureDefinitionHistory).filter(FeatureDefinitionHistory.o_id == current_org_id)
+
+    if start_date:
+        query = query.filter(FeatureDefinitionHistory.changed >= start_date)
+    if end_date:
+        query = query.filter(FeatureDefinitionHistory.changed <= end_date)
+    if fd_id is not None:
+        query = query.filter(FeatureDefinitionHistory.fd_id == fd_id)
+
+    total = query.count()
+    items = query.order_by(FeatureDefinitionHistory.changed.desc()).offset(offset).limit(limit).all()
+
+    return FeatureDefinitionAuditListResponse(
+        total=total,
+        items=[feature_definition_history_to_response(h) for h in items],
         limit=limit,
         offset=offset,
     )

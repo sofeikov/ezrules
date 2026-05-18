@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy import (
     Enum as SQLEnum,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
@@ -326,6 +327,36 @@ class EventVersion(Base):
         ),
         Index("ix_event_versions_o_id_ingested_at", "o_id", "ingested_at"),
         Index("ix_event_versions_o_id_effective_at", "o_id", "effective_at"),
+        Index(
+            "ix_event_versions_o_id_customer_id_effective_at",
+            "o_id",
+            text("((event_data ->> 'customer_id'))"),
+            "effective_at",
+        ),
+        Index(
+            "ix_event_versions_o_id_sender_id_effective_at",
+            "o_id",
+            text("((event_data ->> 'sender_id'))"),
+            "effective_at",
+        ),
+        Index(
+            "ix_event_versions_o_id_account_id_effective_at",
+            "o_id",
+            text("((event_data ->> 'account_id'))"),
+            "effective_at",
+        ),
+        Index(
+            "ix_event_versions_o_id_customer_nested_id_effective_at",
+            "o_id",
+            text("((event_data #>> '{customer,id}'))"),
+            "effective_at",
+        ),
+        Index(
+            "ix_event_versions_o_id_sender_nested_id_effective_at",
+            "o_id",
+            text("((event_data #>> '{sender,id}'))"),
+            "effective_at",
+        ),
     )
 
     ev_id = Column(Integer, unique=True, primary_key=True)
@@ -334,7 +365,7 @@ class EventVersion(Base):
     event_version = Column(Integer, nullable=False)
     effective_at = Column(CoerceDateTime, nullable=False)
     observed_at = Column(CoerceDateTime, nullable=False)
-    event_data = Column(JSON, nullable=False)
+    event_data = Column(JSONB, nullable=False)
     payload_hash = Column(String(64), nullable=False)
     source = Column(String(32), nullable=False, default="evaluate")
     terminal_state = Column(Boolean, nullable=False, default=False)
@@ -936,6 +967,67 @@ class FieldObservation(Base):
 
     def __repr__(self) -> str:
         return f"FieldObservation({self.field_name!r}, {self.observed_json_type!r}, o_id={self.o_id})"
+
+
+class FeatureDefinition(Base):
+    __tablename__ = "feature_definitions"
+    __table_args__ = (
+        UniqueConstraint("o_id", "entity", "feature_name", name="uq_feature_definitions_org_path"),
+        Index("ix_feature_definitions_o_id_status", "o_id", "status"),
+    )
+
+    fd_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    entity = Column(String(64), nullable=False)
+    feature_name = Column(String(128), nullable=False)
+    entity_key = Column(String(255), nullable=False)
+    aggregation_type = Column(String(32), nullable=False)
+    source_field = Column(String(255), nullable=True)
+    window_seconds = Column(Integer, nullable=False)
+    filters = Column(JSON, nullable=False, default=list)
+    inclusion_policy = Column(String(32), nullable=False, default="previous_events")
+    null_handling = Column(String(32), nullable=False, default="exclude")
+    status = Column(String(32), nullable=False, default="draft")
+    version = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.UTC),
+        onupdate=lambda: datetime.datetime.now(datetime.UTC),
+        nullable=False,
+    )
+    created_by = Column(String, nullable=True)
+    updated_by = Column(String, nullable=True)
+    org: Mapped["Organisation"] = relationship()
+
+    @property
+    def stat_path(self) -> str:
+        return f"{self.entity}.{self.feature_name}"
+
+    @property
+    def available_as(self) -> str:
+        return f"stat[{self.stat_path}]"
+
+
+class FeatureDefinitionHistory(Base):
+    __tablename__ = "feature_definition_history"
+    __table_args__ = (
+        Index("ix_feature_definition_history_o_id_changed", "o_id", "changed"),
+        Index("ix_feature_definition_history_o_id_fd_id", "o_id", "fd_id"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fd_id = Column(Integer, nullable=False, index=True)
+    entity = Column(String(64), nullable=False)
+    feature_name = Column(String(128), nullable=False)
+    action = Column(String, nullable=False)
+    version = Column(Integer, nullable=False)
+    details = Column(String, nullable=True)
+    o_id = Column(Integer, nullable=False)
+    changed = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    changed_by = Column(String, nullable=True)
 
 
 class UserSession(Base):

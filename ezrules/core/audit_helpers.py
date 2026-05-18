@@ -12,6 +12,7 @@ from ezrules.models.backend_core import (
     AIRuleAuthoringHistory,
     AlertRuleHistory,
     ApiKeyHistory,
+    FeatureDefinitionHistory,
     FieldTypeHistory,
     LabelHistory,
     OutcomeHistory,
@@ -126,6 +127,32 @@ def save_field_type_history(
         datetime_format=datetime_format,
         required=required,
         action=action,
+        details=details,
+        o_id=o_id,
+        changed=datetime.datetime.now(datetime.UTC),
+        changed_by=changed_by,
+    )
+    db.add(history)
+
+
+def save_feature_definition_history(
+    db,
+    fd_id: int,
+    entity: str,
+    feature_name: str,
+    action: str,
+    version: int,
+    o_id: int,
+    changed_by: str | None = None,
+    details: str | None = None,
+) -> None:
+    """Record an audit entry for a feature definition action."""
+    history = FeatureDefinitionHistory(
+        fd_id=fd_id,
+        entity=entity,
+        feature_name=feature_name,
+        action=action,
+        version=version,
         details=details,
         o_id=o_id,
         changed=datetime.datetime.now(datetime.UTC),

@@ -233,6 +233,31 @@ class FieldTypeAuditListResponse(BaseModel):
     offset: int = Field(..., description="Current offset")
 
 
+class FeatureDefinitionHistoryEntry(BaseModel):
+    """A single entry in feature definition history."""
+
+    id: int = Field(..., description="History entry ID")
+    fd_id: int = Field(..., description="Feature definition ID")
+    entity: str = Field(..., description="Feature entity namespace")
+    feature_name: str = Field(..., description="Feature name")
+    action: str = Field(..., description="Action type (created, updated, activated, deprecated, deleted)")
+    version: int = Field(..., description="Feature version recorded for this action")
+    details: str | None = Field(default=None, description="Additional details about the action")
+    changed: datetime | None = Field(default=None, description="When this action occurred")
+    changed_by: str | None = Field(default=None, description="Who performed this action")
+
+    model_config = {"from_attributes": True}
+
+
+class FeatureDefinitionAuditListResponse(BaseModel):
+    """Paginated list of feature definition audit entries."""
+
+    total: int = Field(..., description="Total number of history entries")
+    items: list[FeatureDefinitionHistoryEntry] = Field(default_factory=list)
+    limit: int = Field(..., description="Page size")
+    offset: int = Field(..., description="Current offset")
+
+
 class ApiKeyHistoryEntry(BaseModel):
     """A single entry in API key history."""
 
@@ -321,6 +346,7 @@ class AuditSummaryResponse(BaseModel):
     total_user_account_actions: int = Field(default=0, description="Total user account history entries")
     total_role_permission_actions: int = Field(default=0, description="Total role permission history entries")
     total_field_type_actions: int = Field(default=0, description="Total field type config history entries")
+    total_feature_definition_actions: int = Field(default=0, description="Total feature definition history entries")
     total_api_key_actions: int = Field(default=0, description="Total API key history entries")
     total_ai_rule_authoring_actions: int = Field(default=0, description="Total AI rule authoring history entries")
     total_strict_mode_actions: int = Field(default=0, description="Total strict mode history entries")

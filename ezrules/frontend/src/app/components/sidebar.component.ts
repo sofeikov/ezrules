@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { PermissionRequirement, ROUTE_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { NotificationBellComponent } from './notification-bell.component';
@@ -8,7 +8,7 @@ import { NotificationBellComponent } from './notification-bell.component';
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, NotificationBellComponent],
+  imports: [CommonModule, RouterLink, NotificationBellComponent],
   template: `
     <div class="w-64 bg-gray-900 text-white h-screen fixed left-0 top-0 flex flex-col">
       <div class="p-6">
@@ -80,6 +80,13 @@ import { NotificationBellComponent } from './notification-bell.component';
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
           </svg>
           <span>User Lists</span>
+        </a>
+
+        <a *ngIf="canAccess(routePermissions.features)" routerLink="/features" [ngClass]="linkClasses('/features')">
+          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 19V5m0 14h16M8 16l3-7 3 4 4-8" />
+          </svg>
+          <span>Features</span>
         </a>
 
         <a *ngIf="canAccess(routePermissions.labelAnalytics)" href="/label_analytics" [ngClass]="linkClasses('/label_analytics')">

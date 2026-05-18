@@ -42,6 +42,7 @@ export interface VerifyRuleResponse {
   params: string[];
   referenced_lists: string[];
   referenced_outcomes: string[];
+  referenced_features: string[];
   warnings: string[];
   errors: RuleVerifyError[];
 }

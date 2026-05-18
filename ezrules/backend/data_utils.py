@@ -184,7 +184,7 @@ def _min_utc(left: datetime, right: datetime) -> datetime:
 
 def eval_and_store(lre, event: Event, response: dict | None = None, commit: bool = True):
     if response is None:
-        response = lre.evaluate_rules(event.event_data)
+        response = lre.evaluate_rules(event.event_data, as_of=event.effective_at)
     response, decision_id = store_eval_result(
         db_session=lre.db,
         o_id=lre.o_id,

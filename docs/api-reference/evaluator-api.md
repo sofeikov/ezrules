@@ -157,6 +157,8 @@ Nested lookups return the full dotted path in the same format:
 }
 ```
 
+Rules can also reference active computed features with `stat[entity.feature_name]`. These are resolved as of the request's `effective_at` timestamp using bounded historical windows. If a referenced stat is missing, inactive, or exceeds feature guardrails, evaluation returns `400` and does not store the event.
+
 Field observations are also recorded on each successful call, contributing to the **Observed Fields** data visible in the UI. Observations include canonical dotted nested paths as well as parent objects. Live evaluation now buffers those observation writes through Redis and a periodic Celery drain, so observation listings are eventually consistent rather than immediate.
 
 ### Test Event

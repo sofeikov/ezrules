@@ -319,6 +319,24 @@ AI authoring settings notes:
 Field type config note:
 - Config payloads now include `required: bool`. When `required=true`, live evaluation rejects events where that field is missing or `null`.
 
+### Features
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/features` | Bearer + `VIEW_FEATURES` | List computed feature definitions for the caller's org |
+| `POST` | `/api/v2/features` | Bearer + `MODIFY_FEATURES` | Create a draft feature definition |
+| `PUT` | `/api/v2/features/{feature_id}` | Bearer + `MODIFY_FEATURES` | Update an unused or non-active feature definition |
+| `POST` | `/api/v2/features/{feature_id}/activate` | Bearer + `MODIFY_FEATURES` | Activate a feature so rules can reference `stat[entity.feature_name]` |
+| `POST` | `/api/v2/features/{feature_id}/deprecate` | Bearer + `MODIFY_FEATURES` | Deprecate an active feature |
+| `DELETE` | `/api/v2/features/{feature_id}` | Bearer + `DELETE_FEATURE` | Delete a feature only when no rules reference it |
+| `POST` | `/api/v2/features/{feature_id}/preview` | Bearer + `VIEW_FEATURES` | Compute the feature for a supplied event and as-of timestamp |
+| `GET` | `/api/v2/features/{feature_id}/dependencies` | Bearer + `VIEW_FEATURES` | List rules that reference the feature |
+
+Feature definition notes:
+- `aggregation_type` supports `count`, `count_distinct`, `sum`, `avg`, `min`, `max`, `stddev`, and `days_since_first_seen`.
+- `window_seconds` must use a preset online window: `600`, `3600`, `86400`, `604800`, `2592000`, or `7776000`.
+- Rule logic references active features with `stat[entity.feature_name]`; raw payload fields continue to use `$field`.
+
 ### Audit
 
 | Method | Path | Auth | Notes |
@@ -333,6 +351,7 @@ Field type config note:
 | `GET` | `/api/v2/audit/users` | Bearer + permission | User-account history for the caller's org (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/roles` | Bearer + permission | Role/permission history for the caller's org (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/field-types` | Bearer + permission | Field type config history (`limit`, `offset`, `field_name` filter) |
+| `GET` | `/api/v2/audit/features` | Bearer + permission | Feature definition history (`limit`, `offset`, `fd_id` filter) |
 | `GET` | `/api/v2/audit/api-keys` | Bearer + permission | API key create/revoke history for the caller's org (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/ai-rule-authoring` | Bearer + permission | AI rule draft generation/application history for the caller's org (`limit`, `offset`, filters) |
 | `GET` | `/api/v2/audit/strict-mode` | Bearer + permission | Strict mode enable/disable history for the caller's org (`limit`, `offset`, filters) |

@@ -16,6 +16,7 @@ import type { Completion, CompletionContext } from '@codemirror/autocomplete';
 import type { Diagnostic as CodeMirrorDiagnostic } from '@codemirror/lint';
 import {
   RuleEditorFieldSuggestion,
+  RuleEditorFeatureSuggestion,
   RuleEditorListSuggestion,
   RuleEditorOutcomeSuggestion,
 } from '../services/rule-editor-assist.service';
@@ -50,7 +51,7 @@ const RULE_KEYWORD_COMPLETIONS: Completion[] = [
     <div class="overflow-hidden rounded-lg border border-slate-200 shadow-sm">
       <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
         <span>{{ readOnly ? 'Read-only rule source' : 'Rule editor' }}</span>
-        <span *ngIf="!readOnly">Type <code>$</code> for fields, <code>&#64;</code> for user lists, and <code>!</code> for outcomes</span>
+        <span *ngIf="!readOnly">Type <code>$</code> for fields, <code>stat[</code> for features, <code>&#64;</code> for user lists, and <code>!</code> for outcomes</span>
       </div>
       <div #editorHost class="rule-editor-host"></div>
     </div>
@@ -61,6 +62,9 @@ const RULE_KEYWORD_COMPLETIONS: Completion[] = [
       </span>
       <span *ngIf="fieldSuggestions.length > 0" class="rounded-full bg-sky-50 px-2.5 py-1 font-medium text-sky-700">
         Observed fields loaded
+      </span>
+      <span *ngIf="featureSuggestions.length > 0" class="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">
+        Features loaded
       </span>
       <span *ngIf="listSuggestions.length > 0" class="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-700">
         User lists loaded
@@ -194,6 +198,7 @@ export class RuleLogicEditorComponent implements AfterViewInit, OnChanges, OnDes
   @Input() placeholderText = 'Enter rule logic';
   @Input() diagnostics: RuleEditorDiagnostic[] = [];
   @Input() fieldSuggestions: RuleEditorFieldSuggestion[] = [];
+  @Input() featureSuggestions: RuleEditorFeatureSuggestion[] = [];
   @Input() listSuggestions: RuleEditorListSuggestion[] = [];
   @Input() outcomeSuggestions: RuleEditorOutcomeSuggestion[] = [];
   @Output() valueChange = new EventEmitter<string>();
@@ -318,6 +323,24 @@ export class RuleLogicEditorComponent implements AfterViewInit, OnChanges, OnDes
   }
 
   private readonly completeRuleTokens = (context: CompletionContext) => {
+    const statToken = context.matchBefore(/stat\[[A-Za-z0-9_.]*/);
+    if (statToken) {
+      const query = statToken.text.slice(5).toLowerCase();
+      const options = this.featureSuggestions
+        .filter((feature) => feature.path.toLowerCase().includes(query))
+        .map((feature) => ({
+          label: `stat[${feature.path}]`,
+          type: 'variable',
+          detail: `feature • ${feature.aggregation} • ${feature.entityKey} • ${feature.windowLabel}`,
+        }));
+
+      return {
+        from: statToken.from,
+        options,
+        validFor: /^stat\[[A-Za-z0-9_.]*$/,
+      };
+    }
+
     const triggeredToken = context.matchBefore(/[$@!][A-Za-z0-9_]*/);
     if (triggeredToken) {
       if (triggeredToken.from === triggeredToken.to && !context.explicit) {

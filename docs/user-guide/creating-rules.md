@@ -50,6 +50,7 @@ Notes:
 
 - Use `$field_name` to read event fields (for example `$amount`, `$country`)
 - Use dotted paths for nested JSON values (for example `$customer.profile.age`, `$device.location.country`)
+- Use `stat[entity.feature_name]` to read active computed historical features from **Features**
 - If no condition matches, return nothing
 - If the rule is in the allowlist lane, it must return the configured neutral outcome using `!OUTCOME`
 
@@ -124,6 +125,17 @@ Use when decisioning depends on maintained allow/block lists.
 if $user_id in @blocked_users:
     return !CANCEL
 ```
+
+### Feature-based velocity pattern
+
+Use when a decision depends on recent behavior rather than only the current payload.
+
+```python
+if stat[sender.sent_amount_sum_24h] > 10000:
+    return !HOLD
+```
+
+Computed features are defined in **Features** and are resolved as of the event timestamp. V1 features use bounded preset windows such as `10m`, `1h`, `24h`, `7d`, `30d`, and `90d`; arbitrary lifetime windows are intentionally not allowed for online rule evaluation.
 
 ### Allowlist pattern
 

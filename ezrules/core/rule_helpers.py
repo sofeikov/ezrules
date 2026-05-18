@@ -8,6 +8,7 @@ from ezrules.core.user_lists import AbstractUserListManager
 
 OUTCOME_HELPER_NAME = "__ezrules_outcome__"
 FIELD_LOOKUP_HELPER_NAME = "__ezrules_lookup__"
+STAT_LOOKUP_HELPER_NAME = "__ezrules_stat__"
 
 
 class RuleParamExtractor(ast.NodeVisitor):
@@ -84,6 +85,30 @@ class TriggerReferenceExtractor:
         return references
 
 
+class StatReferenceExtractor:
+    def __init__(self):
+        identifier = pp.Word(pp.alphas + "_", pp.alphanums + "_")
+        stat_reference = pp.Combine(pp.Literal("stat[") + identifier + pp.Literal(".") + identifier + pp.Literal("]"))
+        line_parser = stat_reference
+        line_parser.ignore(pp.QuotedString('"'))
+        line_parser.ignore(pp.QuotedString("'"))
+        line_parser.ignore(pp.pythonStyleComment)
+        self._parser = line_parser
+
+    def extract(self, code: str) -> list[str]:
+        references: list[str] = []
+
+        def collect_reference(tokens):
+            token = tokens[0]
+            references.append(token.removeprefix("stat[").removesuffix("]"))
+            return token
+
+        parser = self._parser.copy()
+        parser.setParseAction(collect_reference)
+        parser.transform_string(code)
+        return references
+
+
 class DollarNotationConverter:
     TRIGGER_CHAR = "$"
 
@@ -97,6 +122,26 @@ class DollarNotationConverter:
         else:
             search_for_word = pp.Combine(self.TRIGGER_CHAR + identifier)
 
+        line_parser = search_for_word
+        line_parser.ignore(pp.QuotedString('"'))
+        line_parser.ignore(pp.QuotedString("'"))
+        line_parser.ignore(pp.pythonStyleComment)
+        line_parser.setParseAction(self.replace_with_matched_text)
+        self._parser = line_parser
+
+    def transform_rule(self, code: str):
+        return self._parser.transform_string(code)
+
+
+class StatNotationConverter:
+    def replace_with_matched_text(self, tokens):
+        token = tokens[0]
+        path = token.removeprefix("stat[").removesuffix("]")
+        return f"{STAT_LOOKUP_HELPER_NAME}(stats, {json.dumps(path)})"
+
+    def __init__(self):
+        identifier = pp.Word(pp.alphas + "_", pp.alphanums + "_")
+        search_for_word = pp.Combine(pp.Literal("stat[") + identifier + pp.Literal(".") + identifier + pp.Literal("]"))
         line_parser = search_for_word
         line_parser.ignore(pp.QuotedString('"'))
         line_parser.ignore(pp.QuotedString("'"))
@@ -134,6 +179,25 @@ class UserListReferenceExtractor(TriggerReferenceExtractor):
 class OutcomeReferenceExtractor(TriggerReferenceExtractor):
     def __init__(self):
         super().__init__("!")
+
+
+class RuleStatExtractor(ast.NodeVisitor):
+    def __init__(self):
+        self.stats = set()
+
+    def visit_Call(self, node: ast.Call) -> Any:
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id == STAT_LOOKUP_HELPER_NAME
+            and len(node.args) == 2
+            and isinstance(node.args[0], ast.Name)
+            and node.args[0].id == "stats"
+            and isinstance(node.args[1], ast.Constant)
+            and isinstance(node.args[1].value, str)
+        ):
+            self.stats.add(node.args[1].value)
+            return node
+        return super().generic_visit(node)
 
 
 def extract_outcome_helper_value(node: ast.AST | None) -> str | None:

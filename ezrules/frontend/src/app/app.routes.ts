@@ -15,6 +15,7 @@ import { RolePermissionsComponent } from './role-permissions/role-permissions.co
 import { AuditTrailComponent } from './audit-trail/audit-trail.component';
 import { LoginComponent } from './login/login.component';
 import { FieldTypesComponent } from './field-types/field-types.component';
+import { FeaturesComponent } from './features/features.component';
 import { ShadowRulesComponent } from './shadow-rules/shadow-rules.component';
 import { RolloutsComponent } from './rollouts/rollouts.component';
 import { ApiKeysComponent } from './api-keys/api-keys.component';
@@ -160,6 +161,12 @@ export const routes: Routes = [
     component: FieldTypesComponent,
     canActivate: [authGuard, permissionGuard],
     data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.fieldTypes }
+  },
+  {
+    path: 'features',
+    component: FeaturesComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.features }
   },
   {
     path: 'shadow-rules',
