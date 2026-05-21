@@ -549,8 +549,8 @@ def generate_random_data(
     n_events: int,
     label_ratio: float,
     export_csv: str,
-    rule_complexity: str,
-    org_name: str | None,
+    rule_complexity: str = "demo_scalar_and_nested",
+    org_name: str | None = None,
 ):
     if n_rules < 0 or n_events < 0:
         raise click.BadParameter("n-rules and n-events must be zero or greater")
