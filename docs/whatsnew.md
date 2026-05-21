@@ -4,6 +4,7 @@
 
 * **Performance matrix harness**: Added reproducible breakpoint tooling with scenario files, pure Python rule-engine timing, `/api/v2/evaluate` ingestion timing, multi-organisation API-key distribution, latency/error thresholds, and JSON/Markdown result artifacts.
 * **Deployable capacity guide**: Documented how to plan and run performance matrices against production-like infrastructure, including rule count, execution mode, event profile, request-rate, and organisation dimensions.
+* **Evaluator rule-engine cache**: Reused compiled production rule engines inside each API worker until the database config version changes, removing repeated rule compilation and user-list expansion from the `/api/v2/evaluate` hot path.
 
 ## v1.22.0
 
