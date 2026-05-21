@@ -27,6 +27,16 @@ uv run python -m ezrules.performance.runner run performance/scenarios/initial-br
 
 Compare the two layers for the same row. The difference between API latency and pure engine latency is the platform overhead from service and persistence work.
 
+For routine local API benchmarking, prefer the local API suite runner:
+
+```bash
+uv run python -m ezrules.performance.runner api-suite performance/scenarios/initial-breakpoint.yaml \
+  --workers 4 \
+  --continue-after-breach
+```
+
+This command creates disposable Docker Postgres and Redis containers, initializes a private database, bootstraps the scenario organisations, generates API keys, seeds each configured rule-count block, switches `main_rule_execution_mode` for each mode block, starts the API with production-like settings, samples API/Postgres/Redis resources, and writes JSON/Markdown/CSV artifacts under `artifacts/performance/`.
+
 ## What API Runs Measure
 
 ```bash
@@ -87,6 +97,53 @@ uv run python -m ezrules.performance.runner run performance/scenarios/initial-br
 
 By default, the runner stops after the first threshold breach. Use `--continue-after-breach` when you want every row to run even after the target is already failing the configured limits.
 
+## Run The Local API Suite
+
+The `api-suite` command is the repeatable local workflow for finding the current API breakpoint. It owns target setup, so row labels such as `rules-250__mode-first_match` match the actual local target state.
+
+```bash
+uv run python -m ezrules.performance.runner api-suite performance/scenarios/initial-breakpoint.yaml \
+  --workers 4 \
+  --api-port 18888 \
+  --postgres-port 55432 \
+  --redis-port 56379 \
+  --seed-events 100 \
+  --continue-after-breach
+```
+
+By default the suite:
+
+- uses Docker `postgres:16.0-alpine3.18` with `pg_stat_statements` and `track_io_timing`
+- uses Docker `redis:7-alpine`
+- runs the API with `EZRULES_TESTING=false`
+- starts Uvicorn with `--no-access-log` so terminal logging does not distort high-RPS rows
+- removes the local Docker containers when the run finishes
+
+Useful options:
+
+```bash
+# Run one matrix slice while iterating.
+uv run python -m ezrules.performance.runner api-suite performance/scenarios/initial-breakpoint.yaml \
+  --row-filter "rules-50__mode-all_matches__profile-low_risk__complexity-demo_scalar_and_nested__load-smoke"
+
+# Leave containers behind for manual inspection.
+uv run python -m ezrules.performance.runner api-suite performance/scenarios/initial-breakpoint.yaml \
+  --keep-containers
+
+# Keep access logs only if log throughput is part of the test.
+uv run python -m ezrules.performance.runner api-suite performance/scenarios/initial-breakpoint.yaml \
+  --access-log
+```
+
+The suite writes:
+
+- combined JSON results
+- combined Markdown summary
+- resource and database wait-state samples CSV
+- API server log
+
+These outputs are generated artifacts and should not be committed. Communicate headline numbers and caveats in the PR body instead.
+
 ## Breakpoint Criteria
 
 A row breaches when any configured threshold is exceeded:
@@ -114,6 +171,6 @@ The JSON includes the scenario plan, per-row throughput, latency percentiles, st
 
 ## Deployment Notes
 
-Run the load generator outside the API host when measuring deployable capacity. Record the API worker count, container CPU and memory limits, Postgres instance size, connection pool settings, Redis/Celery availability, and git SHA alongside the result artifacts.
+Run the load generator outside the API host when measuring deployable capacity. Record the API worker count, container CPU and memory limits, Postgres instance size, connection pool settings, Redis/Celery availability, logging configuration, and git SHA alongside the result artifacts.
 
-The starter harness does not create organisations or seed production-like rule sets itself. Use existing admin/API setup or `uv run ezrules generate-random-data --n-rules ... --org-name ...` in controlled non-production environments before running each matrix row.
+The lower-level `run` command does not create organisations or seed production-like rule sets itself. Use `api-suite` for repeatable local runs, or use existing admin/API setup plus `uv run ezrules generate-random-data --n-rules ... --org-name ...` in controlled non-production environments before running lower-level API rows.

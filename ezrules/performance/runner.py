@@ -85,6 +85,36 @@ def main() -> None:
         help="Rule-engine evaluations per row (default 1000).",
     )
 
+    api_suite_parser = subparsers.add_parser(
+        "api-suite",
+        help="Run a reproducible local API suite with disposable Docker Postgres/Redis.",
+    )
+    api_suite_parser.add_argument("scenario", help="Path to a performance scenario YAML file.")
+    api_suite_parser.add_argument("--row-filter", help="Only run rows whose row_id contains this string.")
+    api_suite_parser.add_argument("--run-id", help="Stable id for containers and artifacts. Defaults to UTC timestamp.")
+    api_suite_parser.add_argument("--api-port", type=int, default=18888)
+    api_suite_parser.add_argument("--postgres-port", type=int, default=55432)
+    api_suite_parser.add_argument("--redis-port", type=int, default=56379)
+    api_suite_parser.add_argument("--workers", type=int, default=4)
+    api_suite_parser.add_argument("--seed-events", type=int, default=100)
+    api_suite_parser.add_argument("--postgres-image", default="postgres:16.0-alpine3.18")
+    api_suite_parser.add_argument("--redis-image", default="redis:7-alpine")
+    api_suite_parser.add_argument(
+        "--continue-after-breach",
+        action="store_true",
+        help="Keep running later rows after a row breaches the configured thresholds.",
+    )
+    api_suite_parser.add_argument(
+        "--access-log",
+        action="store_true",
+        help="Keep Uvicorn access logging enabled. Disabled by default because it distorts high-RPS runs.",
+    )
+    api_suite_parser.add_argument(
+        "--keep-containers",
+        action="store_true",
+        help="Leave local Docker containers running after the suite exits.",
+    )
+
     args = parser.parse_args()
     scenario = load_scenario(args.scenario)
 
@@ -92,6 +122,12 @@ def main() -> None:
         json_path, markdown_path = write_plan_files(scenario)
         print(f"Wrote {json_path}")
         print(f"Wrote {markdown_path}")
+        return
+
+    if args.command == "api-suite":
+        from ezrules.performance.local_api_suite import main_from_args
+
+        main_from_args(args, scenario)
         return
 
     rows = scenario.rows()
