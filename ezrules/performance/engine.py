@@ -10,8 +10,9 @@ from ezrules.core.rule_engine import (
     RuleEngineFactory,
 )
 from ezrules.core.user_lists import AbstractUserListManager
-from ezrules.demo_data import USER_LISTS, build_demo_rules
+from ezrules.demo_data import USER_LISTS
 from ezrules.performance.events import build_event_data
+from ezrules.performance.rules import build_performance_rules
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,7 +79,12 @@ class PerformanceListManager(AbstractUserListManager):
         self.lists.pop(list_name, None)
 
 
-def build_rule_engine(*, rule_count: int, execution_mode: str) -> RuleEngine:
+def build_rule_engine(
+    *,
+    rule_count: int,
+    execution_mode: str,
+    rule_complexity: str = "demo_scalar_and_nested",
+) -> RuleEngine:
     """Build a pure Python rule engine matching a matrix row."""
 
     if execution_mode not in {RULE_EXECUTION_MODE_ALL_MATCHES, RULE_EXECUTION_MODE_FIRST_MATCH}:
@@ -90,7 +96,10 @@ def build_rule_engine(*, rule_count: int, execution_mode: str) -> RuleEngine:
             "logic": rule.logic,
             "description": rule.description,
         }
-        for index, rule in enumerate(build_demo_rules(rule_count), start=1)
+        for index, rule in enumerate(
+            build_performance_rules(rule_count=rule_count, rule_complexity=rule_complexity),
+            start=1,
+        )
     ]
     return RuleEngineFactory.from_json(
         rules,
@@ -104,11 +113,16 @@ def time_rule_engine(
     rule_count: int,
     execution_mode: str,
     match_profile: str,
+    rule_complexity: str = "demo_scalar_and_nested",
     iterations: int,
 ) -> EngineTimingResult:
     """Time in-process rule evaluation without HTTP, auth, or database writes."""
 
-    engine = build_rule_engine(rule_count=rule_count, execution_mode=execution_mode)
+    engine = build_rule_engine(
+        rule_count=rule_count,
+        execution_mode=execution_mode,
+        rule_complexity=rule_complexity,
+    )
     events = [build_event_data(match_profile=match_profile, seed=index) for index in range(iterations)]
     latencies: list[float] = []
     started = time.perf_counter()

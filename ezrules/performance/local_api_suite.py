@@ -3,18 +3,18 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import secrets
 import signal
 import subprocess
 import threading
 import time
+import uuid
 from contextlib import suppress
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
-import httpx
 
 from ezrules.performance.matrix import MatrixRow, OrganisationTarget, Scenario
 from ezrules.performance.runner import RowResult, render_results_markdown, run_scenario
@@ -39,16 +39,25 @@ class LocalApiSuiteConfig:
     row_filter: str | None = None
 
     @property
+    def resource_id(self) -> str:
+        normalized = re.sub(r"[^A-Za-z0-9_]+", "_", self.run_id).strip("_").lower()
+        return normalized or "run"
+
+    @property
+    def docker_resource_id(self) -> str:
+        return self.resource_id.replace("_", "-").lower()
+
+    @property
     def db_name(self) -> str:
-        return f"ezrules_perf_suite_{self.run_id}"
+        return f"ezrules_perf_suite_{self.resource_id}"
 
     @property
     def postgres_container(self) -> str:
-        return f"ezrules-perf-postgres-{self.run_id}"
+        return f"ezrules-perf-postgres-{self.docker_resource_id}"
 
     @property
     def redis_container(self) -> str:
-        return f"ezrules-perf-redis-{self.run_id}"
+        return f"ezrules-perf-redis-{self.docker_resource_id}"
 
     @property
     def api_url(self) -> str:
@@ -105,36 +114,38 @@ def run_local_api_suite(scenario: Scenario, config: LocalApiSuiteConfig) -> Loca
         sampler.start()
 
         for rule_count in scenario.rule_counts:
-            _seed_rule_count(scenario, config, rule_count)
-            for execution_mode in scenario.execution_modes:
-                _set_execution_mode(scenario.organisations, config, execution_mode)
-                _reset_pg_stat_statements(config)
+            for rule_complexity in scenario.rule_complexities:
+                _seed_rule_count(scenario, config, rule_count, rule_complexity)
+                for execution_mode in scenario.execution_modes:
+                    _set_execution_mode(scenario.organisations, config, execution_mode)
+                    _reset_pg_stat_statements(config)
 
-                _stop_process(api_process)
-                api_process = _start_api(config, api_log_path)
-                _wait_for_api(config.api_url)
+                    _stop_process(api_process)
+                    api_process = _start_api(config, api_log_path)
+                    _wait_for_api(config.api_url)
 
-                suite_scenario = _scenario_slice(
-                    scenario,
-                    config=config,
-                    rule_count=rule_count,
-                    execution_mode=execution_mode,
-                )
-                suite_rows = _filtered_rows(suite_scenario, config.row_filter)
-                if not suite_rows:
-                    continue
-
-                original_env = _install_api_key_env(org_keys)
-                try:
-                    results.extend(
-                        run_scenario(
-                            scenario=suite_scenario,
-                            rows=suite_rows,
-                            continue_after_breach=config.continue_after_breach,
-                        )
+                    suite_scenario = _scenario_slice(
+                        scenario,
+                        config=config,
+                        rule_count=rule_count,
+                        rule_complexity=rule_complexity,
+                        execution_mode=execution_mode,
                     )
-                finally:
-                    _restore_env(original_env, org_keys)
+                    suite_rows = _filtered_rows(suite_scenario, config.row_filter)
+                    if not suite_rows:
+                        continue
+
+                    original_env = _install_api_key_env(org_keys)
+                    try:
+                        results.extend(
+                            run_scenario(
+                                scenario=suite_scenario,
+                                rows=suite_rows,
+                                continue_after_breach=config.continue_after_breach,
+                            )
+                        )
+                    finally:
+                        _restore_env(original_env, org_keys)
 
         json_path, markdown_path = write_api_suite_files(
             scenario=scenario,
@@ -222,7 +233,7 @@ def render_api_suite_markdown(
         f"| API access log | `{'disabled' if config.no_access_log else 'enabled'}` |",
         f"| Postgres | `{config.postgres_image}` on host port `{config.postgres_port}` |",
         f"| Redis | `{config.redis_image}` on host port `{config.redis_port}` |",
-        f"| Seed events per org/rule-count block | `{config.seed_events}` |",
+        f"| Seed events per org/rule-count/complexity block | `{config.seed_events}` |",
         "",
         "## Results",
         "",
@@ -235,7 +246,7 @@ def render_api_suite_markdown(
         "",
         "## Notes",
         "",
-        "- The suite recreates the database once, then reseeds each configured rule-count block before running its mode slices.",
+        "- The suite recreates the database once, then reseeds each configured rule-count/complexity block before running its mode slices.",
         "- API keys are generated in memory for the run and are not written to result artifacts.",
         "- Results are local capacity evidence, not a production capacity guarantee.",
         "",
@@ -248,6 +259,7 @@ def _scenario_slice(
     *,
     config: LocalApiSuiteConfig,
     rule_count: int,
+    rule_complexity: str,
     execution_mode: str,
 ) -> Scenario:
     return Scenario(
@@ -258,7 +270,7 @@ def _scenario_slice(
         rule_counts=(rule_count,),
         execution_modes=(execution_mode,),
         match_profiles=scenario.match_profiles,
-        rule_complexities=scenario.rule_complexities,
+        rule_complexities=(rule_complexity,),
         workload=scenario.workload,
         thresholds=scenario.thresholds,
         output_dir=config.output_dir or scenario.output_dir,
@@ -340,7 +352,7 @@ def _seed_targets(scenario: Scenario, config: LocalApiSuiteConfig) -> dict[str, 
     return org_keys
 
 
-def _seed_rule_count(scenario: Scenario, config: LocalApiSuiteConfig, rule_count: int) -> None:
+def _seed_rule_count(scenario: Scenario, config: LocalApiSuiteConfig, rule_count: int, rule_complexity: str) -> None:
     _truncate_seeded_data(config)
     for org in scenario.organisations:
         _run(
@@ -355,6 +367,8 @@ def _seed_rule_count(scenario: Scenario, config: LocalApiSuiteConfig, rule_count
                 str(config.seed_events),
                 "--label-ratio",
                 "0",
+                "--rule-complexity",
+                rule_complexity,
                 "--org-name",
                 org.name,
             ],
@@ -386,7 +400,7 @@ restart identity cascade;
 def _create_api_key(config: LocalApiSuiteConfig, org_name: str, index: int) -> str:
     raw_key = "ezrk_perf_" + secrets.token_hex(32)
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-    gid = f"00000000-{config.run_id[-4:].zfill(4)}-4000-8000-{index:012d}"
+    gid = str(uuid.uuid5(uuid.NAMESPACE_URL, f"ezrules-performance:{config.run_id}:{org_name}:{index}"))
     _psql(
         config,
         f"""
@@ -445,6 +459,7 @@ def _start_api(config: LocalApiSuiteConfig, api_log_path: Path) -> subprocess.Po
 
 
 def _wait_for_api(api_url: str, timeout_seconds: int = 30) -> None:
+    httpx = _load_httpx()
     deadline = time.monotonic() + timeout_seconds
     last_error: Exception | None = None
     while time.monotonic() < deadline:
@@ -456,6 +471,16 @@ def _wait_for_api(api_url: str, timeout_seconds: int = 30) -> None:
             last_error = exc
         time.sleep(0.5)
     raise TimeoutError(f"API at {api_url} did not become healthy: {last_error}")
+
+
+def _load_httpx() -> Any:
+    try:
+        import httpx
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Local API performance suites require httpx. Install development dependencies with `uv sync`."
+        ) from exc
+    return httpx
 
 
 def _stop_process(process: subprocess.Popen | None) -> None:

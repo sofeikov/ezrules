@@ -9,8 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-
-import httpx
+from typing import Any
 
 from ezrules.performance.engine import time_rule_engine
 from ezrules.performance.events import build_evaluate_payload
@@ -164,6 +163,7 @@ def run_engine_scenario(*, scenario: Scenario, rows: list[MatrixRow], iterations
             rule_count=row.rule_count,
             execution_mode=row.execution_mode,
             match_profile=row.match_profile,
+            rule_complexity=row.rule_complexity,
             iterations=iterations,
         )
         completed = datetime.now(UTC)
@@ -349,6 +349,7 @@ def _send_requests(
     interval = duration_seconds / request_count if request_count > 0 else 0
     start = time.perf_counter()
     futures = []
+    httpx = _load_httpx()
     with httpx.Client(timeout=10.0) as client:
         with ThreadPoolExecutor(max_workers=row.step.concurrency) as pool:
             for index in range(request_count):
@@ -372,7 +373,7 @@ def _send_requests(
 
 
 def _send_one(
-    client: httpx.Client,
+    client: Any,
     url: str,
     org: ResolvedOrganisation,
     row: MatrixRow,
@@ -406,6 +407,16 @@ def _send_one(
             transaction_id=transaction_id,
             error=str(exc),
         )
+
+
+def _load_httpx() -> Any:
+    try:
+        import httpx
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "API performance runs require httpx. Install development dependencies with `uv sync`."
+        ) from exc
+    return httpx
 
 
 def _request_count(target_rps: float, duration_seconds: int) -> int:

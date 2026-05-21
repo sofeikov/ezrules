@@ -45,4 +45,3 @@ thresholds:
   max_failure_rate: 0.001
   max_p95_ms: 500
   max_p99_ms: 1000
-

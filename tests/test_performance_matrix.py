@@ -113,11 +113,19 @@ def test_build_rule_engine_supports_demo_lists():
     assert result["all_rule_results"]
 
 
+def test_build_rule_engine_uses_requested_rule_complexity():
+    engine = build_rule_engine(rule_count=3, execution_mode="all_matches", rule_complexity="simple")
+    result = engine(build_event_data(match_profile="high_risk", seed=42))
+
+    assert result["outcome_counters"] == {"REVIEW": 3}
+
+
 def test_time_rule_engine_returns_latency_percentiles():
     result = time_rule_engine(
         rule_count=3,
         execution_mode="first_match",
         match_profile="cross_border",
+        rule_complexity="simple",
         iterations=5,
     )
 
@@ -157,12 +165,33 @@ workload:
         seed_events=10,
     )
 
-    sliced = _scenario_slice(scenario, config=config, rule_count=250, execution_mode="first_match")
+    sliced = _scenario_slice(
+        scenario,
+        config=config,
+        rule_count=250,
+        rule_complexity="simple",
+        execution_mode="first_match",
+    )
 
     assert sliced.url == "http://localhost:18888"
     assert sliced.rule_counts == (250,)
     assert sliced.execution_modes == ("first_match",)
+    assert sliced.rule_complexities == ("simple",)
     assert len(sliced.rows()) == 2
+
+
+def test_api_suite_normalizes_human_run_id_for_local_resources():
+    config = LocalApiSuiteConfig(
+        run_id="Local-Test",
+        api_port=18888,
+        postgres_port=55432,
+        redis_port=56379,
+        workers=4,
+        seed_events=10,
+    )
+
+    assert config.db_name == "ezrules_perf_suite_local_test"
+    assert config.postgres_container == "ezrules-perf-postgres-local-test"
 
 
 def test_api_suite_row_filter_applies_after_mode_slice(tmp_path: Path):

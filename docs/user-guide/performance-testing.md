@@ -35,7 +35,7 @@ uv run python -m ezrules.performance.runner api-suite performance/scenarios/init
   --continue-after-breach
 ```
 
-This command creates disposable Docker Postgres and Redis containers, initializes a private database, bootstraps the scenario organisations, generates API keys, seeds each configured rule-count block, switches `main_rule_execution_mode` for each mode block, starts the API with production-like settings, samples API/Postgres/Redis resources, and writes JSON/Markdown/CSV artifacts under `artifacts/performance/`.
+This command creates disposable Docker Postgres and Redis containers, initializes a private database, bootstraps the scenario organisations, generates API keys, seeds each configured rule-count/complexity block, switches `main_rule_execution_mode` for each mode block, starts the API with production-like settings, samples API/Postgres/Redis resources, and writes JSON/Markdown/CSV artifacts under `artifacts/performance/`.
 
 ## What API Runs Measure
 
@@ -57,6 +57,7 @@ It varies:
 
 - active rule count
 - `main_rule_execution_mode`
+- rule complexity profile
 - event risk/match profile
 - request rate and concurrency
 - organisation/API-key distribution
@@ -171,6 +172,6 @@ The JSON includes the scenario plan, per-row throughput, latency percentiles, st
 
 ## Deployment Notes
 
-Run the load generator outside the API host when measuring deployable capacity. Record the API worker count, container CPU and memory limits, Postgres instance size, connection pool settings, Redis/Celery availability, logging configuration, and git SHA alongside the result artifacts.
+Run the load generator outside the API host when measuring deployable capacity. Record the API worker count, container CPU and memory limits, Postgres instance size, connection pool settings, Redis/Celery availability, logging configuration, rule complexity profile, and git SHA alongside the result artifacts.
 
-The lower-level `run` command does not create organisations or seed production-like rule sets itself. Use `api-suite` for repeatable local runs, or use existing admin/API setup plus `uv run ezrules generate-random-data --n-rules ... --org-name ...` in controlled non-production environments before running lower-level API rows.
+The lower-level `run` command does not create organisations or seed production-like rule sets itself. Use `api-suite` for repeatable local runs, or use existing admin/API setup plus `uv run ezrules generate-random-data --n-rules ... --rule-complexity demo_scalar_and_nested --org-name ...` in controlled non-production environments before running lower-level API rows.
