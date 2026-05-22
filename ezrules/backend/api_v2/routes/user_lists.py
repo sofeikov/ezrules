@@ -31,6 +31,7 @@ from ezrules.backend.api_v2.schemas.user_lists import (
 )
 from ezrules.core.audit_helpers import save_user_list_history
 from ezrules.core.permissions_constants import PermissionAction
+from ezrules.core.user_lists import bump_user_list_version
 from ezrules.models.backend_core import User, UserList, UserListEntry
 
 router = APIRouter(prefix="/api/v2/user-lists", tags=["User Lists"])
@@ -189,8 +190,7 @@ def create_user_list(
     )
 
     db.add(new_list)
-    db.commit()
-    db.refresh(new_list)
+    db.flush()
 
     save_user_list_history(
         db,
@@ -200,7 +200,9 @@ def create_user_list(
         o_id=current_org_id,
         changed_by=str(user.email) if user.email else None,
     )
+    bump_user_list_version(db, current_org_id)
     db.commit()
+    db.refresh(new_list)
 
     return UserListMutationResponse(
         success=True,
@@ -244,7 +246,7 @@ def update_user_list(
         )
 
     # Check if new name already exists
-    if list_data.name is not None:
+    if list_data.name is not None and list_data.name != user_list.list_name:
         existing = (
             db.query(UserList)
             .filter(
@@ -274,6 +276,8 @@ def update_user_list(
             changed_by=str(user.email) if user.email else None,
             details=f"Renamed from '{old_name}' to '{list_data.name}'",
         )
+
+        bump_user_list_version(db, current_org_id)
 
     db.commit()
     db.refresh(user_list)
@@ -333,6 +337,7 @@ def delete_user_list(
 
     # Entries will be cascade deleted due to relationship configuration
     db.delete(user_list)
+    bump_user_list_version(db, current_org_id)
     db.commit()
 
     return UserListMutationResponse(
@@ -447,6 +452,7 @@ def add_entry(
         details=f"Added entry '{entry_data.value}'",
     )
 
+    bump_user_list_version(db, current_org_id)
     db.commit()
     db.refresh(new_entry)
 
@@ -526,6 +532,7 @@ def bulk_add_entries(
             changed_by=str(user.email) if user.email else None,
             details=f"Added {len(added)} entries, skipped {len(skipped)}",
         )
+        bump_user_list_version(db, current_org_id)
 
     db.commit()
 
@@ -601,6 +608,7 @@ def delete_entry(
     )
 
     db.delete(entry)
+    bump_user_list_version(db, current_org_id)
     db.commit()
 
     return UserListEntryMutationResponse(

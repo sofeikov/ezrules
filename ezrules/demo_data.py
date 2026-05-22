@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from ezrules.core.field_paths import get_field_value
-from ezrules.core.user_lists import PersistentUserListManager
+from ezrules.core.user_lists import PersistentUserListManager, bump_user_list_version
 from ezrules.models.backend_core import UserList, UserListEntry
 
 type DemoScalar = str | int | float
@@ -171,6 +171,7 @@ def seed_demo_user_lists(list_manager: PersistentUserListManager) -> None:
                 current_entries.add(entry)
                 changed = True
     if changed:
+        bump_user_list_version(db_session, list_manager.o_id)
         db_session.commit()
         list_manager._cached_lists = None
 

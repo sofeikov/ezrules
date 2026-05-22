@@ -711,6 +711,19 @@ class UserList(Base):
         return f"{self.ul_id=},{self.list_name=},{self.o_id=}"
 
 
+class UserListVersion(Base):
+    __tablename__ = "user_list_versions"
+
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id", ondelete="CASCADE"), primary_key=True)
+    version = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+
+    org: Mapped["Organisation"] = relationship()
+
+    def __repr__(self) -> str:
+        return f"{self.o_id=},{self.version=},{self.updated_at=}"
+
+
 class UserListEntry(Base):
     __tablename__ = "user_list_entries"
 

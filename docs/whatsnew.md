@@ -1,5 +1,9 @@
 # What's New
 
+## v1.22.1
+
+* **User-list version records**: Added an org-scoped user-list version table that advances in the same transaction as successful list and entry mutations, giving the user-list domain a deterministic runtime version signal separate from audit history.
+
 ## v1.22.0
 
 * **Computed feature registry**: Added org-scoped feature definitions for history-aware rule inputs such as velocity counts, distinct counts, sums, averages, min/max, standard deviation, and days since first seen.
