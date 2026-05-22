@@ -4,7 +4,6 @@ from datetime import datetime
 from threading import Lock
 from typing import Any
 
-from sqlalchemy import func, select
 from sqlalchemy.exc import NoResultFound
 
 from ezrules.backend.features import FeatureResolver
@@ -20,7 +19,7 @@ _RULE_ENGINE_CACHE_LOCK = Lock()
 class RuleEngineCacheState:
     re_id: int
     config_version: int
-    user_list_version: tuple[int, int, int, int, int] | None = None
+    user_list_version: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,7 +105,7 @@ class LocalRuleExecutorSQL(AbstractRuleExecutor):
 
         re_id = int(latest_record[0])
         latest_version = int(latest_record[1])
-        user_list_version: tuple[int, int, int, int, int] | None = None
+        user_list_version: int | None = None
 
         if self._current_cache_state is not None and self.execution_mode == self._current_execution_mode:
             current_state = RuleEngineCacheState(re_id=re_id, config_version=latest_version)
@@ -180,40 +179,11 @@ class LocalRuleExecutorSQL(AbstractRuleExecutor):
         self._current_execution_mode = self.execution_mode
         self.rule_engine = rule_engine
 
-    def _get_user_list_cache_version(self) -> tuple[int, int, int, int, int]:
-        from ezrules.models.backend_core import UserList, UserListEntry, UserListHistory
+    def _get_user_list_cache_version(self) -> int:
+        from ezrules.models.backend_core import UserListVersion
 
-        list_count = select(func.count(UserList.ul_id)).where(UserList.o_id == self.o_id).scalar_subquery()
-        list_max_id = (
-            select(func.coalesce(func.max(UserList.ul_id), 0)).where(UserList.o_id == self.o_id).scalar_subquery()
-        )
-        entry_count = (
-            select(func.count(UserListEntry.ule_id))
-            .select_from(UserListEntry)
-            .join(UserList, UserList.ul_id == UserListEntry.ul_id)
-            .where(UserList.o_id == self.o_id)
-            .scalar_subquery()
-        )
-        entry_max_id = (
-            select(func.coalesce(func.max(UserListEntry.ule_id), 0))
-            .select_from(UserListEntry)
-            .join(UserList, UserList.ul_id == UserListEntry.ul_id)
-            .where(UserList.o_id == self.o_id)
-            .scalar_subquery()
-        )
-        history_max_id = (
-            select(func.coalesce(func.max(UserListHistory.id), 0))
-            .where(UserListHistory.o_id == self.o_id)
-            .scalar_subquery()
-        )
-        version = self.db.query(list_count, list_max_id, entry_count, entry_max_id, history_max_id).one()
-        return (
-            int(version[0] or 0),
-            int(version[1] or 0),
-            int(version[2] or 0),
-            int(version[3] or 0),
-            int(version[4] or 0),
-        )
+        version = self.db.query(UserListVersion.version).where(UserListVersion.o_id == self.o_id).scalar()
+        return int(version or 0)
 
 
 def _rule_config_uses_user_lists(config: list[dict[str, Any]]) -> bool:

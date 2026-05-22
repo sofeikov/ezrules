@@ -7,6 +7,10 @@
 * **Repeatable local API suite**: Added an `api-suite` performance command that provisions disposable Docker Postgres/Redis, seeds scenario organisations by rule-count/complexity block, switches execution mode per matrix block, disables access logs by default, samples resource/DB wait signals, and emits ignored run artifacts for PR discussion.
 * **Evaluator rule-engine cache**: Reused compiled production rule engines inside each API worker until the database config row/version or referenced user-list state changes, removing repeated rule compilation from the `/api/v2/evaluate` hot path without serving stale list-backed decisions.
 
+## v1.22.1
+
+* **User-list version records**: Added an org-scoped user-list version table that advances in the same transaction as successful list and entry mutations, giving the user-list domain a deterministic runtime version signal separate from audit history.
+
 ## v1.22.0
 
 * **Computed feature registry**: Added org-scoped feature definitions for history-aware rule inputs such as velocity counts, distinct counts, sums, averages, min/max, standard deviation, and days since first seen.

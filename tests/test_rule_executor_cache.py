@@ -2,7 +2,8 @@ from typing import Any
 
 from ezrules.backend.rule_executors import executors
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
-from ezrules.models.backend_core import Organisation, RuleEngineConfig, UserListHistory
+from ezrules.core.user_lists import bump_user_list_version
+from ezrules.models.backend_core import Organisation, RuleEngineConfig
 
 
 class FakeRuleEngine:
@@ -120,15 +121,7 @@ def test_rule_executor_recompiles_list_backed_rules_when_user_lists_change(sessi
     first = LocalRuleExecutorSQL(db=session, o_id=int(org.o_id))
     assert first.evaluate_rules({})["outcome_counters"] == {"HOLD": 1}
 
-    session.add(
-        UserListHistory(
-            ul_id=1,
-            list_name="WatchlistMerchants",
-            action="entry_added",
-            o_id=int(org.o_id),
-            details="Added entry",
-        )
-    )
+    bump_user_list_version(session, int(org.o_id))
     session.commit()
 
     second = LocalRuleExecutorSQL(db=session, o_id=int(org.o_id))

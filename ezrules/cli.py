@@ -25,7 +25,7 @@ from ezrules.core.rule_updater import (
     RuleManager,
     RuleManagerFactory,
 )
-from ezrules.core.user_lists import PersistentUserListManager
+from ezrules.core.user_lists import PersistentUserListManager, ensure_user_list_version
 from ezrules.demo_data import build_demo_events, determine_demo_label, seed_demo_user_lists
 from ezrules.models.backend_core import (
     AllowedOutcome,
@@ -190,6 +190,8 @@ def _bootstrap_organisation(session, *, org_name: str) -> tuple[Organisation, bo
 
     user_list_manager = PersistentUserListManager(db_session=session, o_id=organization_id)
     user_list_manager._ensure_default_lists()
+    ensure_user_list_version(session, organization_id)
+    session.commit()
     return organization, created
 
 

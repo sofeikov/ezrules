@@ -142,13 +142,13 @@ verify_db "SELECT COUNT(*) FROM \"user\" WHERE email = '$member_email';" "1" "Du
 # Test 6: Generate random data
 print_status "Test 6: Generate random data"
 initial_rules=$(count_rows "rules" "before data generation")
-initial_events=$(count_rows "testing_record_log" "before data generation")
+initial_events=$(count_rows "event_versions" "before data generation")
 
 uv run ezrules generate-random-data --org-name "$test_org_name" --n-rules 5 --n-events 10 --label-ratio 0.5
 
 # Verify data was generated
 final_rules=$(count_rows "rules" "after data generation")
-final_events=$(count_rows "testing_record_log" "after data generation")
+final_events=$(count_rows "event_versions" "after data generation")
 
 if [[ $final_rules -gt $initial_rules ]]; then
     print_status "✓ Rules generated successfully ($initial_rules → $final_rules)"
@@ -163,7 +163,7 @@ else
 fi
 
 # Verify some events were labeled
-labeled_count=$(psql "$TEST_DB_ENDPOINT" -t -c "SELECT COUNT(*) FROM testing_record_log WHERE el_id IS NOT NULL;" | xargs)
+labeled_count=$(psql "$TEST_DB_ENDPOINT" -t -c "SELECT COUNT(*) FROM event_version_labels;" | xargs)
 print_status "Found $labeled_count labeled events"
 
 if [[ $labeled_count -gt 0 ]]; then
@@ -199,7 +199,7 @@ print_status "Test 8: Delete test data"
 uv run ezrules delete-test-data
 
 # Verify test data is removed
-verify_db "SELECT COUNT(*) FROM testing_record_log WHERE event_id LIKE 'TestEvent_%';" "0" "Test events deleted"
+verify_db "SELECT COUNT(*) FROM event_versions WHERE transaction_id LIKE 'TestEvent_%';" "0" "Test events deleted"
 verify_db "SELECT COUNT(*) FROM rules WHERE rid LIKE 'TestRule_%';" "0" "Test rules deleted"
 
 # Test summary
