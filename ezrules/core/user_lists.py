@@ -1,4 +1,38 @@
 import abc
+import datetime
+
+from sqlalchemy import update
+from sqlalchemy.dialects.postgresql import insert
+
+
+def ensure_user_list_version(db_session, o_id: int):
+    """Ensure the org has a user-list version row without changing its version."""
+    from ezrules.models.backend_core import UserListVersion
+
+    now = datetime.datetime.now(datetime.UTC)
+    stmt = (
+        insert(UserListVersion)
+        .values(o_id=o_id, version=0, updated_at=now)
+        .on_conflict_do_nothing(index_elements=["o_id"])
+    )
+    db_session.execute(stmt)
+    db_session.flush()
+    return db_session.query(UserListVersion).filter(UserListVersion.o_id == o_id).one()
+
+
+def bump_user_list_version(db_session, o_id: int) -> int:
+    """Increment the org user-list version in the caller's current transaction."""
+    from ezrules.models.backend_core import UserListVersion
+
+    ensure_user_list_version(db_session, o_id)
+    now = datetime.datetime.now(datetime.UTC)
+    stmt = (
+        update(UserListVersion)
+        .where(UserListVersion.o_id == o_id)
+        .values(version=UserListVersion.version + 1, updated_at=now)
+        .returning(UserListVersion.version)
+    )
+    return int(db_session.execute(stmt).scalar_one())
 
 
 class AbstractUserListManager(abc.ABC):
@@ -127,7 +161,10 @@ class PersistentUserListManager(AbstractUserListManager):
                     entry = UserListEntry(entry_value=entry_value, ul_id=user_list.ul_id)
                     self.db_session.add(entry)
 
+            bump_user_list_version(self.db_session, self.o_id)
             self.db_session.commit()
+        else:
+            ensure_user_list_version(self.db_session, self.o_id)
 
     def _ensure_initialized(self):
         """Ensure the database has been initialized with default lists"""
@@ -172,11 +209,13 @@ class PersistentUserListManager(AbstractUserListManager):
         # Find the list
         user_list = self.db_session.query(UserList).filter_by(list_name=list_name, o_id=self.o_id).first()
 
+        list_created = False
         if not user_list:
             # Create new list if it doesn't exist
             user_list = UserList(list_name=list_name, o_id=self.o_id)
             self.db_session.add(user_list)
             self.db_session.flush()  # Ensure we have the ID
+            list_created = True
 
         # Check if entry already exists
         existing_entry = (
@@ -186,8 +225,13 @@ class PersistentUserListManager(AbstractUserListManager):
         if not existing_entry:
             entry = UserListEntry(entry_value=new_entry, ul_id=user_list.ul_id)
             self.db_session.add(entry)
+            bump_user_list_version(self.db_session, self.o_id)
             self.db_session.commit()
             # Invalidate cache to force reload
+            self._cached_lists = None
+        elif list_created:
+            bump_user_list_version(self.db_session, self.o_id)
+            self.db_session.commit()
             self._cached_lists = None
 
     def remove_entry(self, list_name, entry_value):
@@ -206,6 +250,7 @@ class PersistentUserListManager(AbstractUserListManager):
 
         if entry:
             self.db_session.delete(entry)
+            bump_user_list_version(self.db_session, self.o_id)
             self.db_session.commit()
             # Invalidate cache to force reload
             self._cached_lists = None
@@ -223,6 +268,7 @@ class PersistentUserListManager(AbstractUserListManager):
 
         user_list = UserList(list_name=list_name, o_id=self.o_id)
         self.db_session.add(user_list)
+        bump_user_list_version(self.db_session, self.o_id)
         self.db_session.commit()
         # Invalidate cache to force reload
         self._cached_lists = None
@@ -239,6 +285,7 @@ class PersistentUserListManager(AbstractUserListManager):
 
         # Due to cascade delete, entries will be automatically deleted
         self.db_session.delete(user_list)
+        bump_user_list_version(self.db_session, self.o_id)
         self.db_session.commit()
         # Invalidate cache to force reload
         self._cached_lists = None
