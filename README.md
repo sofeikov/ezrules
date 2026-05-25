@@ -124,6 +124,7 @@ The result is stored for review in the UI, including the winning outcome and the
 - [Configuration](docs/getting-started/configuration.md)
 - [Admin guide](docs/user-guide/admin-guide.md)
 - [Rule authoring](docs/user-guide/creating-rules.md)
+- [Performance testing](docs/user-guide/performance-testing.md)
 - [API reference](docs/api-reference/manager-api.md)
 - [Deployment guide](docs/architecture/deployment.md)
 - [What's new](docs/whatsnew.md)

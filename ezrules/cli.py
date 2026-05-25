@@ -26,7 +26,7 @@ from ezrules.core.rule_updater import (
     RuleManagerFactory,
 )
 from ezrules.core.user_lists import PersistentUserListManager, ensure_user_list_version
-from ezrules.demo_data import build_demo_events, build_demo_rules, determine_demo_label, seed_demo_user_lists
+from ezrules.demo_data import build_demo_events, determine_demo_label, seed_demo_user_lists
 from ezrules.models.backend_core import (
     AllowedOutcome,
     EventVersion,
@@ -39,6 +39,7 @@ from ezrules.models.backend_core import (
 )
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.database import Base
+from ezrules.performance.rules import SUPPORTED_RULE_COMPLEXITIES, build_performance_rules
 from ezrules.settings import app_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -536,10 +537,23 @@ def api(port, reload):
 @click.option("--label-ratio", default=0.3, help="Ratio of events to label (0.0-1.0)")
 @click.option("--export-csv", help="Export labeled events to CSV file for testing uploads")
 @click.option(
+    "--rule-complexity",
+    default="demo_scalar_and_nested",
+    type=click.Choice(sorted(SUPPORTED_RULE_COMPLEXITIES)),
+    help="Rule complexity profile to generate for performance testing.",
+)
+@click.option(
     "--org-name",
     help="Target organisation name. If omitted and exactly one organisation exists, that organisation is used.",
 )
-def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export_csv: str, org_name: str | None):
+def generate_random_data(
+    n_rules: int,
+    n_events: int,
+    label_ratio: float,
+    export_csv: str,
+    rule_complexity: str = "demo_scalar_and_nested",
+    org_name: str | None = None,
+):
     if n_rules < 0 or n_events < 0:
         raise click.BadParameter("n-rules and n-events must be zero or greater")
     if not 0 <= label_ratio <= 1:
@@ -568,7 +582,11 @@ def generate_random_data(n_rules: int, n_events: int, label_ratio: float, export
             )
             .count()
         )
-        generated_rules = build_demo_rules(n_rules=n_rules, start_index=existing_rule_count)
+        generated_rules = build_performance_rules(
+            rule_count=n_rules,
+            rule_complexity=rule_complexity,
+            start_index=existing_rule_count,
+        )
         for rule in generated_rules:
             session.add(RuleModel(rid=rule.rid, logic=rule.logic, description=rule.description, o_id=org_id))
         if generated_rules:

@@ -1,0 +1,47 @@
+name: initial-breakpoint
+description: >
+  Initial deployable-infrastructure breakpoint matrix for /api/v2/evaluate.
+  Each organisation entry represents a separate customer tenant/API key. Keep
+  the load generator outside the API host when measuring real capacity.
+url: http://localhost:8888
+output_dir: artifacts/performance
+
+organisations:
+  - name: org-a
+    api_key_env: EZRULES_PERF_ORG_A_API_KEY
+    weight: 1
+  - name: org-b
+    api_key_env: EZRULES_PERF_ORG_B_API_KEY
+    weight: 1
+
+rule_counts: [0, 50, 250, 1000]
+execution_modes: [all_matches, first_match]
+match_profiles: [low_risk, cross_border, high_risk, payout]
+rule_complexities: [demo_scalar_and_nested]
+
+workload:
+  - name: smoke
+    target_rps: 5
+    duration_seconds: 30
+    warmup_seconds: 5
+    concurrency: 5
+  - name: ramp-25
+    target_rps: 25
+    duration_seconds: 60
+    warmup_seconds: 10
+    concurrency: 25
+  - name: ramp-100
+    target_rps: 100
+    duration_seconds: 90
+    warmup_seconds: 15
+    concurrency: 100
+  - name: ramp-250
+    target_rps: 250
+    duration_seconds: 120
+    warmup_seconds: 15
+    concurrency: 250
+
+thresholds:
+  max_failure_rate: 0.001
+  max_p95_ms: 500
+  max_p99_ms: 1000
