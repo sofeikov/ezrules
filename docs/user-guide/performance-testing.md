@@ -136,6 +136,44 @@ uv run python -m ezrules.performance.runner api-suite performance/scenarios/init
   --access-log
 ```
 
+### Quick Confirmation Runs
+
+Use the tracked `performance/scenarios/initial-breakpoint.yaml` file for repeatable checks. Files under `artifacts/performance/` are generated run outputs and should not be treated as canonical scenarios.
+
+To confirm the 50-rule, 250 RPS first-match slice that exercises the current high-throughput API path:
+
+```bash
+uv run python -m ezrules.performance.runner api-suite performance/scenarios/initial-breakpoint.yaml \
+  --workers 4 \
+  --api-port 18888 \
+  --postgres-port 55432 \
+  --redis-port 56379 \
+  --seed-events 100 \
+  --row-filter "rules-50__mode-first_match__profile-payout__complexity-demo_scalar_and_nested__load-ramp-250" \
+  --continue-after-breach
+```
+
+To rerun the lower 50-rule, 25 RPS all-matches sanity slice from the same tracked matrix:
+
+```bash
+uv run python -m ezrules.performance.runner api-suite performance/scenarios/initial-breakpoint.yaml \
+  --workers 4 \
+  --api-port 18888 \
+  --postgres-port 55432 \
+  --redis-port 56379 \
+  --seed-events 100 \
+  --row-filter "rules-50__mode-all_matches__profile-low_risk__complexity-demo_scalar_and_nested__load-ramp-25" \
+  --continue-after-breach
+```
+
+Use a unique `--run-id` when comparing repeated local runs so artifact names do not collide:
+
+```bash
+uv run python -m ezrules.performance.runner api-suite performance/scenarios/initial-breakpoint.yaml \
+  --run-id "$(date -u +%Y%m%d%H%M%S)-rps250-confirm" \
+  --row-filter "rules-50__mode-first_match__profile-payout__complexity-demo_scalar_and_nested__load-ramp-250"
+```
+
 The suite writes:
 
 - combined JSON results
