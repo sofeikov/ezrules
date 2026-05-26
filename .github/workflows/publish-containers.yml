@@ -45,7 +45,6 @@ jobs:
           tags: |
             type=sha,prefix=sha-
             type=raw,value=${{ steps.project_version.outputs.version }}
-            type=raw,value=v${{ steps.project_version.outputs.version }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Extract frontend image metadata
@@ -56,7 +55,6 @@ jobs:
           tags: |
             type=sha,prefix=sha-
             type=raw,value=${{ steps.project_version.outputs.version }}
-            type=raw,value=v${{ steps.project_version.outputs.version }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push API image
