@@ -19,10 +19,12 @@ from ezrules.backend.api_v2.schemas.features import (
     FeatureDependencyListResponse,
     FeatureDependencyResponse,
     FeatureFilter,
+    FeatureKind,
     FeatureMutationResponse,
     FeaturePreviewRequest,
     FeaturePreviewResponse,
     FeatureStatus,
+    GraphFeatureConfig,
 )
 from ezrules.backend.features import (
     MAX_ACTIVE_FEATURES_PER_ORG,
@@ -47,6 +49,7 @@ def _response(db: Any, o_id: int, feature: FeatureDefinition) -> FeatureDefiniti
         entity=str(feature.entity),
         feature_name=str(feature.feature_name),
         available_as=f"stat[{stat_path}]",
+        feature_kind=FeatureKind(str(feature.feature_kind)),
         entity_key=str(feature.entity_key),
         aggregation_type=str(feature.aggregation_type),
         source_field=cast(str | None, feature.source_field),
@@ -55,6 +58,9 @@ def _response(db: Any, o_id: int, feature: FeatureDefinition) -> FeatureDefiniti
         filters=[FeatureFilter.model_validate(item) for item in cast(list[dict[str, Any]], feature.filters or [])],
         inclusion_policy=str(feature.inclusion_policy),
         null_handling=str(feature.null_handling),
+        graph_config=GraphFeatureConfig.model_validate(cast(dict[str, Any], feature.graph_config))
+        if feature.graph_config is not None
+        else None,
         status=FeatureStatus(str(feature.status)),
         version=int(feature.version),
         dependency_count=len(get_feature_dependencies(db, o_id, stat_path)),
@@ -68,6 +74,7 @@ def _apply_payload(feature: FeatureDefinition, data: FeatureDefinitionCreate | F
     feature.description = data.description
     feature.entity = data.entity
     feature.feature_name = data.feature_name
+    feature.feature_kind = data.feature_kind.value
     feature.entity_key = data.entity_key
     feature.aggregation_type = data.aggregation_type.value
     feature.source_field = data.source_field
@@ -75,6 +82,7 @@ def _apply_payload(feature: FeatureDefinition, data: FeatureDefinitionCreate | F
     feature.filters = [filter_config.model_dump() for filter_config in data.filters]
     feature.inclusion_policy = data.inclusion_policy
     feature.null_handling = data.null_handling
+    feature.graph_config = data.graph_config.model_dump() if data.graph_config is not None else None
 
 
 def _mark_feature_changed(feature: FeatureDefinition, user_email: str) -> None:

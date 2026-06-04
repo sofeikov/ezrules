@@ -333,8 +333,10 @@ Field type config note:
 | `GET` | `/api/v2/features/{feature_id}/dependencies` | Bearer + `VIEW_FEATURES` | List rules that reference the feature |
 
 Feature definition notes:
-- `aggregation_type` supports `count`, `count_distinct`, `sum`, `avg`, `min`, `max`, `stddev`, and `days_since_first_seen`.
-- `window_seconds` must use a preset online window: `600`, `3600`, `86400`, `604800`, `2592000`, or `7776000`.
+- `feature_kind` defaults to `aggregate`. Aggregate features support `aggregation_type` values `count`, `count_distinct`, `sum`, `avg`, `min`, `max`, `stddev`, and `days_since_first_seen`.
+- Graph features use `feature_kind=graph`, `aggregation_type=graph_distinct_count`, and a `graph_config` containing `target_entity`, `allowed_entity_types`, `max_depth`, and `max_expanded_nodes`.
+- Graph traversal uses current-as-of transaction semantics: repeated transaction versions are stored append-only, but only the version current at the feature's as-of time contributes links.
+- `window_seconds` must use a preset online window: `600`, `3600`, `86400`, `604800`, `2592000`, `7776000`, or `15552000`.
 - Rule logic references active features with `stat[entity.feature_name]`; raw payload fields continue to use `$field`.
 
 ### Audit
