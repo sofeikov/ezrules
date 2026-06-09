@@ -183,6 +183,83 @@ The suite writes:
 
 These outputs are generated artifacts and should not be committed. Communicate headline numbers and caveats in the PR body instead.
 
+## Run Graph Traversal Load Tests
+
+The graph traversal matrix targets the Tested Events graph endpoint:
+
+```bash
+GET /api/v2/tested-events/{evaluation_decision_id}/graph
+```
+
+Use this when you need to understand the cost of bounded graph traversal separately from event ingestion.
+
+The tracked graph scenario lives at:
+
+```bash
+performance/scenarios/graph-traversal-breakpoint.yaml
+```
+
+It varies:
+
+- seeded graph topology size and density
+- `max_events`
+- `max_hops`
+- request rate and concurrency
+- local API worker count
+- optional Docker CPU and memory limits for Postgres and Redis
+
+Generate a plan without sending traffic:
+
+```bash
+uv run python -m ezrules.performance.runner graph-plan performance/scenarios/graph-traversal-breakpoint.yaml
+```
+
+Run the repeatable local graph suite:
+
+```bash
+uv run python -m ezrules.performance.runner graph-api-suite performance/scenarios/graph-traversal-breakpoint.yaml \
+  --workers 4 \
+  --api-port 18888 \
+  --postgres-port 55432 \
+  --redis-port 56379 \
+  --root-decisions 50 \
+  --continue-after-breach
+```
+
+The local graph suite creates disposable Docker Postgres and Redis containers, initializes a private database, creates an admin user, seeds connected event/version/decision/link rows for each graph shape, logs in once, starts the API with production-like settings, samples API/Postgres/Redis resources, and writes JSON/Markdown/CSV artifacts under `artifacts/performance/`.
+
+To compare available container compute, run the same row with different resource limits and stable run IDs:
+
+```bash
+uv run python -m ezrules.performance.runner graph-api-suite performance/scenarios/graph-traversal-breakpoint.yaml \
+  --run-id "$(date -u +%Y%m%d%H%M%S)-graph-2cpu-2g" \
+  --workers 4 \
+  --postgres-cpus 2 \
+  --postgres-memory 2g \
+  --row-filter "shape-connected-5k__events-5000__entities-6__shared-700__max-events-50__hops-3__load-ramp-75" \
+  --continue-after-breach
+
+uv run python -m ezrules.performance.runner graph-api-suite performance/scenarios/graph-traversal-breakpoint.yaml \
+  --run-id "$(date -u +%Y%m%d%H%M%S)-graph-4cpu-4g" \
+  --workers 8 \
+  --postgres-cpus 4 \
+  --postgres-memory 4g \
+  --row-filter "shape-connected-5k__events-5000__entities-6__shared-700__max-events-50__hops-3__load-ramp-75" \
+  --continue-after-breach
+```
+
+For an already-running non-production target, provide a manager bearer token and a comma-separated pool of `evaluation_decision_id` values to rotate through:
+
+```bash
+export EZRULES_GRAPH_PERF_BEARER_TOKEN=...
+export EZRULES_GRAPH_PERF_DECISION_IDS=101,102,103
+
+uv run python -m ezrules.performance.runner graph-run performance/scenarios/graph-traversal-breakpoint.yaml \
+  --row-filter "max-events-50__hops-3__load-ramp-75"
+```
+
+`graph-run` does not seed data. Use it only when the target already contains representative graph links and tested events.
+
 ## Breakpoint Criteria
 
 A row breaches when any configured threshold is exceeded:

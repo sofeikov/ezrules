@@ -32,6 +32,15 @@ class LocalApiSuiteConfig:
     seed_events: int
     postgres_image: str = "postgres:16.0-alpine3.18"
     redis_image: str = "redis:7-alpine"
+    postgres_cpus: str | None = None
+    postgres_memory: str | None = None
+    postgres_max_connections: int | None = None
+    postgres_data_dir: Path | None = None
+    redis_cpus: str | None = None
+    redis_memory: str | None = None
+    db_pool_size: int | None = None
+    db_max_overflow: int | None = None
+    db_pool_timeout_seconds: int | None = None
     continue_after_breach: bool = True
     no_access_log: bool = True
     cleanup: bool = True
@@ -191,6 +200,15 @@ def write_api_suite_files(
             "seed_events": config.seed_events,
             "postgres_image": config.postgres_image,
             "redis_image": config.redis_image,
+            "postgres_cpus": config.postgres_cpus,
+            "postgres_memory": config.postgres_memory,
+            "postgres_max_connections": config.postgres_max_connections,
+            "postgres_data_dir": str(config.postgres_data_dir) if config.postgres_data_dir else None,
+            "redis_cpus": config.redis_cpus,
+            "redis_memory": config.redis_memory,
+            "db_pool_size": config.db_pool_size,
+            "db_max_overflow": config.db_max_overflow,
+            "db_pool_timeout_seconds": config.db_pool_timeout_seconds,
             "no_access_log": config.no_access_log,
             "samples_path": str(samples_path),
             "api_log_path": str(api_log_path),
@@ -232,7 +250,16 @@ def render_api_suite_markdown(
         f"| API workers | `{config.workers}` |",
         f"| API access log | `{'disabled' if config.no_access_log else 'enabled'}` |",
         f"| Postgres | `{config.postgres_image}` on host port `{config.postgres_port}` |",
+        f"| Postgres CPU limit | `{config.postgres_cpus or 'unlimited'}` |",
+        f"| Postgres memory limit | `{config.postgres_memory or 'unlimited'}` |",
+        f"| Postgres max connections | `{config.postgres_max_connections or 'default'}` |",
+        f"| Postgres data dir | `{config.postgres_data_dir or 'docker volume'}` |",
         f"| Redis | `{config.redis_image}` on host port `{config.redis_port}` |",
+        f"| Redis CPU limit | `{config.redis_cpus or 'unlimited'}` |",
+        f"| Redis memory limit | `{config.redis_memory or 'unlimited'}` |",
+        f"| DB pool size | `{config.db_pool_size or 'default'}` |",
+        f"| DB max overflow | `{config.db_max_overflow if config.db_max_overflow is not None else 'default'}` |",
+        f"| DB pool timeout | `{config.db_pool_timeout_seconds or 'default'}` |",
         f"| Seed events per org/rule-count/complexity block | `{config.seed_events}` |",
         "",
         "## Results",
@@ -286,6 +313,18 @@ def _filtered_rows(scenario: Scenario, row_filter: str | None) -> list[MatrixRow
 
 def _start_infra(config: LocalApiSuiteConfig) -> None:
     _cleanup_infra(config)
+    postgres_args = [
+        "-c",
+        "shared_preload_libraries=pg_stat_statements",
+        "-c",
+        "track_io_timing=on",
+    ]
+    if config.postgres_max_connections is not None:
+        postgres_args.extend(["-c", f"max_connections={config.postgres_max_connections}"])
+    volume_args: list[str] = []
+    if config.postgres_data_dir is not None:
+        config.postgres_data_dir.mkdir(parents=True, exist_ok=True)
+        volume_args = ["-v", f"{config.postgres_data_dir.resolve()}:/var/lib/postgresql/data"]
     _run(
         [
             "docker",
@@ -295,13 +334,12 @@ def _start_infra(config: LocalApiSuiteConfig) -> None:
             config.postgres_container,
             "-e",
             "POSTGRES_PASSWORD=root",
+            *volume_args,
             "-p",
             f"{config.postgres_port}:5432",
+            *_docker_resource_args(config.postgres_cpus, config.postgres_memory),
             config.postgres_image,
-            "-c",
-            "shared_preload_libraries=pg_stat_statements",
-            "-c",
-            "track_io_timing=on",
+            *postgres_args,
         ]
     )
     _run(
@@ -313,6 +351,7 @@ def _start_infra(config: LocalApiSuiteConfig) -> None:
             config.redis_container,
             "-p",
             f"{config.redis_port}:6379",
+            *_docker_resource_args(config.redis_cpus, config.redis_memory),
             config.redis_image,
         ]
     )
@@ -439,6 +478,8 @@ def _start_api(config: LocalApiSuiteConfig, api_log_path: Path) -> subprocess.Po
     command = [
         "uv",
         "run",
+        "python",
+        "-m",
         "uvicorn",
         "ezrules.backend.api_v2.main:app",
         "--host",
@@ -508,6 +549,12 @@ def _suite_env(config: LocalApiSuiteConfig, *, testing: bool) -> dict[str, str]:
             "EZRULES_SHADOW_EVALUATION_QUEUE_REDIS_URL": config.redis_url,
         }
     )
+    if config.db_pool_size is not None:
+        env["EZRULES_DB_POOL_SIZE"] = str(config.db_pool_size)
+    if config.db_max_overflow is not None:
+        env["EZRULES_DB_MAX_OVERFLOW"] = str(config.db_max_overflow)
+    if config.db_pool_timeout_seconds is not None:
+        env["EZRULES_DB_POOL_TIMEOUT_SECONDS"] = str(config.db_pool_timeout_seconds)
     return env
 
 
@@ -724,6 +771,15 @@ def parse_api_suite_args(args: Any) -> LocalApiSuiteConfig:
         seed_events=int(args.seed_events),
         postgres_image=str(args.postgres_image),
         redis_image=str(args.redis_image),
+        postgres_cpus=args.postgres_cpus,
+        postgres_memory=args.postgres_memory,
+        postgres_max_connections=args.postgres_max_connections,
+        postgres_data_dir=Path(args.postgres_data_dir) if args.postgres_data_dir else None,
+        redis_cpus=args.redis_cpus,
+        redis_memory=args.redis_memory,
+        db_pool_size=args.db_pool_size,
+        db_max_overflow=args.db_max_overflow,
+        db_pool_timeout_seconds=args.db_pool_timeout_seconds,
         continue_after_breach=bool(args.continue_after_breach),
         no_access_log=not bool(args.access_log),
         cleanup=not bool(args.keep_containers),
@@ -742,3 +798,12 @@ def main_from_args(args: Any, scenario: Scenario) -> None:
 
 if __name__ == "__main__":
     raise SystemExit("Use `python -m ezrules.performance.runner api-suite <scenario>`.")
+
+
+def _docker_resource_args(cpus: str | None, memory: str | None) -> list[str]:
+    args: list[str] = []
+    if cpus:
+        args.extend(["--cpus", str(cpus)])
+    if memory:
+        args.extend(["--memory", str(memory)])
+    return args

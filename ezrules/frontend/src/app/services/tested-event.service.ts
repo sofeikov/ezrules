@@ -33,6 +33,45 @@ export interface TestedEventsResponse {
   limit: number;
 }
 
+export interface TestedEventGraphNode {
+  id: string;
+  kind: 'event' | 'entity';
+  label: string;
+  entity_type: string | null;
+  entity_value: string | null;
+  entity_value_hash: string | null;
+  transaction_id: string | null;
+  event_version: number | null;
+  effective_at: string | null;
+  root: boolean;
+  expandable: boolean;
+}
+
+export interface TestedEventGraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  label: string | null;
+  field_path: string | null;
+}
+
+export interface TestedEventGraphResponse {
+  nodes: TestedEventGraphNode[];
+  edges: TestedEventGraphEdge[];
+  root_event_node_id: string;
+  max_events: number;
+  max_hops: number;
+  event_count: number;
+  truncated: boolean;
+}
+
+export interface TestedEventGraphOptions {
+  maxEvents?: number;
+  maxHops?: number;
+  expandEntityType?: string;
+  expandEntityValueHash?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -46,5 +85,21 @@ export class TestedEventService {
       .set('limit', limit.toString())
       .set('include_referenced_fields', 'true');
     return this.http.get<TestedEventsResponse>(this.apiUrl, { params });
+  }
+
+  getTestedEventGraph(evaluationDecisionId: number, options: TestedEventGraphOptions = {}): Observable<TestedEventGraphResponse> {
+    let params = new HttpParams();
+    if (options.maxEvents !== undefined) {
+      params = params.set('max_events', String(options.maxEvents));
+    }
+    if (options.maxHops !== undefined) {
+      params = params.set('max_hops', String(options.maxHops));
+    }
+    if (options.expandEntityType && options.expandEntityValueHash) {
+      params = params
+        .set('expand_entity_type', options.expandEntityType)
+        .set('expand_entity_value_hash', options.expandEntityValueHash);
+    }
+    return this.http.get<TestedEventGraphResponse>(`${this.apiUrl}/${evaluationDecisionId}/graph`, { params });
   }
 }

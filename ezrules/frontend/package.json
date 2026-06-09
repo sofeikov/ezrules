@@ -35,6 +35,7 @@
     "@types/diff": "^7.0.2",
     "chart.js": "^4.5.1",
     "codemirror": "^6.0.2",
+    "cytoscape": "^3.34.0",
     "diff": "^8.0.3",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",

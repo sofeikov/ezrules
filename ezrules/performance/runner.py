@@ -98,6 +98,26 @@ def main() -> None:
     api_suite_parser.add_argument("--seed-events", type=int, default=100)
     api_suite_parser.add_argument("--postgres-image", default="postgres:16.0-alpine3.18")
     api_suite_parser.add_argument("--redis-image", default="redis:7-alpine")
+    api_suite_parser.add_argument("--postgres-cpus", help="Optional Docker --cpus limit for local Postgres.")
+    api_suite_parser.add_argument("--postgres-memory", help="Optional Docker --memory limit for local Postgres.")
+    api_suite_parser.add_argument(
+        "--postgres-max-connections", type=int, help="Optional Postgres max_connections override."
+    )
+    api_suite_parser.add_argument(
+        "--postgres-data-dir",
+        help="Optional host directory to bind mount as Postgres PGDATA for large local runs.",
+    )
+    api_suite_parser.add_argument("--redis-cpus", help="Optional Docker --cpus limit for local Redis.")
+    api_suite_parser.add_argument("--redis-memory", help="Optional Docker --memory limit for local Redis.")
+    api_suite_parser.add_argument("--db-pool-size", type=int, help="EZRULES_DB_POOL_SIZE for spawned API workers.")
+    api_suite_parser.add_argument(
+        "--db-max-overflow", type=int, help="EZRULES_DB_MAX_OVERFLOW for spawned API workers."
+    )
+    api_suite_parser.add_argument(
+        "--db-pool-timeout-seconds",
+        type=int,
+        help="EZRULES_DB_POOL_TIMEOUT_SECONDS for spawned API workers.",
+    )
     api_suite_parser.add_argument(
         "--continue-after-breach",
         action="store_true",
@@ -114,7 +134,114 @@ def main() -> None:
         help="Leave local Docker containers running after the suite exits.",
     )
 
+    graph_plan_parser = subparsers.add_parser(
+        "graph-plan",
+        help="Write graph traversal JSON and Markdown plan artifacts without sending traffic.",
+    )
+    graph_plan_parser.add_argument("scenario", help="Path to a graph performance scenario YAML file.")
+
+    graph_run_parser = subparsers.add_parser(
+        "graph-run",
+        help="Run graph traversal rows against a live API target.",
+    )
+    graph_run_parser.add_argument("scenario", help="Path to a graph performance scenario YAML file.")
+    graph_run_parser.add_argument("--row-filter", help="Only run rows whose row_id contains this string.")
+    graph_run_parser.add_argument(
+        "--bearer-token-env",
+        default="EZRULES_GRAPH_PERF_BEARER_TOKEN",
+        help="Environment variable containing a manager API bearer token.",
+    )
+    graph_run_parser.add_argument(
+        "--decision-ids-env",
+        default="EZRULES_GRAPH_PERF_DECISION_IDS",
+        help="Environment variable containing comma-separated evaluation_decision_id values.",
+    )
+    graph_run_parser.add_argument(
+        "--continue-after-breach",
+        action="store_true",
+        help="Keep running later rows after a row breaches the configured thresholds.",
+    )
+
+    graph_api_suite_parser = subparsers.add_parser(
+        "graph-api-suite",
+        help="Run a reproducible local graph traversal suite with disposable Docker Postgres/Redis.",
+    )
+    graph_api_suite_parser.add_argument("scenario", help="Path to a graph performance scenario YAML file.")
+    graph_api_suite_parser.add_argument("--row-filter", help="Only run rows whose row_id contains this string.")
+    graph_api_suite_parser.add_argument(
+        "--run-id", help="Stable id for containers and artifacts. Defaults to UTC timestamp."
+    )
+    graph_api_suite_parser.add_argument("--api-port", type=int, default=18888)
+    graph_api_suite_parser.add_argument("--postgres-port", type=int, default=55432)
+    graph_api_suite_parser.add_argument("--redis-port", type=int, default=56379)
+    graph_api_suite_parser.add_argument("--workers", type=int, default=4)
+    graph_api_suite_parser.add_argument(
+        "--root-decisions",
+        type=int,
+        default=50,
+        help="Number of seeded evaluation decisions to rotate through during graph requests.",
+    )
+    graph_api_suite_parser.add_argument("--org-name", default="graph-perf-org")
+    graph_api_suite_parser.add_argument("--admin-email", default="graph-perf@example.com")
+    graph_api_suite_parser.add_argument("--admin-password", default="admin")
+    graph_api_suite_parser.add_argument("--postgres-image", default="postgres:16.0-alpine3.18")
+    graph_api_suite_parser.add_argument("--redis-image", default="redis:7-alpine")
+    graph_api_suite_parser.add_argument("--postgres-cpus", help="Optional Docker --cpus limit for local Postgres.")
+    graph_api_suite_parser.add_argument("--postgres-memory", help="Optional Docker --memory limit for local Postgres.")
+    graph_api_suite_parser.add_argument(
+        "--postgres-max-connections", type=int, help="Optional Postgres max_connections override."
+    )
+    graph_api_suite_parser.add_argument(
+        "--postgres-data-dir",
+        help="Optional host directory to bind mount as Postgres PGDATA for large local runs.",
+    )
+    graph_api_suite_parser.add_argument("--redis-cpus", help="Optional Docker --cpus limit for local Redis.")
+    graph_api_suite_parser.add_argument("--redis-memory", help="Optional Docker --memory limit for local Redis.")
+    graph_api_suite_parser.add_argument(
+        "--db-pool-size", type=int, help="EZRULES_DB_POOL_SIZE for spawned API workers."
+    )
+    graph_api_suite_parser.add_argument(
+        "--db-max-overflow", type=int, help="EZRULES_DB_MAX_OVERFLOW for spawned API workers."
+    )
+    graph_api_suite_parser.add_argument(
+        "--db-pool-timeout-seconds",
+        type=int,
+        help="EZRULES_DB_POOL_TIMEOUT_SECONDS for spawned API workers.",
+    )
+    graph_api_suite_parser.add_argument(
+        "--continue-after-breach",
+        action="store_true",
+        help="Keep running later rows after a row breaches the configured thresholds.",
+    )
+    graph_api_suite_parser.add_argument(
+        "--access-log",
+        action="store_true",
+        help="Keep Uvicorn access logging enabled. Disabled by default because it distorts high-RPS runs.",
+    )
+    graph_api_suite_parser.add_argument(
+        "--keep-containers",
+        action="store_true",
+        help="Leave local Docker containers running after the suite exits.",
+    )
+
     args = parser.parse_args()
+    if args.command in {"graph-plan", "graph-run", "graph-api-suite"}:
+        from ezrules.performance.graph import (
+            load_graph_scenario,
+            main_graph_api_suite,
+            main_graph_plan,
+            main_graph_run,
+        )
+
+        graph_scenario = load_graph_scenario(args.scenario)
+        if args.command == "graph-plan":
+            main_graph_plan(args, graph_scenario)
+        elif args.command == "graph-run":
+            main_graph_run(args, graph_scenario)
+        else:
+            main_graph_api_suite(args, graph_scenario)
+        return
+
     scenario = load_scenario(args.scenario)
 
     if args.command == "plan":

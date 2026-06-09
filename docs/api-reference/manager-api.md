@@ -160,6 +160,7 @@ Rule lifecycle fields on rule responses:
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | `GET` | `/api/v2/tested-events` | Bearer + `VIEW_RULES` | Recent stored event evaluations with uploaded `label_name`, transaction lifecycle timestamps (`first_effective_at`, `first_observed_at`), raw payload, and triggered rules (`?limit=50`). Add `include_referenced_fields=true` to include each rule's referenced top-level fields. |
+| `GET` | `/api/v2/tested-events/{evaluation_decision_id}/graph` | Bearer + `VIEW_RULES` | Bounded event/entity graph for a stored served decision. Use `max_events` to cap returned event nodes and `max_hops` to configure event-to-event traversal depth (default 3). Pass `expand_entity_type` plus `expand_entity_value_hash` to expand traffic connected through a specific entity node. |
 
 ### Outcomes
 

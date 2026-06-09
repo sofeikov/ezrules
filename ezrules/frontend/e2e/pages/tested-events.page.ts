@@ -9,6 +9,8 @@ export class TestedEventsPage {
   readonly emptyState: Locator;
   readonly detailsButtons: Locator;
   readonly detailsPanels: Locator;
+  readonly graphButtons: Locator;
+  readonly graphPanels: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -19,6 +21,8 @@ export class TestedEventsPage {
     this.emptyState = page.locator('[data-testid="tested-events-empty"]');
     this.detailsButtons = page.locator('[data-testid="tested-event-details-button"]');
     this.detailsPanels = page.locator('[data-testid="tested-event-details"]');
+    this.graphButtons = page.locator('[data-testid="tested-event-graph-button"]');
+    this.graphPanels = page.locator('[data-testid="tested-event-graph-panel"]');
   }
 
   async goto() {
@@ -39,5 +43,9 @@ export class TestedEventsPage {
 
   async expandFirstEvent() {
     await this.detailsButtons.first().click();
+  }
+
+  async showFirstEventGraph() {
+    await this.graphButtons.first().click();
   }
 }

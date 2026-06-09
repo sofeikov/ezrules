@@ -45,3 +45,41 @@ class TestedEventsResponse(BaseModel):
     events: list[TestedEventItem]
     total: int
     limit: int
+
+
+class TestedEventGraphNode(BaseModel):
+    """Node in an event relationship graph."""
+
+    id: str
+    kind: str = Field(..., description="Node kind: event or entity")
+    label: str
+    entity_type: str | None = None
+    entity_value: str | None = None
+    entity_value_hash: str | None = None
+    transaction_id: str | None = None
+    event_version: int | None = None
+    effective_at: str | None = None
+    root: bool = False
+    expandable: bool = False
+
+
+class TestedEventGraphEdge(BaseModel):
+    """Relationship between an event node and an entity node."""
+
+    id: str
+    source: str
+    target: str
+    label: str | None = None
+    field_path: str | None = None
+
+
+class TestedEventGraphResponse(BaseModel):
+    """Bounded graph around a tested event or expanded entity."""
+
+    nodes: list[TestedEventGraphNode]
+    edges: list[TestedEventGraphEdge]
+    root_event_node_id: str
+    max_events: int
+    max_hops: int
+    event_count: int
+    truncated: bool = False

@@ -66,9 +66,17 @@ Each rule has its own detail view with source logic, test payloads, historical r
 
 ### Review Tested Events
 
-The Tested Events view connects decisions back to the raw payload, triggered rules, labels, and resolved outcomes. Referenced fields are highlighted so an admin can see why a rule fired.
+The Tested Events view connects decisions back to the raw payload, triggered rules, labels, resolved outcomes, and nearby entity relationships. Referenced fields are highlighted so an admin can see why a rule fired, while the event graph shows related traffic through shared users, cards, devices, merchants, and other configured entities.
 
 ![Tested event payload with referenced fields highlighted](docs/assets/readme/tested-event-inspector.png)
+
+![Tested Events page showing an expanded event graph](docs/assets/readme/tested-event-graph-fullpage.png)
+
+### Expand Event Relationships
+
+Click an entity node in the graph to expand nearby transactions that share that customer, account, card, device, merchant, or another configured entity.
+
+![Graph entity expansion from one event to connected transactions](docs/assets/readme/tested-event-graph-expand.gif)
 
 ### Measure Rule Quality
 
@@ -114,6 +122,7 @@ The result is stored for review in the UI, including the winning outcome and the
 - **Shadow deployment:** observe what a rule would do on live traffic without changing production outcomes.
 - **Rule rollouts:** send a stable percentage of traffic through a candidate rule before full promotion.
 - **Backtesting:** compare proposed logic against historical events before release.
+- **Graph investigation:** inspect connected events through configured entity links and use graph-derived stats inside rule logic.
 - **Labeling and quality reports:** upload or assign labels, then measure how rules perform against known outcomes.
 - **Audit and access control:** keep change history and separate admin, editor, and read-only responsibilities.
 

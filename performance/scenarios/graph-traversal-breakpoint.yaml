@@ -1,0 +1,56 @@
+name: graph-traversal-breakpoint
+description: >
+  Local graph traversal breakpoint matrix for
+  GET /api/v2/tested-events/{evaluation_decision_id}/graph. The local suite
+  seeds connected event/entity rows directly, then measures bounded traversal
+  with different graph densities, hop limits, max event caps, API worker counts,
+  and optional Docker resource limits.
+url: http://localhost:8888
+output_dir: artifacts/performance
+
+graph_shapes:
+  - name: sparse-1k
+    event_count: 1000
+    entities_per_event: 4
+    shared_entity_count: 350
+    entity_type_count: 4
+  - name: connected-5k
+    event_count: 5000
+    entities_per_event: 6
+    shared_entity_count: 700
+    entity_type_count: 5
+  - name: dense-10k
+    event_count: 10000
+    entities_per_event: 8
+    shared_entity_count: 900
+    entity_type_count: 6
+
+max_events: [10, 25, 50, 100]
+max_hops: [1, 2, 3]
+
+workload:
+  - name: smoke
+    target_rps: 5
+    duration_seconds: 20
+    warmup_seconds: 5
+    concurrency: 5
+  - name: ramp-25
+    target_rps: 25
+    duration_seconds: 45
+    warmup_seconds: 10
+    concurrency: 25
+  - name: ramp-75
+    target_rps: 75
+    duration_seconds: 60
+    warmup_seconds: 10
+    concurrency: 75
+  - name: ramp-150
+    target_rps: 150
+    duration_seconds: 75
+    warmup_seconds: 15
+    concurrency: 150
+
+thresholds:
+  max_failure_rate: 0.001
+  max_p95_ms: 500
+  max_p99_ms: 1000

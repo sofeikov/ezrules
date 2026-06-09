@@ -174,10 +174,18 @@
                       <button
                         type="button"
                         (click)="toggleDetails(event.evaluation_decision_id)"
-                        class="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                        class="mb-2 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                         data-testid="tested-event-details-button"
                       >
                         {{ isExpanded(event.evaluation_decision_id) ? 'Hide details' : 'View details' }}
+                      </button>
+                      <button
+                        type="button"
+                        (click)="toggleGraph(event.evaluation_decision_id)"
+                        class="block ml-auto px-3 py-1.5 text-sm border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors"
+                        data-testid="tested-event-graph-button"
+                      >
+                        {{ isGraphVisible(event.evaluation_decision_id) ? 'Hide graph' : 'Show graph' }}
                       </button>
                     </td>
                   </tr>
@@ -286,6 +294,10 @@
                           </ng-container>
                         </div>
                       </div>
+                      <app-tested-event-graph
+                        *ngIf="isGraphVisible(event.evaluation_decision_id)"
+                        [evaluationDecisionId]="event.evaluation_decision_id"
+                      ></app-tested-event-graph>
                     </td>
                   </tr>
                 </ng-container>
