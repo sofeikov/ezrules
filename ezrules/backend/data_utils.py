@@ -6,6 +6,7 @@ from typing import Any, Literal, cast
 from pydantic import BaseModel, field_validator
 from sqlalchemy import text
 
+from ezrules.backend.features import persist_graph_links_for_event
 from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.models.backend_core import (
     EvaluationDecision,
@@ -243,6 +244,7 @@ def store_eval_result(
     )
     db_session.add(event_version_record)
     db_session.flush()
+    persist_graph_links_for_event(db_session, o_id, event_version_record)
 
     resolved_outcome = outcome_manager.resolve_outcome(response["outcome_counters"])
     decision = EvaluationDecision(

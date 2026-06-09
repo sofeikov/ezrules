@@ -1,21 +1,26 @@
 from __future__ import annotations
 
+import hashlib
 import math
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
-from sqlalchemy import false, func, or_, text
+from sqlalchemy import false, func, or_, text, tuple_
 
 from ezrules.backend.api_v2.schemas.features import ALLOWED_WINDOW_SECONDS, FeatureAggregation
 from ezrules.core.field_paths import get_field_value, split_field_path
 from ezrules.core.rule_helpers import StatReferenceExtractor
-from ezrules.models.backend_core import EventVersion, FeatureDefinition
+from ezrules.models.backend_core import EventVersion, FeatureDefinition, GraphEntityField, GraphEventEntityLink
 from ezrules.models.backend_core import Rule as RuleModel
 
 MAX_STAT_REFERENCES_PER_RULE = 10
 MAX_ACTIVE_FEATURES_PER_ORG = 100
 FEATURE_STATEMENT_TIMEOUT_MS = 750
+DEFAULT_GRAPH_MAX_DEPTH = 4
+DEFAULT_GRAPH_MAX_EXPANDED_NODES = 10_000
+HARD_GRAPH_MAX_DEPTH = 6
+HARD_GRAPH_MAX_EXPANDED_NODES = 50_000
 
 
 class FeatureResolutionError(Exception):
@@ -87,6 +92,60 @@ def _jsonb_text_value(value: Any) -> str | None:
     if isinstance(value, bool):
         return "true" if value else "false"
     return str(value)
+
+
+def _graph_entity_value_hash(entity_value: str) -> str:
+    return hashlib.sha256(entity_value.encode("utf-8")).hexdigest()
+
+
+def _graph_entity_values(event_data: dict[str, Any], field_path: str) -> list[str]:
+    value = _safe_get(event_data, field_path)
+    if value is None:
+        return []
+    raw_values = value if isinstance(value, list) else [value]
+    normalized: list[str] = []
+    for raw_value in raw_values:
+        if isinstance(raw_value, dict | list):
+            continue
+        text_value = _jsonb_text_value(raw_value)
+        if text_value is not None and text_value:
+            normalized.append(text_value)
+    return list(dict.fromkeys(normalized))
+
+
+def persist_graph_links_for_event(db: Any, o_id: int, event_version: EventVersion) -> int:
+    fields = (
+        db.query(GraphEntityField)
+        .filter(GraphEntityField.o_id == o_id, GraphEntityField.status == "active")
+        .order_by(GraphEntityField.field_path.asc())
+        .all()
+    )
+    if not fields:
+        return 0
+
+    db.query(GraphEventEntityLink).filter(
+        GraphEventEntityLink.o_id == o_id,
+        GraphEventEntityLink.ev_id == int(event_version.ev_id),
+    ).delete(synchronize_session=False)
+
+    inserted = 0
+    event_data = cast(dict[str, Any], event_version.event_data)
+    for field in fields:
+        for entity_value in _graph_entity_values(event_data, str(field.field_path)):
+            db.add(
+                GraphEventEntityLink(
+                    o_id=o_id,
+                    ev_id=int(event_version.ev_id),
+                    transaction_id=str(event_version.transaction_id),
+                    effective_at=cast(datetime, event_version.effective_at),
+                    field_path=str(field.field_path),
+                    entity_type=str(field.entity_type),
+                    entity_value=entity_value[:1024],
+                    entity_value_hash=_graph_entity_value_hash(entity_value),
+                )
+            )
+            inserted += 1
+    return inserted
 
 
 def _event_data_text_expression(path: str) -> Any:
@@ -177,7 +236,7 @@ def _compute_aggregate(
     raise FeatureResolutionError(f"Unsupported feature aggregation '{aggregation}'")
 
 
-def compute_feature(
+def _compute_aggregate_feature(
     db: Any,
     o_id: int,
     feature: FeatureDefinition,
@@ -218,6 +277,186 @@ def compute_feature(
         as_of=as_of,
         window_start=window_start,
     )
+
+
+def _graph_config_value(feature: FeatureDefinition, key: str, default: Any = None) -> Any:
+    config = feature.graph_config if isinstance(feature.graph_config, dict) else {}
+    return config.get(key, default)
+
+
+def _bounded_int(value: Any, *, default: int, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(parsed, maximum))
+
+
+def _current_event_version_ids_as_of(db: Any, o_id: int, transaction_ids: set[str], as_of: datetime) -> set[int]:
+    if not transaction_ids:
+        return set()
+
+    ranked_versions = (
+        db.query(
+            EventVersion.ev_id.label("ev_id"),
+            func.row_number()
+            .over(
+                partition_by=EventVersion.transaction_id,
+                order_by=(
+                    EventVersion.terminal_state.desc(),
+                    EventVersion.effective_at.desc(),
+                    EventVersion.observed_at.desc(),
+                    EventVersion.ev_id.desc(),
+                ),
+            )
+            .label("row_number"),
+        )
+        .filter(
+            EventVersion.o_id == o_id,
+            EventVersion.transaction_id.in_(sorted(transaction_ids)),
+            EventVersion.observed_at <= as_of,
+        )
+        .subquery()
+    )
+    rows = db.query(ranked_versions.c.ev_id).filter(ranked_versions.c.row_number == 1).all()
+    return {int(row.ev_id) for row in rows}
+
+
+def _compute_graph_distinct_count(
+    db: Any,
+    o_id: int,
+    feature: FeatureDefinition,
+    event_data: dict[str, Any],
+    as_of: datetime,
+) -> FeatureComputationResult:
+    as_of = normalize_as_utc(as_of)
+    entity_value = _safe_get(event_data, str(feature.entity_key))
+    if entity_value is None:
+        return FeatureComputationResult(value=None, matched_event_count=0, as_of=as_of, window_start=as_of)
+
+    if int(feature.window_seconds) not in ALLOWED_WINDOW_SECONDS:
+        raise FeatureResolutionError("Feature window is not an allowed online preset")
+
+    target_entity = str(_graph_config_value(feature, "target_entity", "")).strip()
+    allowed_entity_types = [
+        str(item).strip()
+        for item in cast(list[Any], _graph_config_value(feature, "allowed_entity_types", []))
+        if str(item).strip()
+    ]
+    if not target_entity or not allowed_entity_types:
+        raise FeatureResolutionError("Graph feature requires target_entity and allowed_entity_types")
+    if str(feature.entity) not in allowed_entity_types or target_entity not in allowed_entity_types:
+        raise FeatureResolutionError("Graph feature start and target entities must be traversable")
+
+    max_depth = _bounded_int(
+        _graph_config_value(feature, "max_depth"),
+        default=DEFAULT_GRAPH_MAX_DEPTH,
+        minimum=1,
+        maximum=HARD_GRAPH_MAX_DEPTH,
+    )
+    max_expanded_nodes = _bounded_int(
+        _graph_config_value(feature, "max_expanded_nodes"),
+        default=DEFAULT_GRAPH_MAX_EXPANDED_NODES,
+        minimum=1,
+        maximum=HARD_GRAPH_MAX_EXPANDED_NODES,
+    )
+
+    window_start = as_of - timedelta(seconds=int(feature.window_seconds))
+    try:
+        db.execute(
+            text("SELECT set_config('statement_timeout', :timeout_ms, true)"),
+            {"timeout_ms": str(FEATURE_STATEMENT_TIMEOUT_MS)},
+        )
+    except Exception as exc:
+        raise FeatureResolutionError("Unable to apply feature query timeout") from exc
+
+    seed_text_value = _jsonb_text_value(entity_value)
+    if not seed_text_value:
+        return FeatureComputationResult(value=0, matched_event_count=0, as_of=as_of, window_start=window_start)
+
+    seed = (str(feature.entity), _graph_entity_value_hash(seed_text_value))
+    frontier = {seed}
+    visited_entities = {seed}
+    visited_event_ids: set[int] = set()
+    target_entities: set[tuple[str, str]] = set()
+    expanded_nodes = 1
+
+    for _ in range(max_depth):
+        if not frontier:
+            break
+
+        candidate_event_rows = (
+            db.query(GraphEventEntityLink.ev_id, GraphEventEntityLink.transaction_id)
+            .join(EventVersion, EventVersion.ev_id == GraphEventEntityLink.ev_id)
+            .filter(
+                GraphEventEntityLink.o_id == o_id,
+                GraphEventEntityLink.effective_at >= window_start,
+                GraphEventEntityLink.effective_at < as_of,
+                EventVersion.observed_at <= as_of,
+                tuple_(GraphEventEntityLink.entity_type, GraphEventEntityLink.entity_value_hash).in_(list(frontier)),
+            )
+            .distinct()
+            .limit(max_expanded_nodes + 1)
+            .all()
+        )
+        candidate_event_ids = {int(row.ev_id) for row in candidate_event_rows}
+        candidate_transaction_ids = {str(row.transaction_id) for row in candidate_event_rows}
+        current_event_ids = _current_event_version_ids_as_of(db, o_id, candidate_transaction_ids, as_of)
+        event_ids = (candidate_event_ids & current_event_ids) - visited_event_ids
+        if not event_ids:
+            break
+        expanded_nodes += len(event_ids)
+        if expanded_nodes > max_expanded_nodes:
+            raise FeatureResolutionError("Graph feature expansion cap exceeded")
+        visited_event_ids.update(event_ids)
+
+        link_rows = (
+            db.query(GraphEventEntityLink.entity_type, GraphEventEntityLink.entity_value_hash)
+            .filter(
+                GraphEventEntityLink.o_id == o_id,
+                GraphEventEntityLink.ev_id.in_(event_ids),
+                GraphEventEntityLink.entity_type.in_(allowed_entity_types),
+            )
+            .limit(max_expanded_nodes + 1)
+            .all()
+        )
+        if len(link_rows) > max_expanded_nodes:
+            raise FeatureResolutionError("Graph feature expansion cap exceeded")
+
+        next_frontier: set[tuple[str, str]] = set()
+        for row in link_rows:
+            entity = (str(row.entity_type), str(row.entity_value_hash))
+            if entity[0] == target_entity:
+                target_entities.add(entity)
+            if entity not in visited_entities:
+                visited_entities.add(entity)
+                next_frontier.add(entity)
+
+        expanded_nodes += len(next_frontier)
+        if expanded_nodes > max_expanded_nodes:
+            raise FeatureResolutionError("Graph feature expansion cap exceeded")
+        frontier = next_frontier
+
+    return FeatureComputationResult(
+        value=len(target_entities),
+        matched_event_count=len(visited_event_ids),
+        as_of=as_of,
+        window_start=window_start,
+    )
+
+
+def compute_feature(
+    db: Any,
+    o_id: int,
+    feature: FeatureDefinition,
+    event_data: dict[str, Any],
+    as_of: datetime,
+) -> FeatureComputationResult:
+    if str(feature.feature_kind) == "graph":
+        if str(feature.aggregation_type) != FeatureAggregation.GRAPH_DISTINCT_COUNT.value:
+            raise FeatureResolutionError(f"Unsupported graph feature aggregation '{feature.aggregation_type}'")
+        return _compute_graph_distinct_count(db, o_id, feature, event_data, as_of)
+    return _compute_aggregate_feature(db, o_id, feature, event_data, as_of)
 
 
 class FeatureResolver:

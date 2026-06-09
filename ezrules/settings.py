@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="EZRULES_", extra="ignore")
 
     DB_ENDPOINT: str
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_TIMEOUT_SECONDS: int = 30
     APP_SECRET: str
     EVALUATOR_ENDPOINT: str | None = "localhost:9999"
     CELERY_BROKER_URL: str = "redis://localhost:6379"

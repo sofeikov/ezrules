@@ -14,3 +14,4 @@ Short practical writeups on using ezrules in real workflows.
 - [Rule Quality in ezrules: Precision and Recall by Outcome-Label Pair](rule-quality-precision-recall.md)
 - [Ordered Rule Execution in ezrules: When First Match Beats Conflict Resolution](rule-ordering-first-match.md)
 - [AI-Assisted Rule Authoring in ezrules: Generate Transaction Monitoring Rules from Natural Language](ai-rule-authoring.md)
+- [Graph-Based Event Investigation in ezrules](graph-event-investigation.md)

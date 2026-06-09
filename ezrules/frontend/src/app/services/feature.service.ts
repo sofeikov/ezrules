@@ -5,12 +5,20 @@ import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 export type FeatureStatus = 'draft' | 'active' | 'deprecated';
-export type FeatureAggregation = 'count' | 'count_distinct' | 'sum' | 'avg' | 'min' | 'max' | 'stddev' | 'days_since_first_seen';
+export type FeatureKind = 'aggregate' | 'graph';
+export type FeatureAggregation = 'count' | 'count_distinct' | 'sum' | 'avg' | 'min' | 'max' | 'stddev' | 'days_since_first_seen' | 'graph_distinct_count';
 
 export interface FeatureFilter {
   field: string;
   operator: 'eq' | 'in';
   value: unknown;
+}
+
+export interface GraphFeatureConfig {
+  target_entity: string;
+  allowed_entity_types: string[];
+  max_depth: number;
+  max_expanded_nodes: number;
 }
 
 export interface FeatureDefinition {
@@ -20,6 +28,7 @@ export interface FeatureDefinition {
   entity: string;
   feature_name: string;
   available_as: string;
+  feature_kind: FeatureKind;
   entity_key: string;
   aggregation_type: FeatureAggregation;
   source_field: string | null;
@@ -28,6 +37,7 @@ export interface FeatureDefinition {
   filters: FeatureFilter[];
   inclusion_policy: string;
   null_handling: string;
+  graph_config: GraphFeatureConfig | null;
   status: FeatureStatus;
   version: number;
   dependency_count: number;
@@ -41,12 +51,14 @@ export interface FeatureDefinitionPayload {
   entity: string;
   feature_name: string;
   entity_key: string;
+  feature_kind?: FeatureKind;
   aggregation_type: FeatureAggregation;
   source_field?: string | null;
   window_seconds: number;
   filters?: FeatureFilter[];
   inclusion_policy?: string;
   null_handling?: string;
+  graph_config?: GraphFeatureConfig | null;
 }
 
 interface FeatureListResponse {

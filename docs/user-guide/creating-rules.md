@@ -135,7 +135,7 @@ if stat[sender.sent_amount_sum_24h] > 10000:
     return !HOLD
 ```
 
-Computed features are defined in **Features** and are resolved as of the event timestamp. V1 features use bounded preset windows such as `10m`, `1h`, `24h`, `7d`, `30d`, and `90d`; arbitrary lifetime windows are intentionally not allowed for online rule evaluation.
+Computed features are defined in **Features** and are resolved as of the event timestamp. Features use bounded preset windows such as `10m`, `1h`, `24h`, `7d`, `30d`, `90d`, and `180d`; arbitrary lifetime windows are intentionally not allowed for online rule evaluation. Graph features can also expose bounded relationship counts, for example unique cards reachable from a user through configured transaction entity fields.
 
 ### Allowlist pattern
 

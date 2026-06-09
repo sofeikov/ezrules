@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { SidebarComponent } from '../components/sidebar.component';
 import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { AuthService } from '../services/auth.service';
-import { FeatureAggregation, FeatureDefinition, FeatureDefinitionPayload, FeatureService } from '../services/feature.service';
+import { FeatureAggregation, FeatureDefinition, FeatureDefinitionPayload, FeatureKind, FeatureService, GraphFeatureConfig } from '../services/feature.service';
 
 interface WindowOption {
   label: string;
@@ -44,10 +44,17 @@ interface WindowOption {
                   <input [(ngModel)]="form.name" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </label>
                 <label>
+                  <span class="mb-1 block text-xs font-medium text-gray-600">Kind</span>
+                  <select [ngModel]="form.feature_kind || 'aggregate'" (ngModelChange)="onFeatureKindChange($event)" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="aggregate">aggregate</option>
+                    <option value="graph">graph</option>
+                  </select>
+                </label>
+                <label>
                   <span class="mb-1 block text-xs font-medium text-gray-600">Entity</span>
                   <input [(ngModel)]="form.entity" placeholder="sender" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </label>
-                <label class="md:col-span-2">
+                <label>
                   <span class="mb-1 block text-xs font-medium text-gray-600">Feature name</span>
                   <input [(ngModel)]="form.feature_name" placeholder="sent_amount_sum_24h" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </label>
@@ -63,11 +70,11 @@ interface WindowOption {
                 </label>
                 <label>
                   <span class="mb-1 block text-xs font-medium text-gray-600">Aggregation</span>
-                  <select [(ngModel)]="form.aggregation_type" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option *ngFor="let aggregation of aggregationOptions" [ngValue]="aggregation">{{ aggregation }}</option>
+                  <select [(ngModel)]="form.aggregation_type" [disabled]="isGraphFeature()" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
+                    <option *ngFor="let aggregation of visibleAggregationOptions()" [ngValue]="aggregation">{{ aggregation }}</option>
                   </select>
                 </label>
-                <label class="md:col-span-2">
+                <label class="md:col-span-2" *ngIf="!isGraphFeature()">
                   <span class="mb-1 block text-xs font-medium text-gray-600">Source field</span>
                   <input [(ngModel)]="form.source_field" [disabled]="!needsSourceField()" placeholder="amount" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" />
                 </label>
@@ -77,6 +84,24 @@ interface WindowOption {
                     <option value="exclude">exclude</option>
                     <option value="zero">zero</option>
                   </select>
+                </label>
+              </div>
+              <div *ngIf="isGraphFeature()" class="mt-4 grid grid-cols-1 gap-3 border-t border-gray-200 pt-4 md:grid-cols-6">
+                <label class="md:col-span-2">
+                  <span class="mb-1 block text-xs font-medium text-gray-600">Target entity</span>
+                  <input [(ngModel)]="graphConfig.target_entity" placeholder="card" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </label>
+                <label class="md:col-span-2">
+                  <span class="mb-1 block text-xs font-medium text-gray-600">Allowed entity types</span>
+                  <input [(ngModel)]="allowedEntityTypesText" placeholder="user, account, card, device" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </label>
+                <label>
+                  <span class="mb-1 block text-xs font-medium text-gray-600">Max depth</span>
+                  <input type="number" min="1" max="6" [(ngModel)]="graphConfig.max_depth" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </label>
+                <label>
+                  <span class="mb-1 block text-xs font-medium text-gray-600">Expansion cap</span>
+                  <input type="number" min="1" max="50000" step="1000" [(ngModel)]="graphConfig.max_expanded_nodes" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </label>
               </div>
               <p class="mt-3 text-sm text-gray-600">Path: <code>{{ previewPath() }}</code></p>
@@ -134,7 +159,8 @@ export class FeaturesComponent implements OnInit {
   saveError = '';
   permissions: string[] = [];
   editing: FeatureDefinition | null = null;
-  readonly aggregationOptions: FeatureAggregation[] = ['count', 'count_distinct', 'sum', 'avg', 'min', 'max', 'stddev', 'days_since_first_seen'];
+  readonly aggregateAggregationOptions: FeatureAggregation[] = ['count', 'count_distinct', 'sum', 'avg', 'min', 'max', 'stddev', 'days_since_first_seen'];
+  readonly graphAggregationOptions: FeatureAggregation[] = ['graph_distinct_count'];
   readonly windowOptions: WindowOption[] = [
     { label: '10m', seconds: 600 },
     { label: '1h', seconds: 3600 },
@@ -142,13 +168,20 @@ export class FeaturesComponent implements OnInit {
     { label: '7d', seconds: 604800 },
     { label: '30d', seconds: 2592000 },
     { label: '90d', seconds: 7776000 },
+    { label: '180d', seconds: 15552000 },
   ];
   form: FeatureDefinitionPayload = this.emptyForm();
+  allowedEntityTypesText = 'user, account, card, device';
 
   constructor(private featureService: FeatureService, private authService: AuthService) { }
 
   get canModify(): boolean {
     return hasPermissionRequirement(this.permissions, ACTION_PERMISSION_REQUIREMENTS.modifyFeatures);
+  }
+
+  get graphConfig(): GraphFeatureConfig {
+    this.form.graph_config = this.form.graph_config ?? this.defaultGraphConfig();
+    return this.form.graph_config;
   }
 
   ngOnInit(): void {
@@ -183,17 +216,41 @@ export class FeaturesComponent implements OnInit {
       entity: 'sender',
       feature_name: '',
       entity_key: 'sender_id',
+      feature_kind: 'aggregate',
       aggregation_type: 'sum',
       source_field: 'amount',
       window_seconds: 86400,
       filters: [],
       inclusion_policy: 'previous_events',
       null_handling: 'exclude',
+      graph_config: null,
     };
   }
 
+  visibleAggregationOptions(): FeatureAggregation[] {
+    return this.isGraphFeature() ? this.graphAggregationOptions : this.aggregateAggregationOptions;
+  }
+
+  isGraphFeature(): boolean {
+    return this.form.feature_kind === 'graph';
+  }
+
+  onFeatureKindChange(kind: FeatureKind): void {
+    this.form.feature_kind = kind;
+    if (kind === 'graph') {
+      this.form.aggregation_type = 'graph_distinct_count';
+      this.form.source_field = null;
+      this.form.graph_config = this.form.graph_config ?? this.defaultGraphConfig();
+      this.allowedEntityTypesText = this.form.graph_config.allowed_entity_types.join(', ');
+      return;
+    }
+    this.form.aggregation_type = this.form.aggregation_type === 'graph_distinct_count' ? 'sum' : this.form.aggregation_type;
+    this.form.source_field = this.form.source_field ?? 'amount';
+    this.form.graph_config = null;
+  }
+
   needsSourceField(): boolean {
-    return !['count', 'days_since_first_seen'].includes(this.form.aggregation_type);
+    return !this.isGraphFeature() && !['count', 'days_since_first_seen'].includes(this.form.aggregation_type);
   }
 
   previewPath(): string {
@@ -202,7 +259,20 @@ export class FeaturesComponent implements OnInit {
 
   save(): void {
     this.saveError = '';
-    const payload = { ...this.form, source_field: this.needsSourceField() ? this.form.source_field : null };
+    const payload: FeatureDefinitionPayload = this.isGraphFeature()
+      ? {
+        ...this.form,
+        feature_kind: 'graph',
+        aggregation_type: 'graph_distinct_count',
+        source_field: null,
+        graph_config: this.graphConfigFromForm(),
+      }
+      : {
+        ...this.form,
+        feature_kind: 'aggregate',
+        source_field: this.needsSourceField() ? this.form.source_field : null,
+        graph_config: null,
+      };
     const request = this.editing
       ? this.featureService.updateFeature(this.editing.fd_id, payload)
       : this.featureService.createFeature(payload);
@@ -274,13 +344,16 @@ export class FeaturesComponent implements OnInit {
       entity: feature.entity,
       feature_name: feature.feature_name,
       entity_key: feature.entity_key,
+      feature_kind: feature.feature_kind,
       aggregation_type: feature.aggregation_type,
       source_field: feature.source_field,
       window_seconds: feature.window_seconds,
       filters: feature.filters,
       inclusion_policy: feature.inclusion_policy,
       null_handling: feature.null_handling,
+      graph_config: feature.graph_config ? { ...feature.graph_config, allowed_entity_types: [...feature.graph_config.allowed_entity_types] } : null,
     };
+    this.allowedEntityTypesText = this.form.graph_config?.allowed_entity_types.join(', ') || 'user, account, card, device';
   }
 
   cancelEdit(): void {
@@ -297,6 +370,11 @@ export class FeaturesComponent implements OnInit {
   }
 
   formatAggregation(feature: FeatureDefinition): string {
+    if (feature.feature_kind === 'graph') {
+      const target = feature.graph_config?.target_entity ? `(${feature.graph_config.target_entity})` : '';
+      const maxDepth = feature.graph_config?.max_depth ? ` / depth ${feature.graph_config.max_depth}` : '';
+      return `${feature.aggregation_type}${target} / ${feature.window_label}${maxDepth}`;
+    }
     const source = feature.source_field ? `(${feature.source_field})` : '';
     return `${feature.aggregation_type}${source} / ${feature.window_label}`;
   }
@@ -309,5 +387,48 @@ export class FeaturesComponent implements OnInit {
       return 'bg-amber-100 text-amber-700';
     }
     return 'bg-gray-100 text-gray-700';
+  }
+
+  private defaultGraphConfig(): GraphFeatureConfig {
+    return {
+      target_entity: 'card',
+      allowed_entity_types: ['user', 'account', 'card', 'device'],
+      max_depth: 4,
+      max_expanded_nodes: 10000,
+    };
+  }
+
+  private graphConfigFromForm(): GraphFeatureConfig {
+    const existing = this.form.graph_config ?? this.defaultGraphConfig();
+    const targetEntity = String(existing.target_entity || '').trim();
+    const allowedEntityTypes = this.normalizedAllowedEntityTypes(targetEntity);
+    return {
+      target_entity: targetEntity,
+      allowed_entity_types: allowedEntityTypes,
+      max_depth: this.clampInteger(existing.max_depth, 4, 1, 6),
+      max_expanded_nodes: this.clampInteger(existing.max_expanded_nodes, 10000, 1, 50000),
+    };
+  }
+
+  private normalizedAllowedEntityTypes(targetEntity: string): string[] {
+    const values = this.allowedEntityTypesText
+      .split(/[,\s]+/)
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+    for (const required of [this.form.entity, targetEntity]) {
+      const normalized = String(required || '').trim();
+      if (normalized && !values.includes(normalized)) {
+        values.push(normalized);
+      }
+    }
+    return Array.from(new Set(values));
+  }
+
+  private clampInteger(value: unknown, fallback: number, min: number, max: number): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+    return Math.min(max, Math.max(min, Math.floor(parsed)));
   }
 }

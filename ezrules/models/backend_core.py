@@ -982,6 +982,59 @@ class FieldObservation(Base):
         return f"FieldObservation({self.field_name!r}, {self.observed_json_type!r}, o_id={self.o_id})"
 
 
+class GraphEntityField(Base):
+    __tablename__ = "graph_entity_fields"
+    __table_args__ = (
+        UniqueConstraint("o_id", "field_path", name="uq_graph_entity_fields_org_field"),
+        Index("ix_graph_entity_fields_o_id_status", "o_id", "status"),
+    )
+
+    gef_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    field_path = Column(String(255), nullable=False)
+    entity_type = Column(String(64), nullable=False)
+    status = Column(String(32), nullable=False, default="active")
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.UTC),
+        onupdate=lambda: datetime.datetime.now(datetime.UTC),
+        nullable=False,
+    )
+
+    org: Mapped["Organisation"] = relationship()
+
+
+class GraphEventEntityLink(Base):
+    __tablename__ = "graph_event_entity_links"
+    __table_args__ = (
+        UniqueConstraint("o_id", "ev_id", "field_path", "entity_value_hash", name="uq_graph_links_event_field_value"),
+        Index(
+            "ix_graph_links_o_id_entity_effective",
+            "o_id",
+            "entity_type",
+            "entity_value_hash",
+            "effective_at",
+        ),
+        Index("ix_graph_links_o_id_ev_id", "o_id", "ev_id"),
+        Index("ix_graph_links_o_id_effective_at", "o_id", "effective_at"),
+    )
+
+    gel_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    ev_id: Mapped[int] = mapped_column(ForeignKey("event_versions.ev_id", ondelete="CASCADE"), nullable=False)
+    transaction_id = Column(String, nullable=False)
+    effective_at = Column(CoerceDateTime, nullable=False)
+    field_path = Column(String(255), nullable=False)
+    entity_type = Column(String(64), nullable=False)
+    entity_value = Column(String(1024), nullable=True)
+    entity_value_hash = Column(String(64), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+
+    org: Mapped["Organisation"] = relationship()
+    event_version: Mapped["EventVersion"] = relationship()
+
+
 class FeatureDefinition(Base):
     __tablename__ = "feature_definitions"
     __table_args__ = (
@@ -995,6 +1048,7 @@ class FeatureDefinition(Base):
     description = Column(Text, nullable=True)
     entity = Column(String(64), nullable=False)
     feature_name = Column(String(128), nullable=False)
+    feature_kind = Column(String(32), nullable=False, default="aggregate")
     entity_key = Column(String(255), nullable=False)
     aggregation_type = Column(String(32), nullable=False)
     source_field = Column(String(255), nullable=True)
@@ -1002,6 +1056,7 @@ class FeatureDefinition(Base):
     filters = Column(JSON, nullable=False, default=list)
     inclusion_policy = Column(String(32), nullable=False, default="previous_events")
     null_handling = Column(String(32), nullable=False, default="exclude")
+    graph_config = Column(JSON, nullable=True)
     status = Column(String(32), nullable=False, default="draft")
     version = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)

@@ -5,6 +5,7 @@ import { RouterModule } from '@angular/router';
 import { SidebarComponent } from '../components/sidebar.component';
 import { TestedEvent, TestedEventService } from '../services/tested-event.service';
 import { buildHighlightedFieldPaths } from '../utils/field-paths';
+import { TestedEventGraphComponent } from './tested-event-graph.component';
 
 interface PayloadLine {
   fieldName: string | null;
@@ -17,7 +18,7 @@ interface PayloadLine {
 @Component({
   selector: 'app-tested-events',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TestedEventGraphComponent],
   templateUrl: './tested-events.component.html'
 })
 export class TestedEventsComponent implements OnInit {
@@ -29,6 +30,7 @@ export class TestedEventsComponent implements OnInit {
   error: string | null = null;
   hasLoadedOnce: boolean = false;
   expandedEventIds = new Set<number>();
+  graphEventIds = new Set<number>();
   hoveredRuleIdsByEvent = new Map<number, number>();
   readonly limitOptions = [25, 50, 100, 200];
 
@@ -86,10 +88,24 @@ export class TestedEventsComponent implements OnInit {
   toggleDetails(eventId: number): void {
     if (this.expandedEventIds.has(eventId)) {
       this.expandedEventIds.delete(eventId);
+      this.graphEventIds.delete(eventId);
       this.hoveredRuleIdsByEvent.delete(eventId);
       return;
     }
     this.expandedEventIds.add(eventId);
+  }
+
+  toggleGraph(eventId: number): void {
+    if (this.graphEventIds.has(eventId)) {
+      this.graphEventIds.delete(eventId);
+      return;
+    }
+    this.expandedEventIds.add(eventId);
+    this.graphEventIds.add(eventId);
+  }
+
+  isGraphVisible(eventId: number): boolean {
+    return this.graphEventIds.has(eventId);
   }
 
   isExpanded(eventId: number): boolean {

@@ -1,5 +1,12 @@
 # What's New
 
+## v1.24.0
+
+* **Postgres graph features**: Added configured graph entity fields, canonical event-to-entity link storage, and bounded current-as-of graph feature resolution for rules such as `stat[user.unique_cards_graph_90d]`.
+* **Graph traversal guardrails**: Graph features use preset windows up to 180 days, whitelisted entity types, max-depth limits, expansion caps, and the existing feature activation/audit lifecycle before rule logic can reference them.
+* **Graph feature management UI**: The Features page can now create, edit, display, and activate graph feature definitions with target entity, traversable entity allowlist, depth, and expansion guardrails.
+* **Tested Events graph view**: Tested Events rows can now open a bounded event-entity network, fit or reset the layout, and traverse up to three shared-entity event hops by default while respecting configured event limits.
+
 ## v1.23.0
 
 * **Performance matrix harness**: Added reproducible breakpoint tooling with scenario files, pure Python rule-engine timing, `/api/v2/evaluate` ingestion timing, multi-organisation API-key distribution, latency/error thresholds, and JSON/Markdown result artifacts.

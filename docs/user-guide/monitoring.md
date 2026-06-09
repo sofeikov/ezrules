@@ -62,6 +62,7 @@ Tips:
 - Increase or decrease the **Show latest** selector to inspect a wider or narrower slice.
 - Use the **Uploaded Label** column to verify that CSV-applied labels landed on the expected events.
 - Expand a row to see the payload fields, every triggered rule, and the per-outcome counts for that event.
+- Use **Show graph** to inspect the event's configured entity network. The graph opens with nearby shared-entity events up to the event limit and three event-to-event hops by default.
 - When no rule is hovered, fields referenced by any triggered rule stay highlighted.
 - Hover a specific triggered rule to narrow the payload highlight to just the fields that rule references.
 - Events with **NO OUTCOME** passed through evaluation without any rule returning an allowed outcome.
@@ -72,6 +73,8 @@ Healthy signal:
 - triggered rules match the rule logic you expect from the payload
 
 ![Highlighted event payload fields](../assets/readme/tested-event-inspector.png)
+
+![Connected tested-event graph](../assets/readme/tested-event-graph.png)
 
 ---
 
