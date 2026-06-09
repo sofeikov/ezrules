@@ -220,7 +220,6 @@ export class TestedEventGraphComponent implements AfterViewInit, OnChanges, OnDe
     if (this.expandedEntityIds.has(node.id)) {
       return;
     }
-    this.expandedEntityIds.add(node.id);
     this.loadGraph(false, node);
   }
 
@@ -237,6 +236,9 @@ export class TestedEventGraphComponent implements AfterViewInit, OnChanges, OnDe
     }).subscribe({
       next: (response) => {
         this.applyGraph(response, reset);
+        if (expandNode) {
+          this.expandedEntityIds.add(expandNode.id);
+        }
         this.loading = false;
       },
       error: () => {

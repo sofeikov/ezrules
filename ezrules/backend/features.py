@@ -292,48 +292,34 @@ def _bounded_int(value: Any, *, default: int, minimum: int, maximum: int) -> int
     return max(minimum, min(parsed, maximum))
 
 
-def _event_version_row_is_current(
-    current: EventVersion | None,
-    candidate: EventVersion,
-) -> bool:
-    if current is None:
-        return True
-    if bool(current.terminal_state):
-        return False
-    if bool(candidate.terminal_state):
-        return True
-    current_key = (
-        normalize_as_utc(cast(datetime, current.effective_at)),
-        normalize_as_utc(cast(datetime, current.observed_at)),
-    )
-    candidate_key = (
-        normalize_as_utc(cast(datetime, candidate.effective_at)),
-        normalize_as_utc(cast(datetime, candidate.observed_at)),
-    )
-    return candidate_key >= current_key
-
-
 def _current_event_version_ids_as_of(db: Any, o_id: int, transaction_ids: set[str], as_of: datetime) -> set[int]:
     if not transaction_ids:
         return set()
 
-    rows = (
-        db.query(EventVersion)
+    ranked_versions = (
+        db.query(
+            EventVersion.ev_id.label("ev_id"),
+            func.row_number()
+            .over(
+                partition_by=EventVersion.transaction_id,
+                order_by=(
+                    EventVersion.terminal_state.desc(),
+                    EventVersion.effective_at.desc(),
+                    EventVersion.observed_at.desc(),
+                    EventVersion.ev_id.desc(),
+                ),
+            )
+            .label("row_number"),
+        )
         .filter(
             EventVersion.o_id == o_id,
             EventVersion.transaction_id.in_(sorted(transaction_ids)),
             EventVersion.observed_at <= as_of,
         )
-        .order_by(EventVersion.transaction_id.asc(), EventVersion.observed_at.asc(), EventVersion.ev_id.asc())
-        .all()
+        .subquery()
     )
-    current_by_transaction: dict[str, EventVersion] = {}
-    for row in rows:
-        transaction_id = str(row.transaction_id)
-        current = current_by_transaction.get(transaction_id)
-        if _event_version_row_is_current(current, row):
-            current_by_transaction[transaction_id] = row
-    return {int(row.ev_id) for row in current_by_transaction.values()}
+    rows = db.query(ranked_versions.c.ev_id).filter(ranked_versions.c.row_number == 1).all()
+    return {int(row.ev_id) for row in rows}
 
 
 def _compute_graph_distinct_count(

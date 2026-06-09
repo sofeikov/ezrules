@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import bcrypt
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event as sqlalchemy_event
 
 from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
@@ -209,6 +210,55 @@ def test_tested_event_graph_defaults_to_three_hop_network(graph_client):
     assert {"txn-root", "txn-hop-1", "txn-hop-2", "txn-hop-3"}.issubset(labels)
     assert data["max_hops"] == 3
     assert data["event_count"] == 4
+
+
+def test_tested_event_graph_batches_multi_hop_link_queries(graph_client):
+    session = graph_client.test_data["session"]
+    token = graph_client.test_data["token"]
+    org_id = int(graph_client.test_data["org"].o_id)
+    _configure_graph_fields(session, org_id)
+    effective_at = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
+    root = _add_event(session, org_id, "txn-root", effective_at, {"user_id": "user-1", "card_fingerprint": "card-1"})
+    _add_event(
+        session,
+        org_id,
+        "txn-hop-1",
+        effective_at + timedelta(minutes=1),
+        {"card_fingerprint": "card-1", "device_id": "device-1"},
+    )
+    _add_event(
+        session,
+        org_id,
+        "txn-hop-2",
+        effective_at + timedelta(minutes=2),
+        {"device_id": "device-1", "account_id": "acct-1"},
+    )
+    _add_event(
+        session,
+        org_id,
+        "txn-hop-3",
+        effective_at + timedelta(minutes=3),
+        {"account_id": "acct-1", "user_id": "user-4"},
+    )
+    decision = _add_decision(session, org_id, root)
+    graph_statements: list[str] = []
+
+    def before_cursor_execute(_conn, _cursor, statement, _parameters, _context, _executemany):
+        if "graph_event_entity_links" in statement or "event_versions" in statement:
+            graph_statements.append(statement)
+
+    sqlalchemy_event.listen(session.bind, "before_cursor_execute", before_cursor_execute)
+    try:
+        response = graph_client.get(
+            f"/api/v2/tested-events/{decision.ed_id}/graph",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    finally:
+        sqlalchemy_event.remove(session.bind, "before_cursor_execute", before_cursor_execute)
+
+    assert response.status_code == 200
+    assert response.json()["event_count"] == 4
+    assert len(graph_statements) <= 11
 
 
 def test_tested_event_graph_expansion_respects_event_cap(graph_client):

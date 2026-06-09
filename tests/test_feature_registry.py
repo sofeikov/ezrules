@@ -28,6 +28,24 @@ def _feature_payload(feature_name: str, *, name: str | None = None) -> dict:
     }
 
 
+def _graph_feature_payload() -> dict:
+    return {
+        "name": "User unique cards through graph 90d",
+        "entity": "user",
+        "feature_name": "unique_cards_graph_90d",
+        "feature_kind": "graph",
+        "entity_key": "user_id",
+        "aggregation_type": "graph_distinct_count",
+        "window_seconds": 7776000,
+        "graph_config": {
+            "target_entity": "card",
+            "allowed_entity_types": ["user", "account", "card"],
+            "max_depth": 3,
+            "max_expanded_nodes": 1000,
+        },
+    }
+
+
 def _hash_payload(event_data: dict) -> str:
     serialized = json.dumps(event_data, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
@@ -201,6 +219,29 @@ def test_feature_payload_rejects_unsupported_event_time_field(feature_client):
 
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"] == ["body", "event_time_field"]
+
+
+def test_graph_feature_allowed_entity_types_use_same_identifier_rules_as_target(feature_client):
+    token = feature_client.test_data["token"]
+    payload = _graph_feature_payload()
+    payload["graph_config"]["allowed_entity_types"] = ["user", "card", "café"]
+
+    unicode_response = feature_client.post(
+        "/api/v2/features",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    payload = _graph_feature_payload()
+    payload["graph_config"]["allowed_entity_types"] = ["user", "card", "x" * 65]
+    long_response = feature_client.post(
+        "/api/v2/features",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert unicode_response.status_code == 422
+    assert long_response.status_code == 422
 
 
 def test_rule_test_reports_missing_feature_entity_key(feature_client):

@@ -44,6 +44,7 @@ def _add_graph_event(
     event_data: dict,
     *,
     observed_at: datetime | None = None,
+    terminal_state: bool = False,
 ) -> EventVersion:
     latest = (
         session.query(EventVersion)
@@ -60,6 +61,7 @@ def _add_graph_event(
         observed_at=observed_at or effective_at,
         event_data=event_data,
         payload_hash=_hash_payload(event_data),
+        terminal_state=terminal_state,
         supersedes_ev_id=None if latest is None else int(latest.ev_id),
     )
     session.add(event_version)
@@ -69,12 +71,12 @@ def _add_graph_event(
     return event_version
 
 
-def _graph_feature(org_id: int) -> FeatureDefinition:
+def _graph_feature(org_id: int, *, target_entity: str = "card") -> FeatureDefinition:
     return FeatureDefinition(
         o_id=org_id,
-        name="User unique cards through graph 90d",
+        name=f"User unique {target_entity}s through graph 90d",
         entity="user",
-        feature_name="unique_cards_graph_90d",
+        feature_name=f"unique_{target_entity}s_graph_90d",
         feature_kind="graph",
         entity_key="user_id",
         aggregation_type="graph_distinct_count",
@@ -82,7 +84,7 @@ def _graph_feature(org_id: int) -> FeatureDefinition:
         window_seconds=7776000,
         filters=[],
         graph_config={
-            "target_entity": "card",
+            "target_entity": target_entity,
             "allowed_entity_types": ["user", "account", "card", "device"],
             "max_depth": 4,
             "max_expanded_nodes": 1000,
@@ -200,6 +202,55 @@ def test_graph_distinct_count_uses_current_transaction_version_as_of_time(sessio
     )
 
     assert before_correction.value == 1
+    assert before_correction.matched_event_count == 1
+    assert after_correction.value == 1
+    assert after_correction.matched_event_count == 1
+
+
+def test_graph_distinct_count_uses_latest_terminal_correction_as_of_time(session):
+    org = session.query(Organisation).one()
+    org_id = int(org.o_id)
+    _configure_graph_fields(session, org_id)
+    feature = _graph_feature(org_id, target_entity="account")
+    session.add(feature)
+    session.commit()
+
+    effective_at = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
+    _add_graph_event(
+        session,
+        org_id,
+        "txn-terminal-correction",
+        effective_at,
+        {"user_id": "user-1", "card_fingerprint": "card-old"},
+        observed_at=datetime(2026, 6, 1, 12, 1, tzinfo=UTC),
+        terminal_state=True,
+    )
+    _add_graph_event(
+        session,
+        org_id,
+        "txn-terminal-correction",
+        effective_at,
+        {"user_id": "user-1", "account_id": "acct-new"},
+        observed_at=datetime(2026, 6, 2, 12, 1, tzinfo=UTC),
+        terminal_state=True,
+    )
+
+    before_correction = compute_feature(
+        session,
+        org_id,
+        feature,
+        {"user_id": "user-1"},
+        datetime(2026, 6, 1, 13, 0, tzinfo=UTC),
+    )
+    after_correction = compute_feature(
+        session,
+        org_id,
+        feature,
+        {"user_id": "user-1"},
+        datetime(2026, 6, 3, 12, 0, tzinfo=UTC),
+    )
+
+    assert before_correction.value == 0
     assert before_correction.matched_event_count == 1
     assert after_correction.value == 1
     assert after_correction.matched_event_count == 1

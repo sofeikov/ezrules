@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import tuple_
 
 from ezrules.backend.api_v2.auth.dependencies import (
     get_current_active_user,
@@ -102,13 +103,42 @@ def _graph_edge(link: GraphEventEntityLink) -> TestedEventGraphEdge:
     )
 
 
-def _event_links(db: Any, current_org_id: int, event_version: EventVersion) -> list[GraphEventEntityLink]:
-    return (
+def _load_event_links(
+    db: Any,
+    current_org_id: int,
+    ev_ids: list[int],
+    links_by_ev_id: dict[int, list[GraphEventEntityLink]],
+) -> None:
+    missing_ev_ids = sorted({ev_id for ev_id in ev_ids if ev_id not in links_by_ev_id})
+    if not missing_ev_ids:
+        return
+
+    for ev_id in missing_ev_ids:
+        links_by_ev_id[ev_id] = []
+
+    link_rows = (
         db.query(GraphEventEntityLink)
-        .filter(GraphEventEntityLink.o_id == current_org_id, GraphEventEntityLink.ev_id == int(event_version.ev_id))
-        .order_by(GraphEventEntityLink.entity_type.asc(), GraphEventEntityLink.field_path.asc())
+        .filter(GraphEventEntityLink.o_id == current_org_id, GraphEventEntityLink.ev_id.in_(missing_ev_ids))
+        .order_by(
+            GraphEventEntityLink.ev_id.asc(),
+            GraphEventEntityLink.entity_type.asc(),
+            GraphEventEntityLink.field_path.asc(),
+        )
         .all()
     )
+    for link in link_rows:
+        links_by_ev_id[int(link.ev_id)].append(link)
+
+
+def _event_links(
+    db: Any,
+    current_org_id: int,
+    event_version: EventVersion,
+    links_by_ev_id: dict[int, list[GraphEventEntityLink]],
+) -> list[GraphEventEntityLink]:
+    ev_id = int(event_version.ev_id)
+    _load_event_links(db, current_org_id, [ev_id], links_by_ev_id)
+    return links_by_ev_id[ev_id]
 
 
 def _add_event_links(
@@ -118,11 +148,12 @@ def _add_event_links(
     *,
     nodes: dict[str, TestedEventGraphNode],
     edges: dict[str, TestedEventGraphEdge],
+    links_by_ev_id: dict[int, list[GraphEventEntityLink]],
     root: bool = False,
 ) -> list[GraphEventEntityLink]:
     event_node = _event_node(event_version, root=root)
     nodes[event_node.id] = event_node
-    links = _event_links(db, current_org_id, event_version)
+    links = _event_links(db, current_org_id, event_version, links_by_ev_id)
     for link in links:
         entity_node = _entity_node(link)
         nodes[entity_node.id] = entity_node
@@ -131,23 +162,24 @@ def _add_event_links(
     return links
 
 
-def _linked_event_versions_for_entity(
+def _linked_event_versions_for_entities(
     db: Any,
     current_org_id: int,
     *,
-    entity_type: str,
-    entity_value_hash: str,
+    entity_keys: set[tuple[str, str]],
     max_events: int,
 ) -> tuple[list[EventVersion], bool]:
+    if not entity_keys:
+        return [], False
+
     link_rows = (
         db.query(GraphEventEntityLink.ev_id)
         .filter(
             GraphEventEntityLink.o_id == current_org_id,
-            GraphEventEntityLink.entity_type == entity_type,
-            GraphEventEntityLink.entity_value_hash == entity_value_hash,
+            tuple_(GraphEventEntityLink.entity_type, GraphEventEntityLink.entity_value_hash).in_(sorted(entity_keys)),
         )
         .order_by(GraphEventEntityLink.effective_at.desc(), GraphEventEntityLink.ev_id.desc())
-        .limit(max_events + 1)
+        .limit((max_events * len(entity_keys)) + 1)
         .all()
     )
     ev_ids: list[int] = []
@@ -169,7 +201,8 @@ def _linked_event_versions_for_entity(
         .order_by(EventVersion.effective_at.desc(), EventVersion.ev_id.desc())
         .all()
     )
-    return event_versions, truncated
+    event_versions_by_id = {int(event_version.ev_id): event_version for event_version in event_versions}
+    return [event_versions_by_id[ev_id] for ev_id in ev_ids if ev_id in event_versions_by_id], truncated
 
 
 def _linked_event_versions_for_links(
@@ -181,6 +214,7 @@ def _linked_event_versions_for_links(
     root_ev_id: int,
     max_events: int,
     max_hops: int,
+    links_by_ev_id: dict[int, list[GraphEventEntityLink]],
 ) -> tuple[list[EventVersion], bool]:
     discovered: list[EventVersion] = []
     visited_ev_ids = {root_ev_id}
@@ -198,31 +232,35 @@ def _linked_event_versions_for_links(
             if entity_key in seen_entities:
                 continue
             seen_entities.add(entity_key)
-            linked_event_versions, entity_truncated = _linked_event_versions_for_entity(
+
+        linked_event_versions, entity_truncated = _linked_event_versions_for_entities(
+            db,
+            current_org_id,
+            entity_keys=seen_entities,
+            max_events=max_events,
+        )
+        truncated = truncated or entity_truncated
+        linked_event_versions = [
+            linked_event_version
+            for linked_event_version in linked_event_versions
+            if int(linked_event_version.ev_id) not in visited_ev_ids
+        ]
+        if depth + 1 < max_hops:
+            _load_event_links(
                 db,
                 current_org_id,
-                entity_type=entity_key[0],
-                entity_value_hash=entity_key[1],
-                max_events=max_events,
+                [int(linked_event_version.ev_id) for linked_event_version in linked_event_versions],
+                links_by_ev_id,
             )
-            truncated = truncated or entity_truncated
-            for linked_event_version in linked_event_versions:
-                linked_ev_id = int(linked_event_version.ev_id)
-                if linked_ev_id in visited_ev_ids:
-                    continue
-                if len(discovered) >= max_events:
-                    truncated = True
-                    break
-                visited_ev_ids.add(linked_ev_id)
-                discovered.append(linked_event_version)
-                if depth + 1 < max_hops:
-                    frontier.append(
-                        (
-                            linked_event_version,
-                            _event_links(db, current_org_id, linked_event_version),
-                            depth + 1,
-                        )
-                    )
+        for linked_event_version in linked_event_versions:
+            linked_ev_id = int(linked_event_version.ev_id)
+            if len(discovered) >= max_events:
+                truncated = True
+                break
+            visited_ev_ids.add(linked_ev_id)
+            discovered.append(linked_event_version)
+            if depth + 1 < max_hops:
+                frontier.append((linked_event_version, links_by_ev_id[linked_ev_id], depth + 1))
             if len(discovered) >= max_events:
                 break
 
@@ -363,24 +401,43 @@ def tested_event_graph(
 
     nodes: dict[str, TestedEventGraphNode] = {}
     edges: dict[str, TestedEventGraphEdge] = {}
+    links_by_ev_id: dict[int, list[GraphEventEntityLink]] = {}
     root_event_node_id = _event_node_id(int(root_event_version.ev_id))
-    root_links = _add_event_links(db, current_org_id, root_event_version, nodes=nodes, edges=edges, root=True)
+    root_links = _add_event_links(
+        db,
+        current_org_id,
+        root_event_version,
+        nodes=nodes,
+        edges=edges,
+        links_by_ev_id=links_by_ev_id,
+        root=True,
+    )
     linked_event_limit = max(0, max_events - 1)
 
     truncated = False
     if linked_event_limit == 0:
         truncated = bool(root_links)
     elif expand_entity_type and expand_entity_value_hash:
-        event_versions, truncated = _linked_event_versions_for_entity(
+        event_versions, truncated = _linked_event_versions_for_entities(
             db,
             current_org_id,
-            entity_type=expand_entity_type,
-            entity_value_hash=expand_entity_value_hash,
+            entity_keys={(expand_entity_type, expand_entity_value_hash)},
             max_events=linked_event_limit,
+        )
+        _load_event_links(
+            db, current_org_id, [int(event_version.ev_id) for event_version in event_versions], links_by_ev_id
         )
         for event_version in event_versions:
             if int(event_version.ev_id) != int(root_event_version.ev_id):
-                _add_event_links(db, current_org_id, event_version, nodes=nodes, edges=edges, root=False)
+                _add_event_links(
+                    db,
+                    current_org_id,
+                    event_version,
+                    nodes=nodes,
+                    edges=edges,
+                    links_by_ev_id=links_by_ev_id,
+                    root=False,
+                )
     else:
         event_versions, truncated = _linked_event_versions_for_links(
             db,
@@ -390,9 +447,21 @@ def tested_event_graph(
             root_ev_id=int(root_event_version.ev_id),
             max_events=linked_event_limit,
             max_hops=max_hops,
+            links_by_ev_id=links_by_ev_id,
+        )
+        _load_event_links(
+            db, current_org_id, [int(event_version.ev_id) for event_version in event_versions], links_by_ev_id
         )
         for event_version in event_versions:
-            _add_event_links(db, current_org_id, event_version, nodes=nodes, edges=edges, root=False)
+            _add_event_links(
+                db,
+                current_org_id,
+                event_version,
+                nodes=nodes,
+                edges=edges,
+                links_by_ev_id=links_by_ev_id,
+                root=False,
+            )
 
     event_count = sum(1 for node in nodes.values() if node.kind == "event")
     return TestedEventGraphResponse(

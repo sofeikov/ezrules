@@ -1,8 +1,12 @@
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+GRAPH_ENTITY_NAME_PATTERN = r"^[A-Za-z_][A-Za-z0-9_]*$"
+GRAPH_ENTITY_NAME_RE = re.compile(GRAPH_ENTITY_NAME_PATTERN)
 
 ALLOWED_WINDOW_SECONDS = {
     600: "10m",
@@ -49,7 +53,7 @@ class FeatureFilter(BaseModel):
 class GraphFeatureConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    target_entity: str = Field(..., pattern=r"^[A-Za-z_][A-Za-z0-9_]*$", max_length=64)
+    target_entity: str = Field(..., pattern=GRAPH_ENTITY_NAME_PATTERN, max_length=64)
     allowed_entity_types: list[str] = Field(..., min_length=1, max_length=12)
     max_depth: int = Field(default=4, ge=1, le=6)
     max_expanded_nodes: int = Field(default=10_000, ge=1, le=50_000)
@@ -61,8 +65,8 @@ class GraphFeatureConfig(BaseModel):
         if not normalized:
             raise ValueError("allowed_entity_types must include at least one entity type")
         for item in normalized:
-            if not item.replace("_", "a").isalnum() or item[0].isdigit():
-                raise ValueError("allowed_entity_types must contain identifier-like values")
+            if len(item) > 64 or GRAPH_ENTITY_NAME_RE.fullmatch(item) is None:
+                raise ValueError("allowed_entity_types must contain ASCII identifier values up to 64 characters")
         return normalized
 
     @model_validator(mode="after")
