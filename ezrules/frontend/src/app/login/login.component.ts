@@ -1,7 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
 @Component({
@@ -17,6 +17,10 @@ import { AuthService } from '../services/auth.service';
         </div>
 
         <form (ngSubmit)="onSubmit()" class="space-y-6">
+          <div *ngIf="demoPrefilled" class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded text-sm">
+            Your demo credentials are filled in — just click <strong>Sign In</strong> to enter your sandbox.
+          </div>
+
           <div *ngIf="error" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
             {{ error }}
           </div>
@@ -71,13 +75,41 @@ import { AuthService } from '../services/auth.service';
     </div>
   `
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   email = '';
   password = '';
   loading = false;
   error: string | null = null;
+  demoPrefilled = false;
 
-  constructor(private authService: AuthService, private router: Router) {}
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    private route: ActivatedRoute,
+  ) {}
+
+  ngOnInit(): void {
+    // Disposable-demo deep link: the landing page sends users here with
+    // credentials in the URL fragment (#email=...&password=...). A fragment is
+    // used instead of query params so the credentials are never sent to the
+    // server or written to access logs. We prefill the form (no auto-submit —
+    // the user clicks Sign In) and then strip the fragment so the credentials
+    // don't linger in the address bar or browser history.
+    const fragment = this.route.snapshot.fragment;
+    if (!fragment) {
+      return;
+    }
+
+    const params = new URLSearchParams(fragment);
+    const email = params.get('email');
+    const password = params.get('password');
+    if (email && password) {
+      this.email = email;
+      this.password = password;
+      this.demoPrefilled = true;
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }
 
   onSubmit(): void {
     this.loading = true;
