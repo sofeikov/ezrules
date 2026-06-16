@@ -57,4 +57,4 @@ Use it as the canonical decision log until formal ADR files are introduced.
 - **Decision**: `RuleParamExtractor.visit_Call()` recognizes only the exact helper call shape produced by the `$field.path` compiler rewrite: `__ezrules_lookup__(t, "field.path")`.
 - **Why**: extracted field references drive verify warnings, test JSON prefill, and backtesting missing-field eligibility. If call matching were broader, hand-written helper calls or wrapped arguments could masquerade as canonical `$...` references and create bypasses or misleading metadata.
 - **Tradeoff**: the internal lookup helper is not public syntax. Only canonical `$...` notation is guaranteed to participate in downstream field-reference analysis.
-- **Related docs**: [Creating Rules](../user-guide/creating-rules.md), [Evaluator API](../api-reference/evaluator-api.md), [Complex Entities in Fraud Rules](../blog/complex-entities-in-fraud-rules.md).
+- **Related docs**: [Creating Rules](../user-guide/creating-rules.md), [Evaluator API](../api-reference/evaluator-api.md), [Complex Entities in Fraud Rules](https://ezrules.io/blog/complex-entities-in-fraud-rules/).

@@ -1,5 +1,7 @@
 # ezrules
 
+**[Website & live demo](https://ezrules.io)** · **[Documentation](https://ezrules.readthedocs.io/)** · **[Blog](https://ezrules.io/blog/)**
+
 Open-source transaction monitoring for teams that need clear rule control, auditability, and fast operational changes.
 
 ezrules gives fraud, risk, and compliance administrators a web workspace for managing decision rules without turning every policy update into an engineering project. Rules can be drafted, tested, reviewed, promoted, paused, rolled out, and audited from one place, while your systems keep sending events to a simple evaluation API.
@@ -138,7 +140,7 @@ The result is stored for review in the UI, including the winning outcome and the
 - [Deployment guide](docs/architecture/deployment.md)
 - [What's new](docs/whatsnew.md)
 
-The documentation site is also available at [ezrules.readthedocs.io](https://ezrules.readthedocs.io/).
+The documentation site is also available at [ezrules.readthedocs.io](https://ezrules.readthedocs.io/). Product articles and walkthroughs live on the [ezrules blog](https://ezrules.io/blog/).
 
 ## Development
 
