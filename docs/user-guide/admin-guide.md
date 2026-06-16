@@ -132,7 +132,7 @@ Operational tips:
 - Field type changes affect rule evaluation behavior; review `GET /api/v2/audit/field-types` when investigating unexpected rule outcomes
 - Review `GET /api/v2/audit/api-keys` when tracing API key creation or revocation during an incident
 
-If your organisation uses ordered main-rule execution, see [Ordered Rule Execution in ezrules](../blog/rule-ordering-first-match.md) for the operator-facing model, reorder workflow, and audit implications.
+If your organisation uses ordered main-rule execution, see [Ordered Rule Execution in ezrules](https://ezrules.io/blog/rule-ordering-first-match/) for the operator-facing model, reorder workflow, and audit implications.
 
 ### Rule rollback in incident response
 
