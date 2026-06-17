@@ -4,8 +4,21 @@ This directory contains end-to-end (E2E) tests for the ezrules Angular frontend 
 
 ## Quick Start
 
+Preferred: use the repo agent stack helper so ports and env vars stay aligned.
+
 ```bash
-# Example random high ports
+docker compose up -d postgres redis mailpit
+./scripts/start-agent-stack.sh
+source .env.agent-stack
+cd ezrules/frontend
+npm run test:e2e
+./scripts/stop-agent-stack.sh
+```
+
+Manual setup with custom ports (all four values must match):
+
+```bash
+# Example high ports — pick unused ports if these are taken
 API_PORT=38888
 FRONTEND_PORT=44200
 
@@ -15,6 +28,7 @@ EZRULES_SMTP_HOST=localhost \
 EZRULES_SMTP_PORT=1025 \
 EZRULES_FROM_EMAIL=no-reply@ezrules.local \
 EZRULES_APP_BASE_URL=http://localhost:$FRONTEND_PORT \
+EZRULES_CORS_ALLOWED_ORIGINS=http://localhost:$FRONTEND_PORT \
 uv run ezrules api --port $API_PORT
 
 # 2. Make sure Angular dev server is running
@@ -62,6 +76,7 @@ Before running E2E tests, you need to have the following services running:
    EZRULES_SMTP_PORT=1025 \
    EZRULES_FROM_EMAIL=no-reply@ezrules.local \
    EZRULES_APP_BASE_URL=http://localhost:$FRONTEND_PORT \
+   EZRULES_CORS_ALLOWED_ORIGINS=http://localhost:$FRONTEND_PORT \
    uv run ezrules api --port $API_PORT
    ```
 
@@ -281,6 +296,16 @@ Tests can be integrated into CI/CD pipelines. Example GitHub Actions workflow:
 - Ensure the API service is running and healthy
 - Check service logs in `/tmp/ezrules-*.log`
 - Verify ports are not in use by other processes
+- Run `./scripts/verify-stack.sh` after changing ports
+
+### Login fails but API responds to curl
+
+Likely a frontend/API topology mismatch rather than a bad password.
+
+1. Confirm `ezrules/frontend/public/runtime-config.js` points at the API port you started
+2. Confirm `EZRULES_CORS_ALLOWED_ORIGINS` includes the frontend origin (for example `http://localhost:44200`)
+3. Run `./scripts/verify-stack.sh`
+4. In the browser DevTools Network tab, check whether the login request is blocked by CORS or sent to the wrong host/port
 
 ### "Element not found" errors
 

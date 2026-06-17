@@ -50,10 +50,49 @@ When asked to run agentic exploration:
 - Convert credible repeatable findings into backend business tests or Playwright E2E tests before relying on them as release gates.
 - Generated exploration reports belong under `tests/agentic_exploration/reports/` or `artifacts/` and should not be committed unless explicitly requested.
 
+# Local Agent Stack Topology
+When bringing up API + Angular for manual testing, Playwright, or agentic exploration, use the correlated stack scripts instead of hand-picking ports:
+
+```bash
+docker compose up -d postgres redis mailpit   # if not already running
+./scripts/start-agent-stack.sh && source .env.agent-stack && ./scripts/verify-stack.sh
+./scripts/stop-agent-stack.sh                   # when finished
+```
+
+**Run start, source, and verify in one chained command** (or the same shell turn). If a later agent turn finds connection refused, rerun `./scripts/start-agent-stack.sh --no-reset --suffix <same-suffix>` before verifying again.
+
+`--no-reset` is only for reusing the **same** `--suffix` whose database was already initialized by a prior `./scripts/start-agent-stack.sh` (or `reset-dev`) in this worktree. A **new suffix always needs a full start** without `--no-reset`.
+
+`start-agent-stack.sh` writes `.env.agent-stack` with matching values for:
+- API listen port (`--port`)
+- frontend dev-server port
+- `EZRULES_FRONTEND_API_URL` (frontend → API)
+- `EZRULES_CORS_ALLOWED_ORIGINS` and `EZRULES_APP_BASE_URL` (API → browser)
+- private DB name `ezrules_e2e_<suffix>`
+- Playwright overrides `E2E_BASE_URL` / `E2E_API_BASE_URL`
+
+Before claiming login works:
+1. Run `./scripts/verify-stack.sh` (topology + login smoke test by default)
+2. Or curl login directly after `source .env.agent-stack`:
+
+```bash
+curl -fsS -X POST "${API_URL}/api/v2/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "username=${AGENT_STACK_ADMIN_EMAIL}" \
+  --data-urlencode "password=${AGENT_STACK_ADMIN_PASSWORD}"
+```
+
+The login endpoint expects OAuth2 **form fields** `username` and `password`, not JSON `email`/`password`.
+
+For browser confirmation, open `${FRONTEND_URL}/login` and check DevTools → Network: the login POST must target `${API_URL}` and must not be blocked by CORS.
+
+If you must start services manually, override **all four** together: API port, frontend port, `EZRULES_FRONTEND_API_URL`, and `EZRULES_CORS_ALLOWED_ORIGINS`. See `settings.agent-stack.env.example`.
+
 # Common Development Commands
 - **Install dependencies**: `uv sync`
 - **Initialize database**: `uv run ezrules init-db`
 - **Add user**: `uv run ezrules add-user --user-email admin@example.com --password admin`
+- **Start disposable agent stack** (API + frontend + private DB): `./scripts/start-agent-stack.sh`
 - **Start API service** (FastAPI, includes evaluator): `uv run ezrules api --port 8888`
 - **Start Celery worker** (required for backtesting): `uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo`
 - **Generate test data**: `uv run ezrules generate-random-data --n-rules 10 --n-events 100`
@@ -126,7 +165,7 @@ ezrules is a transaction monitoring engine with business rule capabilities.
 22. After the repeated targeted Playwright run passes, rerun the same targeted command once more without resetting the private dev DB. This is required to catch cleanup leaks and state-coupling between runs.
 23. If a frontend change touches global routing, app shell/sidebar/navigation, runtime config, shared services used across multiple pages, or otherwise has clearly app-wide impact, expand verification to the affected spec cluster. Run the full Playwright suite only when the change is clearly cross-app, when repeated targeted runs still suggest broader coupling, or when the user explicitly asks for the full suite.
 24. When the user requests the full test suite, run the full local suite and also validate the demo Docker path by testing `docker compose -f docker-compose.demo.yml up --build` and confirming the demo stack starts successfully; tear it down afterward.
-25. When tests require starting local services manually, run the API/backend and Angular frontend on random available high ports instead of standard ports like `8888` and `4200` to reduce the chance of blocking commonly used defaults.
+25. When tests require starting local services manually, prefer `./scripts/start-agent-stack.sh` so API port, frontend port, runtime API URL, and CORS origins stay aligned. If you cannot use the script, pick random available high ports instead of `8888`/`4200` and override all correlated env vars together (see **Local Agent Stack Topology** above).
 26. Always use private database names for this worktree/agent instead of shared names like `tests` or `ezrules`. This applies to backend pytest, CLI test helpers, reset-dev, and any Playwright/dev-stack runs. Prefer the existing private E2E naming convention, for example `tests_e2e_<suffix>` and `ezrules_e2e_<suffix>`.
 27. After tests are done, kill any API/backend and Angular dev servers you started manually, regardless of which ports were used.
 28. After verification completes, reset the private dev environment using the same private dev DB you used for the run, not the shared `ezrules` DB.

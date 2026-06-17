@@ -514,8 +514,9 @@ def init_permissions(org_name):
 @click.option("--reload", is_flag=True, help="Enable auto-reload for development")
 def api(port, reload):
     """Start the FastAPI v2 API server (default port 8888 for Angular frontend)."""
-    env = os.environ.copy()
     cmd = [
+        sys.executable,
+        "-m",
         "uvicorn",
         "ezrules.backend.api_v2.main:app",
         "--host",
@@ -525,10 +526,7 @@ def api(port, reload):
     ]
     if reload:
         cmd.append("--reload")
-    subprocess.run(
-        cmd,
-        env=env,
-    )
+    subprocess.run(cmd, env=os.environ.copy(), check=True)
 
 
 @cli.command()

@@ -1,5 +1,11 @@
 # What's New
 
+## v1.24.1
+
+* **Agent local stack scripts**: Added `scripts/start-agent-stack.sh`, `scripts/verify-stack.sh`, and `scripts/stop-agent-stack.sh` to pick correlated API/frontend ports, write `.env.agent-stack`, reset a private database, and verify browser login topology plus a form-encoded login smoke test.
+* **Detached agent stack processes**: Stack services spawn in a new session via `scripts/spawn-detached.py` so API/frontend survive separate agent shell turns.
+* **Local CORS safety net**: `settings.env` now allows any `http://localhost:<port>` origin via regex so custom frontend ports still work when agents forget to override `EZRULES_CORS_ALLOWED_ORIGINS`.
+
 ## v1.24.0
 
 * **Postgres graph features**: Added configured graph entity fields, canonical event-to-entity link storage, and bounded current-as-of graph feature resolution for rules such as `stat[user.unique_cards_graph_90d]`.

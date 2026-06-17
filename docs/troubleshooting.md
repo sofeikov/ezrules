@@ -36,10 +36,31 @@ lsof -i :8888
 - No user exists yet
 - Wrong password
 - API is down, so auth endpoints are unavailable
+- Frontend is calling the wrong API port (`runtime-config.js` still points at `http://localhost:8888`)
+- CORS blocks the browser login request when frontend and API run on different origins/ports
+
+**Diagnose**
+
+```bash
+source .env.agent-stack 2>/dev/null || true
+./scripts/verify-stack.sh
+curl -fsS "${API_URL:-http://localhost:8888}/ping"
+grep apiUrl ezrules/frontend/public/runtime-config.js
+curl -fsS -X OPTIONS "${API_URL:-http://localhost:8888}/api/v2/auth/login" \
+  -H "Origin: ${FRONTEND_URL:-http://localhost:4200}" \
+  -H "Access-Control-Request-Method: POST" -D - -o /dev/null
+```
 
 **Fix**
 
-1. Create an admin user:
+1. Prefer the correlated stack helper:
+
+   ```bash
+   docker compose up -d postgres redis mailpit
+   ./scripts/start-agent-stack.sh
+   ```
+
+2. Create an admin user if needed:
 
    ```bash
    uv run ezrules bootstrap-org --name your-org --admin-email admin@example.com --admin-password admin
@@ -51,8 +72,42 @@ lsof -i :8888
    uv run ezrules add-user --org-name your-org --user-email admin@example.com --password admin --admin
    ```
 
-2. Restart API service
-3. Retry login on `http://localhost:4200/login`
+3. If starting services manually on custom ports, set **all** of these together:
+   - API `--port`
+   - frontend `npm start -- --port`
+   - `EZRULES_FRONTEND_API_URL=http://localhost:<api-port>`
+   - `EZRULES_CORS_ALLOWED_ORIGINS=http://localhost:<frontend-port>`
+4. Retry login on the frontend URL you actually started (for example `http://localhost:44200/login`)
+
+## Login works via curl but not in the browser
+
+**Likely causes**
+
+- `EZRULES_FRONTEND_API_URL` was not set when starting the Angular dev server
+- `EZRULES_CORS_ALLOWED_ORIGINS` does not include the frontend origin
+- A stale API process is still listening on `8888` while the frontend targets another port
+
+**Fix**
+
+1. Restart the frontend with `EZRULES_FRONTEND_API_URL` set to the live API URL
+2. Restart the API with `EZRULES_CORS_ALLOWED_ORIGINS` set to the frontend origin
+3. Run `./scripts/verify-stack.sh` (includes login smoke test by default)
+4. Confirm in DevTools → Network that `/api/v2/auth/login` is not blocked by CORS
+
+Login curl (form-encoded OAuth2 fields, not JSON):
+
+```bash
+source .env.agent-stack
+curl -fsS -X POST "${API_URL}/api/v2/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "username=${AGENT_STACK_ADMIN_EMAIL}" \
+  --data-urlencode "password=${AGENT_STACK_ADMIN_PASSWORD}"
+```
+
+**Verify**
+
+- `./scripts/verify-stack.sh` passes
+- Browser login reaches the intended API port and returns `200` or `401` (not a CORS error)
 
 ## API returns `401` Unauthorized
 
