@@ -5,9 +5,11 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
-from ezrules.core.rule import MissingFieldLookupError
+from ezrules.backend.features import FeatureResolutionError, FeatureResolver
+from ezrules.core.rule import MissingFieldLookupError, MissingStatLookupError
 from ezrules.core.type_casting import (
     CastError,
     FieldCastConfig,
@@ -56,6 +58,7 @@ def _count_rates(counts: Counter[str], total_records: int) -> dict[str, float]:
 class BacktestRecord:
     event_data: dict[str, Any]
     label_name: str | None = None
+    as_of: datetime | None = None
 
 
 @dataclass
@@ -168,10 +171,15 @@ def compute_backtest_metrics(
     proposed_rule: Any,
     test_records: Iterable[BacktestRecord],
     configs: list[FieldCastConfig],
+    feature_resolver: FeatureResolver | None = None,
 ) -> dict[str, Any]:
     stored_rule_fields = set(stored_rule.get_rule_params())
     proposed_rule_fields = set(proposed_rule.get_rule_params())
     referenced_fields = sorted(stored_rule_fields | proposed_rule_fields)
+    stat_paths = stored_rule.get_rule_stats() | proposed_rule.get_rule_stats()
+    if stat_paths and feature_resolver is None:
+        raise ValueError("Backtest rules reference computed stats but feature resolution was not configured.")
+
     total_records = 0
     skipped_records = 0
     labeled_records = 0
@@ -179,6 +187,7 @@ def compute_backtest_metrics(
     quality_outcomes: set[str] = set()
     missing_field_counts: Counter[str] = Counter()
     normalization_failures: Counter[str] = Counter()
+    stat_resolution_failures: Counter[str] = Counter()
 
     stored_metrics = _RuleMetricsAccumulator()
     proposed_metrics = _RuleMetricsAccumulator()
@@ -200,12 +209,30 @@ def compute_backtest_metrics(
             normalization_failures[str(exc)] += 1
             continue
 
+        stats: dict[str, Any] | None = None
+        if stat_paths:
+            if record.as_of is None:
+                skipped_records += 1
+                stat_resolution_failures["missing_as_of"] += 1
+                continue
+            try:
+                assert feature_resolver is not None
+                stats = feature_resolver.resolve(normalized_event, record.as_of, stat_paths)
+            except FeatureResolutionError as exc:
+                skipped_records += 1
+                stat_resolution_failures[str(exc)] += 1
+                continue
+
         try:
-            stored_outcome = stored_rule(normalized_event)
-            proposed_outcome = proposed_rule(normalized_event)
+            stored_outcome = stored_rule(normalized_event, stats)
+            proposed_outcome = proposed_rule(normalized_event, stats)
         except MissingFieldLookupError as exc:
             skipped_records += 1
             missing_field_counts[exc.field_name] += 1
+            continue
+        except MissingStatLookupError as exc:
+            skipped_records += 1
+            stat_resolution_failures[exc.stat_path] += 1
             continue
         except KeyError as exc:
             missing_field = _extract_runtime_missing_field(exc, normalized_event)
@@ -266,6 +293,11 @@ def compute_backtest_metrics(
             f"Records excluded by live normalization rules: {message} ({count})."
             for message, count in normalization_failures.items()
         )
+    if stat_resolution_failures:
+        impacted_stats = ", ".join(
+            f"{reason} ({stat_resolution_failures[reason]})" for reason in sorted(stat_resolution_failures)
+        )
+        warnings.append(f"Records excluded because computed stats could not be resolved: {impacted_stats}.")
 
     return {
         "stored_result": _sorted_counts(stored_metrics.outcome_counts),

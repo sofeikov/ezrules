@@ -8,6 +8,7 @@ output/playwright
 CLAUDE.md
 
 .omx
+.omc
 artifacts
 
 package/

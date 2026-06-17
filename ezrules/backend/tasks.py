@@ -12,6 +12,7 @@ from ezrules.backend.backtesting import (
     BacktestRecord,
     compute_backtest_metrics,
 )
+from ezrules.backend.features import FeatureResolver
 from ezrules.backend.observation_queue import drain_observation_queue
 from ezrules.backend.rule_quality import (
     compute_rule_quality_metrics,
@@ -207,7 +208,7 @@ def execute_backtest_rule_change(
 
         try:
             query = (
-                db_session.query(EventVersion.event_data, Label.label)
+                db_session.query(EventVersion.event_data, EventVersion.effective_at, Label.label)
                 .join(EvaluationDecision, EvaluationDecision.ev_id == EventVersion.ev_id)
                 .outerjoin(
                     EventVersionLabel,
@@ -235,14 +236,21 @@ def execute_backtest_rule_change(
 
         configs = load_cast_configs(db_session, org_id)
 
+        feature_resolver = FeatureResolver(db_session, org_id)
+
         payload = compute_backtest_metrics(
             stored_rule=stored_rule,
             proposed_rule=proposed_rule,
             test_records=(
-                BacktestRecord(event_data=dict(row.event_data or {}), label_name=str(row.label) if row.label else None)
+                BacktestRecord(
+                    event_data=dict(row.event_data or {}),
+                    label_name=str(row.label) if row.label else None,
+                    as_of=row.effective_at,
+                )
                 for row in query.yield_per(5000)
             ),
             configs=configs,
+            feature_resolver=feature_resolver,
         )
     except Exception as e:
         db_session.rollback()

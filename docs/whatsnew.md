@@ -1,5 +1,9 @@
 # What's New
 
+## v1.24.2
+
+* **Backtest stat resolution**: Rule backtests now resolve `stat[...]` computed features as of each historical event's `effective_at`, matching live evaluation semantics and excluding future data from feature windows.
+
 ## v1.24.1
 
 * **Agent local stack scripts**: Added `scripts/start-agent-stack.sh`, `scripts/verify-stack.sh`, and `scripts/stop-agent-stack.sh` to pick correlated API/frontend ports, write `.env.agent-stack`, reset a private database, and verify browser login topology plus a form-encoded login smoke test.
