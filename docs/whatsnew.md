@@ -1,5 +1,10 @@
 # What's New
 
+## v1.25.0
+
+* **Recent rule triggers**: Rule detail pages now show recent served transactions where the rule produced an outcome, with a fixed-size **Load more** flow for reviewing additional trigger history without leaving the page.
+* **Rule trigger API**: Added `GET /api/v2/rules/{rule_id}/triggered-events` with `limit` and `offset` pagination so clients can inspect concrete transactions behind a rule's stored hit trend.
+
 ## v1.24.2
 
 * **Backtest stat resolution**: Rule backtests now resolve `stat[...]` computed features as of each historical event's `effective_at`, matching live evaluation semantics and excluding future data from feature windows.

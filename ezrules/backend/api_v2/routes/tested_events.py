@@ -267,6 +267,69 @@ def _linked_event_versions_for_links(
     return discovered, truncated
 
 
+def build_tested_event_items(
+    db: Any,
+    records: list[tuple[EvaluationDecision, EventVersion, TransactionCurrentVersion, str | None]],
+    *,
+    include_referenced_fields: bool,
+) -> list[TestedEventItem]:
+    """Build tested-event response items for pre-filtered decision records."""
+    triggered_rules_by_decision: dict[int, list[TriggeredRuleItem]] = defaultdict(list)
+    referenced_fields_by_rule_id: dict[int, list[str]] = {}
+    decision_ids = [int(decision.ed_id) for decision, _event_version, _current_version, _label_name in records]
+
+    if decision_ids:
+        rule_rows = (
+            db.query(
+                EvaluationDecision.ed_id,
+                Rule.r_id,
+                Rule.rid,
+                Rule.description,
+                Rule.logic,
+                EvaluationRuleResult.rule_result,
+            )
+            .join(EvaluationRuleResult, EvaluationRuleResult.ed_id == EvaluationDecision.ed_id)
+            .join(Rule, Rule.r_id == EvaluationRuleResult.r_id)
+            .filter(EvaluationDecision.ed_id.in_(decision_ids))
+            .order_by(EvaluationDecision.ed_id.desc(), Rule.rid.asc())
+            .all()
+        )
+
+        for ed_id, r_id, rid, description, rule_logic, rule_result in rule_rows:
+            rule_id = int(r_id)
+            if include_referenced_fields and rule_id not in referenced_fields_by_rule_id:
+                referenced_fields_by_rule_id[rule_id] = _extract_referenced_fields(str(rule_logic))
+
+            triggered_rule = TriggeredRuleItem(
+                r_id=rule_id,
+                rid=str(rid),
+                description=str(description),
+                outcome=str(rule_result),
+            )
+            if include_referenced_fields:
+                triggered_rule.referenced_fields = referenced_fields_by_rule_id[rule_id]
+            triggered_rules_by_decision[int(ed_id)].append(triggered_rule)
+
+    return [
+        TestedEventItem(
+            evaluation_decision_id=int(decision.ed_id),
+            transaction_id=str(decision.transaction_id),
+            effective_at=_utc_isoformat(cast(datetime, decision.effective_at)),
+            observed_at=_utc_isoformat(cast(datetime, decision.observed_at)),
+            first_effective_at=_utc_isoformat(cast(datetime, current_version.first_effective_at)),
+            first_observed_at=_utc_isoformat(cast(datetime, current_version.first_observed_at)),
+            event_version=int(decision.event_version),
+            is_current=bool(decision.is_current),
+            resolved_outcome=str(decision.resolved_outcome) if decision.resolved_outcome is not None else None,
+            label_name=str(label_name) if label_name is not None else None,
+            outcome_counters=dict(cast(dict[str, int], decision.outcome_counters or {})),
+            event_data=dict(cast(dict[str, Any], event_version.event_data or {})),
+            triggered_rules=triggered_rules_by_decision.get(int(decision.ed_id), []),
+        )
+        for decision, event_version, current_version, label_name in records
+    ]
+
+
 @router.get("", response_model=TestedEventsResponse, response_model_exclude_unset=True)
 def list_tested_events(
     limit: int = Query(default=50, ge=1, le=200, description="Max events to return"),
@@ -312,60 +375,7 @@ def list_tested_events(
         .count()
     )
 
-    triggered_rules_by_decision: dict[int, list[TriggeredRuleItem]] = defaultdict(list)
-    referenced_fields_by_rule_id: dict[int, list[str]] = {}
-    decision_ids = [int(decision.ed_id) for decision, _event_version, _current_version, _label_name in records]
-
-    if decision_ids:
-        rule_rows = (
-            db.query(
-                EvaluationDecision.ed_id,
-                Rule.r_id,
-                Rule.rid,
-                Rule.description,
-                Rule.logic,
-                EvaluationRuleResult.rule_result,
-            )
-            .join(EvaluationRuleResult, EvaluationRuleResult.ed_id == EvaluationDecision.ed_id)
-            .join(Rule, Rule.r_id == EvaluationRuleResult.r_id)
-            .filter(EvaluationDecision.ed_id.in_(decision_ids))
-            .order_by(EvaluationDecision.ed_id.desc(), Rule.rid.asc())
-            .all()
-        )
-
-        for ed_id, r_id, rid, description, rule_logic, rule_result in rule_rows:
-            rule_id = int(r_id)
-            if include_referenced_fields and rule_id not in referenced_fields_by_rule_id:
-                referenced_fields_by_rule_id[rule_id] = _extract_referenced_fields(str(rule_logic))
-
-            triggered_rule = TriggeredRuleItem(
-                r_id=rule_id,
-                rid=str(rid),
-                description=str(description),
-                outcome=str(rule_result),
-            )
-            if include_referenced_fields:
-                triggered_rule.referenced_fields = referenced_fields_by_rule_id[rule_id]
-            triggered_rules_by_decision[int(ed_id)].append(triggered_rule)
-
-    events = [
-        TestedEventItem(
-            evaluation_decision_id=int(decision.ed_id),
-            transaction_id=str(decision.transaction_id),
-            effective_at=_utc_isoformat(decision.effective_at),
-            observed_at=_utc_isoformat(decision.observed_at),
-            first_effective_at=_utc_isoformat(current_version.first_effective_at),
-            first_observed_at=_utc_isoformat(current_version.first_observed_at),
-            event_version=int(decision.event_version),
-            is_current=bool(decision.is_current),
-            resolved_outcome=str(decision.resolved_outcome) if decision.resolved_outcome is not None else None,
-            label_name=str(label_name) if label_name is not None else None,
-            outcome_counters=dict(decision.outcome_counters or {}),
-            event_data=dict(event_version.event_data or {}),
-            triggered_rules=triggered_rules_by_decision.get(int(decision.ed_id), []),
-        )
-        for decision, event_version, current_version, label_name in records
-    ]
+    events = build_tested_event_items(db, records, include_referenced_fields=include_referenced_fields)
 
     return TestedEventsResponse(events=events, total=int(total), limit=limit)
 
