@@ -62,7 +62,7 @@ Switch the dashboard to the 30-day window to review sustained traffic and outcom
 
 ### Inspect Rule Logic And Performance
 
-Each rule has its own detail view with source logic, test payloads, historical revisions, backtesting, and hit/outcome performance.
+Each rule has its own detail view with source logic, test payloads, historical revisions, backtesting, hit/outcome performance, and recent transactions that triggered the rule.
 
 ![30-day rule performance chart](docs/assets/readme/rule-detail-performance-30d.png)
 

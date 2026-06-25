@@ -24,6 +24,7 @@ from ezrules.backend.api_v2.auth.dependencies import (
     get_db,
     require_permission,
 )
+from ezrules.backend.api_v2.routes.tested_events import build_tested_event_items
 from ezrules.backend.api_v2.schemas.rollouts import RolloutDeployRequest, RolloutDeployResponse
 from ezrules.backend.api_v2.schemas.rules import (
     MainRuleOrderUpdateRequest,
@@ -43,6 +44,7 @@ from ezrules.backend.api_v2.schemas.rules import (
     RulesListResponse,
     RuleTestRequest,
     RuleTestResponse,
+    RuleTriggeredEventsResponse,
     RuleUpdate,
     RuleVerifyRequest,
     RuleVerifyResponse,
@@ -80,12 +82,17 @@ from ezrules.core.type_casting import CastError, RequiredFieldError, normalize_e
 from ezrules.models.backend_core import (
     Action,
     AIRuleAuthoringHistory,
+    EvaluationDecision,
     EvaluationRuleResult,
+    EventVersion,
+    EventVersionLabel,
+    Label,
     RoleActions,
     RuleDeploymentResultsLog,
     RuleHistory,
     RuleStatus,
     ShadowResultsLog,
+    TransactionCurrentVersion,
     User,
 )
 from ezrules.models.backend_core import Rule as RuleModel
@@ -397,6 +404,68 @@ def get_rule(
     ]
 
     return rule_to_response(rule, revisions)
+
+
+@router.get(
+    "/{rule_id}/triggered-events",
+    response_model=RuleTriggeredEventsResponse,
+    response_model_exclude_unset=True,
+)
+def get_rule_triggered_events(
+    rule_id: int,
+    limit: int = Query(default=10, ge=1, le=100, description="Page size for triggered transactions"),
+    offset: int = Query(default=0, ge=0, description="Triggered transaction offset"),
+    user: User = Depends(get_current_active_user),
+    _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
+    current_org_id: int = Depends(get_current_org_id),
+    db: Any = Depends(get_db),
+) -> RuleTriggeredEventsResponse:
+    """Return recent served transactions where the selected rule produced an outcome."""
+    rule = db.query(RuleModel.r_id).filter(RuleModel.r_id == rule_id, RuleModel.o_id == current_org_id).first()
+    if rule is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
+
+    filters = (
+        EvaluationDecision.o_id == current_org_id,
+        EvaluationDecision.served.is_(True),
+        EvaluationDecision.decision_type == "served",
+        EvaluationRuleResult.r_id == rule_id,
+        EvaluationRuleResult.rule_result.isnot(None),
+    )
+
+    records = (
+        db.query(EvaluationDecision, EventVersion, TransactionCurrentVersion, Label.label)
+        .join(EvaluationRuleResult, EvaluationRuleResult.ed_id == EvaluationDecision.ed_id)
+        .join(EventVersion, EventVersion.ev_id == EvaluationDecision.ev_id)
+        .join(
+            TransactionCurrentVersion,
+            (TransactionCurrentVersion.o_id == EvaluationDecision.o_id)
+            & (TransactionCurrentVersion.transaction_id == EvaluationDecision.transaction_id),
+        )
+        .outerjoin(
+            EventVersionLabel,
+            (EventVersionLabel.ev_id == EvaluationDecision.ev_id) & (EventVersionLabel.o_id == EvaluationDecision.o_id),
+        )
+        .outerjoin(Label, (Label.el_id == EventVersionLabel.el_id) & (Label.o_id == EvaluationDecision.o_id))
+        .filter(*filters)
+        .order_by(EvaluationDecision.ed_id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    total = (
+        db.query(EvaluationRuleResult.err_id)
+        .join(EvaluationDecision, EvaluationDecision.ed_id == EvaluationRuleResult.ed_id)
+        .filter(*filters)
+        .count()
+    )
+
+    return RuleTriggeredEventsResponse(
+        events=build_tested_event_items(db, records, include_referenced_fields=False),
+        total=int(total),
+        limit=limit,
+        offset=offset,
+    )
 
 
 # =============================================================================

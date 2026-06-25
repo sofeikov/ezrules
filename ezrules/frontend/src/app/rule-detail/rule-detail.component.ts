@@ -17,6 +17,7 @@ import {
   ShadowRuleItem,
   UpdateRuleRequest
 } from '../services/rule.service';
+import type { TestedEvent } from '../services/tested-event.service';
 import { ChartDataset, DashboardService } from '../services/dashboard.service';
 import {
   BacktestingService,
@@ -44,6 +45,7 @@ Chart.register(...registerables);
 
 const BACKTEST_RENDER_ROW_LIMIT = 100;
 const BACKTEST_DIFF_CHAR_LIMIT = 50000;
+const RULE_TRIGGER_BATCH_SIZE = 10;
 
 interface BacktestOutcomeRow {
   outcome: string;
@@ -119,6 +121,13 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedPerformanceAggregation: string = '6h';
   performanceOutcomeDatasets: ChartDataset[] = [];
   performanceTimeLabels: string[] = [];
+  triggeredEvents: TestedEvent[] = [];
+  triggeredEventsTotal: number = 0;
+  triggeredEventsLoading: boolean = false;
+  triggeredEventsLoadingMore: boolean = false;
+  triggeredEventsRefreshing: boolean = false;
+  triggeredEventsError: string | null = null;
+  expandedTriggeredEventIds: Set<number> = new Set();
 
   // Revision view properties
   isRevisionView: boolean = false;
@@ -264,6 +273,7 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loading = true;
     this.error = null;
     this.resetRulePerformance();
+    this.resetTriggeredEvents();
 
     this.ruleService.getRule(ruleId).subscribe({
       next: (rule) => {
@@ -275,6 +285,7 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         this.loadRolloutEntry(rule.r_id);
         this.loadBacktestResults(rule.r_id);
         this.loadRulePerformance(rule.r_id);
+        this.loadTriggeredEvents(rule.r_id, true);
       },
       error: (error) => {
         this.rule = null;
@@ -290,6 +301,7 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loading = true;
     this.error = null;
     this.resetRulePerformance();
+    this.resetTriggeredEvents();
 
     this.ruleService.getRuleRevision(ruleId, revisionNumber).subscribe({
       next: (revision: RuleRevisionDetail) => {
@@ -412,6 +424,126 @@ export class RuleDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     this.performanceOutcomeDatasets = [];
     this.performanceTimeLabels = [];
     this.destroyPerformanceChart();
+  }
+
+  loadTriggeredEvents(ruleId: number, reset: boolean = false): void {
+    if (this.isRevisionView) {
+      return;
+    }
+
+    const offset = reset ? 0 : this.triggeredEvents.length;
+    if (reset) {
+      this.triggeredEventsLoading = this.triggeredEvents.length === 0;
+      this.triggeredEventsRefreshing = this.triggeredEvents.length > 0;
+      this.expandedTriggeredEventIds.clear();
+    } else {
+      this.triggeredEventsLoadingMore = true;
+    }
+    this.triggeredEventsError = null;
+
+    this.ruleService.getRuleTriggeredEvents(ruleId, RULE_TRIGGER_BATCH_SIZE, offset).subscribe({
+      next: (response) => {
+        this.triggeredEvents = reset ? response.events : [...this.triggeredEvents, ...response.events];
+        this.triggeredEventsTotal = response.total;
+        this.triggeredEventsLoading = false;
+        this.triggeredEventsRefreshing = false;
+        this.triggeredEventsLoadingMore = false;
+      },
+      error: (error) => {
+        this.triggeredEventsError = 'Failed to load recent triggered transactions.';
+        this.triggeredEventsLoading = false;
+        this.triggeredEventsRefreshing = false;
+        this.triggeredEventsLoadingMore = false;
+        console.error('Error loading rule triggered transactions:', error);
+      }
+    });
+  }
+
+  refreshTriggeredEvents(): void {
+    if (!this.rule || this.triggeredEventsLoading || this.triggeredEventsRefreshing || this.triggeredEventsLoadingMore) {
+      return;
+    }
+    this.loadTriggeredEvents(this.rule.r_id, true);
+  }
+
+  loadMoreTriggeredEvents(): void {
+    if (
+      !this.rule ||
+      this.triggeredEventsLoading ||
+      this.triggeredEventsRefreshing ||
+      this.triggeredEventsLoadingMore ||
+      !this.hasMoreTriggeredEvents()
+    ) {
+      return;
+    }
+    this.loadTriggeredEvents(this.rule.r_id, false);
+  }
+
+  hasMoreTriggeredEvents(): boolean {
+    return this.triggeredEvents.length < this.triggeredEventsTotal;
+  }
+
+  toggleTriggeredEventDetails(eventId: number): void {
+    if (this.expandedTriggeredEventIds.has(eventId)) {
+      this.expandedTriggeredEventIds.delete(eventId);
+      return;
+    }
+    this.expandedTriggeredEventIds.add(eventId);
+  }
+
+  isTriggeredEventExpanded(eventId: number): boolean {
+    return this.expandedTriggeredEventIds.has(eventId);
+  }
+
+  outcomeBadgeClass(outcome: string | null): string {
+    if (outcome === 'CANCEL') {
+      return 'bg-red-100 text-red-800';
+    }
+    if (outcome === 'HOLD') {
+      return 'bg-amber-100 text-amber-800';
+    }
+    if (outcome === 'RELEASE') {
+      return 'bg-green-100 text-green-800';
+    }
+    return 'bg-gray-200 text-gray-700';
+  }
+
+  eventSummary(eventData: Record<string, unknown>): string {
+    const entries = Object.entries(eventData).slice(0, 3);
+    if (entries.length === 0) {
+      return 'No event fields recorded';
+    }
+    return entries
+      .map(([key, value]) => `${key}: ${this.stringifyValue(value)}`)
+      .join(' | ');
+  }
+
+  private resetTriggeredEvents(): void {
+    this.triggeredEvents = [];
+    this.triggeredEventsTotal = 0;
+    this.triggeredEventsLoading = false;
+    this.triggeredEventsLoadingMore = false;
+    this.triggeredEventsRefreshing = false;
+    this.triggeredEventsError = null;
+    this.expandedTriggeredEventIds.clear();
+  }
+
+  private stringifyValue(value: unknown): string {
+    if (value === null) {
+      return 'null';
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '[unserializable]';
+    }
   }
 
   fillInExampleParams(ruleSource?: string): void {
