@@ -47,6 +47,20 @@ export interface BacktestQualitySummary {
   worst_pair: string | null;
 }
 
+export interface FeatureSnapshotSummary {
+  stat_path: string;
+  feature_id?: number | null;
+  feature_kind?: string | null;
+  feature_version?: number | null;
+  as_of_start: string;
+  as_of_end: string;
+  window_start: string;
+  matched_event_count_min: number;
+  matched_event_count_max: number;
+  resolution_status_counts: Record<string, number>;
+  warning_count: number;
+}
+
 export interface BacktestTaskResult {
   status: string;
   queue_status?: string | null;
@@ -65,6 +79,8 @@ export interface BacktestTaskResult {
   proposed_quality_summary?: BacktestQualitySummary | null;
   stored_quality_metrics?: BacktestQualityMetric[];
   proposed_quality_metrics?: BacktestQualityMetric[];
+  feature_snapshots?: FeatureSnapshotSummary[];
+  feature_snapshot_warnings?: string[];
   warnings?: string[];
   error?: string;
 }
