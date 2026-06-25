@@ -122,6 +122,7 @@ def test_returns_referenced_fields_for_triggered_rules(session, tested_events_fi
             "rid": "EVENTS:FIELDS:001",
             "description": "Hold high-value traffic",
             "outcome": "HOLD",
+            "metadata_source": "evaluation_snapshot",
             "referenced_fields": ["amount"],
         },
         {
@@ -129,6 +130,65 @@ def test_returns_referenced_fields_for_triggered_rules(session, tested_events_fi
             "rid": "EVENTS:FIELDS:002",
             "description": "Release GB traffic",
             "outcome": "RELEASE",
+            "metadata_source": "evaluation_snapshot",
             "referenced_fields": ["country"],
         },
     ]
+
+
+def test_referenced_fields_stay_anchored_after_rule_edit(session, tested_events_field_client):
+    org = tested_events_field_client.test_data["org"]
+    token = tested_events_field_client.test_data["token"]
+
+    rule = Rule(
+        logic='if $customer_country == "GB":\n\treturn !RELEASE',
+        description="Release GB customer traffic",
+        rid="EVENTS:FIELDS:DRIFT",
+        o_id=org.o_id,
+        r_id=9203,
+    )
+    session.add(rule)
+    session.commit()
+    _save_rule_config(session, org.o_id)
+
+    _store_event(
+        session,
+        org.o_id,
+        "evt-historical-explanation",
+        1700000300,
+        {"customer_country": "GB", "merchant_category": "books"},
+    )
+
+    before_response = tested_events_field_client.get(
+        "/api/v2/tested-events",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"include_referenced_fields": "true"},
+    )
+    assert before_response.status_code == 200
+    before_event = before_response.json()["events"][0]
+    assert before_event["triggered_rules"] == [
+        {
+            "r_id": 9203,
+            "rid": "EVENTS:FIELDS:DRIFT",
+            "description": "Release GB customer traffic",
+            "outcome": "RELEASE",
+            "metadata_source": "evaluation_snapshot",
+            "referenced_fields": ["customer_country"],
+        }
+    ]
+
+    rule.logic = 'if $merchant_category == "books":\n\treturn !HOLD'
+    rule.description = "Hold book merchant traffic"
+    session.commit()
+    _save_rule_config(session, org.o_id)
+
+    after_response = tested_events_field_client.get(
+        "/api/v2/tested-events",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"include_referenced_fields": "true"},
+    )
+
+    assert after_response.status_code == 200
+    after_event = after_response.json()["events"][0]
+    assert after_event["transaction_id"] == "evt-historical-explanation"
+    assert after_event["triggered_rules"] == before_event["triggered_rules"]

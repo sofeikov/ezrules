@@ -198,9 +198,10 @@ def _evaluate_rollout_result(
     assignment_key: str,
     list_provider: PersistentUserListManager,
     stats: dict[str, Any],
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+) -> tuple[dict[str, Any], list[dict[str, Any]], dict[int, dict[str, Any]]]:
     ordered_rules = list(lre.rule_engine.rules if lre.rule_engine is not None else [])
     rollout_by_rule_id = {int(entry["r_id"]): entry for entry in rollout_entries if "r_id" in entry}
+    rule_metadata_by_id = data_utils.build_rule_metadata_from_rules(ordered_rules)
     all_rule_results: dict[int, Any] = {}
     rollout_logs: list[dict[str, Any]] = []
 
@@ -225,6 +226,7 @@ def _evaluate_rollout_result(
             selected_variant = DEPLOYMENT_VARIANT_CANDIDATE if bucket < traffic_percent else DEPLOYMENT_VARIANT_CONTROL
             if selected_variant == DEPLOYMENT_VARIANT_CANDIDATE and candidate_succeeded:
                 returned_result = candidate_result
+                rule_metadata_by_id.update(data_utils.build_rule_metadata_from_rules([candidate_rule]))
 
             rollout_logs.append(
                 {
@@ -243,7 +245,7 @@ def _evaluate_rollout_result(
         if lre.execution_mode == RULE_EXECUTION_MODE_FIRST_MATCH and returned_result is not None:
             break
 
-    return _build_response_from_all_results(all_rule_results), rollout_logs
+    return _build_response_from_all_results(all_rule_results), rollout_logs, rule_metadata_by_id
 
 
 def _persist_evaluate_observations(db: Any, event_data: dict, o_id: int) -> None:
@@ -305,6 +307,7 @@ def evaluate(
         allowlist_result = allowlist_lre.evaluate_rules(event.event_data, as_of=event.effective_at)
         if allowlist_result.get("rule_results"):
             result = _build_response_from_all_results(dict(allowlist_result.get("all_rule_results", {})))
+            result["_rule_metadata_by_id"] = data_utils.build_rule_metadata_from_engine(allowlist_lre.rule_engine)
             result, _ = data_utils.eval_and_store(lre, event, response=result)
             enqueue_alert_detection(
                 o_id=int(lre.o_id),
@@ -353,7 +356,7 @@ def evaluate(
     if rollout_entries:
         assert list_provider is not None
         assignment_key = _get_assignment_key(event)
-        result, rollout_logs = _evaluate_rollout_result(
+        result, rollout_logs, rule_metadata_by_id = _evaluate_rollout_result(
             event_data=event.event_data,
             lre=lre,
             rollout_entries=rollout_entries,
@@ -361,6 +364,7 @@ def evaluate(
             list_provider=list_provider,
             stats=stats,
         )
+        result["_rule_metadata_by_id"] = rule_metadata_by_id
     else:
         result = production_result
 
@@ -491,7 +495,7 @@ def test_event(
             production_result = lre.evaluate_rules(event.event_data, as_of=event.effective_at, stats=stats)
             if rollout_entries:
                 assert list_provider is not None
-                result, rollout_logs = _evaluate_rollout_result(
+                result, rollout_logs, _rule_metadata_by_id = _evaluate_rollout_result(
                     event_data=event.event_data,
                     lre=lre,
                     rollout_entries=rollout_entries,

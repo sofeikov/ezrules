@@ -473,6 +473,11 @@ class EvaluationRuleResult(Base):
     ed_id: Mapped[int] = mapped_column(ForeignKey("evaluation_decisions.ed_id", ondelete="CASCADE"), nullable=False)
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"), nullable=False)
     rule_result = Column(String, nullable=False)
+    rule_rid = Column(String, nullable=True)
+    rule_description = Column(String, nullable=True)
+    rule_logic = Column(Text, nullable=True)
+    referenced_fields = Column(JSONB, nullable=True)
+    metadata_source = Column(String(32), nullable=False, default="evaluation_snapshot")
 
 
 class EventVersionLabel(Base):
