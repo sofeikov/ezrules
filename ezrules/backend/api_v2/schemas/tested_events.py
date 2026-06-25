@@ -12,6 +12,10 @@ class TriggeredRuleItem(BaseModel):
     rid: str = Field(..., description="Stable rule identifier")
     description: str = Field(..., description="Rule description")
     outcome: str = Field(..., description="Outcome returned by the rule")
+    metadata_source: str = Field(
+        default="evaluation_snapshot",
+        description="Whether rule metadata came from the stored evaluation snapshot or a current-rule fallback",
+    )
     referenced_fields: list[str] | None = Field(
         default=None,
         description="Canonical dotted event fields referenced by the rule logic",

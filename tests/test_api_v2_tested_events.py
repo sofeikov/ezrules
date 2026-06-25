@@ -126,12 +126,14 @@ class TestListTestedEvents:
                 "rid": "EVENTS:001",
                 "description": "Always hold",
                 "outcome": "HOLD",
+                "metadata_source": "evaluation_snapshot",
             },
             {
                 "r_id": 9102,
                 "rid": "EVENTS:002",
                 "description": "Release high-value traffic",
                 "outcome": "RELEASE",
+                "metadata_source": "evaluation_snapshot",
             },
         ]
 

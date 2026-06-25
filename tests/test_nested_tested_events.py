@@ -47,6 +47,7 @@ def test_tested_events_returns_nested_referenced_fields(session, tested_events_f
             "rid": "EVENTS:NESTED:001",
             "description": "Hold adult profiles",
             "outcome": "HOLD",
+            "metadata_source": "evaluation_snapshot",
             "referenced_fields": ["customer.profile.age"],
         }
     ]
