@@ -12,7 +12,7 @@ from ezrules.backend.backtesting import (
     BacktestRecord,
     compute_backtest_metrics,
 )
-from ezrules.backend.features import FeatureResolver
+from ezrules.backend.features import FeatureResolver, summarize_feature_snapshot_resolutions
 from ezrules.backend.observation_queue import drain_observation_queue
 from ezrules.backend.rule_quality import (
     compute_rule_quality_metrics,
@@ -251,7 +251,11 @@ def execute_backtest_rule_change(
             ),
             configs=configs,
             feature_resolver=feature_resolver,
+            backtest_task_id=task_id,
         )
+        if task_id is not None:
+            db_session.flush()
+            payload.update(summarize_feature_snapshot_resolutions(db_session, org_id, task_id))
     except Exception as e:
         db_session.rollback()
         payload = {"error": f"Backtest task failed: {e!s}"}

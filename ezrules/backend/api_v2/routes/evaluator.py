@@ -24,7 +24,7 @@ from ezrules.backend.api_v2.schemas.evaluator import (
     EventTestRuleResult,
 )
 from ezrules.backend.data_utils import Event
-from ezrules.backend.features import FeatureResolutionError, FeatureResolver
+from ezrules.backend.features import FeatureResolutionError, FeatureResolutionTrace, FeatureResolver
 from ezrules.backend.observation_queue import enqueue_observations
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.runtime_settings import get_main_rule_execution_mode
@@ -183,11 +183,11 @@ def _resolve_evaluation_stats(
     lre: LocalRuleExecutorSQL,
     rollout_entries: list[dict[str, Any]],
     list_provider: PersistentUserListManager | None,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], list[FeatureResolutionTrace]]:
     stat_paths = lre.get_rule_stats()
     if rollout_entries and list_provider is not None:
         stat_paths.update(_get_rollout_stat_paths(rollout_entries, list_provider))
-    return FeatureResolver(db, o_id).resolve(event_data, as_of, stat_paths)
+    return FeatureResolver(db, o_id).resolve_with_traces(event_data, as_of, stat_paths)
 
 
 def _evaluate_rollout_result(
@@ -328,7 +328,7 @@ def evaluate(
 
         rollout_entries = list_candidate_deployments(db, lre.o_id, ROLLOUT_CONFIG_LABEL)
         list_provider = PersistentUserListManager(db, lre.o_id) if rollout_entries else None
-        stats = _resolve_evaluation_stats(
+        stats, feature_traces = _resolve_evaluation_stats(
             db=db,
             o_id=lre.o_id,
             event_data=event.event_data,
@@ -367,6 +367,8 @@ def evaluate(
     try:
         # `result` already contains the merged served outcome; passing it avoids a second rule evaluation.
         result, evaluation_decision_id = data_utils.eval_and_store(lre, event, response=result)
+        FeatureResolver(db, lre.o_id).persist_traces(feature_traces, evaluation_decision_id=int(evaluation_decision_id))
+        db.commit()
         enqueue_alert_detection(
             o_id=int(lre.o_id),
             evaluation_decision_id=int(evaluation_decision_id),
@@ -479,7 +481,7 @@ def test_event(
         else:
             rollout_entries = list_candidate_deployments(db, lre.o_id, ROLLOUT_CONFIG_LABEL)
             list_provider = PersistentUserListManager(db, lre.o_id) if rollout_entries else None
-            stats = _resolve_evaluation_stats(
+            stats, _feature_traces = _resolve_evaluation_stats(
                 db=db,
                 o_id=lre.o_id,
                 event_data=event.event_data,
