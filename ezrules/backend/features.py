@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
@@ -11,7 +12,13 @@ from sqlalchemy import false, func, or_, text, tuple_
 from ezrules.backend.api_v2.schemas.features import ALLOWED_WINDOW_SECONDS, FeatureAggregation
 from ezrules.core.field_paths import get_field_value, split_field_path
 from ezrules.core.rule_helpers import StatReferenceExtractor
-from ezrules.models.backend_core import EventVersion, FeatureDefinition, GraphEntityField, GraphEventEntityLink
+from ezrules.models.backend_core import (
+    EventVersion,
+    FeatureDefinition,
+    FeatureSnapshotResolution,
+    GraphEntityField,
+    GraphEventEntityLink,
+)
 from ezrules.models.backend_core import Rule as RuleModel
 
 MAX_STAT_REFERENCES_PER_RULE = 10
@@ -33,6 +40,21 @@ class FeatureComputationResult:
     matched_event_count: int
     as_of: datetime
     window_start: datetime
+    entity_value_hash: str | None = None
+
+
+@dataclass(frozen=True)
+class FeatureResolutionTrace:
+    stat_path: str
+    feature_id: int | None
+    feature_kind: str | None
+    feature_version: int | None
+    as_of: datetime
+    window_start: datetime
+    matched_event_count: int
+    entity_value_hash: str | None
+    resolution_status: str
+    warning: str | None = None
 
 
 def normalize_as_utc(value: datetime) -> datetime:
@@ -96,6 +118,13 @@ def _jsonb_text_value(value: Any) -> str | None:
 
 def _graph_entity_value_hash(entity_value: str) -> str:
     return hashlib.sha256(entity_value.encode("utf-8")).hexdigest()
+
+
+def _entity_value_hash(entity_value: Any) -> str | None:
+    text_value = _jsonb_text_value(entity_value)
+    if not text_value:
+        return None
+    return _graph_entity_value_hash(text_value)
 
 
 def _graph_entity_values(event_data: dict[str, Any], field_path: str) -> list[str]:
@@ -265,17 +294,26 @@ def _compute_aggregate_feature(
         EventVersion.o_id == o_id,
         EventVersion.effective_at >= window_start,
         EventVersion.effective_at < as_of,
+        EventVersion.observed_at <= as_of,
         _event_data_text_expression(str(feature.entity_key)) == entity_text_value,
     )
     filters = list(cast(list[dict[str, Any]], feature.filters or []))
     for filter_config in filters:
         query = _apply_jsonb_filter(query, filter_config)
-    matched_events = query.order_by(EventVersion.effective_at.asc(), EventVersion.ev_id.asc()).all()
+    candidate_events = query.order_by(EventVersion.effective_at.asc(), EventVersion.ev_id.asc()).all()
+    current_event_ids = _current_event_version_ids_as_of(
+        db,
+        o_id,
+        {str(event.transaction_id) for event in candidate_events},
+        as_of,
+    )
+    matched_events = [event for event in candidate_events if int(event.ev_id) in current_event_ids]
     return FeatureComputationResult(
         value=_compute_aggregate(feature, matched_events, as_of=as_of),
         matched_event_count=len(matched_events),
         as_of=as_of,
         window_start=window_start,
+        entity_value_hash=_entity_value_hash(entity_value),
     )
 
 
@@ -372,7 +410,13 @@ def _compute_graph_distinct_count(
 
     seed_text_value = _jsonb_text_value(entity_value)
     if not seed_text_value:
-        return FeatureComputationResult(value=0, matched_event_count=0, as_of=as_of, window_start=window_start)
+        return FeatureComputationResult(
+            value=0,
+            matched_event_count=0,
+            as_of=as_of,
+            window_start=window_start,
+            entity_value_hash=_entity_value_hash(entity_value),
+        )
 
     seed = (str(feature.entity), _graph_entity_value_hash(seed_text_value))
     frontier = {seed}
@@ -442,6 +486,7 @@ def _compute_graph_distinct_count(
         matched_event_count=len(visited_event_ids),
         as_of=as_of,
         window_start=window_start,
+        entity_value_hash=_entity_value_hash(entity_value),
     )
 
 
@@ -463,12 +508,20 @@ class FeatureResolver:
     def __init__(self, db: Any, o_id: int):
         self.db = db
         self.o_id = o_id
-        self._cache: dict[tuple[str, str, datetime], Any] = {}
+        self._cache: dict[tuple[str, str, datetime], FeatureComputationResult] = {}
+        self.last_resolution_traces: list[FeatureResolutionTrace] = []
 
     def resolve(self, event_data: dict[str, Any], as_of: datetime, stat_paths: set[str]) -> dict[str, Any]:
+        resolved, _ = self.resolve_with_traces(event_data, as_of, stat_paths)
+        return resolved
+
+    def resolve_with_traces(
+        self, event_data: dict[str, Any], as_of: datetime, stat_paths: set[str]
+    ) -> tuple[dict[str, Any], list[FeatureResolutionTrace]]:
+        self.last_resolution_traces = []
         validate_feature_reference_budget(stat_paths)
         if not stat_paths:
-            return {}
+            return {}, []
 
         features = (
             self.db.query(FeatureDefinition)
@@ -484,17 +537,125 @@ class FeatureResolver:
             raise FeatureResolutionError(f"Unknown or inactive computed stats: {', '.join(missing)}")
 
         resolved: dict[str, Any] = {}
+        traces: list[FeatureResolutionTrace] = []
         as_of = normalize_as_utc(as_of)
         for stat_path in sorted(stat_paths):
             feature = by_path[stat_path]
             entity_value = _safe_get(event_data, str(feature.entity_key))
             if entity_value is None:
+                trace = FeatureResolutionTrace(
+                    stat_path=stat_path,
+                    feature_id=int(feature.fd_id) if feature.fd_id is not None else None,
+                    feature_kind=str(feature.feature_kind),
+                    feature_version=int(feature.version) if feature.version is not None else None,
+                    as_of=as_of,
+                    window_start=as_of,
+                    matched_event_count=0,
+                    entity_value_hash=None,
+                    resolution_status="failed",
+                    warning=f"Event is missing entity key '{feature.entity_key}' required for stat[{stat_path}]",
+                )
+                traces.append(trace)
+                self.last_resolution_traces = traces
                 raise FeatureResolutionError(
                     f"Event is missing entity key '{feature.entity_key}' required for stat[{stat_path}]"
                 )
             entity_value = str(entity_value)
             cache_key = (stat_path, entity_value, as_of)
             if cache_key not in self._cache:
-                self._cache[cache_key] = compute_feature(self.db, self.o_id, feature, event_data, as_of).value
-            resolved[stat_path] = self._cache[cache_key]
-        return resolved
+                self._cache[cache_key] = compute_feature(self.db, self.o_id, feature, event_data, as_of)
+            result = self._cache[cache_key]
+            resolved[stat_path] = result.value
+            traces.append(
+                FeatureResolutionTrace(
+                    stat_path=stat_path,
+                    feature_id=int(feature.fd_id) if feature.fd_id is not None else None,
+                    feature_kind=str(feature.feature_kind),
+                    feature_version=int(feature.version) if feature.version is not None else None,
+                    as_of=result.as_of,
+                    window_start=result.window_start,
+                    matched_event_count=result.matched_event_count,
+                    entity_value_hash=result.entity_value_hash,
+                    resolution_status="resolved",
+                )
+            )
+        self.last_resolution_traces = traces
+        return resolved, traces
+
+    def persist_traces(
+        self,
+        traces: list[FeatureResolutionTrace],
+        *,
+        evaluation_decision_id: int | None = None,
+        backtest_task_id: str | None = None,
+        backtest_record_index: int | None = None,
+    ) -> None:
+        for trace in traces:
+            self.db.add(
+                FeatureSnapshotResolution(
+                    o_id=self.o_id,
+                    ed_id=evaluation_decision_id,
+                    backtest_task_id=backtest_task_id,
+                    backtest_record_index=backtest_record_index,
+                    fd_id=trace.feature_id,
+                    stat_path=trace.stat_path,
+                    feature_kind=trace.feature_kind,
+                    feature_version=trace.feature_version,
+                    as_of=trace.as_of,
+                    window_start=trace.window_start,
+                    matched_event_count=trace.matched_event_count,
+                    entity_value_hash=trace.entity_value_hash,
+                    resolution_status=trace.resolution_status,
+                    warning=trace.warning,
+                )
+            )
+
+
+def summarize_feature_snapshot_resolutions(db: Any, o_id: int, backtest_task_id: str) -> dict[str, Any]:
+    rows = (
+        db.query(FeatureSnapshotResolution)
+        .filter(
+            FeatureSnapshotResolution.o_id == o_id,
+            FeatureSnapshotResolution.backtest_task_id == backtest_task_id,
+        )
+        .order_by(FeatureSnapshotResolution.stat_path.asc(), FeatureSnapshotResolution.as_of.asc())
+        .all()
+    )
+    if not rows:
+        return {"feature_snapshots": [], "feature_snapshot_warnings": []}
+
+    grouped: dict[str, list[FeatureSnapshotResolution]] = defaultdict(list)
+    for row in rows:
+        grouped[str(row.stat_path)].append(row)
+
+    snapshots: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    for stat_path in sorted(grouped):
+        stat_rows = grouped[stat_path]
+        status_counts = Counter(str(row.resolution_status) for row in stat_rows)
+        warning_count = sum(1 for row in stat_rows if row.warning)
+        warnings.extend(str(row.warning) for row in stat_rows if row.warning)
+        matched_counts = [int(row.matched_event_count or 0) for row in stat_rows]
+        snapshots.append(
+            {
+                "stat_path": stat_path,
+                "feature_id": int(stat_rows[0].fd_id) if stat_rows[0].fd_id is not None else None,
+                "feature_kind": stat_rows[0].feature_kind,
+                "feature_version": int(stat_rows[0].feature_version)
+                if stat_rows[0].feature_version is not None
+                else None,
+                "as_of_start": min(normalize_as_utc(cast(datetime, row.as_of)) for row in stat_rows).isoformat(),
+                "as_of_end": max(normalize_as_utc(cast(datetime, row.as_of)) for row in stat_rows).isoformat(),
+                "window_start": min(
+                    normalize_as_utc(cast(datetime, row.window_start)) for row in stat_rows
+                ).isoformat(),
+                "matched_event_count_min": min(matched_counts),
+                "matched_event_count_max": max(matched_counts),
+                "resolution_status_counts": dict(sorted(status_counts.items())),
+                "warning_count": warning_count,
+            }
+        )
+    return {
+        "feature_snapshots": snapshots,
+        "feature_snapshot_warnings": sorted(set(warnings)),
+    }

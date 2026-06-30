@@ -54,6 +54,20 @@ class BacktestQualitySummary(BaseModel):
     worst_pair: str | None = None
 
 
+class FeatureSnapshotSummary(BaseModel):
+    stat_path: str
+    feature_id: int | None = None
+    feature_kind: str | None = None
+    feature_version: int | None = None
+    as_of_start: str
+    as_of_end: str
+    window_start: str
+    matched_event_count_min: int
+    matched_event_count_max: int
+    resolution_status_counts: dict[str, int]
+    warning_count: int = 0
+
+
 class BacktestTaskResult(BaseModel):
     status: str
     queue_status: str | None = None
@@ -72,5 +86,7 @@ class BacktestTaskResult(BaseModel):
     proposed_quality_summary: BacktestQualitySummary | None = None
     stored_quality_metrics: list[BacktestQualityMetric] | None = None
     proposed_quality_metrics: list[BacktestQualityMetric] | None = None
+    feature_snapshots: list[FeatureSnapshotSummary] | None = None
+    feature_snapshot_warnings: list[str] | None = None
     warnings: list[str] | None = None
     error: str | None = None

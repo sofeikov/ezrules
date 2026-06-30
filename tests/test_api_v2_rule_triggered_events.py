@@ -142,6 +142,7 @@ def test_rule_triggered_events_pages_and_filters_results(session):
             "rid": target_rule.rid,
             "description": target_rule.description,
             "outcome": "HOLD",
+            "metadata_source": "current_rule_fallback",
         }
     ]
 

@@ -77,6 +77,8 @@ def _build_task_result_response(
         proposed_quality_summary=payload.get("proposed_quality_summary"),
         stored_quality_metrics=payload.get("stored_quality_metrics"),
         proposed_quality_metrics=payload.get("proposed_quality_metrics"),
+        feature_snapshots=payload.get("feature_snapshots"),
+        feature_snapshot_warnings=payload.get("feature_snapshot_warnings"),
         warnings=payload.get("warnings"),
         error=(
             str(payload["error"])

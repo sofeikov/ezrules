@@ -829,6 +829,37 @@
                           </ul>
                         </div>
 
+                        <div *ngIf="taskResult.feature_snapshots?.length" class="mb-4 overflow-hidden rounded-lg border border-gray-200" data-testid="backtest-feature-snapshots">
+                          <div class="border-b border-gray-200 bg-gray-50 px-4 py-3">
+                            <h4 class="text-sm font-medium text-gray-900">Computed feature snapshots</h4>
+                          </div>
+                          <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                              <thead class="bg-white text-left text-xs uppercase tracking-wide text-gray-500">
+                                <tr>
+                                  <th class="px-4 py-2 font-medium">Feature</th>
+                                  <th class="px-4 py-2 font-medium">Version</th>
+                                  <th class="px-4 py-2 font-medium">As-of range</th>
+                                  <th class="px-4 py-2 font-medium text-right">Matched events</th>
+                                  <th class="px-4 py-2 font-medium text-right">Warnings</th>
+                                </tr>
+                              </thead>
+                              <tbody class="divide-y divide-gray-100">
+                                <tr *ngFor="let snapshot of taskResult.feature_snapshots" class="text-gray-700">
+                                  <td class="px-4 py-2 font-mono text-xs text-gray-900">{{ snapshot.stat_path }}</td>
+                                  <td class="px-4 py-2">{{ snapshot.feature_version || '—' }}</td>
+                                  <td class="px-4 py-2 text-xs">{{ snapshot.as_of_start | date:'short' }} – {{ snapshot.as_of_end | date:'short' }}</td>
+                                  <td class="px-4 py-2 text-right">{{ snapshot.matched_event_count_min }}–{{ snapshot.matched_event_count_max }}</td>
+                                  <td class="px-4 py-2 text-right">{{ snapshot.warning_count }}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                          <ul *ngIf="taskResult.feature_snapshot_warnings?.length" class="border-t border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 list-disc pl-8 space-y-1">
+                            <li *ngFor="let warning of taskResult.feature_snapshot_warnings">{{ warning }}</li>
+                          </ul>
+                        </div>
+
                         <div class="grid gap-3 md:grid-cols-3 mb-4" data-testid="backtest-quality-summary">
                           <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
                             <h4 class="text-sm font-medium text-gray-700 mb-2">Historical Labels</h4>

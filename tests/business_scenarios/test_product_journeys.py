@@ -201,6 +201,7 @@ def test_rule_authoring_to_served_decision_product_journey(session, live_api_key
                 "rid": "JOURNEY_AMOUNT_REVIEW",
                 "description": "Review high-value product journey events",
                 "outcome": "REVIEW",
+                "metadata_source": "evaluation_snapshot",
                 "referenced_fields": ["amount"],
             }
         ]

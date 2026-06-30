@@ -24,7 +24,7 @@ from ezrules.backend.api_v2.schemas.evaluator import (
     EventTestRuleResult,
 )
 from ezrules.backend.data_utils import Event
-from ezrules.backend.features import FeatureResolutionError, FeatureResolver
+from ezrules.backend.features import FeatureResolutionError, FeatureResolutionTrace, FeatureResolver
 from ezrules.backend.observation_queue import enqueue_observations
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.runtime_settings import get_main_rule_execution_mode
@@ -183,11 +183,11 @@ def _resolve_evaluation_stats(
     lre: LocalRuleExecutorSQL,
     rollout_entries: list[dict[str, Any]],
     list_provider: PersistentUserListManager | None,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], list[FeatureResolutionTrace]]:
     stat_paths = lre.get_rule_stats()
     if rollout_entries and list_provider is not None:
         stat_paths.update(_get_rollout_stat_paths(rollout_entries, list_provider))
-    return FeatureResolver(db, o_id).resolve(event_data, as_of, stat_paths)
+    return FeatureResolver(db, o_id).resolve_with_traces(event_data, as_of, stat_paths)
 
 
 def _evaluate_rollout_result(
@@ -198,9 +198,10 @@ def _evaluate_rollout_result(
     assignment_key: str,
     list_provider: PersistentUserListManager,
     stats: dict[str, Any],
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+) -> tuple[dict[str, Any], list[dict[str, Any]], dict[int, dict[str, Any]]]:
     ordered_rules = list(lre.rule_engine.rules if lre.rule_engine is not None else [])
     rollout_by_rule_id = {int(entry["r_id"]): entry for entry in rollout_entries if "r_id" in entry}
+    rule_metadata_by_id = data_utils.build_rule_metadata_from_rules(ordered_rules)
     all_rule_results: dict[int, Any] = {}
     rollout_logs: list[dict[str, Any]] = []
 
@@ -225,6 +226,7 @@ def _evaluate_rollout_result(
             selected_variant = DEPLOYMENT_VARIANT_CANDIDATE if bucket < traffic_percent else DEPLOYMENT_VARIANT_CONTROL
             if selected_variant == DEPLOYMENT_VARIANT_CANDIDATE and candidate_succeeded:
                 returned_result = candidate_result
+                rule_metadata_by_id.update(data_utils.build_rule_metadata_from_rules([candidate_rule]))
 
             rollout_logs.append(
                 {
@@ -243,7 +245,7 @@ def _evaluate_rollout_result(
         if lre.execution_mode == RULE_EXECUTION_MODE_FIRST_MATCH and returned_result is not None:
             break
 
-    return _build_response_from_all_results(all_rule_results), rollout_logs
+    return _build_response_from_all_results(all_rule_results), rollout_logs, rule_metadata_by_id
 
 
 def _persist_evaluate_observations(db: Any, event_data: dict, o_id: int) -> None:
@@ -305,6 +307,7 @@ def evaluate(
         allowlist_result = allowlist_lre.evaluate_rules(event.event_data, as_of=event.effective_at)
         if allowlist_result.get("rule_results"):
             result = _build_response_from_all_results(dict(allowlist_result.get("all_rule_results", {})))
+            result["_rule_metadata_by_id"] = data_utils.build_rule_metadata_from_engine(allowlist_lre.rule_engine)
             result, _ = data_utils.eval_and_store(lre, event, response=result)
             enqueue_alert_detection(
                 o_id=int(lre.o_id),
@@ -328,7 +331,7 @@ def evaluate(
 
         rollout_entries = list_candidate_deployments(db, lre.o_id, ROLLOUT_CONFIG_LABEL)
         list_provider = PersistentUserListManager(db, lre.o_id) if rollout_entries else None
-        stats = _resolve_evaluation_stats(
+        stats, feature_traces = _resolve_evaluation_stats(
             db=db,
             o_id=lre.o_id,
             event_data=event.event_data,
@@ -353,7 +356,7 @@ def evaluate(
     if rollout_entries:
         assert list_provider is not None
         assignment_key = _get_assignment_key(event)
-        result, rollout_logs = _evaluate_rollout_result(
+        result, rollout_logs, rule_metadata_by_id = _evaluate_rollout_result(
             event_data=event.event_data,
             lre=lre,
             rollout_entries=rollout_entries,
@@ -361,12 +364,15 @@ def evaluate(
             list_provider=list_provider,
             stats=stats,
         )
+        result["_rule_metadata_by_id"] = rule_metadata_by_id
     else:
         result = production_result
 
     try:
         # `result` already contains the merged served outcome; passing it avoids a second rule evaluation.
         result, evaluation_decision_id = data_utils.eval_and_store(lre, event, response=result)
+        FeatureResolver(db, lre.o_id).persist_traces(feature_traces, evaluation_decision_id=int(evaluation_decision_id))
+        db.commit()
         enqueue_alert_detection(
             o_id=int(lre.o_id),
             evaluation_decision_id=int(evaluation_decision_id),
@@ -479,7 +485,7 @@ def test_event(
         else:
             rollout_entries = list_candidate_deployments(db, lre.o_id, ROLLOUT_CONFIG_LABEL)
             list_provider = PersistentUserListManager(db, lre.o_id) if rollout_entries else None
-            stats = _resolve_evaluation_stats(
+            stats, _feature_traces = _resolve_evaluation_stats(
                 db=db,
                 o_id=lre.o_id,
                 event_data=event.event_data,
@@ -491,7 +497,7 @@ def test_event(
             production_result = lre.evaluate_rules(event.event_data, as_of=event.effective_at, stats=stats)
             if rollout_entries:
                 assert list_provider is not None
-                result, rollout_logs = _evaluate_rollout_result(
+                result, rollout_logs, _rule_metadata_by_id = _evaluate_rollout_result(
                     event_data=event.event_data,
                     lre=lre,
                     rollout_entries=rollout_entries,

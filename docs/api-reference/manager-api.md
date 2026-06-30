@@ -159,7 +159,7 @@ Rule lifecycle fields on rule responses:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/tested-events` | Bearer + `VIEW_RULES` | Recent stored event evaluations with uploaded `label_name`, transaction lifecycle timestamps (`first_effective_at`, `first_observed_at`), raw payload, and triggered rules (`?limit=50`). Add `include_referenced_fields=true` to include each rule's referenced top-level fields. |
+| `GET` | `/api/v2/tested-events` | Bearer + `VIEW_RULES` | Recent stored event evaluations with uploaded `label_name`, transaction lifecycle timestamps (`first_effective_at`, `first_observed_at`), raw payload, and triggered rules (`?limit=50`). Triggered rules include `metadata_source` to show whether rule metadata came from the evaluation-time snapshot or a current-rule fallback. Add `include_referenced_fields=true` to include each rule's evaluation-time referenced fields. |
 | `GET` | `/api/v2/rules/{rule_id}/triggered-events` | Bearer + `VIEW_RULES` | Recent stored served decisions where the selected rule produced a non-null outcome. Supports `limit` and `offset` pagination for rule-detail load-more flows. |
 | `GET` | `/api/v2/tested-events/{evaluation_decision_id}/graph` | Bearer + `VIEW_RULES` | Bounded event/entity graph for a stored served decision. Use `max_events` to cap returned event nodes and `max_hops` to configure event-to-event traversal depth (default 3). Pass `expand_entity_type` plus `expand_entity_value_hash` to expand traffic connected through a specific entity node. |
 
@@ -337,7 +337,7 @@ Field type config note:
 Feature definition notes:
 - `feature_kind` defaults to `aggregate`. Aggregate features support `aggregation_type` values `count`, `count_distinct`, `sum`, `avg`, `min`, `max`, `stddev`, and `days_since_first_seen`.
 - Graph features use `feature_kind=graph`, `aggregation_type=graph_distinct_count`, and a `graph_config` containing `target_entity`, `allowed_entity_types`, `max_depth`, and `max_expanded_nodes`.
-- Graph traversal uses current-as-of transaction semantics: repeated transaction versions are stored append-only, but only the version current at the feature's as-of time contributes links.
+- Feature resolution uses current-as-of transaction semantics: repeated transaction versions are stored append-only, but only the version current at the feature's as-of time contributes to aggregate values or graph links.
 - `window_seconds` must use a preset online window: `600`, `3600`, `86400`, `604800`, `2592000`, `7776000`, or `15552000`.
 - Rule logic references active features with `stat[entity.feature_name]`; raw payload fields continue to use `$field`.
 
@@ -367,7 +367,7 @@ Feature definition notes:
 | `POST` | `/api/v2/backtesting` | Bearer + permission | Trigger async backtest for a rule in the caller's org |
 | `DELETE` | `/api/v2/backtesting/{task_id}` | Bearer + permission | Cancel a queued or running backtest task and persist it as `cancelled` |
 | `POST` | `/api/v2/backtesting/{task_id}/retry` | Bearer + permission | Retry a failed/cancelled backtest using the stored logic snapshot |
-| `GET` | `/api/v2/backtesting/task/{task_id}` | Bearer + permission | Task status/result, including outcome counts/rates, `eligible_records`, `skipped_records`, warnings, plus label counts and quality metrics for labeled history |
+| `GET` | `/api/v2/backtesting/task/{task_id}` | Bearer + permission | Task status/result, including outcome counts/rates, `eligible_records`, `skipped_records`, warnings, computed-feature snapshot summaries, plus label counts and quality metrics for labeled history |
 | `GET` | `/api/v2/backtesting/{rule_id}` | Bearer + permission | Backtest history for a rule visible to the caller's org |
 
 Backtest task result note:
@@ -375,6 +375,7 @@ Backtest task result note:
 - Backtest history rows now persist `queue_status`, `completed_at`, and the full result payload in `result_metrics`, so completed jobs remain inspectable even after Celery result-backend entries age out.
 - `GET /api/v2/backtesting/task/{task_id}` returns raw outcome counts/rates over the eligible comparison subset used by both stored and proposed logic.
 - Results now include `eligible_records`, `skipped_records`, and `warnings` when historical records were excluded because a referenced field was missing/null or live normalization rules would have rejected the event.
+- Backtests that resolve computed stats include optional `feature_snapshots` and `feature_snapshot_warnings` fields. Snapshot summaries report the stat path, feature version, as-of/window range, matched-event count range, resolution status counts, and reconstruction warnings for the run.
 - When labeled historical events exist, it also returns `labeled_records`, `label_counts`, and stored/proposed outcome→label quality summaries and pair metrics (`precision`, `recall`, `f1`, `true_positive`, `false_positive`, `false_negative`).
 - Backtest workers derive organisation context from the selected rule/request rather than a fixed app-wide org setting.
 

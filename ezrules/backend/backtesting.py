@@ -172,6 +172,7 @@ def compute_backtest_metrics(
     test_records: Iterable[BacktestRecord],
     configs: list[FieldCastConfig],
     feature_resolver: FeatureResolver | None = None,
+    backtest_task_id: str | None = None,
 ) -> dict[str, Any]:
     stored_rule_fields = set(stored_rule.get_rule_params())
     proposed_rule_fields = set(proposed_rule.get_rule_params())
@@ -192,7 +193,7 @@ def compute_backtest_metrics(
     stored_metrics = _RuleMetricsAccumulator()
     proposed_metrics = _RuleMetricsAccumulator()
 
-    for record in test_records:
+    for record_index, record in enumerate(test_records):
         raw_payload = record.event_data if isinstance(record.event_data, dict) else {}
         raw_event = dict(raw_payload)
 
@@ -217,8 +218,21 @@ def compute_backtest_metrics(
                 continue
             try:
                 assert feature_resolver is not None
-                stats = feature_resolver.resolve(normalized_event, record.as_of, stat_paths)
+                stats, feature_traces = feature_resolver.resolve_with_traces(normalized_event, record.as_of, stat_paths)
+                if backtest_task_id is not None:
+                    feature_resolver.persist_traces(
+                        feature_traces,
+                        backtest_task_id=backtest_task_id,
+                        backtest_record_index=record_index,
+                    )
             except FeatureResolutionError as exc:
+                assert feature_resolver is not None
+                if backtest_task_id is not None and feature_resolver.last_resolution_traces:
+                    feature_resolver.persist_traces(
+                        feature_resolver.last_resolution_traces,
+                        backtest_task_id=backtest_task_id,
+                        backtest_record_index=record_index,
+                    )
                 skipped_records += 1
                 stat_resolution_failures[str(exc)] += 1
                 continue

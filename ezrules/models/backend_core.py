@@ -473,6 +473,11 @@ class EvaluationRuleResult(Base):
     ed_id: Mapped[int] = mapped_column(ForeignKey("evaluation_decisions.ed_id", ondelete="CASCADE"), nullable=False)
     r_id: Mapped[int] = mapped_column(ForeignKey("rules.r_id"), nullable=False)
     rule_result = Column(String, nullable=False)
+    rule_rid = Column(String, nullable=True)
+    rule_description = Column(String, nullable=True)
+    rule_logic = Column(Text, nullable=True)
+    referenced_fields = Column(JSONB, nullable=True)
+    metadata_source = Column(String(32), nullable=False, default="evaluation_snapshot")
 
 
 class EventVersionLabel(Base):
@@ -1033,6 +1038,38 @@ class GraphEventEntityLink(Base):
 
     org: Mapped["Organisation"] = relationship()
     event_version: Mapped["EventVersion"] = relationship()
+
+
+class FeatureSnapshotResolution(Base):
+    __tablename__ = "feature_snapshot_resolutions"
+    __table_args__ = (
+        Index("ix_feature_snapshot_resolutions_o_id_ed_id", "o_id", "ed_id"),
+        Index("ix_feature_snapshot_resolutions_o_id_backtest_task", "o_id", "backtest_task_id"),
+        Index("ix_feature_snapshot_resolutions_o_id_stat_as_of", "o_id", "stat_path", "as_of"),
+    )
+
+    fsr_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    ed_id: Mapped[int | None] = mapped_column(
+        ForeignKey("evaluation_decisions.ed_id", ondelete="CASCADE"), nullable=True
+    )
+    backtest_task_id = Column(String, nullable=True)
+    backtest_record_index = Column(Integer, nullable=True)
+    fd_id: Mapped[int | None] = mapped_column(ForeignKey("feature_definitions.fd_id"), nullable=True)
+    stat_path = Column(String(255), nullable=False)
+    feature_kind = Column(String(32), nullable=True)
+    feature_version = Column(Integer, nullable=True)
+    as_of = Column(CoerceDateTime, nullable=False)
+    window_start = Column(CoerceDateTime, nullable=False)
+    matched_event_count = Column(Integer, nullable=False, default=0)
+    entity_value_hash = Column(String(64), nullable=True)
+    resolution_status = Column(String(32), nullable=False, default="resolved")
+    warning = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+
+    org: Mapped["Organisation"] = relationship()
+    evaluation_decision: Mapped["EvaluationDecision"] = relationship()
+    feature_definition: Mapped["FeatureDefinition"] = relationship()
 
 
 class FeatureDefinition(Base):
