@@ -1,5 +1,10 @@
 # What's New
 
+## v1.25.1
+
+* **Auditable feature snapshots**: Backtests and live evaluations now persist computed-feature snapshot metadata, including feature version, as-of/window assumptions, matched-event counts, and reconstruction warnings.
+* **Correction-aware aggregate stats**: Aggregate `stat[...]` features now use the transaction version current at the historical as-of timestamp, so late corrections and superseded versions do not double-count or leak future data into backtests.
+
 ## v1.24.3
 
 * **Tested Events historical explanations**: Triggered rule metadata in Tested Events is now captured at evaluation time, so referenced fields and rule descriptions stay stable after later rule edits.
