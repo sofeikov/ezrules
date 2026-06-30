@@ -1,5 +1,10 @@
 # What's New
 
+## v1.24.3
+
+* **Tested Events historical explanations**: Triggered rule metadata in Tested Events is now captured at evaluation time, so referenced fields and rule descriptions stay stable after later rule edits.
+* **Rule metadata provenance**: Tested Events now labels triggered-rule metadata as historical evaluation metadata or current-rule fallback metadata.
+
 ## v1.24.2
 
 * **Backtest stat resolution**: Rule backtests now resolve `stat[...]` computed features as of each historical event's `effective_at`, matching live evaluation semantics and excluding future data from feature windows.

@@ -59,6 +59,28 @@ def _hash_payload(event_data: dict) -> str:
 
 
 EvaluationStatus = Literal["new", "duplicate", "superseding"]
+RULE_METADATA_SOURCE_EVALUATION_SNAPSHOT = "evaluation_snapshot"
+
+
+def build_rule_metadata_from_rules(rules: list[Any]) -> dict[int, dict[str, Any]]:
+    metadata_by_rule_id: dict[int, dict[str, Any]] = {}
+    for rule in rules:
+        rule_id = getattr(rule, "r_id", None)
+        if rule_id is None:
+            continue
+        referenced_fields = sorted(str(field) for field in rule.get_rule_params())
+        metadata_by_rule_id[int(rule_id)] = {
+            "rule_rid": str(rule.rid),
+            "rule_description": str(rule.description),
+            "rule_logic": str(rule._source),
+            "referenced_fields": referenced_fields,
+            "metadata_source": RULE_METADATA_SOURCE_EVALUATION_SNAPSHOT,
+        }
+    return metadata_by_rule_id
+
+
+def build_rule_metadata_from_engine(rule_engine: Any) -> dict[int, dict[str, Any]]:
+    return build_rule_metadata_from_rules(list(getattr(rule_engine, "rules", []) or []))
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -186,14 +208,17 @@ def _min_utc(left: datetime, right: datetime) -> datetime:
 def eval_and_store(lre, event: Event, response: dict | None = None, commit: bool = True):
     if response is None:
         response = lre.evaluate_rules(event.event_data, as_of=event.effective_at)
+    current_cache_state = getattr(lre, "_current_cache_state", None)
+    rule_metadata_by_id = response.pop("_rule_metadata_by_id", None)
     response, decision_id = store_eval_result(
         db_session=lre.db,
         o_id=lre.o_id,
         event=event,
         response=response,
         rule_config_label=getattr(lre, "label", "production"),
-        rule_config_version=getattr(lre, "_current_rule_version", None),
+        rule_config_version=getattr(current_cache_state, "config_version", None),
         runtime_config={"execution_mode": getattr(lre, "execution_mode", None)},
+        rule_metadata_by_id=rule_metadata_by_id or build_rule_metadata_from_engine(getattr(lre, "rule_engine", None)),
         commit=commit,
     )
     return response, decision_id
@@ -212,6 +237,7 @@ def store_eval_result(
     rule_config_label: str = "production",
     rule_config_version: int | None = None,
     runtime_config: dict | None = None,
+    rule_metadata_by_id: dict[int, dict[str, Any]] | None = None,
 ):
     outcome_manager = DatabaseOutcome(db_session=db_session, o_id=o_id)
     lock_transaction_for_evaluation(db_session, o_id, event.transaction_id)
@@ -310,7 +336,19 @@ def store_eval_result(
         current.updated_at = datetime.now(UTC)
 
     for r_id, result in response["rule_results"].items():
-        db_session.add(EvaluationRuleResult(ed_id=int(decision.ed_id), r_id=int(r_id), rule_result=str(result)))
+        rule_metadata = (rule_metadata_by_id or {}).get(int(r_id), {})
+        db_session.add(
+            EvaluationRuleResult(
+                ed_id=int(decision.ed_id),
+                r_id=int(r_id),
+                rule_result=str(result),
+                rule_rid=rule_metadata.get("rule_rid"),
+                rule_description=rule_metadata.get("rule_description"),
+                rule_logic=rule_metadata.get("rule_logic"),
+                referenced_fields=rule_metadata.get("referenced_fields"),
+                metadata_source=rule_metadata.get("metadata_source", RULE_METADATA_SOURCE_EVALUATION_SNAPSHOT),
+            )
+        )
     response["transaction_id"] = event.transaction_id
     response["resolved_outcome"] = resolved_outcome
     response["event_version"] = event_version
