@@ -20,7 +20,7 @@ Open **Dashboard** in the sidebar and verify:
 - Transaction volume chart has data in the selected window
 - Most-firing and least-firing rule cards look plausible for the selected window
 - Outcome charts move as you submit test or live events
-- Opening a ranked rule lets you inspect that rule's own **Performance** card and confirm which outcomes are firing over time
+- Opening a ranked rule lets you inspect that rule's own **Performance** card and review recent triggered transactions behind the trend
 
 Use aggregation windows: `1h`, `6h`, `12h`, `24h`, `30d`. For the first operational review, start with `30d` so volume and outcome lines show trend shape rather than just recent activity.
 
@@ -30,6 +30,7 @@ Healthy signal:
 - least-firing rules include active zero-hit rules instead of dropping them from the ranking
 - outcome lines change after rule updates or test submissions
 - the rule-detail performance chart shows the same rule generating plausible outcome counts in the time window you selected
+- the rule-detail recent trigger list shows the concrete served transactions that produced stored outcomes for that rule
 
 Dashboard charts use the canonical served-decision ledger filtered to current transaction projections. Transaction volume counts current served `evaluation_decisions` per `transaction_id`; outcome and rule-activity charts count per-rule `evaluation_rule_results` for those current decisions. Time buckets are based on `evaluation_decisions.evaluated_at`, which shows when ezrules served the decision.
 

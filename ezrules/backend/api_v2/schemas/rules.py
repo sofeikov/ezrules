@@ -9,6 +9,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from ezrules.backend.api_v2.schemas.tested_events import TestedEventItem
 from ezrules.models.backend_core import RuleStatus
 
 # =============================================================================
@@ -212,6 +213,15 @@ class RuleHistoryResponse(BaseModel):
     r_id: int
     rid: str
     history: list[RuleHistoryEntry]
+
+
+class RuleTriggeredEventsResponse(BaseModel):
+    """Recent stored events where a rule produced an outcome."""
+
+    events: list[TestedEventItem]
+    total: int
+    limit: int
+    offset: int
 
 
 class RuleVerifyError(BaseModel):

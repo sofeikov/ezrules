@@ -1,5 +1,10 @@
 # What's New
 
+## v1.26.0
+
+* **Recent rule triggers**: Rule detail pages now show recent served transactions where the rule produced an outcome, with a fixed-size **Load more** flow for reviewing additional trigger history without leaving the page.
+* **Rule trigger API**: Added `GET /api/v2/rules/{rule_id}/triggered-events` with `limit` and `offset` pagination so clients can inspect concrete transactions behind a rule's stored hit trend.
+
 ## v1.25.1
 
 * **Auditable feature snapshots**: Backtests and live evaluations now persist computed-feature snapshot metadata, including feature version, as-of/window assumptions, matched-event counts, and reconstruction warnings.

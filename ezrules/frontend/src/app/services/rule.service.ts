@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
+import type { TestedEvent } from './tested-event.service';
 
 export type RuleStatus = 'draft' | 'active' | 'paused' | 'archived';
 export type RuleEvaluationLane = 'main' | 'allowlist';
@@ -113,6 +114,13 @@ export interface RuleHistoryResponse {
   r_id: number;
   rid: string;
   history: RuleHistoryEntry[];
+}
+
+export interface RuleTriggeredEventsResponse {
+  events: TestedEvent[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface UpdateRuleRequest {
@@ -306,6 +314,13 @@ export class RuleService {
 
   getRuleHistory(ruleId: number, limit: number = 10): Observable<RuleHistoryResponse> {
     return this.http.get<RuleHistoryResponse>(`${this.apiUrl}/${ruleId}/history`, { params: { limit: limit.toString() } });
+  }
+
+  getRuleTriggeredEvents(ruleId: number, limit: number = 10, offset: number = 0): Observable<RuleTriggeredEventsResponse> {
+    const params = new HttpParams()
+      .set('limit', limit.toString())
+      .set('offset', offset.toString());
+    return this.http.get<RuleTriggeredEventsResponse>(`${this.apiUrl}/${ruleId}/triggered-events`, { params });
   }
 
   rollbackRule(ruleId: number, revisionNumber: number): Observable<UpdateRuleResponse> {

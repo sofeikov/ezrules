@@ -26,6 +26,11 @@ export class RuleDetailPage {
   readonly performanceEmptyState: Locator;
   readonly performanceTotalHits: Locator;
   readonly performanceOutcomeCount: Locator;
+  readonly triggeredEventsCard: Locator;
+  readonly triggeredEventsRows: Locator;
+  readonly triggeredEventsEmptyState: Locator;
+  readonly triggeredEventsStatus: Locator;
+  readonly triggeredEventsLoadMoreButton: Locator;
 
   // Revision view locators
   readonly revisionBanner: Locator;
@@ -64,6 +69,11 @@ export class RuleDetailPage {
     this.performanceEmptyState = page.getByTestId('rule-performance-empty');
     this.performanceTotalHits = page.getByTestId('rule-performance-total-hits');
     this.performanceOutcomeCount = page.getByTestId('rule-performance-outcome-count');
+    this.triggeredEventsCard = page.getByTestId('rule-triggered-events-card');
+    this.triggeredEventsRows = page.getByTestId('rule-triggered-events-row');
+    this.triggeredEventsEmptyState = page.getByTestId('rule-triggered-events-empty');
+    this.triggeredEventsStatus = page.getByTestId('rule-triggered-events-status');
+    this.triggeredEventsLoadMoreButton = page.getByTestId('rule-triggered-events-load-more');
 
     // Revision view locators
     this.revisionBanner = page.locator('.bg-yellow-50');
@@ -252,5 +262,9 @@ export class RuleDetailPage {
 
   async selectPerformanceTimeRange(range: string) {
     await this.performanceTimeRangeSelect.selectOption(range);
+  }
+
+  async clickTriggeredEventsLoadMore() {
+    await this.triggeredEventsLoadMoreButton.click();
   }
 }
