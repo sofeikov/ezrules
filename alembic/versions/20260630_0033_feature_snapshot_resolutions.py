@@ -1,8 +1,8 @@
 """Add feature snapshot resolution audit storage.
 
-Revision ID: 20260625_0032
-Revises: 20260604_0031
-Create Date: 2026-06-25
+Revision ID: 20260630_0033
+Revises: 20260625_0032
+Create Date: 2026-06-30
 """
 
 from collections.abc import Sequence
@@ -11,8 +11,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision: str = "20260625_0032"
-down_revision: str | None = "20260604_0031"
+revision: str = "20260630_0033"
+down_revision: str | None = "20260625_0032"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
