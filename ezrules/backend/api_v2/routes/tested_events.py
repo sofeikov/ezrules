@@ -38,6 +38,7 @@ from ezrules.models.backend_core import (
 )
 
 router = APIRouter(prefix="/api/v2/tested-events", tags=["Tested Events"])
+RULE_METADATA_SOURCE_CURRENT_FALLBACK = "current_rule_fallback"
 
 
 def _utc_isoformat(value: datetime) -> str:
@@ -313,7 +314,7 @@ def list_tested_events(
     )
 
     triggered_rules_by_decision: dict[int, list[TriggeredRuleItem]] = defaultdict(list)
-    referenced_fields_by_rule_id: dict[int, list[str]] = {}
+    current_referenced_fields_by_rule_id: dict[int, list[str]] = {}
     decision_ids = [int(decision.ed_id) for decision, _event_version, _current_version, _label_name in records]
 
     if decision_ids:
@@ -325,6 +326,10 @@ def list_tested_events(
                 Rule.description,
                 Rule.logic,
                 EvaluationRuleResult.rule_result,
+                EvaluationRuleResult.rule_rid,
+                EvaluationRuleResult.rule_description,
+                EvaluationRuleResult.referenced_fields,
+                EvaluationRuleResult.metadata_source,
             )
             .join(EvaluationRuleResult, EvaluationRuleResult.ed_id == EvaluationDecision.ed_id)
             .join(Rule, Rule.r_id == EvaluationRuleResult.r_id)
@@ -333,19 +338,41 @@ def list_tested_events(
             .all()
         )
 
-        for ed_id, r_id, rid, description, rule_logic, rule_result in rule_rows:
+        for (
+            ed_id,
+            r_id,
+            current_rid,
+            current_description,
+            current_rule_logic,
+            rule_result,
+            snapshot_rid,
+            snapshot_description,
+            snapshot_referenced_fields,
+            metadata_source,
+        ) in rule_rows:
             rule_id = int(r_id)
-            if include_referenced_fields and rule_id not in referenced_fields_by_rule_id:
-                referenced_fields_by_rule_id[rule_id] = _extract_referenced_fields(str(rule_logic))
+            if snapshot_rid is not None or snapshot_description is not None or snapshot_referenced_fields is not None:
+                rid = str(snapshot_rid or current_rid)
+                description = str(snapshot_description or current_description)
+                source = str(metadata_source or "evaluation_snapshot")
+                referenced_fields = sorted(str(field) for field in (snapshot_referenced_fields or []))
+            else:
+                rid = str(current_rid)
+                description = str(current_description)
+                source = RULE_METADATA_SOURCE_CURRENT_FALLBACK
+                if include_referenced_fields and rule_id not in current_referenced_fields_by_rule_id:
+                    current_referenced_fields_by_rule_id[rule_id] = _extract_referenced_fields(str(current_rule_logic))
+                referenced_fields = current_referenced_fields_by_rule_id.get(rule_id, [])
 
             triggered_rule = TriggeredRuleItem(
                 r_id=rule_id,
-                rid=str(rid),
-                description=str(description),
+                rid=rid,
+                description=description,
                 outcome=str(rule_result),
+                metadata_source=source,
             )
             if include_referenced_fields:
-                triggered_rule.referenced_fields = referenced_fields_by_rule_id[rule_id]
+                triggered_rule.referenced_fields = referenced_fields
             triggered_rules_by_decision[int(ed_id)].append(triggered_rule)
 
     events = [

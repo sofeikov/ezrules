@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { SidebarComponent } from '../components/sidebar.component';
-import { TestedEvent, TestedEventService } from '../services/tested-event.service';
+import { TestedEvent, TestedEventService, TriggeredRule } from '../services/tested-event.service';
 import { buildHighlightedFieldPaths } from '../utils/field-paths';
 import { TestedEventGraphComponent } from './tested-event-graph.component';
 
@@ -183,6 +183,12 @@ export class TestedEventsComponent implements OnInit {
       return 'Hover to highlight 1 referenced field in the payload JSON.';
     }
     return `Hover to highlight ${fields.length} referenced fields in the payload JSON.`;
+  }
+
+  ruleMetadataSourceLabel(rule: TriggeredRule): string {
+    return rule.metadata_source === 'current_rule_fallback'
+      ? 'Current rule metadata fallback'
+      : 'Historical rule metadata';
   }
 
   private highlightedFields(event: TestedEvent): Set<string> {

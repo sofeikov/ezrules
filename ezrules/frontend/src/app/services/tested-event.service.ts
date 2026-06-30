@@ -8,6 +8,7 @@ export interface TriggeredRule {
   rid: string;
   description: string;
   outcome: string;
+  metadata_source: string;
   referenced_fields: string[];
 }
 
