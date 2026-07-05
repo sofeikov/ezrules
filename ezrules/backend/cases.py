@@ -12,7 +12,6 @@ from ezrules.backend.integrations import publish_integration_event
 from ezrules.backend.runtime_settings import get_neutral_outcome
 from ezrules.models.backend_core import AllowedOutcome, Case, CaseEvent, EvaluationDecision, Label, User
 from ezrules.models.database import db_session
-from ezrules.settings import app_settings
 
 logger = logging.getLogger(__name__)
 
@@ -299,18 +298,13 @@ def process_evaluation_for_cases(db: Any, *, o_id: int, evaluation_decision_id: 
 
 
 def enqueue_case_detection(*, o_id: int, evaluation_decision_id: int) -> None:
-    if app_settings.TESTING:
+    try:
         process_evaluation_for_cases(db_session, o_id=o_id, evaluation_decision_id=evaluation_decision_id)
         db_session.commit()
-        return
-
-    try:
-        from ezrules.backend.tasks import process_evaluation_for_cases_task
-
-        process_evaluation_for_cases_task.delay(o_id, evaluation_decision_id)
     except Exception:
+        db_session.rollback()
         logger.exception(
-            "Failed to enqueue case detection for org_id=%s evaluation_decision_id=%s",
+            "Failed to process case detection for org_id=%s evaluation_decision_id=%s",
             o_id,
             evaluation_decision_id,
         )
@@ -332,6 +326,8 @@ def assign_case(db: Any, *, o_id: int, case_id: int, actor_user_id: int, assigne
         if assignee is None:
             raise CaseValidationError("Assignee must belong to the case organisation")
     previous_assignee = int(case.assigned_to_user_id) if case.assigned_to_user_id is not None else None
+    if previous_assignee == assignee_user_id:
+        return case
     case.assigned_to_user_id = assignee_user_id
     if assignee_user_id is None and case.status == CASE_STATUS_IN_REVIEW:
         case.status = CASE_STATUS_OPEN

@@ -274,6 +274,14 @@ def test_case_assignment_api_records_timeline_events(session):
         assert assign_response.json()["case"]["assigned_to_user_id"] == int(user.id)
         assert assign_response.json()["case"]["status"] == "in_review"
 
+        same_assign_response = client.patch(
+            f"/api/v2/cases/{case.case_id}",
+            headers=headers,
+            json={"assigned_to_user_id": int(user.id)},
+        )
+        assert same_assign_response.status_code == 200
+        assert same_assign_response.json()["case"]["assigned_to_user_id"] == int(user.id)
+
         no_op_response = client.patch(
             f"/api/v2/cases/{case.case_id}",
             headers=headers,
