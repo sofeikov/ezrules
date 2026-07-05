@@ -171,12 +171,24 @@ def test_agent_tools_require_label_permission_for_counterexamples(session, agent
     )
 
     with TestClient(app) as client:
+        blast_response = client.post(
+            "/api/v2/agent-tools/rule-blast-radius",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "rule_id": int(agent_tools_fixture["rule"].r_id),
+                "proposed_logic": "if $amount > 150:\n\treturn !HOLD",
+                "sample_limit": 10,
+            },
+        )
         response = client.post(
             "/api/v2/agent-tools/rule-counterexamples",
             headers={"Authorization": f"Bearer {token}"},
             json={"rule_id": int(agent_tools_fixture["rule"].r_id)},
         )
 
+    assert blast_response.status_code == 200
+    assert blast_response.json()["flipped_events"]
+    assert all(event["label_name"] is None for event in blast_response.json()["flipped_events"])
     assert response.status_code == 403
 
 
@@ -290,3 +302,68 @@ def test_rule_blast_radius_handles_empty_replay_window(session, agent_tools_clie
     assert data["eligible_records"] == 0
     assert data["changed_rule_outcome_count"] == 0
     assert data["flipped_events"] == []
+
+
+def test_rule_blast_radius_skips_runtime_key_errors(session, agent_tools_client):
+    token = agent_tools_client.test_data["token"]
+    org = agent_tools_client.test_data["org"]
+    rule = RuleModel(
+        rid="agent_tools_runtime_key_error",
+        logic='if t["missing"]:\n\treturn !HOLD',
+        description="Rule with dynamic missing-key access",
+        o_id=int(org.o_id),
+    )
+    session.add(rule)
+    session.commit()
+    add_served_decision(
+        session,
+        org_id=int(org.o_id),
+        transaction_id="agent_missing_key",
+        event_data={"amount": 200},
+        rule_results={},
+        resolved_outcome=None,
+    )
+    session.commit()
+
+    response = agent_tools_client.post(
+        "/api/v2/agent-tools/rule-blast-radius",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "rule_id": int(rule.r_id),
+            "proposed_logic": 'if t["missing"]:\n\treturn !HOLD',
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_records"] == 1
+    assert data["eligible_records"] == 0
+    assert data["skipped_records"] == 1
+    assert data["warnings"] == ["Records missing referenced fields were skipped: missing (1)."]
+
+
+def test_rule_counterexamples_respects_empty_label_sets(agent_tools_client, agent_tools_fixture):
+    token = agent_tools_client.test_data["token"]
+    rule = agent_tools_fixture["rule"]
+
+    response = agent_tools_client.post(
+        "/api/v2/agent-tools/rule-counterexamples",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "rule_id": int(rule.r_id),
+            "positive_labels": [],
+            "negative_labels": [],
+            "sample_limit": 10,
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["positive_labels"] == []
+    assert data["negative_labels"] == []
+    assert data["buckets"] == {
+        "fired_but_negative": [],
+        "missed_positive": [],
+        "candidate_fixes_existing": [],
+        "candidate_introduces_new_errors": [],
+    }

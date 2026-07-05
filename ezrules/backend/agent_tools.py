@@ -18,8 +18,6 @@ from ezrules.models.backend_core import EvaluationDecision, EventVersion, EventV
 from ezrules.models.backend_core import Rule as RuleModel
 
 NO_OUTCOME = "NO_OUTCOME"
-DEFAULT_NEGATIVE_LABELS = ("NORMAL", "LEGIT", "GENUINE")
-DEFAULT_POSITIVE_LABELS = ("FRAUD",)
 
 
 @dataclass(slots=True)
@@ -256,6 +254,11 @@ def replay_rule_change(
             skipped_records += 1
             stat_failures[exc.stat_path] += 1
             continue
+        except KeyError as exc:
+            skipped_records += 1
+            missing_key = exc.args[0] if exc.args else "runtime_key_error"
+            missing_field_counts[str(missing_key)] += 1
+            continue
 
         stored_counts[_count_key(stored_outcome)] += 1
         proposed_counts[_count_key(proposed_outcome)] += 1
@@ -379,7 +382,7 @@ def build_blast_radius(
         if replay.eligible_records
         else 0.0,
         "group_deltas": group_deltas,
-        "flipped_events": [_evidence_row(item) for item in changed[:sample_limit]],
+        "flipped_events": [_evidence_row(item, include_label=False) for item in changed[:sample_limit]],
         "warnings": replay.warnings,
     }
 
@@ -408,17 +411,19 @@ def _is_wrong(
     return False
 
 
-def _evidence_row(item: ReplayEvaluation) -> dict[str, Any]:
-    return {
+def _evidence_row(item: ReplayEvaluation, *, include_label: bool) -> dict[str, Any]:
+    row = {
         "transaction_id": item.record.transaction_id,
         "event_version": item.record.event_version,
         "evaluation_decision_id": item.record.evaluation_decision_id,
-        "label_name": item.record.label_name,
         "stored_outcome": item.stored_outcome,
         "proposed_outcome": item.proposed_outcome,
         "group": item.group_values,
         "event_data": item.event_data_snippet,
     }
+    if include_label:
+        row["label_name"] = item.record.label_name
+    return row
 
 
 def build_rule_counterexamples(
@@ -447,8 +452,8 @@ def build_rule_counterexamples(
         group_by=[],
         max_records=max_records,
     )
-    positive_label_set = set(positive_labels or DEFAULT_POSITIVE_LABELS)
-    negative_label_set = set(negative_labels or DEFAULT_NEGATIVE_LABELS)
+    positive_label_set = set(positive_labels)
+    negative_label_set = set(negative_labels)
     target_outcome_set = set(target_outcomes) if target_outcomes else None
 
     buckets: dict[str, list[dict[str, Any]]] = {
@@ -480,13 +485,13 @@ def build_rule_counterexamples(
 
         fired = _outcome_is_actionable(item.stored_outcome, target_outcome_set)
         if label_name in negative_label_set and fired and len(buckets["fired_but_negative"]) < sample_limit:
-            buckets["fired_but_negative"].append(_evidence_row(item))
+            buckets["fired_but_negative"].append(_evidence_row(item, include_label=True))
         if label_name in positive_label_set and not fired and len(buckets["missed_positive"]) < sample_limit:
-            buckets["missed_positive"].append(_evidence_row(item))
+            buckets["missed_positive"].append(_evidence_row(item, include_label=True))
         if stored_wrong and not proposed_wrong and len(buckets["candidate_fixes_existing"]) < sample_limit:
-            buckets["candidate_fixes_existing"].append(_evidence_row(item))
+            buckets["candidate_fixes_existing"].append(_evidence_row(item, include_label=True))
         if not stored_wrong and proposed_wrong and len(buckets["candidate_introduces_new_errors"]) < sample_limit:
-            buckets["candidate_introduces_new_errors"].append(_evidence_row(item))
+            buckets["candidate_introduces_new_errors"].append(_evidence_row(item, include_label=True))
 
     return {
         "rule_id": rule_id,
