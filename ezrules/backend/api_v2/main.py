@@ -19,6 +19,7 @@ from ezrules.backend.api_v2.auth.dependencies import (
     get_org_id_for_api_key,
 )
 from ezrules.backend.api_v2.routes import (
+    agent_tools,
     alerts,
     analytics,
     api_keys,
@@ -189,3 +190,6 @@ app.include_router(api_keys.router)
 
 # Runtime settings routes: /api/v2/settings/*
 app.include_router(settings.router)
+
+# Deterministic agent tool routes: /api/v2/agent-tools/*
+app.include_router(agent_tools.router)
