@@ -1,5 +1,11 @@
 # What's New
 
+## v1.27.0
+
+* **Case management inbox**: Non-neutral live evaluation decisions now create durable case work items linked to the canonical evaluation ledger, with a new **Cases** page for reviewing and resolving cases.
+* **Rescoring-aware case lifecycle**: Rescored transactions update the active case with old/new decision references, while resolved cases remain auditable and later case-worthy scores create a new linked case.
+* **Generic integration events**: Evaluation completion and case lifecycle actions now write versioned integration events with a transactional outbox so external systems can poll or receive pushed delivery without changing the `/evaluate` response contract.
+
 ## v1.26.0
 
 * **Recent rule triggers**: Rule detail pages now show recent served transactions where the rule produced an outcome, with a fixed-size **Load more** flow for reviewing additional trigger history without leaving the page.

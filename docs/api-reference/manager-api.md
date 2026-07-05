@@ -236,6 +236,26 @@ Alert detection source of truth:
 - Evaluation-time detection is queued after the served decision is persisted; Celery beat also sweeps enabled alert rules as a repair loop.
 - V1 delivers via the in-app notification channel. Notification channel and policy tables are intentionally separate so email, Slack, PagerDuty, and webhook channels can be added later.
 
+### Cases and Integration Events
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/cases` | Bearer + `VIEW_CASES` | List case-management work items for non-neutral served decisions |
+| `GET` | `/api/v2/cases/{case_id}` | Bearer + `VIEW_CASES` | Read one case plus its immutable case-event timeline |
+| `PATCH` | `/api/v2/cases/{case_id}` | Bearer + `MANAGE_CASES` | Assign or unassign a case |
+| `POST` | `/api/v2/cases/{case_id}/resolve` | Bearer + `MANAGE_CASES` | Resolve a case with a note and optional expected current evaluation id |
+| `GET` | `/api/v2/integration-events` | Bearer + `VIEW_INTEGRATIONS` | Cursor-read versioned events such as `evaluation.completed` and `case.resolved` |
+| `GET` | `/api/v2/integration-subscriptions` | Bearer + `VIEW_INTEGRATIONS` | List outbound integration subscriptions |
+| `POST` | `/api/v2/integration-subscriptions` | Bearer + `MANAGE_INTEGRATIONS` | Create an outbound subscription such as a webhook destination |
+| `PATCH` | `/api/v2/integration-subscriptions/{subscription_id}` | Bearer + `MANAGE_INTEGRATIONS` | Update subscription destination, event filters, or enabled state |
+
+Case lifecycle notes:
+- Case creation is driven by canonical served `evaluation_decisions`: missing outcomes and the configured `neutral_outcome` do not create cases.
+- A rescore of an active case updates the same case with the new `current_evaluation_decision_id` and records a `case.rescored` integration event.
+- A rescore to neutral/no outcome keeps the case open with a non-current decision state so an analyst can close it intentionally.
+- Resolve requests can include `expected_current_ed_id`; the API returns `409` if the case was rescored after the UI loaded.
+- `POST /api/v2/evaluate` remains response-compatible. External systems should consume `evaluation.completed` and case lifecycle changes through `/api/v2/integration-events` or configured outbound delivery.
+
 ### Settings
 
 | Method | Path | Auth | Notes |

@@ -67,6 +67,14 @@ class PermissionAction(Enum):
     VIEW_ALERTS = "view_alerts"
     MANAGE_ALERTS = "manage_alerts"
 
+    # Case Management
+    VIEW_CASES = "view_cases"
+    MANAGE_CASES = "manage_cases"
+
+    # Integration Management
+    VIEW_INTEGRATIONS = "view_integrations"
+    MANAGE_INTEGRATIONS = "manage_integrations"
+
     @classmethod
     def get_default_actions(cls):
         """Get list of (action_name, description, resource_type) tuples for initialization."""
@@ -112,6 +120,10 @@ class PermissionAction(Enum):
             (cls.MANAGE_API_KEYS.value, "Manage API keys for service integration", "api_key"),
             (cls.VIEW_ALERTS.value, "View alert rules, incidents, and notifications", "alert"),
             (cls.MANAGE_ALERTS.value, "Create and update alert rules and notification policies", "alert"),
+            (cls.VIEW_CASES.value, "View case management work items", "case"),
+            (cls.MANAGE_CASES.value, "Assign and resolve case management work items", "case"),
+            (cls.VIEW_INTEGRATIONS.value, "View integration event streams and subscriptions", "integration"),
+            (cls.MANAGE_INTEGRATIONS.value, "Create and update integration subscriptions", "integration"),
         ]
 
 

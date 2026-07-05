@@ -23,6 +23,7 @@ from ezrules.backend.api_v2.schemas.evaluator import (
     EventTestResponse,
     EventTestRuleResult,
 )
+from ezrules.backend.cases import enqueue_case_detection
 from ezrules.backend.data_utils import Event
 from ezrules.backend.features import FeatureResolutionError, FeatureResolutionTrace, FeatureResolver
 from ezrules.backend.observation_queue import enqueue_observations
@@ -314,6 +315,11 @@ def evaluate(
                 evaluation_decision_id=int(result["evaluation_decision_id"]),
                 resolved_outcome=result.get("resolved_outcome"),
             )
+            enqueue_case_detection(
+                o_id=int(lre.o_id),
+                evaluation_decision_id=int(result["evaluation_decision_id"]),
+                resolved_outcome=result.get("resolved_outcome"),
+            )
             _persist_evaluate_observations(db, request_data.event_data, lre.o_id)
             return EvaluateResponse(
                 transaction_id=result["transaction_id"],
@@ -374,6 +380,11 @@ def evaluate(
         FeatureResolver(db, lre.o_id).persist_traces(feature_traces, evaluation_decision_id=int(evaluation_decision_id))
         db.commit()
         enqueue_alert_detection(
+            o_id=int(lre.o_id),
+            evaluation_decision_id=int(evaluation_decision_id),
+            resolved_outcome=result.get("resolved_outcome"),
+        )
+        enqueue_case_detection(
             o_id=int(lre.o_id),
             evaluation_decision_id=int(evaluation_decision_id),
             resolved_outcome=result.get("resolved_outcome"),
