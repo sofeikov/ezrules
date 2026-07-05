@@ -511,11 +511,12 @@ def test_idempotent_integration_publish_enqueues_missing_subscription_delivery(s
         source_id=123,
         event_type="case.created",
         external_event_id="evt_test_case_created",
-        payload={"case": {"case_id": 123}},
+        payload={"case": {"case_id": 456}},
     )
 
     assert result.delivery_count == 1
     assert session.query(IntegrationEvent).count() == 1
+    assert session.query(IntegrationEvent).one().payload == {"case": {"case_id": 456}}
     assert session.query(IntegrationOutbox).count() == 1
 
 

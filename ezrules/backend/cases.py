@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime
-import logging
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -12,8 +11,6 @@ from ezrules.backend.integrations import publish_integration_event
 from ezrules.backend.runtime_settings import get_neutral_outcome
 from ezrules.models.backend_core import AllowedOutcome, Case, CaseEvent, EvaluationDecision, Label, User
 from ezrules.models.database import db_session
-
-logger = logging.getLogger(__name__)
 
 CASE_STATUS_OPEN = "open"
 CASE_STATUS_IN_REVIEW = "in_review"
@@ -298,16 +295,8 @@ def process_evaluation_for_cases(db: Any, *, o_id: int, evaluation_decision_id: 
 
 
 def enqueue_case_detection(*, o_id: int, evaluation_decision_id: int) -> None:
-    try:
-        process_evaluation_for_cases(db_session, o_id=o_id, evaluation_decision_id=evaluation_decision_id)
-        db_session.commit()
-    except Exception:
-        db_session.rollback()
-        logger.exception(
-            "Failed to process case detection for org_id=%s evaluation_decision_id=%s",
-            o_id,
-            evaluation_decision_id,
-        )
+    process_evaluation_for_cases(db_session, o_id=o_id, evaluation_decision_id=evaluation_decision_id)
+    db_session.commit()
 
 
 def get_case_for_update(db: Any, *, o_id: int, case_id: int) -> Case:

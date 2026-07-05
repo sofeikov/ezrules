@@ -95,6 +95,13 @@ def publish_integration_event(
     if external_event_id is not None:
         existing = db.query(IntegrationEvent).filter(IntegrationEvent.external_event_id == external_event_id).first()
         if existing is not None:
+            existing.o_id = o_id
+            existing.source_type = source_type
+            existing.source_id = source_id
+            existing.event_type = event_type
+            existing.occurred_at = occurred_at or existing.occurred_at
+            existing.payload = payload
+            db.flush()
             return IntegrationPublishResult(
                 event=existing, delivery_count=_enqueue_outbox_deliveries(db, event=existing)
             )
