@@ -11,10 +11,16 @@ from ezrules.backend.cases import (
     CASE_STATUS_OPEN,
     CASE_STATUS_RESOLVED,
     CaseConflictError,
+    CaseValidationError,
     process_evaluation_for_cases,
     resolve_case,
 )
-from ezrules.backend.integrations import OUTBOX_DELIVERED, dispatch_pending_outbox, publish_integration_event
+from ezrules.backend.integrations import (
+    OUTBOX_DELIVERED,
+    OUTBOX_SKIPPED,
+    dispatch_pending_outbox,
+    publish_integration_event,
+)
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
@@ -26,6 +32,7 @@ from ezrules.models.backend_core import (
     IntegrationEvent,
     IntegrationOutbox,
     IntegrationSubscription,
+    Label,
     Organisation,
     Role,
     User,
@@ -267,6 +274,14 @@ def test_case_assignment_api_records_timeline_events(session):
         assert assign_response.json()["case"]["assigned_to_user_id"] == int(user.id)
         assert assign_response.json()["case"]["status"] == "in_review"
 
+        no_op_response = client.patch(
+            f"/api/v2/cases/{case.case_id}",
+            headers=headers,
+            json={},
+        )
+        assert no_op_response.status_code == 200
+        assert no_op_response.json()["case"]["assigned_to_user_id"] == int(user.id)
+
         unassign_response = client.patch(
             f"/api/v2/cases/{case.case_id}",
             headers=headers,
@@ -311,6 +326,31 @@ def test_case_assignment_rejects_user_from_another_org(session):
     assert session.query(Case).one().assigned_to_user_id is None
 
 
+def test_case_assignment_rejects_resolved_case(session):
+    _org, user, token = _seed_case_org(session)
+    decision = _add_decision(session, outcome="HOLD")
+    process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
+    case = session.query(Case).one()
+    resolve_case(
+        session,
+        o_id=1,
+        case_id=int(case.case_id),
+        actor_user_id=int(user.id),
+        resolution_note="Already reviewed.",
+    )
+    session.commit()
+
+    with TestClient(app) as client:
+        response = client.patch(
+            f"/api/v2/cases/{case.case_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"assigned_to_user_id": int(user.id)},
+        )
+
+    assert response.status_code == 422
+    assert session.query(Case).one().assigned_to_user_id is None
+
+
 def test_resolving_already_resolved_case_is_idempotent(session):
     _org, user, _token = _seed_case_org(session)
     decision = _add_decision(session, outcome="HOLD")
@@ -340,6 +380,42 @@ def test_resolving_already_resolved_case_is_idempotent(session):
         "resolved",
     ]
     assert session.query(IntegrationEvent).filter(IntegrationEvent.event_type == "case.resolved").count() == 1
+
+
+def test_resolution_label_must_belong_to_case_org(session):
+    _org, user, _token = _seed_case_org(session)
+    other_org = Organisation(name="Other org")
+    session.add(other_org)
+    session.flush()
+    other_label = Label(label="Other org label", o_id=int(other_org.o_id))
+    session.add(other_label)
+    decision = _add_decision(session, outcome="HOLD")
+    process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
+    case = session.query(Case).one()
+
+    with pytest.raises(CaseValidationError, match="Resolution label must belong"):
+        resolve_case(
+            session,
+            o_id=1,
+            case_id=int(case.case_id),
+            actor_user_id=int(user.id),
+            resolution_note="Wrong label.",
+            resolution_label_id=int(other_label.el_id),
+        )
+
+
+def test_cases_outcome_filter_is_case_insensitive(session):
+    _org, _user, token = _seed_case_org(session)
+    decision = _add_decision(session, outcome="hold")
+    process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
+    session.commit()
+
+    with TestClient(app) as client:
+        response = client.get("/api/v2/cases?outcome=HOLD", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+    assert response.json()["cases"][0]["resolved_outcome"] == "hold"
 
 
 def test_integration_subscription_api_validates_webhook_url_and_strips_secret(session):
@@ -388,10 +464,82 @@ def test_integration_subscription_api_validates_webhook_url_and_strips_secret(se
         assert updated["name"] == "Disabled case webhook"
         assert updated["enabled"] is False
         assert updated["event_types"] == ["case.created", "case.resolved"]
+        assert "secret" not in updated["config"]
+        stored_subscription = session.query(IntegrationSubscription).one()
+        assert stored_subscription.config["secret"] == "top-secret"
 
         list_response = client.get("/api/v2/integration-subscriptions", headers=headers)
         assert list_response.status_code == 200
         assert list_response.json()["subscriptions"][0]["id"] == created["id"]
+
+
+def test_idempotent_integration_publish_enqueues_missing_subscription_delivery(session):
+    _seed_case_org(session)
+    publish_integration_event(
+        session,
+        o_id=1,
+        source_type="case_event",
+        source_id=123,
+        event_type="case.created",
+        external_event_id="evt_test_case_created",
+        payload={"case": {"case_id": 123}},
+    )
+    session.flush()
+    subscription = IntegrationSubscription(
+        o_id=1,
+        name="Case webhook",
+        destination_type="webhook",
+        config={"url": "https://example.com/webhook"},
+        event_types=["case.created"],
+        enabled=True,
+    )
+    session.add(subscription)
+    session.flush()
+
+    result = publish_integration_event(
+        session,
+        o_id=1,
+        source_type="case_event",
+        source_id=123,
+        event_type="case.created",
+        external_event_id="evt_test_case_created",
+        payload={"case": {"case_id": 123}},
+    )
+
+    assert result.delivery_count == 1
+    assert session.query(IntegrationEvent).count() == 1
+    assert session.query(IntegrationOutbox).count() == 1
+
+
+def test_outbox_dispatch_skips_disabled_subscription_delivery(session):
+    _seed_case_org(session)
+    subscription = IntegrationSubscription(
+        o_id=1,
+        name="Case webhook",
+        destination_type="webhook",
+        config={"url": "https://example.com/webhook"},
+        event_types=["case.created"],
+        enabled=True,
+    )
+    session.add(subscription)
+    session.flush()
+    publish_integration_event(
+        session,
+        o_id=1,
+        source_type="case_event",
+        source_id=123,
+        event_type="case.created",
+        external_event_id="evt_test_case_created",
+        payload={"case": {"case_id": 123}},
+    )
+    subscription.enabled = False
+    session.commit()
+
+    result = dispatch_pending_outbox(session)
+
+    assert result == {"delivered": 0, "failed": 0}
+    delivery = session.query(IntegrationOutbox).one()
+    assert delivery.status == OUTBOX_SKIPPED
 
 
 def test_outbox_dispatch_delivers_webhook_and_marks_delivery(session, monkeypatch):

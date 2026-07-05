@@ -20,6 +20,7 @@ OUTBOX_PENDING = "pending"
 OUTBOX_DELIVERED = "delivered"
 OUTBOX_FAILED = "failed"
 OUTBOX_DEAD_LETTERED = "dead_lettered"
+OUTBOX_SKIPPED = "skipped"
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +53,34 @@ def _subscriptions_for_event(db: Any, *, o_id: int, event_type: str) -> list[Int
     return [subscription for subscription in subscriptions if _subscription_matches(subscription, event_type)]
 
 
+def _enqueue_outbox_deliveries(db: Any, *, event: IntegrationEvent) -> int:
+    delivery_count = 0
+    for subscription in _subscriptions_for_event(db, o_id=int(event.o_id), event_type=str(event.event_type)):
+        existing = (
+            db.query(IntegrationOutbox.delivery_id)
+            .filter(
+                IntegrationOutbox.integration_event_id == int(event.integration_event_id),
+                IntegrationOutbox.subscription_id == int(subscription.subscription_id),
+            )
+            .first()
+        )
+        if existing is not None:
+            continue
+        db.add(
+            IntegrationOutbox(
+                o_id=int(event.o_id),
+                integration_event_id=int(event.integration_event_id),
+                subscription_id=int(subscription.subscription_id),
+                destination_type=str(subscription.destination_type),
+                status=OUTBOX_PENDING,
+                attempt_count=0,
+                next_attempt_at=_utcnow(),
+            )
+        )
+        delivery_count += 1
+    return delivery_count
+
+
 def publish_integration_event(
     db: Any,
     *,
@@ -66,7 +95,9 @@ def publish_integration_event(
     if external_event_id is not None:
         existing = db.query(IntegrationEvent).filter(IntegrationEvent.external_event_id == external_event_id).first()
         if existing is not None:
-            return IntegrationPublishResult(event=existing, delivery_count=0)
+            return IntegrationPublishResult(
+                event=existing, delivery_count=_enqueue_outbox_deliveries(db, event=existing)
+            )
 
     event = IntegrationEvent(
         external_event_id=external_event_id or _new_event_id(),
@@ -82,21 +113,7 @@ def publish_integration_event(
     db.add(event)
     db.flush()
 
-    delivery_count = 0
-    for subscription in _subscriptions_for_event(db, o_id=o_id, event_type=event_type):
-        db.add(
-            IntegrationOutbox(
-                o_id=o_id,
-                integration_event_id=int(event.integration_event_id),
-                subscription_id=int(subscription.subscription_id),
-                destination_type=str(subscription.destination_type),
-                status=OUTBOX_PENDING,
-                attempt_count=0,
-                next_attempt_at=_utcnow(),
-            )
-        )
-        delivery_count += 1
-    return IntegrationPublishResult(event=event, delivery_count=delivery_count)
+    return IntegrationPublishResult(event=event, delivery_count=_enqueue_outbox_deliveries(db, event=event))
 
 
 def list_integration_events(
@@ -157,7 +174,6 @@ def dispatch_pending_outbox(db: Any, *, limit: int = 100) -> dict[str, int]:
         .filter(
             IntegrationOutbox.status.in_([OUTBOX_PENDING, OUTBOX_FAILED]),
             IntegrationOutbox.next_attempt_at <= now,
-            IntegrationSubscription.enabled.is_(True),
         )
         .order_by(IntegrationOutbox.next_attempt_at.asc(), IntegrationOutbox.delivery_id.asc())
         .with_for_update(skip_locked=True, of=IntegrationOutbox)
@@ -168,6 +184,11 @@ def dispatch_pending_outbox(db: Any, *, limit: int = 100) -> dict[str, int]:
     delivered = 0
     failed = 0
     for delivery, event, subscription in deliveries:
+        if not bool(subscription.enabled):
+            delivery.status = OUTBOX_SKIPPED
+            delivery.last_error = "Subscription disabled before delivery"
+            delivery.updated_at = _utcnow()
+            continue
         delivery.attempt_count = int(delivery.attempt_count or 0) + 1
         delivery.last_attempted_at = now
         try:

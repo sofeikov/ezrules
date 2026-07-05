@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from ezrules.backend.integrations import publish_integration_event
 from ezrules.backend.runtime_settings import get_neutral_outcome
-from ezrules.models.backend_core import AllowedOutcome, Case, CaseEvent, EvaluationDecision, User
+from ezrules.models.backend_core import AllowedOutcome, Case, CaseEvent, EvaluationDecision, Label, User
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
@@ -325,6 +325,8 @@ def get_case_for_update(db: Any, *, o_id: int, case_id: int) -> Case:
 
 def assign_case(db: Any, *, o_id: int, case_id: int, actor_user_id: int, assignee_user_id: int | None) -> Case:
     case = get_case_for_update(db, o_id=o_id, case_id=case_id)
+    if case.status in {CASE_STATUS_RESOLVED, CASE_STATUS_CLOSED}:
+        raise CaseValidationError("Resolved cases cannot be assigned")
     if assignee_user_id is not None:
         assignee = db.query(User.id).filter(User.id == assignee_user_id, User.o_id == o_id).first()
         if assignee is None:
@@ -367,6 +369,11 @@ def resolve_case(
 
     if case.status in {CASE_STATUS_RESOLVED, CASE_STATUS_CLOSED}:
         return case
+
+    if resolution_label_id is not None:
+        label = db.query(Label.el_id).filter(Label.el_id == resolution_label_id, Label.o_id == o_id).first()
+        if label is None:
+            raise CaseValidationError("Resolution label must belong to the case organisation")
 
     previous_status = str(case.status)
     case.status = CASE_STATUS_RESOLVED

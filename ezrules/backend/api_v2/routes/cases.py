@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from ezrules.backend.api_v2.auth.dependencies import (
@@ -130,7 +131,7 @@ def list_cases(
     if status_filter:
         query = query.filter(Case.status == status_filter)
     if outcome:
-        query = query.filter(Case.resolved_outcome == outcome.strip().upper())
+        query = query.filter(sa.func.upper(Case.resolved_outcome) == outcome.strip().upper())
     total = int(query.count())
     cases = query.order_by(Case.updated_at.desc(), Case.case_id.desc()).offset(offset).limit(limit).all()
     return CaseListResponse(cases=[_case_to_response(case) for case in cases], total=total)
@@ -165,6 +166,12 @@ def update_case(
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> CaseMutationResponse:
+    if "assigned_to_user_id" not in payload.model_fields_set:
+        case = db.query(Case).filter(Case.o_id == current_org_id, Case.case_id == case_id).first()
+        if case is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+        return CaseMutationResponse(success=True, message="Case unchanged", case=_case_to_response(case))
+
     try:
         case = assign_case(
             db,
@@ -204,6 +211,8 @@ def resolve_case_route(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found") from exc
     except CaseConflictError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except CaseValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     db.commit()
     return CaseMutationResponse(success=True, message="Case resolved", case=_case_to_response(case))
 
@@ -299,7 +308,9 @@ def update_subscription(
         if payload.destination_type is not None
         else str(subscription.destination_type)
     )
-    config = dict(payload.config) if payload.config is not None else dict(subscription.config or {})
+    config = dict(subscription.config or {})
+    if payload.config is not None:
+        config.update(payload.config)
     _validate_subscription_config(destination_type=destination_type, config=config)
     if payload.name is not None:
         subscription.name = payload.name.strip()
