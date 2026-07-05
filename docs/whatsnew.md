@@ -3,7 +3,7 @@
 ## v1.27.0
 
 * **Deterministic agent tools API**: Added `/api/v2/agent-tools` endpoints that let future fraud-management agents request bounded, permission-gated evidence instead of broad database access.
-* **Rule blast-radius analysis**: Added `POST /api/v2/agent-tools/rule-blast-radius` to compare proposed rule logic against recent served decisions, including outcome deltas, grouped changed-decision rates, representative flipped events, and replay warnings.
+* **Rule blast-radius analysis**: Added `POST /api/v2/agent-tools/rule-blast-radius` to compare proposed rule logic against recent served decisions, including outcome deltas, grouped single-rule outcome flip rates, representative flipped events, and replay warnings.
 * **Rule counterexample mining**: Added `POST /api/v2/agent-tools/rule-counterexamples` to return labeled false-positive, missed-positive, candidate-fix, and candidate-regression examples for rule review workflows.
 
 ## v1.26.0

@@ -17,8 +17,8 @@ class AgentToolEvidenceEvent(BaseModel):
 class AgentToolGroupDelta(BaseModel):
     group: dict[str, Any]
     total_records: int
-    changed_decision_count: int
-    changed_decision_rate: float
+    changed_rule_outcome_count: int
+    changed_rule_outcome_rate: float
     stored_result: dict[str, int]
     proposed_result: dict[str, int]
     outcome_delta: dict[str, int]
@@ -30,7 +30,7 @@ class RuleBlastRadiusRequest(BaseModel):
     lookback_days: int = Field(default=30, ge=1, le=365)
     group_by: list[str] = Field(default_factory=list, max_length=5)
     sample_limit: int = Field(default=20, ge=1, le=100)
-    max_records: int = Field(default=10_000, ge=1, le=100_000)
+    max_records: int = Field(default=1_000, ge=1, le=100_000)
 
 
 class RuleBlastRadiusResponse(BaseModel):
@@ -42,8 +42,8 @@ class RuleBlastRadiusResponse(BaseModel):
     stored_result: dict[str, int]
     proposed_result: dict[str, int]
     outcome_delta: dict[str, int]
-    changed_decision_count: int
-    changed_decision_rate: float
+    changed_rule_outcome_count: int
+    changed_rule_outcome_rate: float
     group_deltas: list[AgentToolGroupDelta]
     flipped_events: list[AgentToolEvidenceEvent]
     warnings: list[str] = Field(default_factory=list)
@@ -60,7 +60,7 @@ class RuleCounterexamplesRequest(BaseModel):
         description="Optional outcome names that count as an actionable rule fire",
     )
     sample_limit: int = Field(default=20, ge=1, le=100)
-    max_records: int = Field(default=10_000, ge=1, le=100_000)
+    max_records: int = Field(default=1_000, ge=1, le=100_000)
 
 
 class RuleCounterexampleBuckets(BaseModel):

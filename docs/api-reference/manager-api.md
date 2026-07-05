@@ -219,20 +219,26 @@ Dashboard analytics source of truth:
 
 ### Agent Tools
 
-Deterministic agent tools expose bounded evidence packets for future fraud-management agents. They do not provide generic database access and they replay recent served decisions through the same rule compiler, field normalization, user-list lookup, and computed-feature resolution paths used by rule analysis.
+Deterministic agent tools expose bounded evidence packets for future fraud-management agents. They do not provide generic database access and they replay current served decisions through the same rule compiler, field normalization, user-list lookup, and computed-feature resolution paths used by rule analysis.
+
+Replay semantics:
+- Replays use current served decisions only (`is_current=true`) so superseded transaction versions do not inflate analysis counts.
+- `stored_outcome` re-executes the rule's current stored logic from the database, not the exact rule source that was active when the historical decision was originally served.
+- Blast-radius `changed_rule_outcome_*` fields measure single-rule outcome flips. They are not full resolved-decision changes across the whole ordered rule set or outcome hierarchy.
+- Replays run synchronously and default to the most recent `1,000` current served decisions. Use smaller windows for interactive use; larger caps may be slower when rules reference computed features.
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `POST` | `/api/v2/agent-tools/rule-blast-radius` | Bearer + `VIEW_RULES` | Compare existing rule logic to proposed logic over recent served decisions. Returns stored/proposed outcome counts, outcome deltas, grouped changed-decision rates, representative flipped events, skipped-record counts, and warnings. |
+| `POST` | `/api/v2/agent-tools/rule-blast-radius` | Bearer + `VIEW_RULES` | Compare existing rule logic to proposed logic over recent current served decisions. Returns stored/proposed outcome counts, outcome deltas, grouped single-rule outcome flip rates, representative flipped events, skipped-record counts, and warnings. |
 | `POST` | `/api/v2/agent-tools/rule-counterexamples` | Bearer + `VIEW_RULES` + `VIEW_LABELS` | Return labeled examples where a rule fired on negative labels, missed positive labels, where candidate logic fixes existing mistakes, and where candidate logic introduces regressions. |
 
 `POST /api/v2/agent-tools/rule-blast-radius` request fields:
 - `rule_id`: existing rule ID in the caller's organisation.
 - `proposed_logic`: candidate ezrules source to compare against the stored rule.
 - `lookback_days`: recent served-decision window, default `30`.
-- `group_by`: up to five event field paths used to segment changed-decision impact.
+- `group_by`: up to five event field paths used to segment single-rule outcome flip impact.
 - `sample_limit`: maximum representative flipped events returned.
-- `max_records`: cap on recent served decisions replayed.
+- `max_records`: cap on recent served decisions replayed, default `1,000`.
 
 `POST /api/v2/agent-tools/rule-counterexamples` request fields:
 - `rule_id`: existing rule ID in the caller's organisation.

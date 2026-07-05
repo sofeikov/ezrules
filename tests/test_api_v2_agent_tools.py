@@ -111,13 +111,13 @@ def test_rule_blast_radius_returns_grouped_flips(agent_tools_client, agent_tools
     assert data["stored_result"] == {"HOLD": 4, "NO_OUTCOME": 2}
     assert data["proposed_result"] == {"HOLD": 2, "NO_OUTCOME": 4}
     assert data["outcome_delta"] == {"HOLD": -2, "NO_OUTCOME": 2}
-    assert data["changed_decision_count"] == 2
-    assert data["changed_decision_rate"] == pytest.approx(0.3333, abs=1e-4)
+    assert data["changed_rule_outcome_count"] == 2
+    assert data["changed_rule_outcome_rate"] == pytest.approx(0.3333, abs=1e-4)
     assert {event["transaction_id"] for event in data["flipped_events"]} == {"agent_evt_2", "agent_evt_5"}
 
     groups = {row["group"]["country"]: row for row in data["group_deltas"]}
-    assert groups["US"]["changed_decision_count"] == 1
-    assert groups["GB"]["changed_decision_count"] == 1
+    assert groups["US"]["changed_rule_outcome_count"] == 1
+    assert groups["GB"]["changed_rule_outcome_count"] == 1
 
 
 def test_rule_counterexamples_returns_fix_and_regression_buckets(agent_tools_client, agent_tools_fixture):
@@ -178,3 +178,115 @@ def test_agent_tools_require_label_permission_for_counterexamples(session, agent
         )
 
     assert response.status_code == 403
+
+
+def test_rule_blast_radius_ignores_superseded_transaction_versions(
+    session,
+    agent_tools_client,
+    agent_tools_fixture,
+):
+    token = agent_tools_client.test_data["token"]
+    org = agent_tools_client.test_data["org"]
+    rule = agent_tools_fixture["rule"]
+    normal_label = session.query(Label).filter(Label.o_id == int(org.o_id), Label.label == "NORMAL").one()
+    now = datetime.datetime.now(datetime.UTC)
+
+    add_served_decision(
+        session,
+        org_id=int(org.o_id),
+        transaction_id="agent_rescore",
+        event_data={"amount": 130, "country": "US"},
+        evaluated_at=now - datetime.timedelta(minutes=20),
+        rule_results={int(rule.r_id): "HOLD"},
+        resolved_outcome="HOLD",
+        label=normal_label,
+    )
+    add_served_decision(
+        session,
+        org_id=int(org.o_id),
+        transaction_id="agent_rescore",
+        event_data={"amount": 80, "country": "US"},
+        evaluated_at=now - datetime.timedelta(minutes=1),
+        rule_results={},
+        resolved_outcome=None,
+        label=normal_label,
+    )
+    session.commit()
+
+    response = agent_tools_client.post(
+        "/api/v2/agent-tools/rule-blast-radius",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "rule_id": int(rule.r_id),
+            "proposed_logic": "if $amount > 150:\n\treturn !HOLD",
+            "sample_limit": 10,
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["eligible_records"] == 7
+    assert data["changed_rule_outcome_count"] == 2
+    assert {event["transaction_id"] for event in data["flipped_events"]} == {"agent_evt_2", "agent_evt_5"}
+
+
+def test_rule_blast_radius_returns_404_when_rule_not_found(agent_tools_client):
+    token = agent_tools_client.test_data["token"]
+
+    response = agent_tools_client.post(
+        "/api/v2/agent-tools/rule-blast-radius",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "rule_id": 999_999,
+            "proposed_logic": "return !HOLD",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Rule not found"
+
+
+def test_rule_blast_radius_rejects_invalid_proposed_logic(agent_tools_client, agent_tools_fixture):
+    token = agent_tools_client.test_data["token"]
+    rule = agent_tools_fixture["rule"]
+
+    response = agent_tools_client.post(
+        "/api/v2/agent-tools/rule-blast-radius",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "rule_id": int(rule.r_id),
+            "proposed_logic": "if $amount >",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Invalid proposed rule logic" in response.json()["detail"]
+
+
+def test_rule_blast_radius_handles_empty_replay_window(session, agent_tools_client):
+    token = agent_tools_client.test_data["token"]
+    org = agent_tools_client.test_data["org"]
+    rule = RuleModel(
+        rid="agent_tools_empty_window",
+        logic="if $amount > 100:\n\treturn !HOLD",
+        description="Rule without recent decisions",
+        o_id=int(org.o_id),
+    )
+    session.add(rule)
+    session.commit()
+
+    response = agent_tools_client.post(
+        "/api/v2/agent-tools/rule-blast-radius",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "rule_id": int(rule.r_id),
+            "proposed_logic": "if $amount > 150:\n\treturn !HOLD",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_records"] == 0
+    assert data["eligible_records"] == 0
+    assert data["changed_rule_outcome_count"] == 0
+    assert data["flipped_events"] == []

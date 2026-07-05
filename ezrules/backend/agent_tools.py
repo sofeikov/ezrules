@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy.orm import aliased
-
 from ezrules.backend.features import FeatureResolutionError, FeatureResolver
 from ezrules.backend.utils import load_cast_configs
 from ezrules.core.field_paths import get_field_value
@@ -26,6 +24,7 @@ DEFAULT_POSITIVE_LABELS = ("FRAUD",)
 
 @dataclass(slots=True)
 class AgentToolRecord:
+    event_version_id: int
     transaction_id: str
     event_version: int
     evaluation_decision_id: int
@@ -57,6 +56,12 @@ class ReplayResult:
 
 def _lookback_start(lookback_days: int) -> datetime:
     return datetime.now(UTC) - timedelta(days=lookback_days)
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _safe_outcome(value: Any) -> str | None:
@@ -124,26 +129,21 @@ def _load_recent_records(
     lookback_days: int,
     max_records: int,
 ) -> list[AgentToolRecord]:
-    label_alias = aliased(Label)
     rows = (
         db.query(
+            EventVersion.ev_id,
             EventVersion.transaction_id,
             EventVersion.event_version,
             EventVersion.event_data,
             EventVersion.effective_at,
             EvaluationDecision.ed_id,
             EvaluationDecision.evaluated_at,
-            label_alias.label,
         )
         .join(EvaluationDecision, EvaluationDecision.ev_id == EventVersion.ev_id)
-        .outerjoin(
-            EventVersionLabel,
-            (EventVersionLabel.ev_id == EventVersion.ev_id) & (EventVersionLabel.o_id == org_id),
-        )
-        .outerjoin(label_alias, (label_alias.el_id == EventVersionLabel.el_id) & (label_alias.o_id == org_id))
         .filter(
             EvaluationDecision.o_id == org_id,
             EvaluationDecision.served.is_(True),
+            EvaluationDecision.is_current.is_(True),
             EvaluationDecision.decision_type == "served",
             EvaluationDecision.evaluated_at >= _lookback_start(lookback_days),
         )
@@ -152,15 +152,34 @@ def _load_recent_records(
         .all()
     )
 
+    ev_ids = [int(row.ev_id) for row in rows]
+    labels_by_ev_id: dict[int, str] = {}
+    if ev_ids:
+        label_rows = (
+            db.query(EventVersionLabel.ev_id, EventVersionLabel.assigned_at, EventVersionLabel.evl_id, Label.label)
+            .join(Label, (Label.el_id == EventVersionLabel.el_id) & (Label.o_id == org_id))
+            .filter(EventVersionLabel.o_id == org_id, EventVersionLabel.ev_id.in_(ev_ids))
+            .order_by(
+                EventVersionLabel.ev_id.asc(),
+                EventVersionLabel.assigned_at.desc(),
+                EventVersionLabel.evl_id.desc(),
+            )
+            .all()
+        )
+        for label_row in label_rows:
+            ev_id = int(label_row.ev_id)
+            labels_by_ev_id.setdefault(ev_id, str(label_row.label))
+
     return [
         AgentToolRecord(
+            event_version_id=int(row.ev_id),
             transaction_id=str(row.transaction_id),
             event_version=int(row.event_version),
             evaluation_decision_id=int(row.ed_id),
             event_data=dict(row.event_data or {}),
-            effective_at=row.effective_at if row.effective_at.tzinfo else row.effective_at.replace(tzinfo=UTC),
-            evaluated_at=row.evaluated_at if row.evaluated_at.tzinfo else row.evaluated_at.replace(tzinfo=UTC),
-            label_name=str(row.label) if row.label else None,
+            effective_at=_as_utc(row.effective_at),
+            evaluated_at=_as_utc(row.evaluated_at),
+            label_name=labels_by_ev_id.get(int(row.ev_id)),
         )
         for row in rows
     ]
@@ -316,7 +335,7 @@ def build_blast_radius(
             {
                 "group": dict(item.group_values),
                 "total_records": 0,
-                "changed_decision_count": 0,
+                "changed_rule_outcome_count": 0,
                 "stored_result": Counter(),
                 "proposed_result": Counter(),
             },
@@ -325,7 +344,7 @@ def build_blast_radius(
         group["stored_result"][_count_key(item.stored_outcome)] += 1
         group["proposed_result"][_count_key(item.proposed_outcome)] += 1
         if _count_key(item.stored_outcome) != _count_key(item.proposed_outcome):
-            group["changed_decision_count"] += 1
+            group["changed_rule_outcome_count"] += 1
 
     group_deltas = []
     for group in group_counters.values():
@@ -335,8 +354,8 @@ def build_blast_radius(
             {
                 "group": group["group"],
                 "total_records": group["total_records"],
-                "changed_decision_count": group["changed_decision_count"],
-                "changed_decision_rate": round(group["changed_decision_count"] / group["total_records"], 4)
+                "changed_rule_outcome_count": group["changed_rule_outcome_count"],
+                "changed_rule_outcome_rate": round(group["changed_rule_outcome_count"] / group["total_records"], 4)
                 if group["total_records"]
                 else 0.0,
                 "stored_result": _sorted_counts(stored_result),
@@ -344,7 +363,7 @@ def build_blast_radius(
                 "outcome_delta": _outcome_delta(stored_result, proposed_result),
             }
         )
-    group_deltas.sort(key=lambda row: (row["changed_decision_count"], row["total_records"]), reverse=True)
+    group_deltas.sort(key=lambda row: (row["changed_rule_outcome_count"], row["total_records"]), reverse=True)
 
     return {
         "rule_id": rule_id,
@@ -355,8 +374,10 @@ def build_blast_radius(
         "stored_result": _sorted_counts(replay.stored_counts),
         "proposed_result": _sorted_counts(replay.proposed_counts),
         "outcome_delta": _outcome_delta(replay.stored_counts, replay.proposed_counts),
-        "changed_decision_count": len(changed),
-        "changed_decision_rate": round(len(changed) / replay.eligible_records, 4) if replay.eligible_records else 0.0,
+        "changed_rule_outcome_count": len(changed),
+        "changed_rule_outcome_rate": round(len(changed) / replay.eligible_records, 4)
+        if replay.eligible_records
+        else 0.0,
         "group_deltas": group_deltas,
         "flipped_events": [_evidence_row(item) for item in changed[:sample_limit]],
         "warnings": replay.warnings,
