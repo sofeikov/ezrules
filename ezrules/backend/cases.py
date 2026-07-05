@@ -284,7 +284,7 @@ def process_evaluation_for_cases(db: Any, *, o_id: int, evaluation_decision_id: 
     return result
 
 
-def enqueue_case_detection(*, o_id: int, evaluation_decision_id: int, resolved_outcome: str | None = None) -> None:
+def enqueue_case_detection(*, o_id: int, evaluation_decision_id: int) -> None:
     if app_settings.TESTING:
         process_evaluation_for_cases(db_session, o_id=o_id, evaluation_decision_id=evaluation_decision_id)
         db_session.commit()

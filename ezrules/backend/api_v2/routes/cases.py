@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -31,6 +32,19 @@ from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Case, CaseEvent, IntegrationEvent, IntegrationSubscription, User
 
 router = APIRouter(prefix="/api/v2", tags=["Cases"])
+
+
+def _validate_subscription_config(*, destination_type: str, config: dict[str, Any]) -> None:
+    if destination_type.strip().lower() != "webhook":
+        return
+
+    url = str(config.get("url") or "").strip()
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Webhook subscriptions require config.url to be an HTTPS URL.",
+        )
 
 
 def _case_to_response(case: Case) -> CaseResponse:
@@ -238,11 +252,14 @@ def create_subscription(
     db: Any = Depends(get_db),
 ) -> IntegrationSubscriptionMutationResponse:
     now = datetime.now(UTC)
+    destination_type = payload.destination_type.strip().lower()
+    config = dict(payload.config)
+    _validate_subscription_config(destination_type=destination_type, config=config)
     subscription = IntegrationSubscription(
         o_id=current_org_id,
         name=payload.name.strip(),
-        destination_type=payload.destination_type.strip(),
-        config=payload.config,
+        destination_type=destination_type,
+        config=config,
         event_types=payload.event_types,
         enabled=payload.enabled,
         created_at=now,
@@ -275,12 +292,19 @@ def update_subscription(
     )
     if subscription is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Integration subscription not found")
+    destination_type = (
+        payload.destination_type.strip().lower()
+        if payload.destination_type is not None
+        else str(subscription.destination_type)
+    )
+    config = dict(payload.config) if payload.config is not None else dict(subscription.config or {})
+    _validate_subscription_config(destination_type=destination_type, config=config)
     if payload.name is not None:
         subscription.name = payload.name.strip()
     if payload.destination_type is not None:
-        subscription.destination_type = payload.destination_type.strip()
+        subscription.destination_type = destination_type
     if payload.config is not None:
-        subscription.config = payload.config
+        subscription.config = config
     if payload.event_types is not None:
         subscription.event_types = payload.event_types
     if payload.enabled is not None:

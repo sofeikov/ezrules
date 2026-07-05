@@ -255,6 +255,7 @@ Case lifecycle notes:
 - A rescore to neutral/no outcome keeps the case open with a non-current decision state so an analyst can close it intentionally.
 - Resolve requests can include `expected_current_ed_id`; the API returns `409` if the case was rescored after the UI loaded.
 - `POST /api/v2/evaluate` remains response-compatible. External systems should consume `evaluation.completed` and case lifecycle changes through `/api/v2/integration-events` or configured outbound delivery.
+- Webhook subscriptions require `config.url` to be a valid HTTPS URL. Responses omit any configured webhook `secret`.
 
 ### Settings
 

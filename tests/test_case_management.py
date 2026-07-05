@@ -1,4 +1,5 @@
 import datetime
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,6 +14,7 @@ from ezrules.backend.cases import (
     process_evaluation_for_cases,
     resolve_case,
 )
+from ezrules.backend.integrations import OUTBOX_DELIVERED, dispatch_pending_outbox, publish_integration_event
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
@@ -22,6 +24,8 @@ from ezrules.models.backend_core import (
     EvaluationDecision,
     EventVersion,
     IntegrationEvent,
+    IntegrationOutbox,
+    IntegrationSubscription,
     Organisation,
     Role,
     User,
@@ -232,3 +236,128 @@ def test_cases_and_integration_events_api(session):
         assert "case.resolved" in event_types
 
     assert session.query(Case).filter(Case.resolved_by_user_id == int(user.id)).count() == 1
+
+
+def test_case_assignment_api_records_timeline_events(session):
+    _org, user, token = _seed_case_org(session)
+    decision = _add_decision(session, outcome="HOLD")
+    process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
+    session.commit()
+    case = session.query(Case).one()
+
+    with TestClient(app) as client:
+        headers = {"Authorization": f"Bearer {token}"}
+        assign_response = client.patch(
+            f"/api/v2/cases/{case.case_id}",
+            headers=headers,
+            json={"assigned_to_user_id": int(user.id)},
+        )
+        assert assign_response.status_code == 200
+        assert assign_response.json()["case"]["assigned_to_user_id"] == int(user.id)
+        assert assign_response.json()["case"]["status"] == "in_review"
+
+        unassign_response = client.patch(
+            f"/api/v2/cases/{case.case_id}",
+            headers=headers,
+            json={"assigned_to_user_id": None},
+        )
+        assert unassign_response.status_code == 200
+        assert unassign_response.json()["case"]["assigned_to_user_id"] is None
+
+    events = session.query(CaseEvent).order_by(CaseEvent.case_event_id).all()
+    assert [event.event_type for event in events] == ["created", "assigned", "assigned"]
+    assert events[-2].details["assigned_to_user_id"] == int(user.id)
+    assert events[-1].details["assigned_to_user_id"] is None
+
+
+def test_integration_subscription_api_validates_webhook_url_and_strips_secret(session):
+    _org, _user, token = _seed_case_org(session)
+
+    with TestClient(app) as client:
+        headers = {"Authorization": f"Bearer {token}"}
+        invalid_response = client.post(
+            "/api/v2/integration-subscriptions",
+            headers=headers,
+            json={
+                "name": "Bad webhook",
+                "destination_type": "webhook",
+                "config": {"url": "http://example.com/webhook"},
+                "event_types": ["case.resolved"],
+            },
+        )
+        assert invalid_response.status_code == 422
+
+        create_response = client.post(
+            "/api/v2/integration-subscriptions",
+            headers=headers,
+            json={
+                "name": "Case webhook",
+                "destination_type": "webhook",
+                "config": {"url": "https://example.com/webhook", "secret": "top-secret"},
+                "event_types": ["case.resolved"],
+            },
+        )
+        assert create_response.status_code == 201
+        created = create_response.json()["subscription"]
+        assert created["config"] == {"url": "https://example.com/webhook"}
+
+        update_response = client.patch(
+            f"/api/v2/integration-subscriptions/{created['id']}",
+            headers=headers,
+            json={
+                "name": "Disabled case webhook",
+                "config": {"url": "https://events.example.com/cases"},
+                "event_types": ["case.created", "case.resolved"],
+                "enabled": False,
+            },
+        )
+        assert update_response.status_code == 200
+        updated = update_response.json()["subscription"]
+        assert updated["name"] == "Disabled case webhook"
+        assert updated["enabled"] is False
+        assert updated["event_types"] == ["case.created", "case.resolved"]
+
+        list_response = client.get("/api/v2/integration-subscriptions", headers=headers)
+        assert list_response.status_code == 200
+        assert list_response.json()["subscriptions"][0]["id"] == created["id"]
+
+
+def test_outbox_dispatch_delivers_webhook_and_marks_delivery(session, monkeypatch):
+    _seed_case_org(session)
+    subscription = IntegrationSubscription(
+        o_id=1,
+        name="Case webhook",
+        destination_type="webhook",
+        config={"url": "https://example.com/webhook", "secret": "top-secret"},
+        event_types=["case.created"],
+        enabled=True,
+    )
+    session.add(subscription)
+    session.flush()
+    publish_integration_event(
+        session,
+        o_id=1,
+        source_type="case_event",
+        source_id=123,
+        event_type="case.created",
+        external_event_id="evt_test_case_created",
+        payload={"case": {"case_id": 123}},
+    )
+    session.commit()
+
+    calls = []
+
+    def fake_post(url, *, data, headers, timeout):
+        calls.append({"url": url, "data": data, "headers": headers, "timeout": timeout})
+        return SimpleNamespace(status_code=204)
+
+    monkeypatch.setattr("ezrules.backend.integrations.requests.post", fake_post)
+
+    result = dispatch_pending_outbox(session)
+
+    assert result == {"delivered": 1, "failed": 0}
+    delivery = session.query(IntegrationOutbox).one()
+    assert delivery.status == OUTBOX_DELIVERED
+    assert delivery.attempt_count == 1
+    assert calls[0]["url"] == "https://example.com/webhook"
+    assert calls[0]["headers"]["X-Ezrules-Signature"].startswith("sha256=")

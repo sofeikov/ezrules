@@ -318,7 +318,6 @@ def evaluate(
             enqueue_case_detection(
                 o_id=int(lre.o_id),
                 evaluation_decision_id=int(result["evaluation_decision_id"]),
-                resolved_outcome=result.get("resolved_outcome"),
             )
             _persist_evaluate_observations(db, request_data.event_data, lre.o_id)
             return EvaluateResponse(
@@ -387,7 +386,6 @@ def evaluate(
         enqueue_case_detection(
             o_id=int(lre.o_id),
             evaluation_decision_id=int(evaluation_decision_id),
-            resolved_outcome=result.get("resolved_outcome"),
         )
     except Exception as exc:
         raise HTTPException(

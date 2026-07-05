@@ -16,8 +16,127 @@ down_revision: str | None = "20260630_0033"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+CASE_INTEGRATION_ACTIONS = (
+    ("view_cases", "View case-management work items", "case"),
+    ("manage_cases", "Assign and resolve case-management work items", "case"),
+    ("view_integrations", "View integration event streams and subscriptions", "integration"),
+    ("manage_integrations", "Create and update integration subscriptions", "integration"),
+)
+
+
+def _insert_case_integration_permissions() -> None:
+    conn = op.get_bind()
+    for name, description, resource_type in CASE_INTEGRATION_ACTIONS:
+        conn.execute(
+            sa.text(
+                """
+                INSERT INTO actions (name, description, resource_type, created_at)
+                SELECT :name, :description, :resource_type, NOW()
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM actions
+                )
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM actions
+                    WHERE name = :name
+                )
+                """
+            ),
+            {
+                "name": name,
+                "description": description,
+                "resource_type": resource_type,
+            },
+        )
+
+        action_id = conn.execute(
+            sa.text(
+                """
+                SELECT id
+                FROM actions
+                WHERE name = :name
+                """
+            ),
+            {"name": name},
+        ).scalar_one_or_none()
+
+        if action_id is None:
+            continue
+
+        admin_role_ids = conn.execute(
+            sa.text(
+                """
+                SELECT id
+                FROM "role"
+                WHERE name = :role_name
+                """
+            ),
+            {"role_name": "admin"},
+        ).scalars()
+
+        for role_id in admin_role_ids:
+            conn.execute(
+                sa.text(
+                    """
+                    INSERT INTO role_actions (role_id, action_id, resource_id, created_at)
+                    SELECT :role_id, :action_id, NULL, NOW()
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM role_actions
+                        WHERE role_id = :role_id
+                          AND action_id = :action_id
+                          AND resource_id IS NULL
+                    )
+                    """
+                ),
+                {
+                    "role_id": int(role_id),
+                    "action_id": int(action_id),
+                },
+            )
+
+
+def _delete_case_integration_permissions() -> None:
+    conn = op.get_bind()
+    action_names = tuple(name for name, _, _ in CASE_INTEGRATION_ACTIONS)
+    action_ids = conn.execute(
+        sa.text(
+            """
+            SELECT id
+            FROM actions
+            WHERE name IN :action_names
+            """
+        ).bindparams(sa.bindparam("action_names", expanding=True)),
+        {"action_names": action_names},
+    ).scalars()
+    action_ids = [int(action_id) for action_id in action_ids]
+    if not action_ids:
+        return
+
+    conn.execute(
+        sa.text(
+            """
+            DELETE FROM role_actions
+            WHERE action_id IN :action_ids
+            """
+        ).bindparams(sa.bindparam("action_ids", expanding=True)),
+        {"action_ids": action_ids},
+    )
+    conn.execute(
+        sa.text(
+            """
+            DELETE FROM actions
+            WHERE id IN :action_ids
+            """
+        ).bindparams(sa.bindparam("action_ids", expanding=True)),
+        {"action_ids": action_ids},
+    )
+
 
 def upgrade() -> None:
+    _insert_case_integration_permissions()
+
     op.create_table(
         "cases",
         sa.Column("case_id", sa.Integer(), nullable=False),
@@ -179,3 +298,4 @@ def downgrade() -> None:
     op.drop_index("ix_cases_o_id_status_updated", table_name="cases")
     op.drop_index("ix_cases_o_id_current_ed", table_name="cases")
     op.drop_table("cases")
+    _delete_case_integration_permissions()
