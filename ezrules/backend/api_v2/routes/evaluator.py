@@ -396,13 +396,22 @@ def evaluate(
             o_id=int(lre.o_id),
             evaluation_decision_id=int(evaluation_decision_id),
         )
-        FeatureResolver(db, lre.o_id).persist_traces(feature_traces, evaluation_decision_id=int(evaluation_decision_id))
-        db.commit()
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Evaluation failed",
         ) from exc
+
+    try:
+        FeatureResolver(db, lre.o_id).persist_traces(feature_traces, evaluation_decision_id=int(evaluation_decision_id))
+        db.commit()
+    except Exception:
+        logger.exception(
+            "Failed to persist feature traces for evaluation_decision_id=%s org_id=%s",
+            evaluation_decision_id,
+            lre.o_id,
+        )
+        db.rollback()
 
     if rollout_logs:
         try:
