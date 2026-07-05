@@ -26,7 +26,7 @@ from ezrules.backend.api_v2.schemas.cases import (
     IntegrationSubscriptionsResponse,
     IntegrationSubscriptionUpdate,
 )
-from ezrules.backend.cases import CaseConflictError, CaseNotFoundError, assign_case, resolve_case
+from ezrules.backend.cases import CaseConflictError, CaseNotFoundError, CaseValidationError, assign_case, resolve_case
 from ezrules.backend.integrations import list_integration_events
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Case, CaseEvent, IntegrationEvent, IntegrationSubscription, User
@@ -175,6 +175,8 @@ def update_case(
         )
     except CaseNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found") from exc
+    except CaseValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     db.commit()
     return CaseMutationResponse(success=True, message="Case updated", case=_case_to_response(case))
 

@@ -145,6 +145,17 @@ def test_neutral_decision_only_publishes_evaluation_event(session):
     assert [event.event_type for event in session.query(IntegrationEvent).all()] == ["evaluation.completed"]
 
 
+def test_neutral_decision_matching_is_case_insensitive(session):
+    _seed_case_org(session)
+    decision = _add_decision(session, outcome="release")
+
+    result = process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
+    session.commit()
+
+    assert result.case_id is None
+    assert session.query(Case).count() == 0
+
+
 def test_rescore_updates_active_case_instead_of_creating_duplicate(session):
     _seed_case_org(session)
     first = _add_decision(session, outcome="HOLD", version=1, is_current=True)
@@ -263,11 +274,72 @@ def test_case_assignment_api_records_timeline_events(session):
         )
         assert unassign_response.status_code == 200
         assert unassign_response.json()["case"]["assigned_to_user_id"] is None
+        assert unassign_response.json()["case"]["status"] == "open"
 
     events = session.query(CaseEvent).order_by(CaseEvent.case_event_id).all()
     assert [event.event_type for event in events] == ["created", "assigned", "assigned"]
     assert events[-2].details["assigned_to_user_id"] == int(user.id)
     assert events[-1].details["assigned_to_user_id"] is None
+
+
+def test_case_assignment_rejects_user_from_another_org(session):
+    _org, _user, token = _seed_case_org(session)
+    other_org = Organisation(name="Other org")
+    session.add(other_org)
+    session.flush()
+    other_user = User(
+        email="other-case-manager@example.com",
+        password="unused",
+        active=True,
+        fs_uniquifier="other-case-manager@example.com",
+        o_id=int(other_org.o_id),
+    )
+    session.add(other_user)
+    decision = _add_decision(session, outcome="HOLD")
+    process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
+    session.commit()
+    case = session.query(Case).one()
+
+    with TestClient(app) as client:
+        response = client.patch(
+            f"/api/v2/cases/{case.case_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"assigned_to_user_id": int(other_user.id)},
+        )
+
+    assert response.status_code == 422
+    assert session.query(Case).one().assigned_to_user_id is None
+
+
+def test_resolving_already_resolved_case_is_idempotent(session):
+    _org, user, _token = _seed_case_org(session)
+    decision = _add_decision(session, outcome="HOLD")
+    process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
+    case = session.query(Case).one()
+
+    resolve_case(
+        session,
+        o_id=1,
+        case_id=int(case.case_id),
+        actor_user_id=int(user.id),
+        resolution_note="Reviewed once.",
+        expected_current_ed_id=int(decision.ed_id),
+    )
+    resolve_case(
+        session,
+        o_id=1,
+        case_id=int(case.case_id),
+        actor_user_id=int(user.id),
+        resolution_note="Reviewed twice.",
+        expected_current_ed_id=int(decision.ed_id),
+    )
+    session.commit()
+
+    assert [event.event_type for event in session.query(CaseEvent).order_by(CaseEvent.case_event_id)] == [
+        "created",
+        "resolved",
+    ]
+    assert session.query(IntegrationEvent).filter(IntegrationEvent.event_type == "case.resolved").count() == 1
 
 
 def test_integration_subscription_api_validates_webhook_url_and_strips_secret(session):

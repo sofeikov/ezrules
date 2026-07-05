@@ -160,6 +160,7 @@ def dispatch_pending_outbox(db: Any, *, limit: int = 100) -> dict[str, int]:
             IntegrationSubscription.enabled.is_(True),
         )
         .order_by(IntegrationOutbox.next_attempt_at.asc(), IntegrationOutbox.delivery_id.asc())
+        .with_for_update(skip_locked=True, of=IntegrationOutbox)
         .limit(limit)
         .all()
     )

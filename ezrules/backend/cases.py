@@ -6,9 +6,11 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
+import sqlalchemy as sa
+
 from ezrules.backend.integrations import publish_integration_event
 from ezrules.backend.runtime_settings import get_neutral_outcome
-from ezrules.models.backend_core import AllowedOutcome, Case, CaseEvent, EvaluationDecision
+from ezrules.models.backend_core import AllowedOutcome, Case, CaseEvent, EvaluationDecision, User
 from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
@@ -32,6 +34,10 @@ class CaseConflictError(Exception):
 
 class CaseNotFoundError(Exception):
     """Raised when a case does not exist in the caller's organisation."""
+
+
+class CaseValidationError(Exception):
+    """Raised when a case mutation payload is invalid for the caller's organisation."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,7 +72,14 @@ def _outcome_priority(db: Any, *, o_id: int, outcome: str | None) -> int:
 def _is_caseable_outcome(db: Any, *, o_id: int, outcome: str | None) -> bool:
     if not outcome:
         return False
-    return outcome != get_neutral_outcome(db, o_id)
+    return outcome.upper() != get_neutral_outcome(db, o_id).upper()
+
+
+def _lock_case_transaction(db: Any, *, o_id: int, transaction_id: str) -> None:
+    db.execute(
+        sa.text("SELECT pg_advisory_xact_lock(:o_id, hashtext(:transaction_id))"),
+        {"o_id": o_id, "transaction_id": transaction_id},
+    )
 
 
 def _active_case_for_transaction(db: Any, *, o_id: int, transaction_id: str) -> Case | None:
@@ -206,6 +219,7 @@ def ensure_case_for_decision(db: Any, *, o_id: int, evaluation_decision_id: int)
 
     outcome = str(decision.resolved_outcome) if decision.resolved_outcome else None
     caseable = _is_caseable_outcome(db, o_id=o_id, outcome=outcome)
+    _lock_case_transaction(db, o_id=o_id, transaction_id=str(decision.transaction_id))
     active_case = _active_case_for_transaction(db, o_id=o_id, transaction_id=str(decision.transaction_id))
 
     if active_case is not None:
@@ -311,9 +325,15 @@ def get_case_for_update(db: Any, *, o_id: int, case_id: int) -> Case:
 
 def assign_case(db: Any, *, o_id: int, case_id: int, actor_user_id: int, assignee_user_id: int | None) -> Case:
     case = get_case_for_update(db, o_id=o_id, case_id=case_id)
+    if assignee_user_id is not None:
+        assignee = db.query(User.id).filter(User.id == assignee_user_id, User.o_id == o_id).first()
+        if assignee is None:
+            raise CaseValidationError("Assignee must belong to the case organisation")
     previous_assignee = int(case.assigned_to_user_id) if case.assigned_to_user_id is not None else None
     case.assigned_to_user_id = assignee_user_id
-    if case.status == CASE_STATUS_OPEN:
+    if assignee_user_id is None and case.status == CASE_STATUS_IN_REVIEW:
+        case.status = CASE_STATUS_OPEN
+    elif assignee_user_id is not None and case.status == CASE_STATUS_OPEN:
         case.status = CASE_STATUS_IN_REVIEW
     case.updated_at = _utcnow()
     db.flush()
@@ -344,6 +364,9 @@ def resolve_case(
     case = get_case_for_update(db, o_id=o_id, case_id=case_id)
     if expected_current_ed_id is not None and int(case.current_ed_id) != expected_current_ed_id:
         raise CaseConflictError("Case score changed; reload before resolving")
+
+    if case.status in {CASE_STATUS_RESOLVED, CASE_STATUS_CLOSED}:
+        return case
 
     previous_status = str(case.status)
     case.status = CASE_STATUS_RESOLVED
