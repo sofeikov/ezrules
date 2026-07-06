@@ -22,6 +22,26 @@ ACTIVE_CASE_STATUSES = (CASE_STATUS_OPEN, CASE_STATUS_IN_REVIEW, CASE_STATUS_REO
 CASE_DECISION_CURRENT = "current"
 CASE_DECISION_RESCORED_NEUTRAL = "rescored_neutral"
 CASE_DECISION_RESCORED_NON_CASEABLE = "rescored_non_caseable"
+CASE_RESOLUTION_DISPOSITIONS = frozenset(
+    {
+        "confirmed_fraud",
+        "false_positive",
+        "approved",
+        "rejected",
+        "duplicate",
+        "unable_to_verify",
+        "escalated",
+    }
+)
+CASE_RESOLUTION_ACTIONS = frozenset(
+    {
+        "none",
+        "release_transaction",
+        "cancel_transaction",
+        "block_customer",
+        "escalate_external_review",
+    }
+)
 
 
 class CaseConflictError(Exception):
@@ -113,6 +133,10 @@ def _case_payload(case: Case) -> dict[str, Any]:
         "decision_state": str(case.decision_state),
         "resolved_outcome": str(case.resolved_outcome) if case.resolved_outcome else None,
         "previous_resolved_outcome": str(case.previous_resolved_outcome) if case.previous_resolved_outcome else None,
+        "assigned_to_user_id": int(case.assigned_to_user_id) if case.assigned_to_user_id is not None else None,
+        "resolved_by_user_id": int(case.resolved_by_user_id) if case.resolved_by_user_id is not None else None,
+        "resolution_disposition": str(case.resolution_disposition) if case.resolution_disposition else None,
+        "resolution_action": str(case.resolution_action) if case.resolution_action else None,
         "current_evaluation_decision_id": int(case.current_ed_id),
         "previous_evaluation_decision_id": int(case.previous_ed_id) if case.previous_ed_id is not None else None,
         "opened_by_evaluation_decision_id": int(case.opened_by_ed_id),
@@ -338,12 +362,26 @@ def assign_case(db: Any, *, o_id: int, case_id: int, actor_user_id: int, assigne
     return case
 
 
+def add_case_note(db: Any, *, o_id: int, case_id: int, actor_user_id: int, note: str) -> CaseEvent:
+    case = get_case_for_update(db, o_id=o_id, case_id=case_id)
+    return record_case_event(
+        db,
+        case=case,
+        event_type="note",
+        actor_user_id=actor_user_id,
+        source_ed_id=int(case.current_ed_id),
+        details={"note": note.strip()},
+    )
+
+
 def resolve_case(
     db: Any,
     *,
     o_id: int,
     case_id: int,
     actor_user_id: int,
+    resolution_disposition: str,
+    resolution_action: str,
     resolution_note: str,
     resolution_label_id: int | None = None,
     expected_current_ed_id: int | None = None,
@@ -355,6 +393,13 @@ def resolve_case(
     if case.status in {CASE_STATUS_RESOLVED, CASE_STATUS_CLOSED}:
         return case
 
+    normalized_disposition = resolution_disposition.strip().lower()
+    if normalized_disposition not in CASE_RESOLUTION_DISPOSITIONS:
+        raise CaseValidationError("Resolution disposition is not supported")
+    normalized_action = resolution_action.strip().lower()
+    if normalized_action not in CASE_RESOLUTION_ACTIONS:
+        raise CaseValidationError("Resolution action is not supported")
+
     if resolution_label_id is not None:
         label = db.query(Label.el_id).filter(Label.el_id == resolution_label_id, Label.o_id == o_id).first()
         if label is None:
@@ -363,6 +408,8 @@ def resolve_case(
     previous_status = str(case.status)
     case.status = CASE_STATUS_RESOLVED
     case.resolved_by_user_id = actor_user_id
+    case.resolution_disposition = normalized_disposition
+    case.resolution_action = normalized_action
     case.resolution_note = resolution_note.strip()
     case.resolution_label_id = resolution_label_id
     case.resolved_at = _utcnow()
@@ -378,6 +425,8 @@ def resolve_case(
         details={
             "previous_status": previous_status,
             "status": CASE_STATUS_RESOLVED,
+            "resolution_disposition": normalized_disposition,
+            "resolution_action": normalized_action,
             "resolution_note": case.resolution_note,
             "resolution_label_id": resolution_label_id,
         },

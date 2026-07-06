@@ -502,6 +502,8 @@ class Case(Base):
     priority = Column(Integer, nullable=False, default=0)
     assigned_to_user_id: Mapped[int | None] = mapped_column(ForeignKey("user.id"), nullable=True)
     resolved_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("user.id"), nullable=True)
+    resolution_disposition = Column(String(64), nullable=True)
+    resolution_action = Column(String(64), nullable=True)
     resolution_note = Column(Text, nullable=True)
     resolution_label_id: Mapped[int | None] = mapped_column(ForeignKey("event_labels.el_id"), nullable=True)
     reopened_from_case_id: Mapped[int | None] = mapped_column(ForeignKey("cases.case_id"), nullable=True)

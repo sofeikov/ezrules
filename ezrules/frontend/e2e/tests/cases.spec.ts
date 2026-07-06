@@ -34,7 +34,11 @@ const caseItem = {
   decision_state: 'current',
   priority: 2,
   assigned_to_user_id: null,
+  assigned_to_email: null,
   resolved_by_user_id: null,
+  resolved_by_email: null,
+  resolution_disposition: null,
+  resolution_action: null,
   resolution_note: null,
   resolution_label_id: null,
   reopened_from_case_id: null,
@@ -55,12 +59,63 @@ test.describe('Cases', () => {
         body: JSON.stringify({ cases: [caseItem], total: 1 }),
       });
     });
+    await page.route('**/api/v2/cases/assignees', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ users: [{ id: 1, email: 'case.manager@example.com' }] }),
+      });
+    });
     await page.route('**/api/v2/cases/42', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            message: 'Case updated',
+            case: {
+              ...caseItem,
+              status: 'in_review',
+              assigned_to_user_id: 1,
+              assigned_to_email: 'case.manager@example.com',
+            },
+          }),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           case: caseItem,
+          evaluation: {
+            evaluation_decision_id: 200,
+            transaction_id: 'txn-premium-review-001',
+            event_version_id: 100,
+            event_version: 1,
+            effective_at: '2026-07-05T09:58:00Z',
+            observed_at: '2026-07-05T10:00:00Z',
+            evaluated_at: '2026-07-05T10:00:00Z',
+            is_current: true,
+            resolved_outcome: 'HOLD',
+            outcome_counters: { HOLD: 1 },
+            event_data: {
+              transaction_id: 'txn-premium-review-001',
+              amount: 12500,
+              sender_id: 'premium-customer-884',
+            },
+            triggered_rules: [
+              {
+                r_id: 7,
+                rid: 'premium_amount_hold',
+                description: 'Premium transfer requires manual review',
+                outcome: 'HOLD',
+                metadata_source: 'evaluation_snapshot',
+                referenced_fields: ['amount', 'sender_id'],
+              },
+            ],
+          },
           events: [
             {
               id: 1,
@@ -74,6 +129,27 @@ test.describe('Cases', () => {
               created_at: '2026-07-05T10:00:00Z',
             },
           ],
+        }),
+      });
+    });
+    await page.route('**/api/v2/cases/42/notes', async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          message: 'Case note added',
+          event: {
+            id: 2,
+            case_id: 42,
+            event_type: 'note',
+            actor_user_id: 1,
+            source_ed_id: 200,
+            external_event_id: 'case_evt_note',
+            occurred_at: '2026-07-05T10:03:00Z',
+            details: { note: 'Customer confirmed this transfer was expected.' },
+            created_at: '2026-07-05T10:03:00Z',
+          },
         }),
       });
     });
@@ -110,6 +186,9 @@ test.describe('Cases', () => {
             ...caseItem,
             status: 'resolved',
             resolved_by_user_id: 1,
+            resolved_by_email: 'case.manager@example.com',
+            resolution_disposition: 'false_positive',
+            resolution_action: 'release_transaction',
             resolution_note: 'Verified customer profile and cleared case.',
             resolved_at: '2026-07-05T10:05:00Z',
           },
@@ -123,9 +202,21 @@ test.describe('Cases', () => {
     await expect(casesPage.casesTable).toBeVisible();
     await expect(casesPage.caseRows.first()).toContainText('txn-premium-review-001');
     await expect(casesPage.detail).toContainText('HOLD');
+    await expect(casesPage.detail).toContainText('txn-premium-review-001');
+    await expect(page.locator('[data-testid="case-evaluation-context"]')).toContainText('Event version');
+    await expect(page.locator('[data-testid="case-triggered-rules"]')).toContainText('premium_amount_hold');
+    await expect(page.locator('[data-testid="case-triggered-rules"]')).toContainText('Premium transfer requires manual review');
+    await expect(page.locator('[data-testid="case-event-payload"]')).toContainText('premium-customer-884');
     await expect(casesPage.eventsList).toContainText('created');
     await expect(page.locator('text=evaluation.completed')).toBeVisible();
 
+    await page.locator('[data-testid="case-claim-button"]').click();
+    await expect(page.locator('text=Case assignment updated.')).toBeVisible();
+    await page.locator('[data-testid="case-note"]').fill('Customer confirmed this transfer was expected.');
+    await page.locator('[data-testid="case-add-note-button"]').click();
+    await expect(page.locator('text=Case note added.')).toBeVisible();
+    await page.locator('[data-testid="case-resolution-disposition"]').selectOption('false_positive');
+    await page.locator('[data-testid="case-resolution-action"]').selectOption('release_transaction');
     await casesPage.resolutionNote.fill('Verified customer profile and cleared case.');
     await casesPage.resolveButton.click();
 

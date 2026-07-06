@@ -16,7 +16,11 @@ export interface CaseItem {
   decision_state: string;
   priority: number;
   assigned_to_user_id: number | null;
+  assigned_to_email: string | null;
   resolved_by_user_id: number | null;
+  resolved_by_email: string | null;
+  resolution_disposition: string | null;
+  resolution_action: string | null;
   resolution_note: string | null;
   resolution_label_id: number | null;
   reopened_from_case_id: number | null;
@@ -37,9 +41,48 @@ export interface CaseEvent {
   created_at: string;
 }
 
+export interface CaseTriggeredRule {
+  r_id: number;
+  rid: string;
+  description: string;
+  outcome: string;
+  metadata_source: string;
+  referenced_fields: string[] | null;
+}
+
+export interface CaseEvaluation {
+  evaluation_decision_id: number;
+  transaction_id: string;
+  event_version_id: number;
+  event_version: number;
+  effective_at: string;
+  observed_at: string;
+  evaluated_at: string;
+  is_current: boolean;
+  resolved_outcome: string | null;
+  outcome_counters: Record<string, number>;
+  event_data: Record<string, unknown>;
+  triggered_rules: CaseTriggeredRule[];
+}
+
 export interface CaseDetail {
   case: CaseItem;
   events: CaseEvent[];
+  evaluation: CaseEvaluation | null;
+}
+
+export interface CaseFilters {
+  status?: string;
+  assignedTo?: string;
+  outcome?: string;
+  priorityMin?: number | null;
+  decisionState?: string;
+  query?: string;
+}
+
+export interface CaseAssignee {
+  id: number;
+  email: string;
 }
 
 export interface IntegrationEvent {
@@ -62,24 +105,59 @@ export class CaseService {
 
   constructor(private http: HttpClient) {}
 
-  getCases(status?: string): Observable<{ cases: CaseItem[]; total: number }> {
+  getCases(filters: CaseFilters = {}): Observable<{ cases: CaseItem[]; total: number }> {
     let params = new HttpParams().set('limit', 100);
-    if (status) {
-      params = params.set('status', status);
+    if (filters.status) {
+      params = params.set('status', filters.status);
+    }
+    if (filters.assignedTo) {
+      params = params.set('assigned_to', filters.assignedTo);
+    }
+    if (filters.outcome) {
+      params = params.set('outcome', filters.outcome);
+    }
+    if (filters.priorityMin !== undefined && filters.priorityMin !== null) {
+      params = params.set('priority_min', String(filters.priorityMin));
+    }
+    if (filters.decisionState) {
+      params = params.set('decision_state', filters.decisionState);
+    }
+    if (filters.query) {
+      params = params.set('q', filters.query);
     }
     return this.http.get<{ cases: CaseItem[]; total: number }>(`${this.apiUrl}/cases`, { params });
+  }
+
+  getAssignees(): Observable<{ users: CaseAssignee[] }> {
+    return this.http.get<{ users: CaseAssignee[] }>(`${this.apiUrl}/cases/assignees`);
   }
 
   getCase(caseId: number): Observable<CaseDetail> {
     return this.http.get<CaseDetail>(`${this.apiUrl}/cases/${caseId}`);
   }
 
+  assignCase(caseId: number, assignedToUserId: number | null): Observable<{ success: boolean; message: string; case: CaseItem }> {
+    return this.http.patch<{ success: boolean; message: string; case: CaseItem }>(`${this.apiUrl}/cases/${caseId}`, {
+      assigned_to_user_id: assignedToUserId,
+    });
+  }
+
+  addNote(caseId: number, note: string): Observable<{ success: boolean; message: string; event: CaseEvent }> {
+    return this.http.post<{ success: boolean; message: string; event: CaseEvent }>(`${this.apiUrl}/cases/${caseId}/notes`, {
+      note,
+    });
+  }
+
   resolveCase(
     caseId: number,
+    resolutionDisposition: string,
+    resolutionAction: string,
     resolutionNote: string,
     expectedCurrentEvaluationId: number,
   ): Observable<{ success: boolean; message: string; case: CaseItem }> {
     return this.http.post<{ success: boolean; message: string; case: CaseItem }>(`${this.apiUrl}/cases/${caseId}/resolve`, {
+      resolution_disposition: resolutionDisposition,
+      resolution_action: resolutionAction,
       resolution_note: resolutionNote,
       expected_current_ed_id: expectedCurrentEvaluationId,
     });

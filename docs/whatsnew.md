@@ -3,6 +3,8 @@
 ## v1.27.0
 
 * **Case management inbox**: Non-neutral live evaluation decisions now create durable case work items linked to the canonical evaluation ledger, with a new **Cases** page for reviewing and resolving cases.
+* **Case investigation details**: Case detail now includes the transaction id, event payload, evaluation counters, and triggered-rule context so analysts can understand why a case exists before resolving it.
+* **Case workflow controls**: Analysts can now claim, assign, filter, note, and resolve cases with structured disposition/action fields that are published in case integration events.
 * **Rescoring-aware case lifecycle**: Rescored transactions update the active case with old/new decision references, while resolved cases remain auditable and later case-worthy scores create a new linked case.
 * **Generic integration events**: Evaluation completion and case lifecycle actions now write versioned integration events with a transactional outbox so external systems can poll or receive pushed delivery without changing the `/evaluate` response contract.
 * **Case and integration permissions**: Upgrades now seed the new case/integration permissions for existing admin roles, and webhook subscriptions validate HTTPS destinations before events enter the outbox.

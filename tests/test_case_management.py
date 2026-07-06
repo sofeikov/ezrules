@@ -34,6 +34,7 @@ from ezrules.models.backend_core import (
     IntegrationSubscription,
     Label,
     Organisation,
+    Rule,
     Role,
     User,
 )
@@ -89,6 +90,7 @@ def _add_decision(
     outcome: str | None = "HOLD",
     version: int = 1,
     is_current: bool = True,
+    rule_id: int = 1,
 ) -> EvaluationDecision:
     now = datetime.datetime.now(datetime.UTC)
     event = EventVersion(
@@ -115,12 +117,27 @@ def _add_decision(
         is_current=is_current,
         outcome_counters=counters,
         resolved_outcome=outcome,
-        all_rule_results={"1": outcome} if outcome else {},
+        all_rule_results={str(rule_id): outcome} if outcome else {},
         evaluated_at=now,
     )
     session.add(decision)
     session.flush()
     return decision
+
+
+def _resolve_case_for_test(
+    session, *, case: Case, actor_user_id: int, expected_current_ed_id: int | None = None
+) -> Case:
+    return resolve_case(
+        session,
+        o_id=int(case.o_id),
+        case_id=int(case.case_id),
+        actor_user_id=actor_user_id,
+        resolution_disposition="false_positive",
+        resolution_action="release_transaction",
+        resolution_note="Reviewed case.",
+        expected_current_ed_id=expected_current_ed_id,
+    )
 
 
 def test_case_created_for_non_neutral_decision_and_integration_events(session):
@@ -218,6 +235,8 @@ def test_resolve_requires_current_decision_when_expected_id_is_supplied(session)
             o_id=1,
             case_id=int(case.case_id),
             actor_user_id=int(user.id),
+            resolution_disposition="false_positive",
+            resolution_action="release_transaction",
             resolution_note="Reviewed before score changed",
             expected_current_ed_id=int(first.ed_id),
         )
@@ -225,7 +244,17 @@ def test_resolve_requires_current_decision_when_expected_id_is_supplied(session)
 
 def test_cases_and_integration_events_api(session):
     _org, user, token = _seed_case_org(session)
-    decision = _add_decision(session, outcome="HOLD")
+    rule_id = 987001
+    session.add(
+        Rule(
+            r_id=rule_id,
+            rid="premium_amount_hold",
+            logic="$amount > 100",
+            description="Premium amount hold",
+            o_id=1,
+        )
+    )
+    decision = _add_decision(session, outcome="HOLD", rule_id=rule_id)
     process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
     session.commit()
     case = session.query(Case).one()
@@ -236,22 +265,49 @@ def test_cases_and_integration_events_api(session):
         assert list_response.status_code == 200
         assert list_response.json()["cases"][0]["id"] == int(case.case_id)
 
+        detail_response = client.get(f"/api/v2/cases/{case.case_id}", headers=headers)
+        assert detail_response.status_code == 200
+        detail = detail_response.json()
+        assert detail["case"]["transaction_id"] == "txn-case-1"
+        assert detail["evaluation"]["evaluation_decision_id"] == int(decision.ed_id)
+        assert detail["evaluation"]["event_data"] == {"transaction_id": "txn-case-1", "amount": 101}
+        assert detail["evaluation"]["outcome_counters"] == {"HOLD": 1}
+        assert detail["evaluation"]["triggered_rules"] == [
+            {
+                "r_id": rule_id,
+                "rid": "premium_amount_hold",
+                "description": "Premium amount hold",
+                "outcome": "HOLD",
+                "metadata_source": "current_rule_fallback",
+                "referenced_fields": None,
+            }
+        ]
+
         resolve_response = client.post(
             f"/api/v2/cases/{case.case_id}/resolve",
             headers=headers,
             json={
+                "resolution_disposition": "false_positive",
+                "resolution_action": "release_transaction",
                 "resolution_note": "Reviewed customer history and approved closure.",
                 "expected_current_ed_id": int(decision.ed_id),
             },
         )
         assert resolve_response.status_code == 200
         assert resolve_response.json()["case"]["status"] == CASE_STATUS_RESOLVED
+        assert resolve_response.json()["case"]["resolution_disposition"] == "false_positive"
+        assert resolve_response.json()["case"]["resolution_action"] == "release_transaction"
 
         events_response = client.get("/api/v2/integration-events", headers=headers)
         assert events_response.status_code == 200
-        event_types = [event["event_type"] for event in events_response.json()["events"]]
+        integration_events = events_response.json()["events"]
+        event_types = [event["event_type"] for event in integration_events]
         assert "evaluation.completed" in event_types
         assert "case.resolved" in event_types
+        resolved_event = next(event for event in integration_events if event["event_type"] == "case.resolved")
+        assert resolved_event["payload"]["case"]["resolution_disposition"] == "false_positive"
+        assert resolved_event["payload"]["case"]["resolution_action"] == "release_transaction"
+        assert resolved_event["payload"]["case_event"]["details"]["resolution_disposition"] == "false_positive"
 
     assert session.query(Case).filter(Case.resolved_by_user_id == int(user.id)).count() == 1
 
@@ -305,6 +361,55 @@ def test_case_assignment_api_records_timeline_events(session):
     assert events[-1].details["assigned_to_user_id"] is None
 
 
+def test_case_assignees_filters_and_notes_api(session):
+    _org, user, token = _seed_case_org(session)
+    decision = _add_decision(session, outcome="HOLD", transaction_id="txn-filterable-case")
+    process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
+    session.commit()
+    case = session.query(Case).one()
+
+    with TestClient(app) as client:
+        headers = {"Authorization": f"Bearer {token}"}
+        assignees_response = client.get("/api/v2/cases/assignees", headers=headers)
+        assert assignees_response.status_code == 200
+        assert {"id": int(user.id), "email": "case-manager@example.com"} in assignees_response.json()["users"]
+
+        unassigned_response = client.get("/api/v2/cases?assigned_to=unassigned&q=filterable", headers=headers)
+        assert unassigned_response.status_code == 200
+        assert unassigned_response.json()["total"] == 1
+
+        assign_response = client.patch(
+            f"/api/v2/cases/{case.case_id}",
+            headers=headers,
+            json={"assigned_to_user_id": int(user.id)},
+        )
+        assert assign_response.status_code == 200
+        assert assign_response.json()["case"]["assigned_to_email"] == "case-manager@example.com"
+
+        assigned_to_me_response = client.get("/api/v2/cases?assigned_to=me&priority_min=1", headers=headers)
+        assert assigned_to_me_response.status_code == 200
+        assert assigned_to_me_response.json()["total"] == 1
+
+        note_response = client.post(
+            f"/api/v2/cases/{case.case_id}/notes",
+            headers=headers,
+            json={"note": "Customer confirmed the attempted transfer."},
+        )
+        assert note_response.status_code == 201
+        assert note_response.json()["event"]["event_type"] == "note"
+        assert note_response.json()["event"]["details"]["note"] == "Customer confirmed the attempted transfer."
+
+        detail_response = client.get(f"/api/v2/cases/{case.case_id}", headers=headers)
+        assert detail_response.status_code == 200
+        assert [event["event_type"] for event in detail_response.json()["events"]] == ["created", "assigned", "note"]
+
+        events_response = client.get("/api/v2/integration-events?event_type=case.note", headers=headers)
+        assert events_response.status_code == 200
+        assert events_response.json()["events"][0]["payload"]["case_event"]["details"]["note"] == (
+            "Customer confirmed the attempted transfer."
+        )
+
+
 def test_case_assignment_rejects_user_from_another_org(session):
     _org, _user, token = _seed_case_org(session)
     other_org = Organisation(name="Other org")
@@ -339,13 +444,7 @@ def test_case_assignment_rejects_resolved_case(session):
     decision = _add_decision(session, outcome="HOLD")
     process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
     case = session.query(Case).one()
-    resolve_case(
-        session,
-        o_id=1,
-        case_id=int(case.case_id),
-        actor_user_id=int(user.id),
-        resolution_note="Already reviewed.",
-    )
+    _resolve_case_for_test(session, case=case, actor_user_id=int(user.id))
     session.commit()
 
     with TestClient(app) as client:
@@ -365,22 +464,8 @@ def test_resolving_already_resolved_case_is_idempotent(session):
     process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
     case = session.query(Case).one()
 
-    resolve_case(
-        session,
-        o_id=1,
-        case_id=int(case.case_id),
-        actor_user_id=int(user.id),
-        resolution_note="Reviewed once.",
-        expected_current_ed_id=int(decision.ed_id),
-    )
-    resolve_case(
-        session,
-        o_id=1,
-        case_id=int(case.case_id),
-        actor_user_id=int(user.id),
-        resolution_note="Reviewed twice.",
-        expected_current_ed_id=int(decision.ed_id),
-    )
+    _resolve_case_for_test(session, case=case, actor_user_id=int(user.id), expected_current_ed_id=int(decision.ed_id))
+    _resolve_case_for_test(session, case=case, actor_user_id=int(user.id), expected_current_ed_id=int(decision.ed_id))
     session.commit()
 
     assert [event.event_type for event in session.query(CaseEvent).order_by(CaseEvent.case_event_id)] == [
@@ -407,6 +492,8 @@ def test_resolution_label_must_belong_to_case_org(session):
             o_id=1,
             case_id=int(case.case_id),
             actor_user_id=int(user.id),
+            resolution_disposition="false_positive",
+            resolution_action="release_transaction",
             resolution_note="Wrong label.",
             resolution_label_id=int(other_label.el_id),
         )

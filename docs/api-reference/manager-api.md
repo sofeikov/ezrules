@@ -271,10 +271,12 @@ Alert detection source of truth:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/cases` | Bearer + `VIEW_CASES` | List case-management work items for non-neutral served decisions |
-| `GET` | `/api/v2/cases/{case_id}` | Bearer + `VIEW_CASES` | Read one case plus its immutable case-event timeline |
+| `GET` | `/api/v2/cases` | Bearer + `VIEW_CASES` | List case-management work items for non-neutral served decisions; supports filters such as `status`, `assigned_to`, `outcome`, `priority_min`, `decision_state`, and `q` |
+| `GET` | `/api/v2/cases/assignees` | Bearer + `VIEW_CASES` | List active same-org users available for case assignment |
+| `GET` | `/api/v2/cases/{case_id}` | Bearer + `VIEW_CASES` | Read one case, its immutable case-event timeline, and the current evaluation context |
 | `PATCH` | `/api/v2/cases/{case_id}` | Bearer + `MANAGE_CASES` | Assign or unassign a case |
-| `POST` | `/api/v2/cases/{case_id}/resolve` | Bearer + `MANAGE_CASES` | Resolve a case with a note and optional expected current evaluation id |
+| `POST` | `/api/v2/cases/{case_id}/notes` | Bearer + `MANAGE_CASES` | Add an analyst note to a case timeline |
+| `POST` | `/api/v2/cases/{case_id}/resolve` | Bearer + `MANAGE_CASES` | Resolve a case with `resolution_disposition`, `resolution_action`, a note, and optional expected current evaluation id |
 | `GET` | `/api/v2/integration-events` | Bearer + `VIEW_INTEGRATIONS` | Cursor-read versioned events such as `evaluation.completed` and `case.resolved` |
 | `GET` | `/api/v2/integration-subscriptions` | Bearer + `VIEW_INTEGRATIONS` | List outbound integration subscriptions |
 | `POST` | `/api/v2/integration-subscriptions` | Bearer + `MANAGE_INTEGRATIONS` | Create an outbound subscription such as a webhook destination |
@@ -282,6 +284,8 @@ Alert detection source of truth:
 
 Case lifecycle notes:
 - Case creation is driven by canonical served `evaluation_decisions`: missing outcomes and the configured `neutral_outcome` do not create cases.
+- Case detail includes the current transaction payload, event/evaluation identifiers, resolved outcome counters, and triggered-rule metadata when available.
+- Assignment changes emit `case.assigned`; analyst notes emit `case.note`; structured resolutions emit `case.resolved` with disposition and intended action.
 - A rescore of an active case updates the same case with the new `current_evaluation_decision_id` and records a `case.rescored` integration event.
 - A rescore to neutral/no outcome keeps the case open with a non-current decision state so an analyst can close it intentionally.
 - Resolve requests can include `expected_current_ed_id`; the API returns `409` if the case was rescored after the UI loaded.

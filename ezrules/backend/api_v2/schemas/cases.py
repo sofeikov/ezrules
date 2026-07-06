@@ -1,6 +1,26 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
+
+from ezrules.backend.api_v2.schemas.tested_events import TriggeredRuleItem
+
+CaseResolutionDisposition = Literal[
+    "confirmed_fraud",
+    "false_positive",
+    "approved",
+    "rejected",
+    "duplicate",
+    "unable_to_verify",
+    "escalated",
+]
+CaseResolutionAction = Literal[
+    "none",
+    "release_transaction",
+    "cancel_transaction",
+    "block_customer",
+    "escalate_external_review",
+]
 
 
 class CaseEventResponse(BaseModel):
@@ -28,7 +48,11 @@ class CaseResponse(BaseModel):
     decision_state: str
     priority: int
     assigned_to_user_id: int | None = None
+    assigned_to_email: str | None = None
     resolved_by_user_id: int | None = None
+    resolved_by_email: str | None = None
+    resolution_disposition: str | None = None
+    resolution_action: str | None = None
     resolution_note: str | None = None
     resolution_label_id: int | None = None
     reopened_from_case_id: int | None = None
@@ -42,16 +66,46 @@ class CaseListResponse(BaseModel):
     total: int
 
 
+class CaseEvaluationResponse(BaseModel):
+    evaluation_decision_id: int
+    transaction_id: str
+    event_version_id: int
+    event_version: int
+    effective_at: datetime
+    observed_at: datetime
+    evaluated_at: datetime
+    is_current: bool
+    resolved_outcome: str | None = None
+    outcome_counters: dict[str, int] = Field(default_factory=dict)
+    event_data: dict = Field(default_factory=dict)
+    triggered_rules: list[TriggeredRuleItem] = Field(default_factory=list)
+
+
 class CaseDetailResponse(BaseModel):
     case: CaseResponse
     events: list[CaseEventResponse]
+    evaluation: CaseEvaluationResponse | None = None
 
 
 class CaseUpdateRequest(BaseModel):
     assigned_to_user_id: int | None = None
 
 
+class CaseNoteRequest(BaseModel):
+    note: str = Field(..., min_length=1, max_length=5000)
+
+    @field_validator("note")
+    @classmethod
+    def normalize_note(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("note cannot be empty")
+        return stripped
+
+
 class CaseResolveRequest(BaseModel):
+    resolution_disposition: CaseResolutionDisposition
+    resolution_action: CaseResolutionAction = "none"
     resolution_note: str = Field(..., min_length=1, max_length=5000)
     resolution_label_id: int | None = None
     expected_current_ed_id: int | None = None
@@ -69,6 +123,21 @@ class CaseMutationResponse(BaseModel):
     success: bool
     message: str
     case: CaseResponse
+
+
+class CaseEventMutationResponse(BaseModel):
+    success: bool
+    message: str
+    event: CaseEventResponse
+
+
+class CaseAssigneeResponse(BaseModel):
+    id: int
+    email: str
+
+
+class CaseAssigneesResponse(BaseModel):
+    users: list[CaseAssigneeResponse]
 
 
 class IntegrationEventResponse(BaseModel):
