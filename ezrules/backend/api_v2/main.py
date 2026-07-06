@@ -19,6 +19,7 @@ from ezrules.backend.api_v2.auth.dependencies import (
     get_org_id_for_api_key,
 )
 from ezrules.backend.api_v2.routes import (
+    agent_tools,
     alerts,
     analytics,
     api_keys,
@@ -193,3 +194,6 @@ app.include_router(settings.router)
 
 # Case management and integration event routes: /api/v2/cases/*, /api/v2/integration-*
 app.include_router(cases.router)
+
+# Deterministic agent tool routes: /api/v2/agent-tools/*
+app.include_router(agent_tools.router)

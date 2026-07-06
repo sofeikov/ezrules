@@ -217,6 +217,37 @@ Dashboard analytics source of truth:
 - Time buckets are anchored on `evaluation_decisions.evaluated_at`, so charts show when a decision was served rather than the event's business timestamp.
 - Label analytics and rule-quality endpoints use canonical `event_version_labels` joined to served decisions and event labels; label chart buckets are anchored on served decision time.
 
+### Agent Tools
+
+Deterministic agent tools expose bounded evidence packets for future fraud-management agents. They do not provide generic database access and they replay current served decisions through the same rule compiler, field normalization, user-list lookup, and computed-feature resolution paths used by rule analysis.
+
+Replay semantics:
+- Replays use current served decisions only (`is_current=true`) so superseded transaction versions do not inflate analysis counts.
+- `stored_outcome` re-executes the rule's current stored logic from the database, not the exact rule source that was active when the historical decision was originally served.
+- Blast-radius `changed_rule_outcome_*` fields measure single-rule outcome flips. They are not full resolved-decision changes across the whole ordered rule set or outcome hierarchy.
+- Replays run synchronously and default to the most recent `1,000` current served decisions. Use smaller windows for interactive use; larger caps may be slower when rules reference computed features.
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `POST` | `/api/v2/agent-tools/rule-blast-radius` | Bearer + `VIEW_RULES` | Compare existing rule logic to proposed logic over recent current served decisions. Returns stored/proposed outcome counts, outcome deltas, grouped single-rule outcome flip rates, representative flipped events, skipped-record counts, and warnings. |
+| `POST` | `/api/v2/agent-tools/rule-counterexamples` | Bearer + `VIEW_RULES` + `VIEW_LABELS` | Return labeled examples where a rule fired on negative labels, missed positive labels, where candidate logic fixes existing mistakes, and where candidate logic introduces regressions. |
+
+`POST /api/v2/agent-tools/rule-blast-radius` request fields:
+- `rule_id`: existing rule ID in the caller's organisation.
+- `proposed_logic`: candidate ezrules source to compare against the stored rule.
+- `lookback_days`: recent served-decision window, default `30`.
+- `group_by`: up to five event field paths used to segment single-rule outcome flip impact.
+- `sample_limit`: maximum representative flipped events returned.
+- `max_records`: cap on recent served decisions replayed, default `1,000`.
+
+`POST /api/v2/agent-tools/rule-counterexamples` request fields:
+- `rule_id`: existing rule ID in the caller's organisation.
+- `proposed_logic`: optional candidate ezrules source for fix/regression buckets.
+- `positive_labels`: labels that should usually be caught, default `["FRAUD"]`.
+- `negative_labels`: labels that should usually not be caught, default `["NORMAL", "LEGIT", "GENUINE"]`.
+- `target_outcomes`: optional outcome names that count as actionable rule fires. When omitted, any non-null rule outcome counts as a fire.
+- `lookback_days`, `sample_limit`, and `max_records`: bounded replay controls.
+
 ### Alerts and Notifications
 
 | Method | Path | Auth | Notes |
