@@ -341,8 +341,8 @@ AI authoring settings notes:
 |---|---|---|---|
 | `GET` | `/api/v2/users` | Bearer + permission | List users in the caller's org |
 | `GET` | `/api/v2/users/{user_id}` | Bearer + permission | Get user details in the caller's org |
-| `POST` | `/api/v2/users` | Bearer + permission | Create user in the caller's org |
-| `POST` | `/api/v2/users/invite` | Bearer + permission | Invite user into the caller's org and send activation link |
+| `POST` | `/api/v2/users` | Bearer + `CREATE_USER` | Create user in the caller's org |
+| `POST` | `/api/v2/users/invite` | Bearer + `CREATE_USER` | Invite user into the caller's org and send activation link |
 | `PUT` | `/api/v2/users/{user_id}` | Bearer + permission | Update user in the caller's org |
 | `DELETE` | `/api/v2/users/{user_id}` | Bearer + permission | Delete user in the caller's org |
 | `POST` | `/api/v2/users/{user_id}/roles` | Bearer + permission | Assign role to user in the caller's org (cross-org role IDs return `404`) |
@@ -355,6 +355,8 @@ AI authoring settings notes:
 | `DELETE` | `/api/v2/roles/{role_id}` | Bearer + permission | Delete role from the caller's org |
 | `GET` | `/api/v2/roles/{role_id}/permissions` | Bearer + permission | Get role permissions in the caller's org |
 | `PUT` | `/api/v2/roles/{role_id}/permissions` | Bearer + permission | Update role permissions in the caller's org |
+
+User creation and invitation do not accept initial role assignments. Assign roles after the account exists with `POST /api/v2/users/{user_id}/roles`, which requires `MANAGE_USER_ROLES`.
 
 ### User Lists
 

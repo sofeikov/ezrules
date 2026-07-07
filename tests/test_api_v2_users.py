@@ -226,9 +226,10 @@ class TestCreateUser:
         assert data["user"]["email"] == "newuser@example.com"
         assert data["user"]["active"] is True
 
-    def test_create_user_with_roles(self, users_test_client, sample_role):
-        """Should create user with assigned roles."""
+    def test_create_user_rejects_role_ids(self, users_test_client, sample_role):
+        """Role assignment must use the dedicated role-assignment endpoint."""
         token = users_test_client.test_data["token"]
+        session = users_test_client.test_data["session"]
 
         response = users_test_client.post(
             "/api/v2/users",
@@ -240,11 +241,8 @@ class TestCreateUser:
             },
         )
 
-        assert response.status_code == 201
-        data = response.json()
-        assert data["success"] is True
-        assert len(data["user"]["roles"]) == 1
-        assert data["user"]["roles"][0]["name"] == "test_role"
+        assert response.status_code == 422
+        assert session.query(User).filter(User.email == "withroles@example.com").first() is None
 
     def test_create_user_duplicate_email(self, users_test_client, sample_user):
         """Should return error for duplicate email."""
@@ -294,9 +292,10 @@ class TestCreateUser:
 
         assert response.status_code == 422
 
-    def test_create_user_invalid_role_id(self, users_test_client):
-        """Should return error for non-existent role ID."""
+    def test_create_user_rejects_invalid_role_ids_field(self, users_test_client):
+        """Unknown role IDs are not processed by the create-user endpoint."""
         token = users_test_client.test_data["token"]
+        session = users_test_client.test_data["session"]
 
         response = users_test_client.post(
             "/api/v2/users",
@@ -308,10 +307,8 @@ class TestCreateUser:
             },
         )
 
-        assert response.status_code == 201
-        data = response.json()
-        assert data["success"] is False
-        assert "not found" in data["error"]
+        assert response.status_code == 422
+        assert session.query(User).filter(User.email == "invalidrole@example.com").first() is None
 
 
 class TestInviteUser:

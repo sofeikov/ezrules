@@ -7,7 +7,7 @@ Pydantic automatically validates incoming data and serializes outgoing data.
 
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 # =============================================================================
 # REQUEST SCHEMAS
@@ -19,33 +19,31 @@ class UserCreate(BaseModel):
 
     email: EmailStr = Field(..., description="User's email address")
     password: str = Field(..., min_length=6, description="User's password (min 6 characters)")
-    role_ids: list[int] | None = Field(default=None, description="Optional list of role IDs to assign")
 
-    model_config = {
-        "json_schema_extra": {
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
             "example": {
                 "email": "newuser@example.com",
                 "password": "securepassword123",
-                "role_ids": [1, 2],
             }
-        }
-    }
+        },
+    )
 
 
 class UserInvite(BaseModel):
     """Schema for inviting a new user."""
 
     email: EmailStr = Field(..., description="User's email address")
-    role_ids: list[int] | None = Field(default=None, description="Optional list of role IDs to assign")
 
-    model_config = {
-        "json_schema_extra": {
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
             "example": {
                 "email": "newuser@example.com",
-                "role_ids": [1, 2],
             }
-        }
-    }
+        },
+    )
 
 
 class UserUpdate(BaseModel):

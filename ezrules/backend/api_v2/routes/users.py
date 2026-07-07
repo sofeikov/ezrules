@@ -198,19 +198,6 @@ def create_user(
         o_id=current_org_id,
     )
 
-    # Assign roles if provided
-    if user_data.role_ids:
-        roles = db.query(Role).filter(Role.o_id == current_org_id, Role.id.in_(user_data.role_ids)).all()
-        if len(roles) != len(user_data.role_ids):
-            found_ids = {r.id for r in roles}
-            missing_ids = [rid for rid in user_data.role_ids if rid not in found_ids]
-            return UserMutationResponse(
-                success=False,
-                message="Some roles not found",
-                error=f"Role IDs not found: {missing_ids}",
-            )
-        new_user.roles = roles
-
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -252,6 +239,7 @@ def invite_user(
     Creates an inactive user when needed and sends a one-time invite email.
     """
     email = str(invite_data.email).strip().lower()
+
     existing_user = db.query(User).filter(User.email == email).first()
 
     if existing_user and int(existing_user.o_id) != current_org_id:
@@ -281,20 +269,6 @@ def invite_user(
         db.flush()
     else:
         target_user.active = False
-
-    if invite_data.role_ids:
-        roles = db.query(Role).filter(Role.o_id == current_org_id, Role.id.in_(invite_data.role_ids)).all()
-        if len(roles) != len(invite_data.role_ids):
-            found_ids = {int(r.id) for r in roles}
-            missing_ids = [rid for rid in invite_data.role_ids if rid not in found_ids]
-            return UserInviteResponse(
-                success=False,
-                message="Some roles not found",
-                error=f"Role IDs not found: {missing_ids}",
-            )
-        for role in roles:
-            if role not in target_user.roles:
-                target_user.roles.append(role)
 
     now = now_utc_naive()
     db.query(Invitation).filter(
