@@ -8,12 +8,13 @@ These tests verify:
 - Self-deletion/deactivation prevention
 """
 
+import hashlib
+import uuid
+from datetime import UTC, datetime, timedelta
+
 import bcrypt
 import pytest
 from fastapi.testclient import TestClient
-from datetime import UTC, datetime, timedelta
-import hashlib
-import uuid
 
 from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
@@ -561,7 +562,7 @@ class TestDeleteUser:
         session.add(
             UserSession(
                 user_id=int(sample_user.id),
-                refresh_token="refresh-token-for-delete-test",
+                refresh_token=hashlib.sha256(b"refresh-token-for-delete-test").hexdigest(),
                 expires_at=now + timedelta(days=1),
             )
         )

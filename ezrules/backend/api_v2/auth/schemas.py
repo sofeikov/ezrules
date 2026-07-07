@@ -48,8 +48,9 @@ class RefreshRequest(BaseModel):
         "refresh_token": "eyJhbGciOiJIUzI1NiIs..."
     }
 
-    This is used when the access token expires and the client
-    wants a new one without re-entering their password.
+    This is used by API clients when the access token expires and the client
+    wants a new one without re-entering their password. Browser clients can
+    instead rely on the HttpOnly refresh cookie set during login.
     """
 
     refresh_token: str
@@ -93,9 +94,9 @@ class TokenResponse(BaseModel):
     }
 
     The client will:
-    1. Store both tokens (localStorage, memory, etc.)
+    1. Store the access token
     2. Send access_token in Authorization header: "Bearer eyJ..."
-    3. When access_token expires, use refresh_token to get a new pair
+    3. When access_token expires, use the refresh_token or HttpOnly refresh cookie to get a new pair
     """
 
     access_token: str

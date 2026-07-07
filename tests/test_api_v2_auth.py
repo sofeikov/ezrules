@@ -27,6 +27,10 @@ from ezrules.backend.api_v2.routes import auth as auth_routes
 from ezrules.models.backend_core import Invitation, Organisation, PasswordResetToken, Role, User, UserSession
 
 
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 @pytest.fixture(scope="function")
 def api_client(session):
     """
@@ -452,7 +456,7 @@ class TestInviteAndPasswordResetEndpoints:
         session.add(
             UserSession(
                 user_id=int(user.id),
-                refresh_token="test_refresh_token_to_revoke",
+                refresh_token=_hash_token("test_refresh_token_to_revoke"),
                 expires_at=now + timedelta(days=1),
             )
         )
@@ -567,7 +571,7 @@ class TestSessionTracking:
     """Tests for server-side refresh token session tracking (UserSession table)."""
 
     def test_login_creates_session(self, api_client, session):
-        """Login should insert a UserSession row for the issued refresh token."""
+        """Login should insert a UserSession row with a hash of the issued refresh token."""
         response = api_client.post(
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
@@ -576,10 +580,26 @@ class TestSessionTracking:
         tokens = response.json()
 
         session.expire_all()
-        session_row = session.query(UserSession).filter(UserSession.refresh_token == tokens["refresh_token"]).first()
+        session_row = (
+            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(tokens["refresh_token"])).first()
+        )
         assert session_row is not None
+        assert session_row.refresh_token != tokens["refresh_token"]
         assert session_row.expires_at is not None
         assert session_row.user_id is not None
+
+    def test_login_sets_http_only_refresh_cookie(self, api_client, session):
+        """Browser logins should receive a refresh cookie that JavaScript cannot read."""
+        response = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        assert response.status_code == 200
+
+        set_cookie = response.headers.get("set-cookie", "")
+        assert "ezrules_refresh_token=" in set_cookie
+        assert "HttpOnly" in set_cookie
+        assert "SameSite=lax" in set_cookie
 
     def test_refresh_rotation_deletes_old_and_creates_new_session(self, api_client, session):
         """Refresh should delete the consumed session and insert a new one."""
@@ -599,14 +619,43 @@ class TestSessionTracking:
 
         session.expire_all()
         # Old session must be gone
-        old_session = session.query(UserSession).filter(UserSession.refresh_token == old_refresh_token).first()
+        old_session = (
+            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(old_refresh_token)).first()
+        )
         assert old_session is None
 
         # New session must exist
         new_session = (
-            session.query(UserSession).filter(UserSession.refresh_token == new_tokens["refresh_token"]).first()
+            session.query(UserSession)
+            .filter(UserSession.refresh_token == _hash_token(new_tokens["refresh_token"]))
+            .first()
         )
         assert new_session is not None
+
+    def test_refresh_accepts_http_only_cookie(self, api_client, session):
+        """Browser refresh can rotate the token from the cookie without a JSON body."""
+        login_response = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        assert login_response.status_code == 200
+        original_refresh_token = login_response.json()["refresh_token"]
+
+        refresh_response = api_client.post("/api/v2/auth/refresh")
+        assert refresh_response.status_code == 200
+        new_tokens = refresh_response.json()
+
+        session.expire_all()
+        assert (
+            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(original_refresh_token)).first()
+            is None
+        )
+        assert (
+            session.query(UserSession)
+            .filter(UserSession.refresh_token == _hash_token(new_tokens["refresh_token"]))
+            .first()
+            is not None
+        )
 
     def test_refresh_token_can_only_be_used_once(self, api_client, session):
         """A refresh token should be invalid after it has been used once (rotation)."""
@@ -639,7 +688,7 @@ class TestSessionTracking:
         tokens = login_response.json()
 
         # Manually revoke the session directly in the database
-        session.query(UserSession).filter(UserSession.refresh_token == tokens["refresh_token"]).delete()
+        session.query(UserSession).filter(UserSession.refresh_token == _hash_token(tokens["refresh_token"])).delete()
         session.commit()
 
         response = api_client.post(
@@ -675,8 +724,31 @@ class TestLogoutEndpoint:
         assert logout_response.json()["message"] == "Logged out successfully"
 
         session.expire_all()
-        session_row = session.query(UserSession).filter(UserSession.refresh_token == tokens["refresh_token"]).first()
+        session_row = (
+            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(tokens["refresh_token"])).first()
+        )
         assert session_row is None
+
+    def test_logout_accepts_http_only_cookie(self, api_client, session):
+        """Browser logout can revoke the session using the refresh cookie."""
+        login_response = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        tokens = login_response.json()
+
+        logout_response = api_client.post(
+            "/api/v2/auth/logout",
+            headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        )
+        assert logout_response.status_code == 200
+
+        session.expire_all()
+        assert (
+            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(tokens["refresh_token"])).first()
+            is None
+        )
+        assert "ezrules_refresh_token=" in logout_response.headers.get("set-cookie", "")
 
     def test_refresh_after_logout_returns_401(self, api_client, session):
         """After logout, using the old refresh token should return 401."""

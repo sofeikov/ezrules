@@ -1,5 +1,11 @@
 # What's New
 
+## v1.27.1
+
+* **Hashed refresh sessions**: Refresh token sessions are now stored as SHA-256 hashes in `user_session`, including a migration that hashes any existing plaintext session rows during upgrade.
+* **HttpOnly browser refresh cookie**: Browser login and refresh flows now set the long-lived refresh token in an HttpOnly cookie and no longer persist it in frontend `localStorage`.
+* **Compatible refresh API**: API clients can still send refresh tokens in request bodies, while browser refresh/logout can use the cookie-backed flow.
+
 ## v1.27.0
 
 * **Deterministic agent tools API**: Added `/api/v2/agent-tools` endpoints that let future fraud-management agents request bounded, permission-gated evidence instead of broad database access.

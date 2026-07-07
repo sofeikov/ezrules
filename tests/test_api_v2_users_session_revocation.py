@@ -89,17 +89,17 @@ def test_admin_password_change_revokes_existing_refresh_sessions(user_admin_clie
         [
             UserSession(
                 user_id=managed_user_id,
-                refresh_token="managed-refresh-token-1",
+                refresh_token="a" * 64,
                 expires_at=session_expires_at,
             ),
             UserSession(
                 user_id=managed_user_id,
-                refresh_token="managed-refresh-token-2",
+                refresh_token="b" * 64,
                 expires_at=session_expires_at,
             ),
             UserSession(
                 user_id=admin_user_id,
-                refresh_token="admin-refresh-token",
+                refresh_token="c" * 64,
                 expires_at=session_expires_at,
             ),
         ]

@@ -12,7 +12,6 @@ function json(route: Route, body: unknown, status = 200) {
 async function mockTestedEventGraphApi(page: Page, onGraphRequest: () => void) {
   await page.addInitScript(() => {
     localStorage.setItem('ezrules_access_token', 'ui-test-access-token');
-    localStorage.setItem('ezrules_refresh_token', 'ui-test-refresh-token');
   });
 
   await page.route('**/api/v2/auth/me', async (route) => {

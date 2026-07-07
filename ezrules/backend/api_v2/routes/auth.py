@@ -18,7 +18,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 
@@ -49,6 +49,9 @@ from ezrules.settings import app_settings
 # All routes here will be under /api/v2/auth/...
 router = APIRouter(prefix="/api/v2/auth", tags=["Authentication"])
 logger = logging.getLogger(__name__)
+
+REFRESH_TOKEN_COOKIE_NAME = "ezrules_refresh_token"
+REFRESH_TOKEN_COOKIE_PATH = "/api/v2/auth"
 
 
 # =============================================================================
@@ -82,7 +85,7 @@ def hash_password(password: str) -> str:
 
 
 def hash_token(token: str) -> str:
-    """Hash a one-time token for secure storage."""
+    """Hash a bearer or one-time token for secure storage."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
@@ -120,6 +123,46 @@ def _cleanup_expired_sessions(db: Any, user_id: int) -> None:
     ).delete()
 
 
+def _refresh_cookie_secure() -> bool:
+    """Use secure refresh cookies whenever the configured app URL is HTTPS."""
+    return app_settings.APP_BASE_URL.lower().startswith("https://")
+
+
+def _set_refresh_token_cookie(response: Response, refresh_token: str) -> None:
+    response.set_cookie(
+        key=REFRESH_TOKEN_COOKIE_NAME,
+        value=refresh_token,
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=_refresh_cookie_secure(),
+        samesite="lax",
+        path=REFRESH_TOKEN_COOKIE_PATH,
+    )
+
+
+def _clear_refresh_token_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=REFRESH_TOKEN_COOKIE_NAME,
+        httponly=True,
+        secure=_refresh_cookie_secure(),
+        samesite="lax",
+        path=REFRESH_TOKEN_COOKIE_PATH,
+    )
+
+
+def _refresh_token_from_request(body: RefreshRequest | None, request: Request) -> str | None:
+    if body is not None and body.refresh_token:
+        return body.refresh_token
+    return request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+
+
+def _store_refresh_session(db: Any, user_id: int, refresh_token: str, expires_at: datetime) -> None:
+    refresh_token_hash = hash_token(refresh_token)
+    db.query(UserSession).filter(UserSession.refresh_token == refresh_token_hash).delete()
+    db.flush()
+    db.add(UserSession(user_id=user_id, refresh_token=refresh_token_hash, expires_at=expires_at))
+
+
 # =============================================================================
 # LOGIN ENDPOINT
 # =============================================================================
@@ -133,6 +176,7 @@ def _cleanup_expired_sessions(db: Any, user_id: int) -> None:
     },
 )
 def login(
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Any = Depends(get_db),
 ):
@@ -150,6 +194,8 @@ def login(
     2. On success, you get back:
        - access_token: Use this in Authorization header for API calls
        - refresh_token: Use this to get new access tokens
+       - HttpOnly refresh cookie: Browser clients can refresh without storing
+         the refresh token in JavaScript-accessible storage
        - expires_in: Seconds until access_token expires
 
     3. For subsequent API calls, include the header:
@@ -204,10 +250,9 @@ def login(
     # edge cases where the same JWT can be generated within the same second).
     _cleanup_expired_sessions(db, int(user.id))
     expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    db.query(UserSession).filter(UserSession.refresh_token == refresh_token).delete()
-    db.flush()
-    db.add(UserSession(user_id=int(user.id), refresh_token=refresh_token, expires_at=expires_at))
+    _store_refresh_session(db, int(user.id), refresh_token, expires_at)
     db.commit()
+    _set_refresh_token_cookie(response, refresh_token)
 
     return TokenResponse(
         access_token=access_token,
@@ -372,7 +417,9 @@ def reset_password(
     },
 )
 def refresh_token(
-    request: RefreshRequest,
+    http_request: Request,
+    response: Response,
+    body: RefreshRequest | None = Body(default=None),
     db: Any = Depends(get_db),
 ):
     """
@@ -386,7 +433,8 @@ def refresh_token(
 
     **How it works:**
 
-    1. Send your refresh_token in the request body
+    1. Send your refresh_token in the request body, or use the HttpOnly
+       refresh cookie set during browser login
     2. If valid, you get back a fresh pair of tokens
     3. The old refresh token is immediately invalidated (rotation)
 
@@ -396,8 +444,16 @@ def refresh_token(
     If an admin deactivates a user, their refresh tokens stop working.
     Each refresh token can only be used once (rotation).
     """
+    raw_refresh_token = _refresh_token_from_request(body, http_request)
+    if raw_refresh_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     # Decode the refresh token
-    payload = decode_token(request.refresh_token)
+    payload = decode_token(raw_refresh_token)
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -430,7 +486,15 @@ def refresh_token(
         )
 
     # Verify the session exists in the database (wasn't revoked via logout)
-    session_row = db.query(UserSession).filter(UserSession.refresh_token == request.refresh_token).first()
+    refresh_token_hash = hash_token(raw_refresh_token)
+    session_row = (
+        db.query(UserSession)
+        .filter(
+            UserSession.refresh_token == refresh_token_hash,
+            UserSession.user_id == payload.user_id,
+        )
+        .first()
+    )
     if session_row is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -459,10 +523,9 @@ def refresh_token(
 
     # Record the new session, guarding against clock-precision duplicates.
     expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    db.query(UserSession).filter(UserSession.refresh_token == new_refresh_token).delete()
-    db.flush()
-    db.add(UserSession(user_id=int(user.id), refresh_token=new_refresh_token, expires_at=expires_at))
+    _store_refresh_session(db, int(user.id), new_refresh_token, expires_at)
     db.commit()
+    _set_refresh_token_cookie(response, new_refresh_token)
 
     return TokenResponse(
         access_token=access_token,
@@ -485,7 +548,9 @@ def refresh_token(
     },
 )
 def logout(
-    request: RefreshRequest,
+    http_request: Request,
+    response: Response,
+    body: RefreshRequest | None = Body(default=None),
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_active_user_strict),
 ):
@@ -496,21 +561,26 @@ def logout(
 
     1. Include your access token in the Authorization header:
        `Authorization: Bearer <access_token>`
-    2. Send the refresh token in the request body:
+    2. Browser clients can use the HttpOnly refresh cookie. API clients can
+       send the refresh token in the request body:
        `{"refresh_token": "<refresh_token>"}`
 
     After this call the refresh token is deleted from the database and
-    cannot be used again. The client should also clear its local storage.
+    cannot be used again. The client should also clear local access-token state.
     """
+    raw_refresh_token = _refresh_token_from_request(body, http_request)
+
     # Delete the session row scoped to this user (prevents cross-user deletion)
-    db.query(UserSession).filter(
-        UserSession.refresh_token == request.refresh_token,
-        UserSession.user_id == int(current_user.id),
-    ).delete()
+    if raw_refresh_token is not None:
+        db.query(UserSession).filter(
+            UserSession.refresh_token == hash_token(raw_refresh_token),
+            UserSession.user_id == int(current_user.id),
+        ).delete()
 
     # Lazy cleanup of expired sessions for this user
     _cleanup_expired_sessions(db, int(current_user.id))
     db.commit()
+    _clear_refresh_token_cookie(response)
 
     return {"message": "Logged out successfully"}
 

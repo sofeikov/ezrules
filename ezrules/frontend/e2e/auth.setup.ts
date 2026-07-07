@@ -1,8 +1,8 @@
 import { test as setup } from '@playwright/test';
 
 /**
- * Global setup that logs in once and saves the auth state (localStorage tokens)
- * to a file. All test projects depend on this setup so they start authenticated.
+ * Global setup that logs in once and saves the auth state to a file.
+ * All test projects depend on this setup so they start authenticated.
  */
 setup('authenticate', async ({ page }) => {
   // Navigate to login page
@@ -16,6 +16,6 @@ setup('authenticate', async ({ page }) => {
   // Wait for redirect to dashboard after login
   await page.waitForURL(/.*dashboard/, { timeout: 30000 });
 
-  // Save the authenticated state (localStorage with tokens)
+  // Save the authenticated state (access token plus refresh cookie)
   await page.context().storageState({ path: 'e2e/.auth/user.json' });
 });

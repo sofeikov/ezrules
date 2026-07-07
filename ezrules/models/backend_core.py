@@ -1140,7 +1140,7 @@ class UserSession(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
-    refresh_token = Column(String(2048), nullable=False, unique=True)
+    refresh_token = Column(String(64), nullable=False, unique=True)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 

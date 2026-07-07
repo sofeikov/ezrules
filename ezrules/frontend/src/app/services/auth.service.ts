@@ -31,7 +31,7 @@ export interface MessageResponse {
 export class AuthService {
   private readonly AUTH_URL = `${environment.apiUrl}/api/v2/auth`;
   private readonly ACCESS_TOKEN_KEY = 'ezrules_access_token';
-  private readonly REFRESH_TOKEN_KEY = 'ezrules_refresh_token';
+  private readonly LEGACY_REFRESH_TOKEN_KEY = 'ezrules_refresh_token';
 
   private loggedIn = new BehaviorSubject<boolean>(this.hasToken());
   private currentUser = new BehaviorSubject<AuthUser | null>(null);
@@ -46,10 +46,6 @@ export class AuthService {
 
   getAccessToken(): string | null {
     return localStorage.getItem(this.ACCESS_TOKEN_KEY);
-  }
-
-  getRefreshToken(): string | null {
-    return localStorage.getItem(this.REFRESH_TOKEN_KEY);
   }
 
   getCurrentUserSnapshot(): AuthUser | null {
@@ -67,11 +63,12 @@ export class AuthService {
     formData.set('password', password);
 
     return this.http.post<TokenResponse>(`${this.AUTH_URL}/login`, formData.toString(), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      withCredentials: true
     }).pipe(
       tap(response => {
         localStorage.setItem(this.ACCESS_TOKEN_KEY, response.access_token);
-        localStorage.setItem(this.REFRESH_TOKEN_KEY, response.refresh_token);
+        localStorage.removeItem(this.LEGACY_REFRESH_TOKEN_KEY);
         this.setCurrentUser(null);
         this.currentUserRequest$ = null;
         this.loggedIn.next(true);
@@ -85,17 +82,10 @@ export class AuthService {
   }
 
   refresh(): Observable<TokenResponse> {
-    const refreshToken = this.getRefreshToken();
-    if (!refreshToken) {
-      return throwError(() => new Error('No refresh token'));
-    }
-
-    return this.http.post<TokenResponse>(`${this.AUTH_URL}/refresh`, {
-      refresh_token: refreshToken
-    }).pipe(
+    return this.http.post<TokenResponse>(`${this.AUTH_URL}/refresh`, null, { withCredentials: true }).pipe(
       tap(response => {
         localStorage.setItem(this.ACCESS_TOKEN_KEY, response.access_token);
-        localStorage.setItem(this.REFRESH_TOKEN_KEY, response.refresh_token);
+        localStorage.removeItem(this.LEGACY_REFRESH_TOKEN_KEY);
         this.currentUserRequest$ = null;
         this.loggedIn.next(true);
       }),
@@ -107,15 +97,15 @@ export class AuthService {
   }
 
   logout(): void {
-    const refreshToken = this.getRefreshToken();
-    if (refreshToken) {
+    const accessToken = this.getAccessToken();
+    if (accessToken) {
       // Fire and forget — clear local state regardless of outcome
-      this.http.post(`${this.AUTH_URL}/logout`, { refresh_token: refreshToken }).subscribe({
+      this.http.post(`${this.AUTH_URL}/logout`, null, { withCredentials: true }).subscribe({
         error: () => {} // Ignore errors — local cleanup always happens
       });
     }
     localStorage.removeItem(this.ACCESS_TOKEN_KEY);
-    localStorage.removeItem(this.REFRESH_TOKEN_KEY);
+    localStorage.removeItem(this.LEGACY_REFRESH_TOKEN_KEY);
     this.setCurrentUser(null);
     this.currentUserRequest$ = null;
     this.loggedIn.next(false);

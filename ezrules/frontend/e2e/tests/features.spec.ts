@@ -92,7 +92,6 @@ test.describe('Features Page', () => {
 
     await page.addInitScript(() => {
       localStorage.setItem('ezrules_access_token', 'ui-test-access-token');
-      localStorage.setItem('ezrules_refresh_token', 'ui-test-refresh-token');
     });
 
     await mockFeaturePageApi(page, {
