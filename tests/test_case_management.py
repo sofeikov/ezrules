@@ -158,6 +158,27 @@ def test_case_created_for_non_neutral_decision_and_integration_events(session):
     assert event_types == {"case.created", "evaluation.completed"}
 
 
+def test_ignored_replay_preserves_evaluation_completed_case_id(session):
+    _seed_case_org(session)
+    decision = _add_decision(session, outcome="HOLD", is_current=True)
+    process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
+    session.commit()
+    case = session.query(Case).one()
+    evaluation_event = (
+        session.query(IntegrationEvent).filter(IntegrationEvent.event_type == "evaluation.completed").one()
+    )
+    assert evaluation_event.payload["case_id"] == int(case.case_id)
+
+    decision.is_current = False
+    result = process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
+    session.commit()
+
+    assert result.action == "ignored_decision"
+    assert session.query(IntegrationEvent).filter(IntegrationEvent.event_type == "evaluation.completed").count() == 1
+    replayed_event = session.query(IntegrationEvent).filter(IntegrationEvent.event_type == "evaluation.completed").one()
+    assert replayed_event.payload["case_id"] == int(case.case_id)
+
+
 def test_neutral_decision_only_publishes_evaluation_event(session):
     _seed_case_org(session)
     decision = _add_decision(session, outcome="RELEASE")
@@ -564,6 +585,32 @@ def test_case_assignment_rejects_user_from_another_org(session):
             f"/api/v2/cases/{case.case_id}",
             headers={"Authorization": f"Bearer {token}"},
             json={"assigned_to_user_id": int(other_user.id)},
+        )
+
+    assert response.status_code == 422
+    assert session.query(Case).one().assigned_to_user_id is None
+
+
+def test_case_assignment_rejects_inactive_user(session):
+    _org, _user, token = _seed_case_org(session)
+    inactive_user = User(
+        email="inactive-case-manager@example.com",
+        password="unused",
+        active=False,
+        fs_uniquifier="inactive-case-manager@example.com",
+        o_id=1,
+    )
+    session.add(inactive_user)
+    decision = _add_decision(session, outcome="HOLD")
+    process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
+    session.commit()
+    case = session.query(Case).one()
+
+    with TestClient(app) as client:
+        response = client.patch(
+            f"/api/v2/cases/{case.case_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"assigned_to_user_id": int(inactive_user.id)},
         )
 
     assert response.status_code == 422

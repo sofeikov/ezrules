@@ -9,7 +9,15 @@ import sqlalchemy as sa
 
 from ezrules.backend.integrations import publish_integration_event
 from ezrules.backend.runtime_settings import get_neutral_outcome
-from ezrules.models.backend_core import AllowedOutcome, Case, CaseEvent, EvaluationDecision, Label, User
+from ezrules.models.backend_core import (
+    AllowedOutcome,
+    Case,
+    CaseEvent,
+    EvaluationDecision,
+    IntegrationEvent,
+    Label,
+    User,
+)
 from ezrules.models.database import db_session
 
 CASE_STATUS_OPEN = "open"
@@ -248,6 +256,19 @@ def publish_evaluation_completed(
     )
     if decision is None:
         return
+    effective_case_id = case_id
+    if effective_case_id is None:
+        existing_event = (
+            db.query(IntegrationEvent.payload)
+            .filter(IntegrationEvent.external_event_id == f"evt_evaluation_completed_{evaluation_decision_id}")
+            .first()
+        )
+        existing_payload = (
+            existing_event[0] if existing_event is not None and isinstance(existing_event[0], dict) else {}
+        )
+        existing_case_id = existing_payload.get("case_id")
+        effective_case_id = int(existing_case_id) if isinstance(existing_case_id, int) else None
+
     publish_integration_event(
         db,
         o_id=o_id,
@@ -265,7 +286,7 @@ def publish_evaluation_completed(
             "decision_type": str(decision.decision_type),
             "served": bool(decision.served),
             "is_current": bool(decision.is_current),
-            "case_id": case_id,
+            "case_id": effective_case_id,
         },
     )
 
@@ -380,9 +401,11 @@ def assign_case(db: Any, *, o_id: int, case_id: int, actor_user_id: int, assigne
     if case.status in {CASE_STATUS_RESOLVED, CASE_STATUS_CLOSED}:
         raise CaseValidationError("Resolved cases cannot be assigned")
     if assignee_user_id is not None:
-        assignee = db.query(User.id).filter(User.id == assignee_user_id, User.o_id == o_id).first()
+        assignee = (
+            db.query(User.id).filter(User.id == assignee_user_id, User.o_id == o_id, User.active.is_(True)).first()
+        )
         if assignee is None:
-            raise CaseValidationError("Assignee must belong to the case organisation")
+            raise CaseValidationError("Assignee must be an active user in the case organisation")
     previous_assignee = int(case.assigned_to_user_id) if case.assigned_to_user_id is not None else None
     if previous_assignee == assignee_user_id:
         return case
