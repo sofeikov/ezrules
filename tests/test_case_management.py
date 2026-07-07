@@ -13,6 +13,7 @@ from ezrules.backend.cases import (
     CASE_STATUS_RESOLVED,
     CaseConflictError,
     CaseValidationError,
+    enqueue_case_detection,
     process_evaluation_for_cases,
     resolve_case,
 )
@@ -177,6 +178,30 @@ def test_ignored_replay_preserves_evaluation_completed_case_id(session):
     assert session.query(IntegrationEvent).filter(IntegrationEvent.event_type == "evaluation.completed").count() == 1
     replayed_event = session.query(IntegrationEvent).filter(IntegrationEvent.event_type == "evaluation.completed").one()
     assert replayed_event.payload["case_id"] == int(case.case_id)
+
+
+def test_enqueue_case_detection_rolls_back_on_failure(monkeypatch):
+    calls = []
+
+    class FakeSession:
+        def commit(self):
+            calls.append("commit")
+
+        def rollback(self):
+            calls.append("rollback")
+
+    def fail_processing(db, *, o_id, evaluation_decision_id):
+        calls.append(("process", db, o_id, evaluation_decision_id))
+        raise RuntimeError("case processing failed")
+
+    fake_session = FakeSession()
+    monkeypatch.setattr("ezrules.backend.cases.db_session", fake_session)
+    monkeypatch.setattr("ezrules.backend.cases.process_evaluation_for_cases", fail_processing)
+
+    with pytest.raises(RuntimeError, match="case processing failed"):
+        enqueue_case_detection(o_id=1, evaluation_decision_id=123)
+
+    assert calls == [("process", fake_session, 1, 123), "rollback"]
 
 
 def test_neutral_decision_only_publishes_evaluation_event(session):

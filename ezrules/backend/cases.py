@@ -385,8 +385,12 @@ def process_evaluation_for_cases(db: Any, *, o_id: int, evaluation_decision_id: 
 
 
 def enqueue_case_detection(*, o_id: int, evaluation_decision_id: int) -> None:
-    process_evaluation_for_cases(db_session, o_id=o_id, evaluation_decision_id=evaluation_decision_id)
-    db_session.commit()
+    try:
+        process_evaluation_for_cases(db_session, o_id=o_id, evaluation_decision_id=evaluation_decision_id)
+        db_session.commit()
+    except Exception:
+        db_session.rollback()
+        raise
 
 
 def get_case_for_update(db: Any, *, o_id: int, case_id: int) -> Case:
