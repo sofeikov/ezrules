@@ -168,6 +168,11 @@ If you use async field-observation buffering or async shadow evaluation:
 - keep Celery beat running so queue drain tasks execute on schedule
 - tune the `*_DRAIN_INTERVAL_SECONDS`, `*_DRAIN_BATCH_SIZE`, and `*_MAX_BATCHES_PER_DRAIN` settings only if you need different throughput or lag tradeoffs
 
+If you use outbound integration webhooks:
+
+- keep Celery workers and Celery beat running so `dispatch-integration-outbox` can deliver pending webhook events
+- expect case and evaluation events to be persisted before webhook delivery; delivery retries are handled asynchronously from the integration outbox
+
 AI-assisted rule authoring is enabled in Settings by default for new organisations. To make draft generation usable:
 
 - set `EZRULES_AI_AUTHORING_BASE_URL` if you need a non-default OpenAI endpoint

@@ -12,7 +12,9 @@ from ezrules.backend.backtesting import (
     BacktestRecord,
     compute_backtest_metrics,
 )
+from ezrules.backend.cases import process_evaluation_for_cases
 from ezrules.backend.features import FeatureResolver, summarize_feature_snapshot_resolutions
+from ezrules.backend.integrations import dispatch_pending_outbox
 from ezrules.backend.observation_queue import drain_observation_queue
 from ezrules.backend.rule_quality import (
     compute_rule_quality_metrics,
@@ -49,6 +51,10 @@ app.conf.beat_schedule = {
     "sweep-alert-rules": {
         "task": "ezrules.backend.tasks.sweep_alert_rules_task",
         "schedule": timedelta(seconds=app_settings.ALERT_SWEEP_INTERVAL_SECONDS),
+    },
+    "dispatch-integration-outbox": {
+        "task": "ezrules.backend.tasks.dispatch_integration_outbox_task",
+        "schedule": timedelta(seconds=60),
     },
 }
 
@@ -348,6 +354,18 @@ def drain_shadow_evaluation_queue_task() -> dict[str, int]:
 def detect_alerts_for_decision_task(o_id: int, evaluation_decision_id: int) -> dict[str, int]:
     incident_ids = detect_alerts_for_decision(db_session, o_id=o_id, evaluation_decision_id=evaluation_decision_id)
     return {"incidents": len(incident_ids)}
+
+
+@app.task(name="ezrules.backend.tasks.process_evaluation_for_cases_task")
+def process_evaluation_for_cases_task(o_id: int, evaluation_decision_id: int) -> dict[str, str | int | None]:
+    result = process_evaluation_for_cases(db_session, o_id=o_id, evaluation_decision_id=evaluation_decision_id)
+    db_session.commit()
+    return {"case_id": result.case_id, "action": result.action}
+
+
+@app.task(name="ezrules.backend.tasks.dispatch_integration_outbox_task")
+def dispatch_integration_outbox_task() -> dict[str, int]:
+    return dispatch_pending_outbox(db_session)
 
 
 @app.task(name="ezrules.backend.tasks.sweep_alert_rules_task")

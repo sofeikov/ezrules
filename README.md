@@ -12,6 +12,7 @@ ezrules gives fraud, risk, and compliance administrators a web workspace for man
 
 - **Own the rule lifecycle.** Create rules, keep drafts separate from live logic, pause risky rules, restore older revisions, and promote changes deliberately.
 - **See what happened.** Review canonical served decisions, the outcome returned, every rule that fired, and the exact event version those rules used.
+- **Work the exceptions.** Turn non-neutral decisions into resolvable cases, track rescoring changes, and publish case/evaluation events to external systems.
 - **Improve rules with evidence.** Use labels, precision/recall reports, backtests, shadow rules, and percentage rollouts before changing production decisions.
 - **Run with admin controls.** Manage roles, permissions, API keys, outcomes, user lists, field types, traffic persistence, and audit history inside the product.
 - **Self-host it.** Run the full stack yourself with PostgreSQL, Redis, FastAPI, Celery, and the web UI.
@@ -116,6 +117,7 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
 ```
 
 The result is stored for review in the UI, including the winning outcome and the rules that contributed to the decision.
+Non-neutral decisions can also become case work items, while evaluation and case lifecycle events are available through the integration event stream.
 
 ## Core Workflows
 

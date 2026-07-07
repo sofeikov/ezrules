@@ -120,6 +120,14 @@ import { NotificationBellComponent } from './notification-bell.component';
           <span>Alerts</span>
         </a>
 
+        <a *ngIf="canAccess(routePermissions.cases)" href="/cases" [ngClass]="linkClasses('/cases')">
+          <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
+          </svg>
+          <span>Cases</span>
+        </a>
+
         <a *ngIf="canAccess(routePermissions.users)" href="/management/users" [ngClass]="linkClasses('/management/users')">
           <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
