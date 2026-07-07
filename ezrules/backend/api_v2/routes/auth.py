@@ -552,16 +552,13 @@ def logout(
     response: Response,
     body: RefreshRequest | None = Body(default=None),
     db: Any = Depends(get_db),
-    current_user: User = Depends(get_current_active_user_strict),
 ):
     """
     Revoke the current refresh token server-side.
 
     **How to use:**
 
-    1. Include your access token in the Authorization header:
-       `Authorization: Bearer <access_token>`
-    2. Browser clients can use the HttpOnly refresh cookie. API clients can
+    1. Browser clients can use the HttpOnly refresh cookie. API clients can
        send the refresh token in the request body:
        `{"refresh_token": "<refresh_token>"}`
 
@@ -569,16 +566,29 @@ def logout(
     cannot be used again. The client should also clear local access-token state.
     """
     raw_refresh_token = _refresh_token_from_request(body, http_request)
+    if raw_refresh_token is None:
+        _clear_refresh_token_cookie(response)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    # Delete the session row scoped to this user (prevents cross-user deletion)
-    if raw_refresh_token is not None:
-        db.query(UserSession).filter(
-            UserSession.refresh_token == hash_token(raw_refresh_token),
-            UserSession.user_id == int(current_user.id),
-        ).delete()
+    payload = decode_token(raw_refresh_token)
+    if payload is None or payload.token_type != "refresh":
+        _clear_refresh_token_cookie(response)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    # Lazy cleanup of expired sessions for this user
-    _cleanup_expired_sessions(db, int(current_user.id))
+    db.query(UserSession).filter(
+        UserSession.refresh_token == hash_token(raw_refresh_token),
+        UserSession.user_id == payload.user_id,
+    ).delete()
+
+    _cleanup_expired_sessions(db, payload.user_id)
     db.commit()
     _clear_refresh_token_cookie(response)
 

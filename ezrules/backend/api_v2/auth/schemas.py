@@ -53,7 +53,7 @@ class RefreshRequest(BaseModel):
     instead rely on the HttpOnly refresh cookie set during login.
     """
 
-    refresh_token: str
+    refresh_token: str | None = None
 
 
 class AcceptInviteRequest(BaseModel):

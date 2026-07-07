@@ -1,5 +1,12 @@
 # What's New
 
+## v1.28.1
+
+* **Hashed refresh sessions**: Refresh token sessions are now stored as SHA-256 hashes in `user_session`, including a migration that hashes any existing plaintext session rows during upgrade.
+* **HttpOnly browser refresh cookie**: Browser login and refresh flows now set the long-lived refresh token in an HttpOnly cookie and no longer persist it in frontend `localStorage`.
+* **Compatible refresh API**: API clients can still send refresh tokens in request bodies, while browser refresh/logout can use the cookie-backed flow.
+* **Refresh-token logout hardening**: Logout now revokes directly from the refresh token or HttpOnly cookie, so expired access tokens and empty JSON request bodies do not leave browser refresh sessions active.
+
 ## v1.28.0
 
 * **Case management inbox**: Non-neutral live evaluation decisions now create durable case work items linked to the canonical evaluation ledger, with a new **Cases** page for reviewing and resolving cases.
@@ -9,9 +16,6 @@
 * **Rescoring-aware case lifecycle**: Rescored transactions update the active case with old/new decision references, while resolved cases remain auditable and later case-worthy scores create a new linked case.
 * **Generic integration events**: Evaluation completion and case lifecycle actions now write versioned integration events with a transactional outbox so external systems can poll or receive pushed delivery without changing the `/evaluate` response contract.
 * **Case and integration permissions**: Upgrades now seed the new case/integration permissions for existing admin roles, and webhook subscriptions validate HTTPS destinations before events enter the outbox.
-* **Hashed refresh sessions**: Refresh token sessions are now stored as SHA-256 hashes in `user_session`, including a migration that hashes any existing plaintext session rows during upgrade.
-* **HttpOnly browser refresh cookie**: Browser login and refresh flows now set the long-lived refresh token in an HttpOnly cookie and no longer persist it in frontend `localStorage`.
-* **Compatible refresh API**: API clients can still send refresh tokens in request bodies, while browser refresh/logout can use the cookie-backed flow.
 
 ## v1.27.0
 

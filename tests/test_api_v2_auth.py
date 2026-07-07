@@ -657,6 +657,18 @@ class TestSessionTracking:
             is not None
         )
 
+    def test_refresh_accepts_cookie_with_empty_json_body(self, api_client, session):
+        """Cookie refresh should still work when a client sends an empty JSON object."""
+        login_response = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        assert login_response.status_code == 200
+
+        refresh_response = api_client.post("/api/v2/auth/refresh", json={})
+        assert refresh_response.status_code == 200
+        assert "refresh_token" in refresh_response.json()
+
     def test_refresh_token_can_only_be_used_once(self, api_client, session):
         """A refresh token should be invalid after it has been used once (rotation)."""
         login_response = api_client.post(
@@ -718,7 +730,6 @@ class TestLogoutEndpoint:
         logout_response = api_client.post(
             "/api/v2/auth/logout",
             json={"refresh_token": tokens["refresh_token"]},
-            headers={"Authorization": f"Bearer {tokens['access_token']}"},
         )
         assert logout_response.status_code == 200
         assert logout_response.json()["message"] == "Logged out successfully"
@@ -730,17 +741,14 @@ class TestLogoutEndpoint:
         assert session_row is None
 
     def test_logout_accepts_http_only_cookie(self, api_client, session):
-        """Browser logout can revoke the session using the refresh cookie."""
+        """Browser logout can revoke the session using only the refresh cookie."""
         login_response = api_client.post(
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
         tokens = login_response.json()
 
-        logout_response = api_client.post(
-            "/api/v2/auth/logout",
-            headers={"Authorization": f"Bearer {tokens['access_token']}"},
-        )
+        logout_response = api_client.post("/api/v2/auth/logout")
         assert logout_response.status_code == 200
 
         session.expire_all()
@@ -749,6 +757,23 @@ class TestLogoutEndpoint:
             is None
         )
         assert "ezrules_refresh_token=" in logout_response.headers.get("set-cookie", "")
+
+    def test_logout_accepts_cookie_with_empty_json_body(self, api_client, session):
+        """Cookie logout should still work when a client sends an empty JSON object."""
+        login_response = api_client.post(
+            "/api/v2/auth/login",
+            data={"username": "testuser@example.com", "password": "testpassword123"},
+        )
+        tokens = login_response.json()
+
+        logout_response = api_client.post("/api/v2/auth/logout", json={})
+        assert logout_response.status_code == 200
+
+        session.expire_all()
+        assert (
+            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(tokens["refresh_token"])).first()
+            is None
+        )
 
     def test_refresh_after_logout_returns_401(self, api_client, session):
         """After logout, using the old refresh token should return 401."""
@@ -761,7 +786,6 @@ class TestLogoutEndpoint:
         api_client.post(
             "/api/v2/auth/logout",
             json={"refresh_token": tokens["refresh_token"]},
-            headers={"Authorization": f"Bearer {tokens['access_token']}"},
         )
 
         response = api_client.post(
@@ -770,8 +794,13 @@ class TestLogoutEndpoint:
         )
         assert response.status_code == 401
 
-    def test_logout_without_access_token_returns_401(self, api_client, session):
-        """Logout with no Bearer token should be rejected."""
+    def test_logout_without_refresh_token_returns_401(self, api_client, session):
+        """Logout with no refresh token or cookie should be rejected."""
+        response = api_client.post("/api/v2/auth/logout")
+        assert response.status_code == 401
+
+    def test_logout_with_invalid_refresh_token_returns_401(self, api_client, session):
+        """Logout with an invalid refresh token should be rejected."""
         response = api_client.post(
             "/api/v2/auth/logout",
             json={"refresh_token": "sometoken"},
@@ -796,7 +825,6 @@ class TestLogoutEndpoint:
         api_client.post(
             "/api/v2/auth/logout",
             json={"refresh_token": tokens1["refresh_token"]},
-            headers={"Authorization": f"Bearer {tokens1['access_token']}"},
         )
 
         # Second session should still be usable

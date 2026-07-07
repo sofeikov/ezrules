@@ -45,7 +45,6 @@ Refresh tokens are tracked server-side in the `user_session` table as SHA-256 ha
 
 ```bash
 curl -X POST http://localhost:8888/api/v2/auth/logout \
-  -H "Authorization: Bearer <access_token>" \
   --cookie "ezrules_refresh_token=<refresh_token>"
 ```
 
@@ -53,7 +52,6 @@ API clients can still revoke a session by sending the refresh token in the reque
 
 ```bash
 curl -X POST http://localhost:8888/api/v2/auth/logout \
-  -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{"refresh_token": "<refresh_token>"}'
 ```
@@ -75,7 +73,7 @@ Each call to `POST /api/v2/auth/refresh` deletes the stored hash for the submitt
 | `POST` | `/api/v2/auth/forgot-password` | No | Send password reset email (always generic response) |
 | `POST` | `/api/v2/auth/reset-password` | No | Reset password using one-time token |
 | `POST` | `/api/v2/auth/refresh` | No (refresh cookie or body) | Exchanges refresh token (rotation — one-time use) |
-| `POST` | `/api/v2/auth/logout` | Bearer + refresh cookie or body | Revokes refresh token server-side |
+| `POST` | `/api/v2/auth/logout` | Refresh cookie or body | Revokes refresh token server-side |
 | `GET` | `/api/v2/auth/me` | Bearer | Current user profile, including effective permission names |
 
 ### Rules
