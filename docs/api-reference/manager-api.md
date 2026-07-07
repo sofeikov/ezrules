@@ -266,6 +266,7 @@ Alert detection source of truth:
 - Alert rules count canonical served `evaluation_decisions` by `resolved_outcome`.
 - Evaluation-time detection is queued after the served decision is persisted; Celery beat also sweeps enabled alert rules as a repair loop.
 - V1 delivers via the in-app notification channel. Notification channel and policy tables are intentionally separate so email, Slack, PagerDuty, and webhook channels can be added later.
+- Notification channel configs are encrypted at rest, validated against an explicit schema per channel type, and redacted before safe display or dispatch-error persistence.
 
 ### Cases and Integration Events
 

@@ -1,5 +1,6 @@
 import datetime
 from enum import Enum
+from typing import Any
 
 from sqlalchemy import (
     JSON,
@@ -25,6 +26,11 @@ from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, backref, mapped_column, relationship
 
 from ezrules.core.application_context import get_organization_id
+from ezrules.core.notification_channel_config import (
+    decrypt_notification_channel_config,
+    encrypt_notification_channel_config,
+    redact_notification_channel_config,
+)
 from ezrules.models.database import Base
 
 
@@ -733,7 +739,7 @@ class NotificationChannel(Base):
     name = Column(String(255), nullable=False)
     channel_type = Column(String(64), nullable=False)
     enabled = Column(Boolean, nullable=False, default=True)
-    config = Column(JSON, nullable=False, default=dict)
+    config_encrypted = Column(Text, nullable=False, default="")
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
     updated_at = Column(
         DateTime,
@@ -741,6 +747,18 @@ class NotificationChannel(Base):
         onupdate=lambda: datetime.datetime.now(datetime.UTC),
         nullable=False,
     )
+
+    @property
+    def config(self) -> dict[str, Any]:
+        return decrypt_notification_channel_config(str(self.channel_type), str(self.config_encrypted or ""))
+
+    @config.setter
+    def config(self, value: dict[str, Any] | None) -> None:
+        self.config_encrypted = encrypt_notification_channel_config(str(self.channel_type), value)
+
+    @property
+    def redacted_config(self) -> dict[str, Any]:
+        return redact_notification_channel_config(str(self.channel_type), self.config)
 
 
 class NotificationPolicy(Base):
