@@ -54,7 +54,7 @@ uv run ezrules bootstrap-org --name your-org --admin-email admin@example.com --a
 
 1. Open **Security** for user management
 2. Open **Settings** for role/permission management
-3. Use **Invite User** for standard onboarding (email + optional role)
+3. Use **Invite User** for standard onboarding, then assign roles through the dedicated role controls
 4. Apply least-privilege role assignments
 
 ### API endpoints

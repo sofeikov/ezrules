@@ -1,5 +1,9 @@
 # What's New
 
+## v1.28.1
+
+* **User role assignment permission boundary**: Creating or inviting users no longer accepts `role_ids`; callers must create or invite the account first and then use the dedicated role-assignment endpoint with `MANAGE_USER_ROLES`.
+
 ## v1.28.0
 
 * **Case management inbox**: Non-neutral live evaluation decisions now create durable case work items linked to the canonical evaluation ledger, with a new **Cases** page for reviewing and resolving cases.
