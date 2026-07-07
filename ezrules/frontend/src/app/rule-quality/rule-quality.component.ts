@@ -172,7 +172,7 @@ export class RuleQualityComponent implements OnInit, OnDestroy {
 
         this.pollAttempts += 1;
         if (this.pollAttempts >= this.maxPollAttempts) {
-          this.error = 'Rule quality report timed out. Please refresh the report.';
+          this.error = `Rule quality report timed out. ${this.reportRecoveryActionMessage()}`;
           this.loading = false;
           this.polling = false;
           this.reportId = null;
@@ -183,13 +183,20 @@ export class RuleQualityComponent implements OnInit, OnDestroy {
         this.schedulePoll();
       },
       error: () => {
-        this.error = 'Failed while polling report status. Please refresh the report.';
+        this.error = `Failed while polling report status. ${this.reportRecoveryActionMessage()}`;
         this.loading = false;
         this.polling = false;
         this.reportId = null;
         this.clearPollTimeout();
       }
     });
+  }
+
+  private reportRecoveryActionMessage(): string {
+    if (this.canGenerateReports) {
+      return 'Please refresh the report.';
+    }
+    return 'Ask someone with report generation access to refresh it.';
   }
 
   private applyResult(response: RuleQualityResponse): void {
