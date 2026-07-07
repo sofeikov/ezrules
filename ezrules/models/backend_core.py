@@ -727,6 +727,9 @@ class AlertIncident(Base):
     acknowledged_by = Column(String(255), nullable=True)
 
 
+_CONFIG_NOT_PROVIDED = object()
+
+
 class NotificationChannel(Base):
     __tablename__ = "notification_channels"
     __table_args__ = (
@@ -747,6 +750,12 @@ class NotificationChannel(Base):
         onupdate=lambda: datetime.datetime.now(datetime.UTC),
         nullable=False,
     )
+
+    def __init__(self, **kwargs: Any) -> None:
+        config = kwargs.pop("config", _CONFIG_NOT_PROVIDED)
+        super().__init__(**kwargs)
+        if config is not _CONFIG_NOT_PROVIDED:
+            self.config = config
 
     @property
     def config(self) -> dict[str, Any]:

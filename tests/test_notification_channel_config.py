@@ -67,6 +67,20 @@ def test_notification_channel_config_rejects_unknown_and_missing_fields():
         )
 
 
+def test_notification_channel_config_init_applies_config_after_channel_type():
+    config = {"url": "https://hooks.example.com/secret-token"}
+
+    channel = NotificationChannel(
+        o_id=1,
+        name="Order-insensitive webhook",
+        config=config,
+        channel_type="webhook",
+        enabled=True,
+    )
+
+    assert channel.config == config
+
+
 def test_legacy_notification_channel_config_encryption_skips_validation():
     legacy_config = {"unexpected": "legacy", "nested": ["still", "encrypted"]}
 
