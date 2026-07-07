@@ -275,6 +275,37 @@ Alert detection source of truth:
 - Evaluation-time detection is queued after the served decision is persisted; Celery beat also sweeps enabled alert rules as a repair loop.
 - V1 delivers via the in-app notification channel. Notification channel and policy tables are intentionally separate so email, Slack, PagerDuty, and webhook channels can be added later.
 
+### Cases and Integration Events
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/cases` | Bearer + `VIEW_CASES` | List case-management work items for non-neutral served decisions; supports queue/search filters such as `status`, `assigned_to`, `outcome`, `priority_min`, `decision_state`, `transaction_id`, `q`, `created_from`, `created_to`, `updated_from`, and `updated_to` |
+| `GET` | `/api/v2/cases/assignees` | Bearer + `VIEW_CASES` | List active same-org users available for case assignment |
+| `GET` | `/api/v2/cases/{case_id}` | Bearer + `VIEW_CASES` | Read one case, its immutable case-event timeline, and the current evaluation context |
+| `PATCH` | `/api/v2/cases/{case_id}` | Bearer + `MANAGE_CASES` | Assign or unassign a case |
+| `POST` | `/api/v2/cases/{case_id}/notes` | Bearer + `MANAGE_CASES` | Add an analyst note to a case timeline |
+| `POST` | `/api/v2/cases/{case_id}/resolve` | Bearer + `MANAGE_CASES` | Resolve a case with `resolution_disposition`, `resolution_action`, a note, and optional expected current evaluation id |
+| `GET` | `/api/v2/integration-events` | Bearer + `VIEW_INTEGRATIONS` | Cursor-read versioned events such as `evaluation.completed` and `case.resolved` |
+| `GET` | `/api/v2/integration-subscriptions` | Bearer + `VIEW_INTEGRATIONS` | List outbound integration subscriptions |
+| `POST` | `/api/v2/integration-subscriptions` | Bearer + `MANAGE_INTEGRATIONS` | Create an outbound subscription such as a webhook destination |
+| `PATCH` | `/api/v2/integration-subscriptions/{subscription_id}` | Bearer + `MANAGE_INTEGRATIONS` | Update subscription destination, event filters, or enabled state |
+
+Case lifecycle notes:
+- Case creation is driven by canonical served `evaluation_decisions`: missing outcomes and the configured `neutral_outcome` do not create cases.
+- Case queues are assignment filters over the case list: `assigned_to=me` for the caller's queue, `assigned_to=unassigned` for unclaimed work, or `assigned_to=<user_id>` for a specific analyst.
+- Case date filters accept ISO datetimes or plain `YYYY-MM-DD` dates; date-only upper bounds include the full day.
+- `decision_state` filters exact stored case states, currently `current`, `rescored_neutral`, and `rescored_non_caseable`.
+- Case detail includes the current transaction payload, event/evaluation identifiers, resolved outcome counters, and triggered-rule metadata when available.
+- Assignment changes emit `case.assigned`; analyst notes emit `case.note`; structured resolutions emit `case.resolved` with disposition and intended action.
+- Case lifecycle integration payloads include top-level consumer fields (`case_id`, `transaction_id`, `case_event_type`, actor/source IDs, current evaluation/event IDs, status, decision state, resolution fields, and `downstream_action`) plus nested `case` and `case_event` objects for full context.
+- `downstream_action` records analyst intent only. For example, `resolution_action=release_transaction` means an external consumer should decide whether and how to release the transaction in its own system; ezrules does not execute the release/cancel/block action itself.
+- Consumers should use the integration event `external_event_id` as the idempotency key. Webhook deliveries also send this value as `event_id` in the body and `X-Ezrules-Event-Id` in headers.
+- A rescore of an active case updates the same case with the new `current_evaluation_decision_id` and records a `case.rescored` integration event.
+- A rescore to neutral/no outcome keeps the case open with a non-current decision state so an analyst can close it intentionally.
+- Resolve requests can include `expected_current_ed_id`; the API returns `409` if the case was rescored after the UI loaded.
+- `POST /api/v2/evaluate` remains response-compatible. External systems should consume `evaluation.completed` and case lifecycle changes through `/api/v2/integration-events` or configured outbound delivery.
+- Webhook subscriptions require `config.url` to be a valid HTTPS URL. Responses omit any configured webhook `secret`.
+
 ### Settings
 
 | Method | Path | Auth | Notes |

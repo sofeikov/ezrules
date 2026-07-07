@@ -24,6 +24,7 @@ export const ROUTE_PERMISSION_REQUIREMENTS = {
   rollouts: { allOf: ['view_rules'] },
   apiKeys: { allOf: ['manage_api_keys'] },
   alerts: { allOf: ['view_alerts'] },
+  cases: { allOf: ['view_cases'] },
 } as const satisfies Record<string, PermissionRequirement>;
 
 export const ACTION_PERMISSION_REQUIREMENTS = {
@@ -56,6 +57,8 @@ export const ACTION_PERMISSION_REQUIREMENTS = {
   deleteFeature: { allOf: ['delete_feature'] },
   manageApiKeys: { allOf: ['manage_api_keys'] },
   manageAlerts: { allOf: ['manage_alerts'] },
+  manageCases: { allOf: ['manage_cases'] },
+  manageIntegrations: { allOf: ['manage_integrations'] },
   submitTestEvents: { allOf: ['submit_test_events'] },
 } as const satisfies Record<string, PermissionRequirement>;
 
@@ -101,6 +104,10 @@ export const PERMISSION_LABELS: Record<string, string> = {
   manage_api_keys: 'Manage API keys',
   view_alerts: 'View alerts',
   manage_alerts: 'Manage alerts',
+  view_cases: 'View cases',
+  manage_cases: 'Manage cases',
+  view_integrations: 'View integrations',
+  manage_integrations: 'Manage integrations',
 };
 
 export function hasPermissionRequirement(

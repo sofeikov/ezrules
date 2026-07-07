@@ -19,6 +19,7 @@ import { FeaturesComponent } from './features/features.component';
 import { ShadowRulesComponent } from './shadow-rules/shadow-rules.component';
 import { RolloutsComponent } from './rollouts/rollouts.component';
 import { ApiKeysComponent } from './api-keys/api-keys.component';
+import { CasesComponent } from './cases/cases.component';
 import { TestedEventsComponent } from './tested-events/tested-events.component';
 import { EventTesterComponent } from './event-tester/event-tester.component';
 import { authGuard } from './auth/auth.guard';
@@ -131,6 +132,12 @@ export const routes: Routes = [
     component: AlertsComponent,
     canActivate: [authGuard, permissionGuard],
     data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.alerts }
+  },
+  {
+    path: 'cases',
+    component: CasesComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.cases }
   },
   {
     path: 'management/users',

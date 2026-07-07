@@ -480,6 +480,141 @@ class EvaluationRuleResult(Base):
     metadata_source = Column(String(32), nullable=False, default="evaluation_snapshot")
 
 
+class Case(Base):
+    __tablename__ = "cases"
+    __table_args__ = (
+        Index("ix_cases_o_id_status_updated", "o_id", "status", "updated_at"),
+        Index("ix_cases_o_id_transaction", "o_id", "transaction_id"),
+        Index("ix_cases_o_id_current_ed", "o_id", "current_ed_id"),
+    )
+
+    case_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    transaction_id = Column(String, nullable=False)
+    current_ev_id: Mapped[int] = mapped_column(ForeignKey("event_versions.ev_id"), nullable=False)
+    current_ed_id: Mapped[int] = mapped_column(ForeignKey("evaluation_decisions.ed_id"), nullable=False)
+    opened_by_ed_id: Mapped[int] = mapped_column(ForeignKey("evaluation_decisions.ed_id"), nullable=False)
+    previous_ed_id: Mapped[int | None] = mapped_column(ForeignKey("evaluation_decisions.ed_id"), nullable=True)
+    resolved_outcome = Column(String(255), nullable=True)
+    previous_resolved_outcome = Column(String(255), nullable=True)
+    status = Column(String(32), nullable=False, default="open")
+    decision_state = Column(String(32), nullable=False, default="current")
+    priority = Column(Integer, nullable=False, default=0)
+    assigned_to_user_id: Mapped[int | None] = mapped_column(ForeignKey("user.id"), nullable=True)
+    resolved_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("user.id"), nullable=True)
+    resolution_disposition = Column(String(64), nullable=True)
+    resolution_action = Column(String(64), nullable=True)
+    resolution_note = Column(Text, nullable=True)
+    resolution_label_id: Mapped[int | None] = mapped_column(ForeignKey("event_labels.el_id"), nullable=True)
+    reopened_from_case_id: Mapped[int | None] = mapped_column(ForeignKey("cases.case_id"), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.UTC),
+        onupdate=lambda: datetime.datetime.now(datetime.UTC),
+        nullable=False,
+    )
+    resolved_at = Column(DateTime, nullable=True)
+
+
+class CaseEvent(Base):
+    __tablename__ = "case_events"
+    __table_args__ = (
+        Index("ix_case_events_o_id_created", "o_id", "created_at"),
+        Index("ix_case_events_case_id_created", "case_id", "created_at"),
+        UniqueConstraint("external_event_id", name="uq_case_events_external_event_id"),
+    )
+
+    case_event_id = Column(Integer, unique=True, primary_key=True)
+    case_id: Mapped[int] = mapped_column(ForeignKey("cases.case_id", ondelete="CASCADE"), nullable=False)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    event_type = Column(String(64), nullable=False)
+    actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("user.id"), nullable=True)
+    source_ed_id: Mapped[int | None] = mapped_column(ForeignKey("evaluation_decisions.ed_id"), nullable=True)
+    external_event_id = Column(String(64), nullable=False)
+    occurred_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    details = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+
+
+class IntegrationEvent(Base):
+    __tablename__ = "integration_events"
+    __table_args__ = (
+        Index("ix_integration_events_o_id_created", "o_id", "created_at"),
+        Index("ix_integration_events_o_id_type_created", "o_id", "event_type", "created_at"),
+        Index("ix_integration_events_o_id_source", "o_id", "source_type", "source_id"),
+        UniqueConstraint("external_event_id", name="uq_integration_events_external_event_id"),
+    )
+
+    integration_event_id = Column(Integer, unique=True, primary_key=True)
+    external_event_id = Column(String(64), nullable=False)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    source_type = Column(String(64), nullable=False)
+    source_id = Column(Integer, nullable=False)
+    event_type = Column(String(128), nullable=False)
+    event_version = Column(Integer, nullable=False, default=1)
+    occurred_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    payload = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+
+
+class IntegrationSubscription(Base):
+    __tablename__ = "integration_subscriptions"
+    __table_args__ = (
+        Index("ix_integration_subscriptions_o_id_enabled", "o_id", "enabled"),
+        UniqueConstraint("o_id", "name", name="uq_integration_subscriptions_org_name"),
+    )
+
+    subscription_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    destination_type = Column(String(64), nullable=False)
+    config = Column(JSON, nullable=False, default=dict)
+    secret_ref = Column(String(255), nullable=True)
+    event_types = Column(JSON, nullable=False, default=list)
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.UTC),
+        onupdate=lambda: datetime.datetime.now(datetime.UTC),
+        nullable=False,
+    )
+
+
+class IntegrationOutbox(Base):
+    __tablename__ = "integration_outbox"
+    __table_args__ = (
+        Index("ix_integration_outbox_status_next", "status", "next_attempt_at"),
+        Index("ix_integration_outbox_o_id_created", "o_id", "created_at"),
+        UniqueConstraint("integration_event_id", "subscription_id", name="uq_integration_outbox_event_subscription"),
+    )
+
+    delivery_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    integration_event_id: Mapped[int] = mapped_column(
+        ForeignKey("integration_events.integration_event_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    subscription_id: Mapped[int] = mapped_column(
+        ForeignKey("integration_subscriptions.subscription_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    destination_type = Column(String(64), nullable=False)
+    status = Column(String(32), nullable=False, default="pending")
+    attempt_count = Column(Integer, nullable=False, default=0)
+    next_attempt_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    last_attempted_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.UTC),
+        onupdate=lambda: datetime.datetime.now(datetime.UTC),
+        nullable=False,
+    )
+
+
 class EventVersionLabel(Base):
     __tablename__ = "event_version_labels"
     __table_args__ = (

@@ -26,6 +26,7 @@ from ezrules.backend.api_v2.routes import (
     audit,
     auth,
     backtesting,
+    cases,
     evaluator,
     features,
     field_types,
@@ -190,6 +191,9 @@ app.include_router(api_keys.router)
 
 # Runtime settings routes: /api/v2/settings/*
 app.include_router(settings.router)
+
+# Case management and integration event routes: /api/v2/cases/*, /api/v2/integration-*
+app.include_router(cases.router)
 
 # Deterministic agent tool routes: /api/v2/agent-tools/*
 app.include_router(agent_tools.router)

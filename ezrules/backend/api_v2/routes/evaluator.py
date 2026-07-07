@@ -23,6 +23,7 @@ from ezrules.backend.api_v2.schemas.evaluator import (
     EventTestResponse,
     EventTestRuleResult,
 )
+from ezrules.backend.cases import enqueue_case_detection
 from ezrules.backend.data_utils import Event
 from ezrules.backend.features import FeatureResolutionError, FeatureResolutionTrace, FeatureResolver
 from ezrules.backend.observation_queue import enqueue_observations
@@ -290,6 +291,17 @@ def evaluate(
     data_utils.lock_transaction_for_evaluation(db, lre.o_id, event.transaction_id)
     duplicate = data_utils.find_duplicate_evaluation(db, lre.o_id, event)
     if duplicate is not None:
+        duplicate_evaluation_id = duplicate.get("evaluation_id")
+        if duplicate_evaluation_id is not None:
+            enqueue_alert_detection(
+                o_id=int(lre.o_id),
+                evaluation_decision_id=int(duplicate_evaluation_id),
+                resolved_outcome=duplicate.get("resolved_outcome"),
+            )
+            enqueue_case_detection(
+                o_id=int(lre.o_id),
+                evaluation_decision_id=int(duplicate_evaluation_id),
+            )
         return EvaluateResponse(
             transaction_id=duplicate["transaction_id"],
             outcome_counters=duplicate["outcome_counters"],
@@ -313,6 +325,10 @@ def evaluate(
                 o_id=int(lre.o_id),
                 evaluation_decision_id=int(result["evaluation_decision_id"]),
                 resolved_outcome=result.get("resolved_outcome"),
+            )
+            enqueue_case_detection(
+                o_id=int(lre.o_id),
+                evaluation_decision_id=int(result["evaluation_decision_id"]),
             )
             _persist_evaluate_observations(db, request_data.event_data, lre.o_id)
             return EvaluateResponse(
@@ -371,18 +387,31 @@ def evaluate(
     try:
         # `result` already contains the merged served outcome; passing it avoids a second rule evaluation.
         result, evaluation_decision_id = data_utils.eval_and_store(lre, event, response=result)
-        FeatureResolver(db, lre.o_id).persist_traces(feature_traces, evaluation_decision_id=int(evaluation_decision_id))
-        db.commit()
         enqueue_alert_detection(
             o_id=int(lre.o_id),
             evaluation_decision_id=int(evaluation_decision_id),
             resolved_outcome=result.get("resolved_outcome"),
+        )
+        enqueue_case_detection(
+            o_id=int(lre.o_id),
+            evaluation_decision_id=int(evaluation_decision_id),
         )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Evaluation failed",
         ) from exc
+
+    try:
+        FeatureResolver(db, lre.o_id).persist_traces(feature_traces, evaluation_decision_id=int(evaluation_decision_id))
+        db.commit()
+    except Exception:
+        logger.exception(
+            "Failed to persist feature traces for evaluation_decision_id=%s org_id=%s",
+            evaluation_decision_id,
+            lre.o_id,
+        )
+        db.rollback()
 
     if rollout_logs:
         try:
