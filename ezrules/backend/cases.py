@@ -129,17 +129,37 @@ def _case_payload(case: Case) -> dict[str, Any]:
     return {
         "case_id": int(case.case_id),
         "transaction_id": str(case.transaction_id),
+        "current_event_version_id": int(case.current_ev_id),
+        "current_evaluation_decision_id": int(case.current_ed_id),
+        "previous_evaluation_decision_id": int(case.previous_ed_id) if case.previous_ed_id is not None else None,
+        "opened_by_evaluation_decision_id": int(case.opened_by_ed_id),
         "status": str(case.status),
         "decision_state": str(case.decision_state),
+        "priority": int(case.priority),
         "resolved_outcome": str(case.resolved_outcome) if case.resolved_outcome else None,
         "previous_resolved_outcome": str(case.previous_resolved_outcome) if case.previous_resolved_outcome else None,
         "assigned_to_user_id": int(case.assigned_to_user_id) if case.assigned_to_user_id is not None else None,
         "resolved_by_user_id": int(case.resolved_by_user_id) if case.resolved_by_user_id is not None else None,
         "resolution_disposition": str(case.resolution_disposition) if case.resolution_disposition else None,
         "resolution_action": str(case.resolution_action) if case.resolution_action else None,
-        "current_evaluation_decision_id": int(case.current_ed_id),
-        "previous_evaluation_decision_id": int(case.previous_ed_id) if case.previous_ed_id is not None else None,
-        "opened_by_evaluation_decision_id": int(case.opened_by_ed_id),
+        "resolution_note": str(case.resolution_note) if case.resolution_note else None,
+        "resolution_label_id": int(case.resolution_label_id) if case.resolution_label_id is not None else None,
+        "reopened_from_case_id": int(case.reopened_from_case_id) if case.reopened_from_case_id is not None else None,
+        "resolved_at": case.resolved_at.isoformat() if case.resolved_at else None,
+        "created_at": case.created_at.isoformat(),
+        "updated_at": case.updated_at.isoformat(),
+    }
+
+
+def _downstream_action_payload(case: Case, *, event_type: str) -> dict[str, Any]:
+    action = str(case.resolution_action) if case.resolution_action else "none"
+    requested = event_type == "resolved" and action != "none"
+    return {
+        "requested": requested,
+        "action": action,
+        "status": "requested" if requested else "none",
+        "source": "analyst_resolution" if event_type == "resolved" else "case_lifecycle_event",
+        "executed_by_ezrules": False,
     }
 
 
@@ -167,6 +187,7 @@ def record_case_event(
     db.add(case_event)
     db.flush()
 
+    case_payload = _case_payload(case)
     publish_integration_event(
         db,
         o_id=int(case.o_id),
@@ -176,11 +197,35 @@ def record_case_event(
         external_event_id=f"evt_case_event_{case_event.case_event_id}",
         occurred_at=now,
         payload={
-            "case": _case_payload(case),
+            "case_id": case_payload["case_id"],
+            "transaction_id": case_payload["transaction_id"],
+            "case_event_id": int(case_event.case_event_id),
+            "case_event_type": event_type,
+            "case_event_external_event_id": str(case_event.external_event_id),
+            "actor_user_id": actor_user_id,
+            "source_evaluation_decision_id": source_ed_id,
+            "current_event_version_id": case_payload["current_event_version_id"],
+            "current_evaluation_decision_id": case_payload["current_evaluation_decision_id"],
+            "opened_by_evaluation_decision_id": case_payload["opened_by_evaluation_decision_id"],
+            "previous_evaluation_decision_id": case_payload["previous_evaluation_decision_id"],
+            "status": case_payload["status"],
+            "decision_state": case_payload["decision_state"],
+            "resolved_outcome": case_payload["resolved_outcome"],
+            "previous_resolved_outcome": case_payload["previous_resolved_outcome"],
+            "assigned_to_user_id": case_payload["assigned_to_user_id"],
+            "resolved_by_user_id": case_payload["resolved_by_user_id"],
+            "resolution_disposition": case_payload["resolution_disposition"],
+            "resolution_action": case_payload["resolution_action"],
+            "resolution_note": case_payload["resolution_note"],
+            "resolution_label_id": case_payload["resolution_label_id"],
+            "downstream_action": _downstream_action_payload(case, event_type=event_type),
+            "occurred_at": now.isoformat(),
+            "case": case_payload,
             "case_event": {
                 "case_event_id": int(case_event.case_event_id),
                 "event_type": event_type,
                 "external_event_id": str(case_event.external_event_id),
+                "occurred_at": now.isoformat(),
                 "details": case_event.details,
             },
             "actor": {"user_id": actor_user_id},

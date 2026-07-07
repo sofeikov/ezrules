@@ -51,8 +51,10 @@ test.describe('Cases', () => {
   test('lists and resolves a case while showing integration events', async ({ page }) => {
     const casesPage = new CasesPage(page);
     await mockAuthMe(page, ['view_cases', 'manage_cases', 'view_integrations']);
+    const caseListUrls: string[] = [];
 
     await page.route('**/api/v2/cases?**', async (route) => {
+      caseListUrls.push(route.request().url());
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -209,6 +211,29 @@ test.describe('Cases', () => {
     await expect(page.locator('[data-testid="case-event-payload"]')).toContainText('premium-customer-884');
     await expect(casesPage.eventsList).toContainText('created');
     await expect(page.locator('text=evaluation.completed')).toBeVisible();
+
+    await page.locator('[data-testid="case-queue-me"]').click();
+    await page.locator('[data-testid="case-priority-min-filter"]').selectOption({ label: '2+' });
+    await page.locator('[data-testid="case-decision-state-filter"]').selectOption('current');
+    await page.locator('[data-testid="case-created-from-filter"]').fill('2026-07-05');
+    await page.locator('[data-testid="case-created-from-filter"]').dispatchEvent('change');
+    await page.locator('[data-testid="case-updated-to-filter"]').fill('2026-07-06');
+    await page.locator('[data-testid="case-updated-to-filter"]').dispatchEvent('change');
+    await expect.poll(() => {
+      const lastUrl = caseListUrls.at(-1);
+      if (!lastUrl) {
+        return false;
+      }
+      const params = new URL(lastUrl).searchParams;
+      return (
+        params.get('assigned_to') === 'me' &&
+        params.get('status') === 'open' &&
+        params.get('priority_min') === '2' &&
+        params.get('decision_state') === 'current' &&
+        params.get('created_from') === '2026-07-05' &&
+        params.get('updated_to') === '2026-07-06'
+      );
+    }).toBeTruthy();
 
     await page.locator('[data-testid="case-claim-button"]').click();
     await expect(page.locator('text=Case assignment updated.')).toBeVisible();

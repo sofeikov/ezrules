@@ -77,7 +77,12 @@ export interface CaseFilters {
   outcome?: string;
   priorityMin?: number | null;
   decisionState?: string;
+  transactionId?: string;
   query?: string;
+  createdFrom?: string;
+  createdTo?: string;
+  updatedFrom?: string;
+  updatedTo?: string;
 }
 
 export interface CaseAssignee {
@@ -122,8 +127,23 @@ export class CaseService {
     if (filters.decisionState) {
       params = params.set('decision_state', filters.decisionState);
     }
+    if (filters.transactionId) {
+      params = params.set('transaction_id', filters.transactionId);
+    }
     if (filters.query) {
       params = params.set('q', filters.query);
+    }
+    if (filters.createdFrom) {
+      params = params.set('created_from', filters.createdFrom);
+    }
+    if (filters.createdTo) {
+      params = params.set('created_to', filters.createdTo);
+    }
+    if (filters.updatedFrom) {
+      params = params.set('updated_from', filters.updatedFrom);
+    }
+    if (filters.updatedTo) {
+      params = params.set('updated_to', filters.updatedTo);
     }
     return this.http.get<{ cases: CaseItem[]; total: number }>(`${this.apiUrl}/cases`, { params });
   }

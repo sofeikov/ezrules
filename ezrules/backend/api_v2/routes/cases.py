@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 from typing import Any, cast
 from urllib.parse import urlparse
 
@@ -71,6 +71,31 @@ def _validate_subscription_config(*, destination_type: str, config: dict[str, An
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Webhook subscriptions require config.url to be an HTTPS URL.",
         )
+
+
+def _parse_case_filter_datetime(raw_value: str | None, *, param_name: str, end_of_day: bool = False) -> datetime | None:
+    if not raw_value:
+        return None
+
+    value = raw_value.strip()
+    if not value:
+        return None
+
+    try:
+        if len(value) == 10:
+            parsed_date = date.fromisoformat(value)
+            boundary = time.max if end_of_day else time.min
+            return datetime.combine(parsed_date, boundary, tzinfo=UTC)
+        parsed_datetime = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{param_name} must be an ISO date or datetime.",
+        ) from exc
+
+    if parsed_datetime.tzinfo is None:
+        return parsed_datetime.replace(tzinfo=UTC)
+    return parsed_datetime
 
 
 def _case_to_response(case: Case, user_emails_by_id: dict[int, str] | None = None) -> CaseResponse:
@@ -286,7 +311,12 @@ def list_cases(
     assigned_to: str | None = None,
     priority_min: int | None = Query(default=None, ge=0),
     decision_state: str | None = None,
+    transaction_id: str | None = None,
     q: str | None = None,
+    created_from: str | None = None,
+    created_to: str | None = None,
+    updated_from: str | None = None,
+    updated_to: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_active_user),
@@ -316,8 +346,22 @@ def list_cases(
         query = query.filter(Case.priority >= priority_min)
     if decision_state:
         query = query.filter(Case.decision_state == decision_state.strip())
+    if transaction_id:
+        query = query.filter(Case.transaction_id == transaction_id.strip())
     if q:
         query = query.filter(Case.transaction_id.ilike(f"%{q.strip()}%"))
+    created_from_value = _parse_case_filter_datetime(created_from, param_name="created_from")
+    created_to_value = _parse_case_filter_datetime(created_to, param_name="created_to", end_of_day=True)
+    updated_from_value = _parse_case_filter_datetime(updated_from, param_name="updated_from")
+    updated_to_value = _parse_case_filter_datetime(updated_to, param_name="updated_to", end_of_day=True)
+    if created_from_value is not None:
+        query = query.filter(Case.created_at >= created_from_value)
+    if created_to_value is not None:
+        query = query.filter(Case.created_at <= created_to_value)
+    if updated_from_value is not None:
+        query = query.filter(Case.updated_at >= updated_from_value)
+    if updated_to_value is not None:
+        query = query.filter(Case.updated_at <= updated_to_value)
     total = int(query.count())
     cases = query.order_by(Case.updated_at.desc(), Case.case_id.desc()).offset(offset).limit(limit).all()
     user_emails = _user_emails_for_cases(db, cases=cases, current_org_id=current_org_id)

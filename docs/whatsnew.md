@@ -1,13 +1,17 @@
 # What's New
 
-## v1.27.0
+## v1.28.0
 
 * **Case management inbox**: Non-neutral live evaluation decisions now create durable case work items linked to the canonical evaluation ledger, with a new **Cases** page for reviewing and resolving cases.
 * **Case investigation details**: Case detail now includes the transaction id, event payload, evaluation counters, and triggered-rule context so analysts can understand why a case exists before resolving it.
-* **Case workflow controls**: Analysts can now claim, assign, filter, note, and resolve cases with structured disposition/action fields that are published in case integration events.
+* **Case workflow controls**: Analysts can now claim, assign, filter queue views by ownership/search/date/priority/state, note, and resolve cases with structured disposition/action fields that are published in case integration events.
+* **Case downstream action contract**: Case lifecycle events now expose top-level consumer fields and a `downstream_action` object so external systems can react idempotently to analyst resolution intent without changing the live evaluation response.
 * **Rescoring-aware case lifecycle**: Rescored transactions update the active case with old/new decision references, while resolved cases remain auditable and later case-worthy scores create a new linked case.
 * **Generic integration events**: Evaluation completion and case lifecycle actions now write versioned integration events with a transactional outbox so external systems can poll or receive pushed delivery without changing the `/evaluate` response contract.
 * **Case and integration permissions**: Upgrades now seed the new case/integration permissions for existing admin roles, and webhook subscriptions validate HTTPS destinations before events enter the outbox.
+
+## v1.27.0
+
 * **Deterministic agent tools API**: Added `/api/v2/agent-tools` endpoints that let future fraud-management agents request bounded, permission-gated evidence instead of broad database access.
 * **Rule blast-radius analysis**: Added `POST /api/v2/agent-tools/rule-blast-radius` to compare proposed rule logic against recent served decisions, including outcome deltas, grouped single-rule outcome flip rates, representative flipped events, and replay warnings.
 * **Rule counterexample mining**: Added `POST /api/v2/agent-tools/rule-counterexamples` to return labeled false-positive, missed-positive, candidate-fix, and candidate-regression examples for rule review workflows.

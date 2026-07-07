@@ -1,4 +1,5 @@
 import datetime
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -305,11 +306,132 @@ def test_cases_and_integration_events_api(session):
         assert "evaluation.completed" in event_types
         assert "case.resolved" in event_types
         resolved_event = next(event for event in integration_events if event["event_type"] == "case.resolved")
+        assert resolved_event["external_event_id"].startswith("evt_case_event_")
+        assert resolved_event["payload"]["case_id"] == int(case.case_id)
+        assert resolved_event["payload"]["transaction_id"] == "txn-case-1"
+        assert resolved_event["payload"]["case_event_type"] == "resolved"
+        assert resolved_event["payload"]["current_event_version_id"] == int(decision.ev_id)
+        assert resolved_event["payload"]["current_evaluation_decision_id"] == int(decision.ed_id)
+        assert resolved_event["payload"]["resolved_by_user_id"] == int(user.id)
+        assert resolved_event["payload"]["resolution_disposition"] == "false_positive"
+        assert resolved_event["payload"]["resolution_action"] == "release_transaction"
+        assert resolved_event["payload"]["downstream_action"] == {
+            "requested": True,
+            "action": "release_transaction",
+            "status": "requested",
+            "source": "analyst_resolution",
+            "executed_by_ezrules": False,
+        }
         assert resolved_event["payload"]["case"]["resolution_disposition"] == "false_positive"
         assert resolved_event["payload"]["case"]["resolution_action"] == "release_transaction"
         assert resolved_event["payload"]["case_event"]["details"]["resolution_disposition"] == "false_positive"
 
     assert session.query(Case).filter(Case.resolved_by_user_id == int(user.id)).count() == 1
+
+
+def test_case_resolved_event_enqueues_downstream_delivery_contract(session):
+    _org, _user, token = _seed_case_org(session)
+    subscription = IntegrationSubscription(
+        o_id=1,
+        name="Resolved case webhook",
+        destination_type="webhook",
+        config={"url": "https://example.com/webhook"},
+        event_types=["case.resolved"],
+        enabled=True,
+    )
+    session.add(subscription)
+    decision = _add_decision(session, transaction_id="txn-downstream-action", outcome="HOLD")
+    process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
+    session.commit()
+    case = session.query(Case).one()
+
+    with TestClient(app) as client:
+        response = client.post(
+            f"/api/v2/cases/{case.case_id}/resolve",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "resolution_disposition": "confirmed_fraud",
+                "resolution_action": "cancel_transaction",
+                "resolution_note": "Fraud operations confirmed account takeover.",
+                "expected_current_ed_id": int(decision.ed_id),
+            },
+        )
+
+    assert response.status_code == 200
+    resolved_event = session.query(IntegrationEvent).filter(IntegrationEvent.event_type == "case.resolved").one()
+    delivery = session.query(IntegrationOutbox).one()
+    payload = resolved_event.payload
+    assert delivery.integration_event_id == resolved_event.integration_event_id
+    assert delivery.subscription_id == subscription.subscription_id
+    assert delivery.status == "pending"
+    assert resolved_event.external_event_id == f"evt_case_event_{resolved_event.source_id}"
+    assert payload["transaction_id"] == "txn-downstream-action"
+    assert payload["status"] == CASE_STATUS_RESOLVED
+    assert payload["resolved_outcome"] == "HOLD"
+    assert payload["resolution_disposition"] == "confirmed_fraud"
+    assert payload["resolution_action"] == "cancel_transaction"
+    assert payload["downstream_action"] == {
+        "requested": True,
+        "action": "cancel_transaction",
+        "status": "requested",
+        "source": "analyst_resolution",
+        "executed_by_ezrules": False,
+    }
+
+
+def test_case_resolved_webhook_delivery_contains_downstream_contract(session, monkeypatch):
+    _org, _user, token = _seed_case_org(session)
+    subscription = IntegrationSubscription(
+        o_id=1,
+        name="Resolved case webhook",
+        destination_type="webhook",
+        config={"url": "https://example.com/webhook"},
+        event_types=["case.resolved"],
+        enabled=True,
+    )
+    session.add(subscription)
+    decision = _add_decision(session, transaction_id="txn-webhook-action", outcome="HOLD")
+    process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(decision.ed_id))
+    session.commit()
+    case = session.query(Case).one()
+
+    with TestClient(app) as client:
+        response = client.post(
+            f"/api/v2/cases/{case.case_id}/resolve",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "resolution_disposition": "false_positive",
+                "resolution_action": "release_transaction",
+                "resolution_note": "Customer verified the transfer.",
+                "expected_current_ed_id": int(decision.ed_id),
+            },
+        )
+
+    assert response.status_code == 200
+    calls = []
+
+    def fake_post(url, *, data, headers, timeout):
+        calls.append({"url": url, "data": data, "headers": headers, "timeout": timeout})
+        return SimpleNamespace(status_code=204)
+
+    monkeypatch.setattr("ezrules.backend.integrations.requests.post", fake_post)
+
+    result = dispatch_pending_outbox(session)
+
+    assert result == {"delivered": 1, "failed": 0}
+    delivered_body = json.loads(calls[0]["data"])
+    event = session.query(IntegrationEvent).filter(IntegrationEvent.event_type == "case.resolved").one()
+    assert calls[0]["headers"]["X-Ezrules-Event-Id"] == event.external_event_id
+    assert delivered_body["event_id"] == event.external_event_id
+    assert delivered_body["event_type"] == "case.resolved"
+    assert delivered_body["payload"]["transaction_id"] == "txn-webhook-action"
+    assert delivered_body["payload"]["downstream_action"] == {
+        "requested": True,
+        "action": "release_transaction",
+        "status": "requested",
+        "source": "analyst_resolution",
+        "executed_by_ezrules": False,
+    }
 
 
 def test_case_assignment_api_records_timeline_events(session):
@@ -511,6 +633,53 @@ def test_cases_outcome_filter_is_case_insensitive(session):
     assert response.status_code == 200
     assert response.json()["total"] == 1
     assert response.json()["cases"][0]["resolved_outcome"] == "hold"
+
+
+def test_cases_support_phase_four_queue_search_filters(session):
+    _org, _user, token = _seed_case_org(session)
+    older_decision = _add_decision(session, transaction_id="txn-phase-four-old", outcome="HOLD")
+    newer_decision = _add_decision(session, transaction_id="txn-phase-four-new", outcome="CANCEL", rule_id=2)
+    process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(older_decision.ed_id))
+    process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(newer_decision.ed_id))
+    older_case = session.query(Case).filter(Case.transaction_id == "txn-phase-four-old").one()
+    newer_case = session.query(Case).filter(Case.transaction_id == "txn-phase-four-new").one()
+    older_case.created_at = datetime.datetime(2026, 7, 1, 9, 0, tzinfo=datetime.UTC)
+    older_case.updated_at = datetime.datetime(2026, 7, 2, 9, 0, tzinfo=datetime.UTC)
+    older_case.priority = 1
+    newer_case.created_at = datetime.datetime(2026, 7, 5, 9, 0, tzinfo=datetime.UTC)
+    newer_case.updated_at = datetime.datetime(2026, 7, 6, 9, 0, tzinfo=datetime.UTC)
+    newer_case.priority = 2
+    session.commit()
+
+    headers = {"Authorization": f"Bearer {token}"}
+    with TestClient(app) as client:
+        exact_response = client.get(
+            "/api/v2/cases?transaction_id=txn-phase-four-new",
+            headers=headers,
+        )
+        created_response = client.get(
+            "/api/v2/cases?created_from=2026-07-04&created_to=2026-07-05",
+            headers=headers,
+        )
+        updated_response = client.get(
+            "/api/v2/cases?updated_from=2026-07-06T00:00:00Z&updated_to=2026-07-06T23:59:59Z",
+            headers=headers,
+        )
+        priority_response = client.get(
+            "/api/v2/cases?q=phase-four&priority_min=2&decision_state=current",
+            headers=headers,
+        )
+        invalid_response = client.get("/api/v2/cases?created_from=not-a-date", headers=headers)
+
+    assert exact_response.status_code == 200
+    assert [item["transaction_id"] for item in exact_response.json()["cases"]] == ["txn-phase-four-new"]
+    assert created_response.status_code == 200
+    assert [item["transaction_id"] for item in created_response.json()["cases"]] == ["txn-phase-four-new"]
+    assert updated_response.status_code == 200
+    assert [item["transaction_id"] for item in updated_response.json()["cases"]] == ["txn-phase-four-new"]
+    assert priority_response.status_code == 200
+    assert [item["transaction_id"] for item in priority_response.json()["cases"]] == ["txn-phase-four-new"]
+    assert invalid_response.status_code == 422
 
 
 def test_integration_subscription_api_validates_webhook_url_and_strips_secret(session):

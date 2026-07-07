@@ -13,12 +13,12 @@ import { CaseAssignee, CaseDetail, CaseItem, CaseService, IntegrationEvent } fro
     <app-sidebar></app-sidebar>
     <main class="ml-64 min-h-screen bg-gray-50">
       <div class="px-8 py-6">
-        <div class="mb-6 flex items-center justify-between gap-4">
+        <div class="mb-4 flex items-center justify-between gap-4">
           <div>
             <h1 class="text-2xl font-bold text-gray-900">Cases</h1>
             <p class="mt-1 text-sm text-gray-600">Review non-neutral decisions and publish case outcomes.</p>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
+          <div class="flex items-center gap-2">
             <input
               data-testid="case-search"
               [(ngModel)]="searchQuery"
@@ -26,33 +26,122 @@ import { CaseAssignee, CaseDetail, CaseItem, CaseService, IntegrationEvent } fro
               placeholder="Search transaction"
               class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
             />
-            <select
-              data-testid="case-status-filter"
-              [(ngModel)]="statusFilter"
-              (change)="loadCases()"
-              class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">All statuses</option>
-              <option value="open">Open</option>
-              <option value="in_review">In review</option>
-              <option value="resolved">Resolved</option>
-            </select>
-            <select
-              data-testid="case-assignment-filter"
-              [(ngModel)]="assignedToFilter"
-              (change)="loadCases()"
-              class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">All assignments</option>
-              <option value="me">Assigned to me</option>
-              <option value="unassigned">Unassigned</option>
-            </select>
             <button
               type="button"
               (click)="loadCases()"
               class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700"
             >
               Apply
+            </button>
+          </div>
+        </div>
+
+        <div class="mb-4 flex flex-wrap items-center gap-2" role="tablist" aria-label="Case queues">
+          <button
+            *ngFor="let queue of queues"
+            type="button"
+            role="tab"
+            [attr.aria-selected]="queue.value === assignedToFilter"
+            [attr.data-testid]="'case-queue-' + queue.testId"
+            (click)="selectQueue(queue.value)"
+            class="rounded-md border px-3 py-2 text-sm font-medium"
+            [ngClass]="queue.value === assignedToFilter ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-300 bg-white text-gray-700'"
+          >
+            {{ queue.label }}
+          </button>
+        </div>
+
+        <div class="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-4 lg:grid-cols-4 xl:grid-cols-8">
+          <label class="block text-sm">
+            <span class="mb-1 block font-medium text-gray-700">Status</span>
+            <select
+              data-testid="case-status-filter"
+              [(ngModel)]="statusFilter"
+              (change)="loadCases()"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">All statuses</option>
+              <option value="open">Open</option>
+              <option value="in_review">In review</option>
+              <option value="resolved">Resolved</option>
+            </select>
+          </label>
+          <label class="block text-sm">
+            <span class="mb-1 block font-medium text-gray-700">Decision</span>
+            <select
+              data-testid="case-decision-state-filter"
+              [(ngModel)]="decisionStateFilter"
+              (change)="loadCases()"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">All states</option>
+              <option value="current">Current</option>
+              <option value="rescored_changed">Rescored changed</option>
+              <option value="rescored_same">Rescored same</option>
+            </select>
+          </label>
+          <label class="block text-sm">
+            <span class="mb-1 block font-medium text-gray-700">Min priority</span>
+            <select
+              data-testid="case-priority-min-filter"
+              [(ngModel)]="priorityMinFilter"
+              (change)="loadCases()"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            >
+              <option [ngValue]="null">Any</option>
+              <option [ngValue]="1">1+</option>
+              <option [ngValue]="2">2+</option>
+              <option [ngValue]="3">3+</option>
+            </select>
+          </label>
+          <label class="block text-sm">
+            <span class="mb-1 block font-medium text-gray-700">Created from</span>
+            <input
+              data-testid="case-created-from-filter"
+              type="date"
+              [(ngModel)]="createdFromFilter"
+              (change)="loadCases()"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+          <label class="block text-sm">
+            <span class="mb-1 block font-medium text-gray-700">Created to</span>
+            <input
+              data-testid="case-created-to-filter"
+              type="date"
+              [(ngModel)]="createdToFilter"
+              (change)="loadCases()"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+          <label class="block text-sm">
+            <span class="mb-1 block font-medium text-gray-700">Updated from</span>
+            <input
+              data-testid="case-updated-from-filter"
+              type="date"
+              [(ngModel)]="updatedFromFilter"
+              (change)="loadCases()"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+          <label class="block text-sm">
+            <span class="mb-1 block font-medium text-gray-700">Updated to</span>
+            <input
+              data-testid="case-updated-to-filter"
+              type="date"
+              [(ngModel)]="updatedToFilter"
+              (change)="loadCases()"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+          <div class="flex items-end">
+            <button
+              type="button"
+              data-testid="case-clear-filters"
+              (click)="clearFilters()"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700"
+            >
+              Clear
             </button>
           </div>
         </div>
@@ -76,7 +165,8 @@ import { CaseAssignee, CaseDetail, CaseItem, CaseService, IntegrationEvent } fro
             <table *ngIf="!loading && cases.length > 0" class="min-w-full divide-y divide-gray-200" data-testid="cases-table">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Transaction</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Case #</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Transaction ID</th>
                   <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Outcome</th>
                   <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Assignee</th>
                   <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Priority</th>
@@ -92,6 +182,7 @@ import { CaseAssignee, CaseDetail, CaseItem, CaseService, IntegrationEvent } fro
                   [class.bg-blue-50]="selected?.id === item.id"
                   data-testid="case-row"
                 >
+                  <td class="px-4 py-3 text-sm font-medium text-gray-700">#{{ item.id }}</td>
                   <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ item.transaction_id }}</td>
                   <td class="px-4 py-3 text-sm text-gray-700">{{ item.resolved_outcome || 'None' }}</td>
                   <td class="px-4 py-3 text-sm text-gray-700">{{ item.assigned_to_email || 'Unassigned' }}</td>
@@ -121,7 +212,7 @@ import { CaseAssignee, CaseDetail, CaseItem, CaseService, IntegrationEvent } fro
                     <dd class="font-medium text-gray-900">{{ selected.id }}</dd>
                   </div>
                   <div>
-                    <dt class="text-gray-500">Transaction</dt>
+                    <dt class="text-gray-500">Transaction ID</dt>
                     <dd class="break-all font-medium text-gray-900" data-testid="case-detail-transaction">
                       {{ selected.transaction_id }}
                     </dd>
@@ -161,7 +252,7 @@ import { CaseAssignee, CaseDetail, CaseItem, CaseService, IntegrationEvent } fro
                       [disabled]="saving || !currentUser || selected.assigned_to_user_id === currentUser.id"
                       class="rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-300"
                     >
-                      Claim
+                      {{ currentUser && selected.assigned_to_user_id === currentUser.id ? 'Assigned to you' : 'Claim' }}
                     </button>
                   </div>
                   <div class="flex gap-2">
@@ -382,8 +473,19 @@ export class CasesComponent implements OnInit {
   assignees: CaseAssignee[] = [];
   integrationEvents: IntegrationEvent[] = [];
   currentUser: AuthUser | null = null;
+  queues = [
+    { label: 'All cases', value: '', testId: 'all' },
+    { label: 'My queue', value: 'me', testId: 'me' },
+    { label: 'Unassigned', value: 'unassigned', testId: 'unassigned' },
+  ];
   statusFilter = '';
   assignedToFilter = '';
+  decisionStateFilter = '';
+  priorityMinFilter: number | null = null;
+  createdFromFilter = '';
+  createdToFilter = '';
+  updatedFromFilter = '';
+  updatedToFilter = '';
   searchQuery = '';
   selectedAssigneeId: number | null = null;
   noteText = '';
@@ -425,7 +527,13 @@ export class CasesComponent implements OnInit {
     this.caseService.getCases({
       status: this.statusFilter || undefined,
       assignedTo: this.assignedToFilter || undefined,
+      priorityMin: this.priorityMinFilter,
+      decisionState: this.decisionStateFilter || undefined,
       query: this.searchQuery.trim() || undefined,
+      createdFrom: this.createdFromFilter || undefined,
+      createdTo: this.createdToFilter || undefined,
+      updatedFrom: this.updatedFromFilter || undefined,
+      updatedTo: this.updatedToFilter || undefined,
     }).subscribe({
       next: (response) => {
         this.cases = response.cases;
@@ -439,6 +547,27 @@ export class CasesComponent implements OnInit {
         this.loading = false;
       }
     });
+  }
+
+  selectQueue(queueValue: string): void {
+    this.assignedToFilter = queueValue;
+    if (!this.statusFilter && queueValue !== '') {
+      this.statusFilter = 'open';
+    }
+    this.loadCases();
+  }
+
+  clearFilters(): void {
+    this.statusFilter = '';
+    this.assignedToFilter = '';
+    this.decisionStateFilter = '';
+    this.priorityMinFilter = null;
+    this.createdFromFilter = '';
+    this.createdToFilter = '';
+    this.updatedFromFilter = '';
+    this.updatedToFilter = '';
+    this.searchQuery = '';
+    this.loadCases();
   }
 
   selectCase(item: CaseItem): void {

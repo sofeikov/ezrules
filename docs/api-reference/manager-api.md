@@ -271,7 +271,7 @@ Alert detection source of truth:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/cases` | Bearer + `VIEW_CASES` | List case-management work items for non-neutral served decisions; supports filters such as `status`, `assigned_to`, `outcome`, `priority_min`, `decision_state`, and `q` |
+| `GET` | `/api/v2/cases` | Bearer + `VIEW_CASES` | List case-management work items for non-neutral served decisions; supports queue/search filters such as `status`, `assigned_to`, `outcome`, `priority_min`, `decision_state`, `transaction_id`, `q`, `created_from`, `created_to`, `updated_from`, and `updated_to` |
 | `GET` | `/api/v2/cases/assignees` | Bearer + `VIEW_CASES` | List active same-org users available for case assignment |
 | `GET` | `/api/v2/cases/{case_id}` | Bearer + `VIEW_CASES` | Read one case, its immutable case-event timeline, and the current evaluation context |
 | `PATCH` | `/api/v2/cases/{case_id}` | Bearer + `MANAGE_CASES` | Assign or unassign a case |
@@ -284,8 +284,13 @@ Alert detection source of truth:
 
 Case lifecycle notes:
 - Case creation is driven by canonical served `evaluation_decisions`: missing outcomes and the configured `neutral_outcome` do not create cases.
+- Case queues are assignment filters over the case list: `assigned_to=me` for the caller's queue, `assigned_to=unassigned` for unclaimed work, or `assigned_to=<user_id>` for a specific analyst.
+- Case date filters accept ISO datetimes or plain `YYYY-MM-DD` dates; date-only upper bounds include the full day.
 - Case detail includes the current transaction payload, event/evaluation identifiers, resolved outcome counters, and triggered-rule metadata when available.
 - Assignment changes emit `case.assigned`; analyst notes emit `case.note`; structured resolutions emit `case.resolved` with disposition and intended action.
+- Case lifecycle integration payloads include top-level consumer fields (`case_id`, `transaction_id`, `case_event_type`, actor/source IDs, current evaluation/event IDs, status, decision state, resolution fields, and `downstream_action`) plus nested `case` and `case_event` objects for full context.
+- `downstream_action` records analyst intent only. For example, `resolution_action=release_transaction` means an external consumer should decide whether and how to release the transaction in its own system; ezrules does not execute the release/cancel/block action itself.
+- Consumers should use the integration event `external_event_id` as the idempotency key. Webhook deliveries also send this value as `event_id` in the body and `X-Ezrules-Event-Id` in headers.
 - A rescore of an active case updates the same case with the new `current_evaluation_decision_id` and records a `case.rescored` integration event.
 - A rescore to neutral/no outcome keeps the case open with a non-current decision state so an analyst can close it intentionally.
 - Resolve requests can include `expected_current_ed_id`; the API returns `409` if the case was rescored after the UI loaded.
