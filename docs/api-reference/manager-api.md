@@ -286,6 +286,7 @@ Case lifecycle notes:
 - Case creation is driven by canonical served `evaluation_decisions`: missing outcomes and the configured `neutral_outcome` do not create cases.
 - Case queues are assignment filters over the case list: `assigned_to=me` for the caller's queue, `assigned_to=unassigned` for unclaimed work, or `assigned_to=<user_id>` for a specific analyst.
 - Case date filters accept ISO datetimes or plain `YYYY-MM-DD` dates; date-only upper bounds include the full day.
+- `decision_state` filters exact stored case states, currently `current`, `rescored_neutral`, and `rescored_non_caseable`.
 - Case detail includes the current transaction payload, event/evaluation identifiers, resolved outcome counters, and triggered-rule metadata when available.
 - Assignment changes emit `case.assigned`; analyst notes emit `case.note`; structured resolutions emit `case.resolved` with disposition and intended action.
 - Case lifecycle integration payloads include top-level consumer fields (`case_id`, `transaction_id`, `case_event_type`, actor/source IDs, current evaluation/event IDs, status, decision state, resolution fields, and `downstream_action`) plus nested `case` and `case_event` objects for full context.

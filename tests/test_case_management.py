@@ -205,7 +205,7 @@ def test_rescore_updates_active_case_instead_of_creating_duplicate(session):
 
 
 def test_rescore_to_neutral_keeps_case_open_with_non_caseable_state(session):
-    _seed_case_org(session)
+    _org, _user, token = _seed_case_org(session)
     first = _add_decision(session, outcome="HOLD", version=1, is_current=True)
     process_evaluation_for_cases(session, o_id=1, evaluation_decision_id=int(first.ed_id))
     first.is_current = False
@@ -219,6 +219,15 @@ def test_rescore_to_neutral_keeps_case_open_with_non_caseable_state(session):
     assert case.current_ed_id == second.ed_id
     assert case.status == CASE_STATUS_OPEN
     assert case.decision_state == CASE_DECISION_RESCORED_NEUTRAL
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/v2/cases?decision_state=rescored_neutral",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["cases"]] == [int(case.case_id)]
 
 
 def test_resolve_requires_current_decision_when_expected_id_is_supplied(session):

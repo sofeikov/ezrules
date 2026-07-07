@@ -214,7 +214,7 @@ test.describe('Cases', () => {
 
     await page.locator('[data-testid="case-queue-me"]').click();
     await page.locator('[data-testid="case-priority-min-filter"]').selectOption({ label: '2+' });
-    await page.locator('[data-testid="case-decision-state-filter"]').selectOption('current');
+    await page.locator('[data-testid="case-decision-state-filter"]').selectOption('rescored_neutral');
     await page.locator('[data-testid="case-created-from-filter"]').fill('2026-07-05');
     await page.locator('[data-testid="case-created-from-filter"]').dispatchEvent('change');
     await page.locator('[data-testid="case-updated-to-filter"]').fill('2026-07-06');
@@ -229,7 +229,7 @@ test.describe('Cases', () => {
         params.get('assigned_to') === 'me' &&
         params.get('status') === 'open' &&
         params.get('priority_min') === '2' &&
-        params.get('decision_state') === 'current' &&
+        params.get('decision_state') === 'rescored_neutral' &&
         params.get('created_from') === '2026-07-05' &&
         params.get('updated_to') === '2026-07-06'
       );

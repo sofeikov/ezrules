@@ -76,8 +76,8 @@ import { CaseAssignee, CaseDetail, CaseItem, CaseService, IntegrationEvent } fro
             >
               <option value="">All states</option>
               <option value="current">Current</option>
-              <option value="rescored_changed">Rescored changed</option>
-              <option value="rescored_same">Rescored same</option>
+              <option value="rescored_neutral">Rescored neutral</option>
+              <option value="rescored_non_caseable">Rescored no outcome</option>
             </select>
           </label>
           <label class="block text-sm">
