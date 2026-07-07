@@ -1,5 +1,9 @@
 # What's New
 
+## v1.28.3
+
+* **Rule-quality report generation permission**: Added a dedicated `generate_rule_quality_reports` permission so readonly users can view existing rule-quality snapshots without being able to enqueue expensive refreshes or trigger synchronous report computation.
+
 ## v1.28.2
 
 * **Protected notification channel configs**: Notification channel configuration is now stored encrypted, validated by channel type, and redacted before dispatch errors or display-safe views can expose secret fields.

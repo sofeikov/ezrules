@@ -32,6 +32,7 @@ class TestPermissionAction:
         assert "create_rule" in action_names
         assert "pause_rules" in action_names
         assert "promote_rules" in action_names
+        assert "generate_rule_quality_reports" in action_names
         assert "view_rules" in action_names
         assert "access_audit_trail" in action_names
 
@@ -64,6 +65,7 @@ class TestRoleType:
             PermissionAction.CREATE_RULE,
             PermissionAction.MODIFY_RULE,
             PermissionAction.REORDER_RULES,
+            PermissionAction.GENERATE_RULE_QUALITY_REPORTS,
             PermissionAction.VIEW_RULES,
             PermissionAction.VIEW_OUTCOMES,
             PermissionAction.VIEW_LISTS,

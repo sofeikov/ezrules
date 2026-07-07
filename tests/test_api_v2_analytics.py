@@ -80,6 +80,7 @@ def analytics_test_client(session):
     PermissionManager.grant_permission(analytics_role.id, PermissionAction.VIEW_RULES)
     PermissionManager.grant_permission(analytics_role.id, PermissionAction.VIEW_OUTCOMES)
     PermissionManager.grant_permission(analytics_role.id, PermissionAction.VIEW_LABELS)
+    PermissionManager.grant_permission(analytics_role.id, PermissionAction.GENERATE_RULE_QUALITY_REPORTS)
 
     # Create a token for the user
     roles = [role.name for role in analytics_user.roles]
@@ -1114,6 +1115,146 @@ class TestRuleQualityReports:
         fetched = get_response.json()
         assert fetched["status"] == "SUCCESS"
         assert fetched["result"] is not None
+
+    def test_rule_quality_report_readonly_can_fetch_cached_but_not_generate(
+        self,
+        analytics_test_client,
+        sample_rule_quality_data,
+        monkeypatch,
+    ):
+        """Readonly analytics users can view cached snapshots but cannot enqueue expensive work."""
+        token = analytics_test_client.test_data["token"]
+        session = analytics_test_client.test_data["session"]
+        delay_calls = {"count": 0}
+
+        def fake_delay(report_id: int):
+            delay_calls["count"] += 1
+            generate_rule_quality_report(report_id)
+
+            class FakeResult:
+                id = f"rule-quality-task-readonly-{delay_calls['count']}"
+
+            return FakeResult()
+
+        monkeypatch.setattr(analytics_routes.generate_rule_quality_report, "delay", fake_delay)
+
+        create_response = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30, "force_refresh": True},
+        )
+        assert create_response.status_code == 200
+        report_id = create_response.json()["report_id"]
+
+        readonly_role = Role(name="rule_quality_readonly_reports", description="Can view rule quality reports")
+        readonly_user = User(
+            email="readonly_rule_quality_reports@example.com",
+            password=bcrypt.hashpw("readonlypass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
+            active=True,
+            fs_uniquifier="readonly_rule_quality_reports@example.com",
+            o_id=1,
+        )
+        readonly_user.roles.append(readonly_role)
+        session.add_all([readonly_role, readonly_user])
+        session.commit()
+        PermissionManager.grant_permission(readonly_role.id, PermissionAction.VIEW_RULES)
+        PermissionManager.grant_permission(readonly_role.id, PermissionAction.VIEW_LABELS)
+
+        readonly_token = create_access_token(
+            user_id=int(readonly_user.id),
+            email=str(readonly_user.email),
+            roles=[readonly_role.name],
+            org_id=int(readonly_user.o_id),
+        )
+
+        cached_response = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {readonly_token}"},
+            json={"min_support": 1, "lookback_days": 30},
+        )
+        direct_get_response = analytics_test_client.get(
+            f"/api/v2/analytics/rule-quality/reports/{report_id}",
+            headers={"Authorization": f"Bearer {readonly_token}"},
+        )
+        refresh_response = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {readonly_token}"},
+            json={"min_support": 1, "lookback_days": 30, "force_refresh": True},
+        )
+        sync_response = analytics_test_client.get(
+            "/api/v2/analytics/rule-quality",
+            headers={"Authorization": f"Bearer {readonly_token}"},
+        )
+
+        assert cached_response.status_code == 200
+        assert cached_response.json()["report_id"] == report_id
+        assert cached_response.json()["cached"] is True
+        assert direct_get_response.status_code == 200
+        assert direct_get_response.json()["report_id"] == report_id
+        assert refresh_response.status_code == 403
+        assert sync_response.status_code == 403
+        assert delay_calls["count"] == 1
+
+    def test_rule_quality_report_readonly_poll_does_not_run_sync_fallback(
+        self,
+        analytics_test_client,
+        sample_rule_quality_data,
+        monkeypatch,
+    ):
+        token = analytics_test_client.test_data["token"]
+        session = analytics_test_client.test_data["session"]
+        monkeypatch.setattr(app_settings, "RULE_QUALITY_REPORT_SYNC_FALLBACK", True)
+        delay_calls = {"count": 0}
+
+        def fake_delay(_report_id: int):
+            delay_calls["count"] += 1
+
+            class FakeResult:
+                id = f"rule-quality-task-readonly-pending-{delay_calls['count']}"
+
+            return FakeResult()
+
+        monkeypatch.setattr(analytics_routes.generate_rule_quality_report, "delay", fake_delay)
+
+        create_response = analytics_test_client.post(
+            "/api/v2/analytics/rule-quality/reports",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"min_support": 1, "lookback_days": 30, "force_refresh": True},
+        )
+        assert create_response.status_code == 200
+        assert create_response.json()["status"] == "PENDING"
+        report_id = create_response.json()["report_id"]
+
+        readonly_role = Role(name="rule_quality_readonly_pending", description="Can view pending rule quality reports")
+        readonly_user = User(
+            email="readonly_rule_quality_pending@example.com",
+            password=bcrypt.hashpw("readonlypass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
+            active=True,
+            fs_uniquifier="readonly_rule_quality_pending@example.com",
+            o_id=1,
+        )
+        readonly_user.roles.append(readonly_role)
+        session.add_all([readonly_role, readonly_user])
+        session.commit()
+        PermissionManager.grant_permission(readonly_role.id, PermissionAction.VIEW_RULES)
+        PermissionManager.grant_permission(readonly_role.id, PermissionAction.VIEW_LABELS)
+
+        readonly_token = create_access_token(
+            user_id=int(readonly_user.id),
+            email=str(readonly_user.email),
+            roles=[readonly_role.name],
+            org_id=int(readonly_user.o_id),
+        )
+
+        get_response = analytics_test_client.get(
+            f"/api/v2/analytics/rule-quality/reports/{report_id}",
+            headers={"Authorization": f"Bearer {readonly_token}"},
+        )
+
+        assert get_response.status_code == 200
+        assert get_response.json()["status"] == "PENDING"
+        assert get_response.json()["result"] is None
+        assert delay_calls["count"] == 1
 
     def test_rule_quality_report_not_found(self, analytics_test_client):
         """Unknown report ID should return 404."""

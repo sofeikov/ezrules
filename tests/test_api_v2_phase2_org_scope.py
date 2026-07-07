@@ -546,7 +546,11 @@ def test_analytics_rule_quality_and_reports_are_org_scoped(session, monkeypatch)
         session,
         org_id=int(org.o_id),
         email=_unique_email("phase2-analytics-user"),
-        permissions=[PermissionAction.VIEW_RULES, PermissionAction.VIEW_LABELS],
+        permissions=[
+            PermissionAction.VIEW_RULES,
+            PermissionAction.VIEW_LABELS,
+            PermissionAction.GENERATE_RULE_QUALITY_REPORTS,
+        ],
     )
     other_user = _create_user(
         session,

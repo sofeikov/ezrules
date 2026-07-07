@@ -85,6 +85,7 @@ def _manager_token(session, *, email: str = "journey-manager@example.com") -> st
             PermissionAction.PROMOTE_RULES,
             PermissionAction.PAUSE_RULES,
             PermissionAction.DELETE_RULE,
+            PermissionAction.GENERATE_RULE_QUALITY_REPORTS,
             PermissionAction.SUBMIT_TEST_EVENTS,
             PermissionAction.VIEW_LISTS,
             PermissionAction.CREATE_LIST,

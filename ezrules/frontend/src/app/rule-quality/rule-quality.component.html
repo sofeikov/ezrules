@@ -12,8 +12,11 @@
         {{ error }}
       </div>
 
-      <div *ngIf="noSnapshotAvailable" class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-6">
+      <div *ngIf="noSnapshotAvailable && canGenerateReports" class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-6">
         No snapshot exists for the selected filters. Click <strong>Refresh Report</strong> to generate one.
+      </div>
+      <div *ngIf="noSnapshotAvailable && !canGenerateReports" class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-6">
+        No snapshot exists for the selected filters.
       </div>
 
       <div class="bg-white rounded-lg shadow border border-gray-200 p-6 mb-6">
@@ -49,6 +52,7 @@
 
         <div class="flex flex-wrap items-center gap-3 mt-4">
           <button
+            *ngIf="canGenerateReports"
             id="rule-quality-refreshReport"
             type="button"
             class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded-md hover:bg-blue-700"

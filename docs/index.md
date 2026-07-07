@@ -41,7 +41,7 @@ ezrules provides building blocks to define rule-based decisions, evaluate live e
 
 - **Flexible Rule Engine** - Write business rules in a Python-like language with expressive syntax for transaction logic
 - **Web Management Interface** - Create and manage rules through an intuitive web UI
-- **Role-Based Access Control** - Granular permissions with 32 distinct actions that can be assigned per role
+- **Role-Based Access Control** - Granular permissions with 46 distinct actions that can be assigned per role
 - **Transaction Labeling** - Label events through REST API flows and analyze label trends in the UI
 - **Analytics Dashboard** - Monitor transaction volume and outcome trends with configurable time ranges
 - **Outcome Spike Alerts** - Notify operators in-app when configured outcomes exceed rolling thresholds

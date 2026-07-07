@@ -136,8 +136,8 @@ Healthy signal:
 - `GET /api/v2/analytics/rule-activity?aggregation=30d&limit=5`
 - `GET /api/v2/analytics/labels-summary`
 - `GET /api/v2/analytics/labels-distribution?aggregation=30d`
-- `GET /api/v2/analytics/rule-quality?min_support=5&lookback_days=30`
-- `POST /api/v2/analytics/rule-quality/reports` then `GET /api/v2/analytics/rule-quality/reports/{report_id}`
+- `GET /api/v2/analytics/rule-quality?min_support=5&lookback_days=30` (`GENERATE_RULE_QUALITY_REPORTS` required)
+- `POST /api/v2/analytics/rule-quality/reports` then `GET /api/v2/analytics/rule-quality/reports/{report_id}` (`force_refresh=true` requires `GENERATE_RULE_QUALITY_REPORTS`; cached report reads require only rule and label view access)
 - `GET /api/v2/alerts/rules`
 - `GET /api/v2/alerts/incidents`
 - `GET /api/v2/notifications/unread-count`
