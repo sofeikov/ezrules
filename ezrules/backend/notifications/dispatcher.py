@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from ezrules.core.notification_channel_config import redact_notification_channel_error
 from ezrules.models.backend_core import (
     InAppNotification,
     NotificationAttempt,
@@ -153,7 +154,10 @@ def dispatch_notification(
             result = adapter.send(db, channel, message)
         except Exception as exc:
             logger.exception("Notification channel %s failed for incident %s", channel.nc_id, incident_id)
-            result = DeliveryResult(status="failure", error=str(exc))
+            result = DeliveryResult(
+                status="failure",
+                error=redact_notification_channel_error(str(channel.channel_type), channel.config, str(exc)),
+            )
 
         db.add(
             NotificationAttempt(
