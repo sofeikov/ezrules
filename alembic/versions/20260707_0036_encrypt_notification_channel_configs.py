@@ -13,8 +13,8 @@ import sqlalchemy as sa
 
 from alembic import op
 from ezrules.core.notification_channel_config import (
-    decrypt_notification_channel_config,
-    encrypt_notification_channel_config,
+    decrypt_notification_channel_config_unvalidated,
+    encrypt_notification_channel_config_unvalidated,
 )
 
 revision: str = "20260707_0036"
@@ -29,8 +29,7 @@ def upgrade() -> None:
     connection = op.get_bind()
     rows = connection.execute(sa.text("SELECT nc_id, channel_type, config FROM notification_channels")).mappings()
     for row in rows:
-        encrypted_config = encrypt_notification_channel_config(
-            str(row["channel_type"]),
+        encrypted_config = encrypt_notification_channel_config_unvalidated(
             _coerce_json_config(row["config"]),
         )
         connection.execute(
@@ -53,20 +52,21 @@ def downgrade() -> None:
         sa.text("SELECT nc_id, channel_type, config_encrypted FROM notification_channels")
     ).mappings()
     for row in rows:
-        config = decrypt_notification_channel_config(str(row["channel_type"]), row["config_encrypted"])
+        config = decrypt_notification_channel_config_unvalidated(row["config_encrypted"])
         connection.execute(update_config, {"config": config, "nc_id": row["nc_id"]})
 
     op.alter_column("notification_channels", "config", nullable=False)
     op.drop_column("notification_channels", "config_encrypted")
 
 
-def _coerce_json_config(raw_config: Any) -> dict[str, Any]:
+def _coerce_json_config(raw_config: Any) -> Any:
     if raw_config is None:
         return {}
-    if isinstance(raw_config, dict):
+    if isinstance(raw_config, dict | list | int | float | bool):
         return raw_config
     if isinstance(raw_config, str):
-        decoded = json.loads(raw_config)
-        if isinstance(decoded, dict):
-            return decoded
-    raise ValueError("notification_channels.config must contain a JSON object")
+        try:
+            return json.loads(raw_config)
+        except json.JSONDecodeError:
+            return raw_config
+    raise ValueError("notification_channels.config must contain JSON-serializable data")

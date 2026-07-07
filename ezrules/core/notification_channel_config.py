@@ -92,13 +92,22 @@ def validate_notification_channel_config(channel_type: str, config: Mapping[str,
 
 def encrypt_notification_channel_config(channel_type: str, config: Mapping[str, Any] | None) -> str:
     validated_config = validate_notification_channel_config(channel_type, config)
-    payload = json.dumps(validated_config, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return encrypt_notification_channel_config_unvalidated(validated_config)
+
+
+def encrypt_notification_channel_config_unvalidated(config: Any) -> str:
+    payload = json.dumps(config, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return CONFIG_ENCRYPTION_PREFIX + _fernet().encrypt(payload).decode("utf-8")
 
 
 def decrypt_notification_channel_config(channel_type: str, encrypted_config: str | None) -> dict[str, Any]:
+    decoded = decrypt_notification_channel_config_unvalidated(encrypted_config)
+    return validate_notification_channel_config(channel_type, decoded)
+
+
+def decrypt_notification_channel_config_unvalidated(encrypted_config: str | None) -> Any:
     if not encrypted_config:
-        return validate_notification_channel_config(channel_type, {})
+        return {}
     if not encrypted_config.startswith(CONFIG_ENCRYPTION_PREFIX):
         raise ValueError("Notification channel config is not encrypted with a supported format")
 
@@ -112,7 +121,7 @@ def decrypt_notification_channel_config(channel_type: str, encrypted_config: str
         decoded = json.loads(payload.decode("utf-8"))
     except json.JSONDecodeError as exc:
         raise ValueError("Notification channel config decrypted to invalid JSON") from exc
-    return validate_notification_channel_config(channel_type, decoded)
+    return decoded
 
 
 def redact_notification_channel_config(channel_type: str, config: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -130,7 +139,7 @@ def redact_notification_channel_error(
         return None
 
     redacted_message = error_message
-    for secret_value in _iter_secret_values(channel_type, config):
+    for secret_value in _iter_secret_values_for_error(channel_type, config):
         if secret_value:
             redacted_message = redacted_message.replace(secret_value, REDACTED_VALUE)
     for pattern, replacement in _SECRET_TEXT_PATTERNS:
@@ -223,6 +232,49 @@ def _iter_secret_values(channel_type: str, config: Mapping[str, Any] | None) -> 
     secret_values: list[str] = []
     _collect_redacted_values(original_config, redacted_config, secret_values)
     return secret_values
+
+
+def _iter_secret_values_for_error(channel_type: str, config: Mapping[str, Any] | None) -> list[str]:
+    if not isinstance(config, Mapping):
+        return []
+    try:
+        schema = CHANNEL_CONFIG_SCHEMAS[normalize_notification_channel_type(channel_type)]
+    except ValueError:
+        return []
+
+    secret_values: list[str] = []
+    for secret_field in schema.secret_fields:
+        value = _get_path_value(config, tuple(secret_field.split(".")))
+        _collect_string_values(value, secret_values)
+    return secret_values
+
+
+def _get_path_value(config: Mapping[str, Any], path: tuple[str, ...]) -> Any:
+    current: Any = config
+    for segment in path:
+        if not isinstance(current, Mapping):
+            return None
+        current = _get_mapping_value_case_insensitive(current, segment)
+    return current
+
+
+def _get_mapping_value_case_insensitive(config: Mapping[str, Any], key: str) -> Any:
+    if key in config:
+        return config[key]
+    normalized_key = key.lower()
+    for candidate_key, value in config.items():
+        if str(candidate_key).lower() == normalized_key:
+            return value
+    return None
+
+
+def _collect_string_values(value: Any, values: list[str]) -> None:
+    if isinstance(value, str):
+        values.append(value)
+    elif isinstance(value, Mapping):
+        values.extend(str(item) for item in value.values() if isinstance(item, str))
+    elif isinstance(value, list):
+        values.extend(str(item) for item in value if isinstance(item, str))
 
 
 def _collect_redacted_values(original: Any, redacted: Any, values: list[str]) -> None:

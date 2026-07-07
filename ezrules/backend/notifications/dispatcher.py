@@ -12,6 +12,8 @@ from ezrules.models.backend_core import (
 
 logger = logging.getLogger(__name__)
 
+SAFE_REDACTION_FALLBACK_ERROR = "Notification delivery failed; error details could not be safely redacted"
+
 
 @dataclass(frozen=True, slots=True)
 class NotificationMessage:
@@ -107,6 +109,23 @@ def ensure_default_policy(db: Any, *, o_id: int, alert_rule_id: int) -> None:
     )
 
 
+def _redact_delivery_error(channel: NotificationChannel, error: str | None) -> str | None:
+    if error is None:
+        return None
+
+    try:
+        config = channel.config
+    except Exception:
+        logger.warning("Notification channel %s config could not be read while redacting error", channel.nc_id)
+        config = None
+
+    try:
+        return redact_notification_channel_error(str(channel.channel_type), config, error)
+    except Exception:
+        logger.exception("Notification channel %s error redaction failed", channel.nc_id)
+        return SAFE_REDACTION_FALLBACK_ERROR
+
+
 def dispatch_notification(
     db: Any, *, o_id: int, alert_rule_id: int, incident_id: int, message: NotificationMessage
 ) -> None:
@@ -156,8 +175,10 @@ def dispatch_notification(
             logger.exception("Notification channel %s failed for incident %s", channel.nc_id, incident_id)
             result = DeliveryResult(
                 status="failure",
-                error=redact_notification_channel_error(str(channel.channel_type), channel.config, str(exc)),
+                error=_redact_delivery_error(channel, str(exc)),
             )
+        else:
+            result = DeliveryResult(status=result.status, error=_redact_delivery_error(channel, result.error))
 
         db.add(
             NotificationAttempt(
