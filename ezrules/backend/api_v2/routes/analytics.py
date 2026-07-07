@@ -43,10 +43,12 @@ from ezrules.backend.runtime_settings import get_rule_quality_lookback_days
 from ezrules.backend.tasks import generate_rule_quality_report
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
+    Action,
     EvaluationDecision,
     EvaluationRuleResult,
     EventVersionLabel,
     Label,
+    RoleActions,
     RuleQualityReport,
     RuleStatus,
     User,
@@ -60,6 +62,34 @@ router = APIRouter(prefix="/api/v2/analytics", tags=["Analytics"])
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
+
+def _user_has_permission(db: Any, user: User, action: PermissionAction) -> bool:
+    db_action = db.query(Action).filter_by(name=action.value).first()
+    if db_action is None:
+        return False
+
+    for role in user.roles:
+        role_action = (
+            db.query(RoleActions)
+            .filter_by(role_id=role.id, action_id=db_action.id)
+            .filter(RoleActions.resource_id.is_(None))
+            .first()
+        )
+        if role_action is not None:
+            return True
+
+    return False
+
+
+def _require_rule_quality_report_generation_permission(db: Any, user: User) -> None:
+    if _user_has_permission(db, user, PermissionAction.GENERATE_RULE_QUALITY_REPORTS):
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="GENERATE_RULE_QUALITY_REPORTS permission is required to generate rule quality reports",
+    )
 
 
 def validate_aggregation(aggregation: str | AggregationPeriod) -> tuple[AggregationPeriod, dict[str, Any]]:
@@ -611,6 +641,7 @@ def get_rule_quality(
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_RULES)),
     __: None = Depends(require_permission(PermissionAction.VIEW_LABELS)),
+    ___: None = Depends(require_permission(PermissionAction.GENERATE_RULE_QUALITY_REPORTS)),
     current_org_id: int = Depends(get_current_org_id),
     db: Any = Depends(get_db),
 ) -> RuleQualityResponse:
@@ -657,6 +688,9 @@ def request_rule_quality_report(
         if request_data.lookback_days is not None
         else get_rule_quality_lookback_days(db, current_org_id)
     )
+    if request_data.force_refresh:
+        _require_rule_quality_report_generation_permission(db, user)
+
     active_pairs = get_active_rule_quality_pairs(db, o_id=current_org_id)
     pair_set_hash = compute_rule_quality_pairs_hash(active_pairs)
     _window_start, now = get_current_time_bounds()
@@ -736,6 +770,7 @@ def get_rule_quality_report(
         and report.status == "PENDING"
         and report.started_at is None
         and report.result is None
+        and _user_has_permission(db, user, PermissionAction.GENERATE_RULE_QUALITY_REPORTS)
     ):
         generate_rule_quality_report(report.rqr_id)
         db.expire_all()

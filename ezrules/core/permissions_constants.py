@@ -10,6 +10,7 @@ class PermissionAction(Enum):
     REORDER_RULES = "reorder_rules"
     PAUSE_RULES = "pause_rules"
     PROMOTE_RULES = "promote_rules"
+    GENERATE_RULE_QUALITY_REPORTS = "generate_rule_quality_reports"
     DELETE_RULE = "delete_rule"
     VIEW_RULES = "view_rules"
     SUBMIT_TEST_EVENTS = "submit_test_events"
@@ -84,6 +85,7 @@ class PermissionAction(Enum):
             (cls.REORDER_RULES.value, "Reorder main rules", "rule"),
             (cls.PAUSE_RULES.value, "Pause active rules without archiving them", "rule"),
             (cls.PROMOTE_RULES.value, "Promote draft or shadow rules to production", "rule"),
+            (cls.GENERATE_RULE_QUALITY_REPORTS.value, "Generate rule-quality report snapshots", "rule"),
             (cls.DELETE_RULE.value, "Delete rules", "rule"),
             (cls.VIEW_RULES.value, "View rules", "rule"),
             (cls.SUBMIT_TEST_EVENTS.value, "Submit dry-run test events", "rule"),
@@ -151,6 +153,7 @@ class RoleType(Enum):
                 PermissionAction.CREATE_RULE,
                 PermissionAction.MODIFY_RULE,
                 PermissionAction.REORDER_RULES,
+                PermissionAction.GENERATE_RULE_QUALITY_REPORTS,
                 PermissionAction.VIEW_RULES,
                 PermissionAction.VIEW_OUTCOMES,
                 PermissionAction.VIEW_LISTS,

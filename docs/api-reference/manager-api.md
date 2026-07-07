@@ -193,14 +193,14 @@ Rule lifecycle fields on rule responses:
 | `GET` | `/api/v2/analytics/labels-summary` | Bearer + permission | Total labeled summary for the caller's org |
 | `GET` | `/api/v2/analytics/labels-distribution` | Bearer + permission | Label trends for the caller's org |
 | `GET` | `/api/v2/analytics/labeled-transaction-volume` | Bearer + permission | Time-series labeled event volume for the caller's org |
-| `GET` | `/api/v2/analytics/rule-quality` | Bearer + `VIEW_RULES` + `VIEW_LABELS` | Synchronous snapshot precision/recall report for configured curated pairs (includes `freeze_at`) |
-| `POST` | `/api/v2/analytics/rule-quality/reports` | Bearer + `VIEW_RULES` + `VIEW_LABELS` | Return existing snapshot by filters, or generate a new one only when `force_refresh=true` |
-| `GET` | `/api/v2/analytics/rule-quality/reports/{report_id}` | Bearer + `VIEW_RULES` + `VIEW_LABELS` | Poll async report status/result |
+| `GET` | `/api/v2/analytics/rule-quality` | Bearer + `VIEW_RULES` + `VIEW_LABELS` + `GENERATE_RULE_QUALITY_REPORTS` | Synchronous snapshot precision/recall report for configured curated pairs (includes `freeze_at`) |
+| `POST` | `/api/v2/analytics/rule-quality/reports` | Bearer + `VIEW_RULES` + `VIEW_LABELS` | Return existing snapshot by filters, or generate a new one only when `force_refresh=true` and the caller has `GENERATE_RULE_QUALITY_REPORTS` |
+| `GET` | `/api/v2/analytics/rule-quality/reports/{report_id}` | Bearer + `VIEW_RULES` + `VIEW_LABELS` | Poll async report status/result; synchronous fallback computation only runs for callers with `GENERATE_RULE_QUALITY_REPORTS` |
 
 Rule quality query params:
 - `min_support` (default `1`)
 - `lookback_days` (optional; defaults to runtime setting)
-- `force_refresh` on report requests: `false` returns existing snapshot only, `true` enqueues a new snapshot
+- `force_refresh` on report requests: `false` returns existing snapshot only, `true` enqueues a new snapshot and requires `GENERATE_RULE_QUALITY_REPORTS`
 - `freeze_at` is returned in responses to indicate snapshot timestamp
 - Reports include only active curated pairs configured under Settings.
 

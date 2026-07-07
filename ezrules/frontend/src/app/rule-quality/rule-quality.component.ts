@@ -2,7 +2,9 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
+import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
 import { SidebarComponent } from '../components/sidebar.component';
+import { AuthService } from '../services/auth.service';
 import {
   RuleQualityPairMetric,
   RuleQualityReportTaskResponse,
@@ -22,6 +24,7 @@ export class RuleQualityComponent implements OnInit, OnDestroy {
   polling: boolean = false;
   error: string | null = null;
   noSnapshotAvailable: boolean = false;
+  canGenerateReports: boolean = false;
 
   minSupport: number = 1;
   lookbackDays: number = 30;
@@ -37,9 +40,13 @@ export class RuleQualityComponent implements OnInit, OnDestroy {
   private readonly pollIntervalMs = 1000;
   private readonly maxPollAttempts = 60;
 
-  constructor(private ruleQualityService: RuleQualityService) {}
+  constructor(
+    private ruleQualityService: RuleQualityService,
+    private authService: AuthService
+  ) {}
 
   ngOnInit(): void {
+    this.loadPermissions();
     this.loadRuleQuality(true);
   }
 
@@ -48,6 +55,10 @@ export class RuleQualityComponent implements OnInit, OnDestroy {
   }
 
   loadRuleQuality(useConfiguredDefault: boolean = false, forceRefresh: boolean = false): void {
+    if (forceRefresh && !this.canGenerateReports) {
+      return;
+    }
+
     this.loading = true;
     this.polling = false;
     this.error = null;
@@ -71,9 +82,29 @@ export class RuleQualityComponent implements OnInit, OnDestroy {
           this.polling = false;
           return;
         }
+        if (err.status === 403) {
+          this.error = 'You do not have permission to generate rule quality reports.';
+          this.loading = false;
+          this.polling = false;
+          return;
+        }
         this.error = 'Failed to request rule quality report. Please try again.';
         this.loading = false;
         this.polling = false;
+      }
+    });
+  }
+
+  private loadPermissions(): void {
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        this.canGenerateReports = hasPermissionRequirement(
+          user.permissions,
+          ACTION_PERMISSION_REQUIREMENTS.generateRuleQualityReports
+        );
+      },
+      error: () => {
+        this.canGenerateReports = false;
       }
     });
   }
@@ -179,6 +210,9 @@ export class RuleQualityComponent implements OnInit, OnDestroy {
   }
 
   refreshReport(): void {
+    if (!this.canGenerateReports) {
+      return;
+    }
     this.loadRuleQuality(false, true);
   }
 
