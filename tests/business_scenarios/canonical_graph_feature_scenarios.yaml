@@ -1,0 +1,86 @@
+version: 1
+name: canonical_graph_feature_scenarios
+
+outcomes:
+  - name: HOLD
+    severity_rank: 1
+  - name: REVIEW
+    severity_rank: 2
+  - name: RELEASE
+    severity_rank: 3
+
+scenarios:
+  - id: graph_distinct_count_drives_live_rule_decision
+    purpose: Configured event-entity links feed a bounded graph feature that live rule evaluation can reference.
+    graph_entity_fields:
+      - field_path: user_id
+        entity_type: user
+      - field_path: account_id
+        entity_type: account
+      - field_path: card_fingerprint
+        entity_type: card
+      - field_path: device_id
+        entity_type: device
+    feature:
+      name: Canonical user unique cards through graph 90d
+      entity: user
+      feature_name: unique_cards_graph_90d
+      feature_kind: graph
+      entity_key: user_id
+      aggregation_type: graph_distinct_count
+      window_seconds: 7776000
+      graph_config:
+        target_entity: card
+        allowed_entity_types:
+          - user
+          - account
+          - card
+          - device
+        max_depth: 4
+        max_expanded_nodes: 1000
+      status: active
+    history:
+      - transaction_id: canonical_graph_user_account
+        effective_at: "2026-06-01T12:00:00Z"
+        event_data:
+          user_id: user-1
+          account_id: acct-1
+      - transaction_id: canonical_graph_account_card_1
+        effective_at: "2026-06-01T12:01:00Z"
+        event_data:
+          account_id: acct-1
+          card_fingerprint: card-1
+      - transaction_id: canonical_graph_account_card_2
+        effective_at: "2026-06-01T12:02:00Z"
+        event_data:
+          account_id: acct-1
+          card_fingerprint: card-2
+      - transaction_id: canonical_graph_user_device
+        effective_at: "2026-06-01T12:03:00Z"
+        event_data:
+          user_id: user-1
+          device_id: device-1
+      - transaction_id: canonical_graph_device_card
+        effective_at: "2026-06-01T12:04:00Z"
+        event_data:
+          device_id: device-1
+          card_fingerprint: card-3
+    rule:
+      ref: graph_card_velocity_rule
+      numeric_id: 94101
+      rid: CANONICAL_GRAPH_CARD_VELOCITY
+      description: Hold users connected to three or more cards.
+      logic: "if stat[user.unique_cards_graph_90d] >= 3:\n\treturn !HOLD"
+    evaluation:
+      transaction_id: canonical_graph_live_decision
+      effective_at: "2026-06-02T12:00:00Z"
+      event_data:
+        user_id: user-1
+        amount: 25
+      expected:
+        resolved_outcome: HOLD
+        outcome_counters:
+          HOLD: 1
+        rule_results:
+          graph_card_velocity_rule: HOLD
+    expected_graph_links: 10
