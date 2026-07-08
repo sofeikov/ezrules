@@ -1,5 +1,9 @@
 # What's New
 
+## v1.28.4
+
+* **CLI smoke coverage in CI**: Promoted the database-backed CLI smoke flow into pytest so GitHub's backend test workflow now exercises core CLI commands against Postgres.
+
 ## v1.28.3
 
 * **Rule-quality report generation permission**: Added a dedicated `generate_rule_quality_reports` permission so readonly users can view existing rule-quality snapshots without being able to enqueue expensive refreshes or trigger synchronous report computation.
