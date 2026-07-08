@@ -1,21 +1,18 @@
 import base64
 import hashlib
 import json
-import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from ezrules.settings import SETTINGS_ENV_FILE, app_settings
+from ezrules.settings import app_settings
 
 CONFIG_ENCRYPTION_PREFIX = "fernet:v1:"
 REDACTED_VALUE = "[redacted]"
-ALEMBIC_PLACEHOLDER_APP_SECRET = "alembic-placeholder-secret"
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,25 +92,11 @@ def validate_notification_channel_config(channel_type: str, config: Mapping[str,
 
 def encrypt_notification_channel_config(channel_type: str, config: Mapping[str, Any] | None) -> str:
     validated_config = validate_notification_channel_config(channel_type, config)
-    return encrypt_notification_channel_config_unvalidated(validated_config)
-
-
-def encrypt_notification_channel_config_unvalidated(config: Any) -> str:
-    payload = json.dumps(config, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    payload = json.dumps(validated_config, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return CONFIG_ENCRYPTION_PREFIX + _fernet().encrypt(payload).decode("utf-8")
 
 
 def decrypt_notification_channel_config(channel_type: str, encrypted_config: str | None) -> dict[str, Any]:
-    decoded = decrypt_notification_channel_config_unvalidated(encrypted_config)
-    try:
-        return validate_notification_channel_config(channel_type, decoded)
-    except ValueError:
-        if isinstance(decoded, Mapping):
-            return dict(decoded)
-        return {"legacy_value": decoded}
-
-
-def decrypt_notification_channel_config_unvalidated(encrypted_config: str | None) -> Any:
     if not encrypted_config:
         return {}
     if not encrypted_config.startswith(CONFIG_ENCRYPTION_PREFIX):
@@ -129,7 +112,7 @@ def decrypt_notification_channel_config_unvalidated(encrypted_config: str | None
         decoded = json.loads(payload.decode("utf-8"))
     except json.JSONDecodeError as exc:
         raise ValueError("Notification channel config decrypted to invalid JSON") from exc
-    return decoded
+    return validate_notification_channel_config(channel_type, decoded)
 
 
 def redact_notification_channel_config(channel_type: str, config: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -156,39 +139,8 @@ def redact_notification_channel_error(
 
 
 def _fernet() -> Fernet:
-    digest = hashlib.sha256(_notification_config_app_secret().encode("utf-8")).digest()
+    digest = hashlib.sha256(app_settings.APP_SECRET.encode("utf-8")).digest()
     return Fernet(base64.urlsafe_b64encode(digest))
-
-
-def _notification_config_app_secret() -> str:
-    env_secret = os.getenv("EZRULES_APP_SECRET")
-    if env_secret and env_secret != ALEMBIC_PLACEHOLDER_APP_SECRET:
-        return env_secret
-
-    env_file_secret = _read_app_secret_from_settings_env()
-    if env_file_secret:
-        return env_file_secret
-
-    if app_settings.APP_SECRET and app_settings.APP_SECRET != ALEMBIC_PLACEHOLDER_APP_SECRET:
-        return app_settings.APP_SECRET
-
-    raise ValueError("Notification channel config encryption requires a non-placeholder EZRULES_APP_SECRET")
-
-
-def _read_app_secret_from_settings_env() -> str | None:
-    env_file = Path(SETTINGS_ENV_FILE)
-    if not env_file.exists():
-        return None
-
-    for raw_line in env_file.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        if key.strip() != "EZRULES_APP_SECRET":
-            continue
-        return value.strip().strip('"').strip("'")
-    return None
 
 
 def _is_empty_value(value: Any) -> bool:
