@@ -1,0 +1,44 @@
+version: 1
+name: canonical_backtesting_scenarios
+
+outcomes:
+  - name: HOLD
+    severity_rank: 1
+  - name: REVIEW
+    severity_rank: 2
+  - name: RELEASE
+    severity_rank: 3
+
+scenarios:
+  - id: proposed_rule_backtest_compares_against_served_history
+    purpose: Backtesting replays recent served decisions and stores stored/proposed outcome distributions for the rule.
+    actor:
+      email: canonical-backtesting@example.com
+    rule:
+      ref: backtest_amount_rule
+      rid: CANONICAL_BACKTEST_AMOUNT
+      description: Review high amount before candidate change.
+      logic: "if $amount >= 1000:\n\treturn !REVIEW"
+    history:
+      - transaction_id: canonical_backtest_history_review_1
+        effective_at: 1710000000
+        event_data:
+          amount: 1200
+      - transaction_id: canonical_backtest_history_release
+        effective_at: 1710000060
+        event_data:
+          amount: 800
+      - transaction_id: canonical_backtest_history_review_2
+        effective_at: 1710000120
+        event_data:
+          amount: 2000
+    proposed_logic: "if $amount >= 1500:\n\treturn !HOLD"
+    expected_result:
+      queue_status: done
+      total_records: 3
+      stored_result:
+        REVIEW: 2
+      proposed_result:
+        HOLD: 1
+      eligible_records: 3
+      skipped_records: 0

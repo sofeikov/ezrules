@@ -1,0 +1,49 @@
+version: 1
+name: canonical_labels_audit_scenarios
+
+outcomes:
+  - name: HOLD
+    severity_rank: 1
+  - name: REVIEW
+    severity_rank: 2
+  - name: RELEASE
+    severity_rank: 3
+
+scenarios:
+  - id: label_assignment_feeds_quality_and_audit
+    purpose: Analysts can create a label, assign it to served events, see rule-quality metrics, and audit the label activity.
+    actor:
+      email: canonical-labels@example.com
+    rule:
+      ref: labels_risk_rule
+      rid: CANONICAL_LABELS_RISK
+      description: Hold high-risk labeled events.
+      logic: "if $risk_score >= 80:\n\treturn !HOLD"
+    label:
+      name: canonical_fraud
+    quality_pair:
+      outcome: HOLD
+      label: CANONICAL_FRAUD
+    events:
+      - transaction_id: canonical_label_fraud_1
+        effective_at: 1710000000
+        event_data:
+          risk_score: 95
+        assign_label: true
+      - transaction_id: canonical_label_fraud_2
+        effective_at: 1710000060
+        event_data:
+          risk_score: 88
+        assign_label: true
+    expected_quality:
+      total_labeled_events: 2
+      true_positive: 2
+      false_positive: 0
+      false_negative: 0
+      precision: 1.0
+      recall: 1.0
+      f1: 1.0
+    expected_audit_actions:
+      - assigned
+      - assigned
+      - created

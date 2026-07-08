@@ -2,6 +2,8 @@
 
 ## v1.28.4
 
+* **Canonical business scenario fixtures**: Added YAML-backed canonical scenarios for rule lifecycle, shadow/rollout provenance, labels and audit, graph-feature decisions, and backtesting so these operational journeys can be expanded from readable fixtures.
+* **Generated invariant coverage**: Added deterministic property-style fuzz tests for rule parsing/execution, dotted field paths, type casting, event normalization, CSV label upload parsing, idempotency-key scoping, duplicate evaluation lookup, and outcome resolution.
 * **Live Redis/Celery CI smoke lane**: Backend CI now includes a focused Postgres, Redis, and Celery worker job that exercises real queue draining, Redis locking, broker dispatch, result handling, and Redis-backed cache invalidation.
 
 ## v1.28.3
