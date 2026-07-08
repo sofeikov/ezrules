@@ -1,5 +1,9 @@
 # What's New
 
+## v1.28.4
+
+* **Generated invariant coverage**: Added deterministic property-style fuzz tests for rule parsing/execution, dotted field paths, type casting, event normalization, CSV label upload parsing, idempotency-key scoping, duplicate evaluation lookup, and outcome resolution.
+
 ## v1.28.3
 
 * **Rule-quality report generation permission**: Added a dedicated `generate_rule_quality_reports` permission so readonly users can view existing rule-quality snapshots without being able to enqueue expensive refreshes or trigger synchronous report computation.
