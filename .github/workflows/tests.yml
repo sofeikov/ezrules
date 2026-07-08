@@ -55,3 +55,92 @@ jobs:
 
     - name: Run backend and CLI tests
       run: uv run pytest -q --cov=ezrules.backend --cov=ezrules.core --cov-report=xml tests
+
+  redis-celery-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: tests
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      EZRULES_DB_ENDPOINT: postgresql://postgres:root@localhost:5432/tests
+      EZRULES_TESTING: "false"
+      EZRULES_APP_SECRET: "test-secret"
+      EZRULES_ORG_ID: "1"
+      EZRULES_CELERY_BROKER_URL: redis://localhost:6379/0
+      EZRULES_OBSERVATION_QUEUE_REDIS_URL: redis://localhost:6379/0
+      EZRULES_OBSERVATION_QUEUE_KEY: ezrules:ci:field_observation_queue
+      EZRULES_OBSERVATION_QUEUE_LOCK_KEY: ezrules:ci:field_observation_queue:lock
+      EZRULES_LIVE_REDIS_CELERY_SMOKE: "true"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install UV
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: Install dependencies
+      run: uv sync --dev
+
+    - name: Apply database migrations
+      run: uv run alembic upgrade head
+
+    - name: Start Celery worker
+      run: |
+        nohup uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo --concurrency=1 > /tmp/ezrules-worker.log 2>&1 &
+        echo $! > /tmp/ezrules-worker.pid
+
+    - name: Wait for Celery worker
+      run: |
+        for i in {1..30}; do
+          if uv run celery -A ezrules.backend.tasks inspect ping --timeout=5 | grep -q "pong"; then
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "Worker did not become ready in time"
+        cat /tmp/ezrules-worker.log || true
+        exit 1
+
+    - name: Run Redis/Celery smoke tests
+      run: uv run pytest -q tests/test_redis_celery_smoke.py
+
+    - name: Show Celery worker log on failure
+      if: failure()
+      run: cat /tmp/ezrules-worker.log || true
+
+    - name: Stop Celery worker
+      if: always()
+      run: |
+        if [ -f /tmp/ezrules-worker.pid ]; then
+          kill "$(cat /tmp/ezrules-worker.pid)" || true
+        fi
