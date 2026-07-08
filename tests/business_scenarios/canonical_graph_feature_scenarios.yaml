@@ -83,4 +83,4 @@ scenarios:
           HOLD: 1
         rule_results:
           graph_card_velocity_rule: HOLD
-    expected_graph_links: 10
+    expected_graph_links: 11
