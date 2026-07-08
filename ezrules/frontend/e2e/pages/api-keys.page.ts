@@ -1,4 +1,5 @@
 import { Page, Locator } from '@playwright/test';
+import { acceptDialog } from '../support/dialogs';
 
 /**
  * Page Object Model for the API Keys management page.
@@ -65,7 +66,6 @@ export class ApiKeysPage {
 
   async revokeKeyByLabel(label: string) {
     const row = this.page.locator('[data-testid="api-key-row"]').filter({ hasText: label });
-    this.page.on('dialog', d => d.accept());
-    await row.locator('[data-testid="revoke-btn"]').click();
+    await acceptDialog(this.page, () => row.locator('[data-testid="revoke-btn"]').click());
   }
 }

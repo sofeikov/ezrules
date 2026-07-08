@@ -1,5 +1,6 @@
 import { test, expect } from '../support/fixtures';
 import { UserManagementPage } from '../pages/user-management.page';
+import { acceptDialog, dismissDialog } from '../support/dialogs';
 import { testResourceName } from '../support/test-data';
 import { STATEFUL_TAG, TEST_DATA_TAG } from '../support/tags';
 
@@ -99,8 +100,7 @@ test.describe(`User Management Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
       expect(await userMgmtPage.hasUserWithEmail(uniqueEmail)).toBe(true);
 
       // Cleanup: delete the created user
-      page.on('dialog', dialog => dialog.accept());
-      await userMgmtPage.clickDeleteUser(uniqueEmail);
+      await acceptDialog(page, () => userMgmtPage.clickDeleteUser(uniqueEmail));
       await page.waitForFunction(
         (email: string) => {
           const rows = document.querySelectorAll('table tbody tr');
@@ -137,8 +137,7 @@ test.describe(`User Management Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
       await expect(errorText).toBeVisible();
 
       // Cleanup
-      page.on('dialog', dialog => dialog.accept());
-      await userMgmtPage.clickDeleteUser(uniqueEmail);
+      await acceptDialog(page, () => userMgmtPage.clickDeleteUser(uniqueEmail));
       await page.waitForFunction(
         (email: string) => {
           const rows = document.querySelectorAll('table tbody tr');
@@ -168,11 +167,8 @@ test.describe(`User Management Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
         { timeout: 5000 }
       );
 
-      // Accept the confirmation dialog
-      page.on('dialog', dialog => dialog.accept());
-
       const countBefore = await userMgmtPage.getUserRowCount();
-      await userMgmtPage.clickDeleteUser(uniqueEmail);
+      await acceptDialog(page, () => userMgmtPage.clickDeleteUser(uniqueEmail));
 
       // Wait for the user to disappear
       await page.waitForFunction(
@@ -207,19 +203,13 @@ test.describe(`User Management Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
 
       const countBefore = await userMgmtPage.getUserRowCount();
 
-      const dismissDialogPromise = page.waitForEvent('dialog');
-      await userMgmtPage.clickDeleteUser(uniqueEmail);
-      const dismissDialog = await dismissDialogPromise;
-      await dismissDialog.dismiss();
+      await dismissDialog(page, () => userMgmtPage.clickDeleteUser(uniqueEmail));
 
       await expect(page.locator('table tbody tr')).toHaveCount(countBefore);
       expect(await userMgmtPage.hasUserWithEmail(uniqueEmail)).toBe(true);
 
       // Cleanup
-      const acceptDialogPromise = page.waitForEvent('dialog');
-      await userMgmtPage.clickDeleteUser(uniqueEmail);
-      const acceptDialog = await acceptDialogPromise;
-      await acceptDialog.accept();
+      await acceptDialog(page, () => userMgmtPage.clickDeleteUser(uniqueEmail));
       await page.waitForFunction(
         (email: string) => {
           const rows = document.querySelectorAll('table tbody tr');

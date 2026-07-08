@@ -1,5 +1,6 @@
 import { test, expect } from '../support/fixtures';
 import { OutcomesPage } from '../pages/outcomes.page';
+import { acceptDialog, dismissDialog } from '../support/dialogs';
 import { testResourceName } from '../support/test-data';
 import { STATEFUL_TAG, TEST_DATA_TAG } from '../support/tags';
 
@@ -106,8 +107,7 @@ test.describe(`Outcomes Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
       await expect(await outcomesPage.hasOutcome(upperOutcome)).toBe(true);
 
       // Cleanup: delete the outcome we created
-      page.on('dialog', dialog => dialog.accept());
-      await outcomesPage.clickDelete(upperOutcome);
+      await acceptDialog(page, () => outcomesPage.clickDelete(upperOutcome));
       await page.waitForFunction(
         (name: string) => {
           const items = document.querySelectorAll('ul li');
@@ -150,11 +150,8 @@ test.describe(`Outcomes Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
         { timeout: 5000 }
       );
 
-      // Accept the confirmation dialog
-      page.on('dialog', dialog => dialog.accept());
-
       const countBefore = await outcomesPage.getOutcomeCount();
-      await outcomesPage.clickDelete(upperOutcome);
+      await acceptDialog(page, () => outcomesPage.clickDelete(upperOutcome));
 
       // Wait for the outcome to disappear
       await page.waitForFunction(
@@ -176,12 +173,8 @@ test.describe(`Outcomes Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
 
       const countBefore = await outcomesPage.getOutcomeCount();
 
-      // Click delete on the first outcome
-      const dialogPromise = page.waitForEvent('dialog');
       const firstDeleteButton = page.locator('button:has-text("Delete")').first();
-      await firstDeleteButton.click();
-      const dialog = await dialogPromise;
-      await dialog.dismiss();
+      await dismissDialog(page, () => firstDeleteButton.click());
 
       await expect(page.locator('ul li')).toHaveCount(countBefore);
     });

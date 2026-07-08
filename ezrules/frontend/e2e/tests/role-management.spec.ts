@@ -1,5 +1,6 @@
 import { test, expect } from '../support/fixtures';
 import { RoleManagementPage } from '../pages/role-management.page';
+import { acceptDialog, dismissDialog } from '../support/dialogs';
 import { testResourceName } from '../support/test-data';
 import { STATEFUL_TAG, TEST_DATA_TAG } from '../support/tags';
 
@@ -104,8 +105,7 @@ test.describe(`Role Management Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
       expect(await roleManagementPage.hasRoleWithName(uniqueName)).toBe(true);
 
       // Cleanup: delete the created role
-      page.on('dialog', dialog => dialog.accept());
-      await roleManagementPage.clickDeleteRole(uniqueName);
+      await acceptDialog(page, () => roleManagementPage.clickDeleteRole(uniqueName));
       await page.waitForFunction(
         (name: string) => {
           const tables = document.querySelectorAll('table');
@@ -146,8 +146,7 @@ test.describe(`Role Management Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
       await expect(errorText).toBeVisible();
 
       // Cleanup
-      page.on('dialog', dialog => dialog.accept());
-      await roleManagementPage.clickDeleteRole(uniqueName);
+      await acceptDialog(page, () => roleManagementPage.clickDeleteRole(uniqueName));
       await page.waitForFunction(
         (name: string) => {
           const tables = document.querySelectorAll('table');
@@ -181,11 +180,8 @@ test.describe(`Role Management Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
         { timeout: 5000 }
       );
 
-      // Accept the confirmation dialog
-      page.on('dialog', dialog => dialog.accept());
-
       const countBefore = await roleManagementPage.getRoleRowCount();
-      await roleManagementPage.clickDeleteRole(uniqueName);
+      await acceptDialog(page, () => roleManagementPage.clickDeleteRole(uniqueName));
 
       // Wait for the role to disappear
       await page.waitForFunction(
@@ -224,19 +220,13 @@ test.describe(`Role Management Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
 
       const countBefore = await roleManagementPage.getRoleRowCount();
 
-      const dismissDialogPromise = page.waitForEvent('dialog');
-      await roleManagementPage.clickDeleteRole(uniqueName);
-      const dismissDialog = await dismissDialogPromise;
-      await dismissDialog.dismiss();
+      await dismissDialog(page, () => roleManagementPage.clickDeleteRole(uniqueName));
 
       await expect(roleManagementPage.rolesTable.locator('tbody tr')).toHaveCount(countBefore);
       expect(await roleManagementPage.hasRoleWithName(uniqueName)).toBe(true);
 
       // Cleanup
-      const acceptDialogPromise = page.waitForEvent('dialog');
-      await roleManagementPage.clickDeleteRole(uniqueName);
-      const acceptDialog = await acceptDialogPromise;
-      await acceptDialog.accept();
+      await acceptDialog(page, () => roleManagementPage.clickDeleteRole(uniqueName));
       await page.waitForFunction(
         (name: string) => {
           const tables = document.querySelectorAll('table');

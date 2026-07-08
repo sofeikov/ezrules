@@ -1,6 +1,7 @@
 import { test, expect } from '../support/fixtures';
 import { FieldTypesPage } from '../pages/field-types.page';
 import { deleteFieldTypeByName } from '../support/api-helpers';
+import { acceptDialog, dismissDialog } from '../support/dialogs';
 import { testResourceName } from '../support/test-data';
 import { STATEFUL_TAG, TEST_DATA_TAG } from '../support/tags';
 
@@ -80,10 +81,7 @@ test.describe(`Field Types Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
       expect(await fieldTypesPage.hasConfiguredField(fieldName)).toBe(true);
 
       // Cleanup
-      const dialogPromise = page.waitForEvent('dialog');
-      await fieldTypesPage.deleteFieldType(fieldName);
-      const dialog = await dialogPromise;
-      await dialog.accept();
+      await acceptDialog(page, () => fieldTypesPage.deleteFieldType(fieldName));
       await fieldTypesPage.waitForConfiguredFieldRemoved(fieldName);
     });
 
@@ -130,10 +128,7 @@ test.describe(`Field Types Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
 
       await fieldTypesPage.waitForConfiguredField(fieldName);
 
-      const dialogPromise = page.waitForEvent('dialog');
-      await fieldTypesPage.deleteFieldType(fieldName);
-      const dialog = await dialogPromise;
-      await dialog.accept();
+      await acceptDialog(page, () => fieldTypesPage.deleteFieldType(fieldName));
 
       await fieldTypesPage.waitForConfiguredFieldRemoved(fieldName);
 
@@ -151,19 +146,13 @@ test.describe(`Field Types Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
       await fieldTypesPage.waitForConfiguredField(fieldName);
 
       const countBefore = await fieldTypesPage.getConfiguredCount();
-      const dismissDialogPromise = page.waitForEvent('dialog');
-      await fieldTypesPage.deleteFieldType(fieldName);
-      const dismissDialog = await dismissDialogPromise;
-      await dismissDialog.dismiss();
+      await dismissDialog(page, () => fieldTypesPage.deleteFieldType(fieldName));
 
       await expect(fieldTypesPage.configuredRows).toHaveCount(countBefore);
       expect(await fieldTypesPage.hasConfiguredField(fieldName)).toBe(true);
 
       // Cleanup
-      const acceptDialogPromise = page.waitForEvent('dialog');
-      await fieldTypesPage.deleteFieldType(fieldName);
-      const acceptDialog = await acceptDialogPromise;
-      await acceptDialog.accept();
+      await acceptDialog(page, () => fieldTypesPage.deleteFieldType(fieldName));
       await fieldTypesPage.waitForConfiguredFieldRemoved(fieldName);
     });
   });

@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { test, expect } from '../support/fixtures';
 import { UserListsPage } from '../pages/user-lists.page';
 import { deleteUserListByName } from '../support/api-helpers';
+import { acceptDialog, dismissDialog } from '../support/dialogs';
 import { testResourceName } from '../support/test-data';
 import { STATEFUL_TAG, TEST_DATA_TAG } from '../support/tags';
 
@@ -19,10 +20,7 @@ test.describe(`User Lists Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
   }
 
   async function deleteListAndWait(page: Page, name: string) {
-    const dialogPromise = page.waitForEvent('dialog');
-    await userListsPage.clickDeleteList(name);
-    const dialog = await dialogPromise;
-    await dialog.accept();
+    await acceptDialog(page, () => userListsPage.clickDeleteList(name));
     await userListsPage.waitForListRemoved(name);
   }
 
@@ -32,10 +30,7 @@ test.describe(`User Lists Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
   }
 
   async function deleteEntryAndWait(page: Page, value: string) {
-    const dialogPromise = page.waitForEvent('dialog');
-    await userListsPage.clickDeleteEntry(value);
-    const dialog = await dialogPromise;
-    await dialog.accept();
+    await acceptDialog(page, () => userListsPage.clickDeleteEntry(value));
     await userListsPage.waitForEntryRemoved(value);
   }
 
@@ -146,10 +141,7 @@ test.describe(`User Lists Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
 
       const countBefore = await userListsPage.getListCount();
 
-      const dialogPromise = page.waitForEvent('dialog');
-      await userListsPage.clickDeleteList(uniqueName);
-      const dialog = await dialogPromise;
-      await dialog.dismiss();
+      await dismissDialog(page, () => userListsPage.clickDeleteList(uniqueName));
 
       await expect(userListsPage.listItems).toHaveCount(countBefore);
       await expect(userListsPage.listItem(uniqueName)).toBeVisible();

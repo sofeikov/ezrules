@@ -1,5 +1,6 @@
 import { test, expect } from '../support/fixtures';
 import { LabelsPage } from '../pages/labels.page';
+import { acceptDialog, dismissDialog } from '../support/dialogs';
 import { testResourceName } from '../support/test-data';
 import { STATEFUL_TAG, TEST_DATA_TAG } from '../support/tags';
 
@@ -104,8 +105,7 @@ test.describe(`Labels Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
       await expect(await labelsPage.hasLabel(uniqueLabel)).toBe(true);
 
       // Cleanup: delete the label we created
-      page.on('dialog', dialog => dialog.accept());
-      await labelsPage.clickDelete(uniqueLabel);
+      await acceptDialog(page, () => labelsPage.clickDelete(uniqueLabel));
       await page.waitForFunction(
         (label: string) => {
           const items = document.querySelectorAll('ul li');
@@ -152,11 +152,8 @@ test.describe(`Labels Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
         { timeout: 5000 }
       );
 
-      // Accept the confirmation dialog
-      page.on('dialog', dialog => dialog.accept());
-
       const countBefore = await labelsPage.getLabelCount();
-      await labelsPage.clickDelete(uniqueLabel);
+      await acceptDialog(page, () => labelsPage.clickDelete(uniqueLabel));
 
       // Wait for the label to disappear
       await page.waitForFunction(
@@ -178,12 +175,8 @@ test.describe(`Labels Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
 
       const countBefore = await labelsPage.getLabelCount();
 
-      // Click delete on the first label
-      const dialogPromise = page.waitForEvent('dialog');
       const firstDeleteButton = page.locator('button:has-text("Delete")').first();
-      await firstDeleteButton.click();
-      const dialog = await dialogPromise;
-      await dialog.dismiss();
+      await dismissDialog(page, () => firstDeleteButton.click());
 
       await expect(page.locator('ul li')).toHaveCount(countBefore);
     });
