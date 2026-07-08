@@ -48,7 +48,12 @@ export function testResourceName(
   return uppercase ? name.toUpperCase() : name;
 }
 
-export function deterministicUnixTimestamp(testInfo: TestInfo, baseTimestamp = 1_893_456_000): number {
+function currentUtcDayBaseTimestamp(): number {
+  const now = new Date();
+  return Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000);
+}
+
+export function deterministicUnixTimestamp(testInfo: TestInfo, baseTimestamp = currentUtcDayBaseTimestamp()): number {
   const source = testInfoId(testInfo);
   let hash = 0;
   for (let index = 0; index < source.length; index += 1) {

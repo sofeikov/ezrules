@@ -192,13 +192,22 @@ test.describe(`Main Rule Execution Mode ${STATEFUL_TAG} ${SETTINGS_TAG} @global-
       for (const ruleId of createdRuleIds) {
         await deleteRuleById(request, ruleId);
       }
+      let restoredMainRuleIds: number[] | null = null;
       if (originalMainRuleIds.length > 0) {
-        await apiRequest(request, '/api/v2/rules/main-order', 'PUT', { ordered_r_ids: originalMainRuleIds }, authHeaders);
-        const restoredMainRuleIds = await getActiveMainRuleIds(request, authHeaders);
+        try {
+          await apiRequest(request, '/api/v2/rules/main-order', 'PUT', { ordered_r_ids: originalMainRuleIds }, authHeaders);
+          restoredMainRuleIds = await getActiveMainRuleIds(request, authHeaders);
+        } finally {
+          await restoreRuntimeSettings(request, currentSettings);
+          await expectRuntimeSettingsRestored(request, currentSettings);
+        }
+      } else {
+        await restoreRuntimeSettings(request, currentSettings);
+        await expectRuntimeSettingsRestored(request, currentSettings);
+      }
+      if (restoredMainRuleIds) {
         expect(restoredMainRuleIds).toEqual(originalMainRuleIds);
       }
-      await restoreRuntimeSettings(request, currentSettings);
-      await expectRuntimeSettingsRestored(request, currentSettings);
     }
   });
 });
