@@ -10,6 +10,7 @@ export class FieldTypesPage {
   readonly typeSelect: Locator;
   readonly saveButton: Locator;
   readonly loadingSpinner: Locator;
+  readonly configuredSection: Locator;
   readonly configuredRows: Locator;
 
   constructor(page: Page) {
@@ -19,7 +20,8 @@ export class FieldTypesPage {
     this.typeSelect = page.locator('select');
     this.saveButton = page.locator('button:has-text("Save")');
     this.loadingSpinner = page.locator('.animate-spin');
-    this.configuredRows = page.locator('tbody tr');
+    this.configuredSection = page.locator('h2:has-text("Configured Fields")').locator('../..');
+    this.configuredRows = this.configuredSection.locator('tbody tr');
   }
 
   async goto() {
@@ -31,11 +33,7 @@ export class FieldTypesPage {
   }
 
   async getConfiguredCount(): Promise<number> {
-    // Count rows in the Configured Fields table
-    const section = this.page.locator('h2:has-text("Configured Fields")').locator('../..');
-    const rows = section.locator('tbody tr');
-    const count = await rows.count();
-    return count;
+    return await this.configuredRows.count();
   }
 
   async hasConfiguredField(fieldName: string): Promise<boolean> {
