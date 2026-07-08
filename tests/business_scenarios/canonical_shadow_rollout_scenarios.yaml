@@ -1,0 +1,76 @@
+version: 1
+name: canonical_shadow_rollout_scenarios
+
+outcomes:
+  - name: HOLD
+    severity_rank: 1
+  - name: REVIEW
+    severity_rank: 2
+  - name: RELEASE
+    severity_rank: 3
+
+scenarios:
+  - id: shadow_candidate_records_comparison_without_changing_served_result
+    purpose: Shadow logic is evaluated and logged while production continues to serve the active rule result.
+    mode: shadow
+    actor:
+      email: canonical-shadow@example.com
+    rule:
+      ref: shadow_amount_rule
+      rid: CANONICAL_SHADOW_AMOUNT
+      description: Production amount review rule.
+      logic: "if $amount >= 1000:\n\treturn !REVIEW"
+    candidate:
+      description: Shadow candidate amount hold rule.
+      logic: "if $amount >= 1000:\n\treturn !HOLD"
+    evaluation:
+      transaction_id: canonical_shadow_candidate
+      effective_at: 1710000000
+      event_data:
+        amount: 1500
+      expected:
+        resolved_outcome: REVIEW
+        outcome_counters:
+          REVIEW: 1
+        rule_results:
+          shadow_amount_rule: REVIEW
+    expected_log:
+      mode: shadow
+      selected_variant: control
+      control_result: REVIEW
+      candidate_result: HOLD
+      returned_result: REVIEW
+
+  - id: rollout_candidate_can_win_split_without_mutating_control_rule
+    purpose: A 100 percent rollout serves candidate logic and logs control/candidate provenance without changing the stored rule.
+    mode: rollout
+    actor:
+      email: canonical-rollout@example.com
+    rule:
+      ref: rollout_amount_rule
+      rid: CANONICAL_ROLLOUT_AMOUNT
+      description: Control amount review rule.
+      logic: "if $amount >= 1000:\n\treturn !REVIEW"
+    candidate:
+      description: Rollout candidate amount hold rule.
+      logic: "if $amount >= 1000:\n\treturn !HOLD"
+      traffic_percent: 100
+    evaluation:
+      transaction_id: canonical_rollout_candidate
+      effective_at: 1710000000
+      event_data:
+        amount: 1500
+      expected:
+        resolved_outcome: HOLD
+        outcome_counters:
+          HOLD: 1
+        rule_results:
+          rollout_amount_rule: HOLD
+    expected_log:
+      mode: split
+      selected_variant: candidate
+      traffic_percent: 100
+      control_result: REVIEW
+      candidate_result: HOLD
+      returned_result: HOLD
+    expected_stored_logic: "if $amount >= 1000:\n\treturn !REVIEW"
