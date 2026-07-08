@@ -121,6 +121,7 @@ def test_real_celery_worker_drains_observation_queue_through_redis(reset_live_sm
     assert observed_rows == [
         ("amount", "int"),
         ("country", "str"),
+        ("risk", "dict"),
         ("risk.score", "float"),
     ]
 
