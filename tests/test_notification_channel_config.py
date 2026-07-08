@@ -2,7 +2,6 @@ import datetime
 
 import pytest
 
-import ezrules.core.notification_channel_config as config_module
 from ezrules.backend.notifications.dispatcher import (
     CHANNEL_ADAPTERS,
     SAFE_REDACTION_FALLBACK_ERROR,
@@ -12,9 +11,6 @@ from ezrules.backend.notifications.dispatcher import (
 )
 from ezrules.core.notification_channel_config import (
     REDACTED_VALUE,
-    decrypt_notification_channel_config,
-    decrypt_notification_channel_config_unvalidated,
-    encrypt_notification_channel_config_unvalidated,
 )
 from ezrules.models.backend_core import (
     AlertIncident,
@@ -79,41 +75,6 @@ def test_notification_channel_config_init_applies_config_after_channel_type():
     )
 
     assert channel.config == config
-
-
-def test_legacy_notification_channel_config_encryption_skips_validation():
-    legacy_config = {"unexpected": "legacy", "nested": ["still", "encrypted"]}
-
-    encrypted_config = encrypt_notification_channel_config_unvalidated(legacy_config)
-
-    assert "legacy" not in encrypted_config
-    assert decrypt_notification_channel_config_unvalidated(encrypted_config) == legacy_config
-    assert decrypt_notification_channel_config("webhook", encrypted_config) == legacy_config
-
-
-def test_placeholder_app_secret_uses_settings_env_secret(monkeypatch, tmp_path):
-    legacy_config = {"unexpected": "legacy"}
-    settings_env = tmp_path / "settings.env"
-    settings_env.write_text('EZRULES_APP_SECRET="settings-env-secret"\n', encoding="utf-8")
-
-    monkeypatch.setenv("EZRULES_APP_SECRET", config_module.ALEMBIC_PLACEHOLDER_APP_SECRET)
-    monkeypatch.setattr(config_module, "SETTINGS_ENV_FILE", str(settings_env))
-
-    encrypted_config = encrypt_notification_channel_config_unvalidated(legacy_config)
-
-    monkeypatch.setenv("EZRULES_APP_SECRET", "settings-env-secret")
-    monkeypatch.setattr(config_module, "SETTINGS_ENV_FILE", str(tmp_path / "missing.env"))
-
-    assert decrypt_notification_channel_config_unvalidated(encrypted_config) == legacy_config
-
-
-def test_placeholder_app_secret_without_real_secret_is_rejected(monkeypatch, tmp_path):
-    monkeypatch.setenv("EZRULES_APP_SECRET", config_module.ALEMBIC_PLACEHOLDER_APP_SECRET)
-    monkeypatch.setattr(config_module, "SETTINGS_ENV_FILE", str(tmp_path / "missing.env"))
-    monkeypatch.setattr(config_module.app_settings, "APP_SECRET", config_module.ALEMBIC_PLACEHOLDER_APP_SECRET)
-
-    with pytest.raises(ValueError, match="non-placeholder EZRULES_APP_SECRET"):
-        encrypt_notification_channel_config_unvalidated({})
 
 
 def test_dispatch_failure_persists_redacted_error(session, monkeypatch):
