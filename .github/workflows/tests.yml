@@ -53,7 +53,7 @@ jobs:
     - name: Apply database migrations
       run: uv run alembic upgrade head
 
-    - name: Run tests
+    - name: Run backend and CLI tests
       run: uv run pytest -q --cov=ezrules.backend --cov=ezrules.core --cov-report=xml tests
 
   redis-celery-smoke:

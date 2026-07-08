@@ -1,5 +1,9 @@
 # What's New
 
+## v1.28.6
+
+* **CLI smoke coverage in CI**: Promoted the database-backed CLI smoke flow into pytest so GitHub's backend test workflow now exercises core CLI commands against Postgres, replacing the legacy shell helper.
+
 ## v1.28.5
 
 * **Live Redis/Celery CI smoke lane**: Backend CI now includes a focused Postgres, Redis, and Celery worker job that exercises real queue draining, Redis locking, broker dispatch, result handling, and Redis-backed cache invalidation.
