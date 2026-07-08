@@ -1,9 +1,12 @@
 # What's New
 
+## v1.28.2
+
+* **Protected notification channel configs**: Notification channel configuration is now stored encrypted, validated by channel type, and redacted before dispatch errors or display-safe views can expose secret fields.
+
 ## v1.28.1
 
 * **User role assignment permission boundary**: Creating or inviting users no longer accepts `role_ids`; callers must create or invite the account first and then use the dedicated role-assignment endpoint with `MANAGE_USER_ROLES`.
-* **Protected notification channel configs**: Notification channel configuration is now stored encrypted, validated by channel type, and redacted before dispatch errors or display-safe views can expose secret fields.
 
 ## v1.28.0
 
