@@ -188,7 +188,6 @@ def test_find_duplicate_evaluation_matches_generated_equivalent_payloads(session
             event_data=copy.deepcopy(event_data),
             outcome_counters={"HOLD": 1},
             resolved_outcome="HOLD",
-            rule_results={index + 1: "HOLD"},
         )
 
         duplicate = data_utils.find_duplicate_evaluation(
