@@ -1,5 +1,9 @@
 # What's New
 
+## v1.28.4
+
+* **Canonical business scenario fixtures**: Added YAML-backed canonical scenarios for rule lifecycle, shadow/rollout provenance, labels and audit, graph-feature decisions, and backtesting so these operational journeys can be expanded from readable fixtures.
+
 ## v1.28.3
 
 * **Rule-quality report generation permission**: Added a dedicated `generate_rule_quality_reports` permission so readonly users can view existing rule-quality snapshots without being able to enqueue expensive refreshes or trigger synchronous report computation.

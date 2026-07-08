@@ -1,0 +1,110 @@
+version: 1
+name: canonical_rule_lifecycle_scenarios
+
+outcomes:
+  - name: HOLD
+    severity_rank: 1
+  - name: REVIEW
+    severity_rank: 2
+  - name: RELEASE
+    severity_rank: 3
+
+scenarios:
+  - id: pause_resume_rule_changes_live_serving
+    purpose: Pausing an active rule removes it from live serving, and resuming restores the same decision behavior.
+    actor:
+      email: canonical-lifecycle@example.com
+    rule:
+      ref: lifecycle_device_hold
+      rid: CANONICAL_LIFECYCLE_DEVICE_HOLD
+      description: Hold low-trust device events.
+      logic: "if $device_trust_score <= 20:\n\treturn !HOLD"
+    probes:
+      active:
+        transaction_id: canonical_lifecycle_active
+        effective_at: 1710000000
+        event_data:
+          device_trust_score: 5
+        expected:
+          resolved_outcome: HOLD
+          outcome_counters:
+            HOLD: 1
+          rule_results:
+            lifecycle_device_hold: HOLD
+      paused:
+        transaction_id: canonical_lifecycle_paused
+        effective_at: 1710000060
+        event_data:
+          device_trust_score: 5
+        expected:
+          resolved_outcome: null
+          outcome_counters: {}
+          rule_results: {}
+      resumed:
+        transaction_id: canonical_lifecycle_resumed
+        effective_at: 1710000120
+        event_data:
+          device_trust_score: 5
+        expected:
+          resolved_outcome: HOLD
+          outcome_counters:
+            HOLD: 1
+          rule_results:
+            lifecycle_device_hold: HOLD
+    expected_history_actions:
+      - promoted
+      - paused
+      - resumed
+
+  - id: edited_active_rule_requires_repromotion
+    purpose: Editing an active rule moves it back to draft until the changed logic is promoted.
+    actor:
+      email: canonical-rule-edit@example.com
+    rule:
+      ref: lifecycle_amount_rule
+      rid: CANONICAL_LIFECYCLE_AMOUNT
+      description: Review high amount before edit.
+      logic: "if $amount >= 1000:\n\treturn !REVIEW"
+    initial_probe:
+      transaction_id: canonical_lifecycle_before_edit
+      effective_at: 1710000000
+      event_data:
+        amount: 1500
+      expected:
+        resolved_outcome: REVIEW
+        outcome_counters:
+          REVIEW: 1
+        rule_results:
+          lifecycle_amount_rule: REVIEW
+    update:
+      description: Hold high amount after edit.
+      logic: "if $amount >= 1000:\n\treturn !HOLD"
+    draft_probe:
+      transaction_id: canonical_lifecycle_draft_gap
+      effective_at: 1710000060
+      event_data:
+        amount: 1500
+      expected:
+        resolved_outcome: null
+        outcome_counters: {}
+        rule_results: {}
+    promoted_probe:
+      transaction_id: canonical_lifecycle_after_repromote
+      effective_at: 1710000120
+      event_data:
+        amount: 1500
+      expected:
+        resolved_outcome: HOLD
+        outcome_counters:
+          HOLD: 1
+        rule_results:
+          lifecycle_amount_rule: HOLD
+    expected_history_statuses:
+      - draft
+      - active
+      - draft
+      - active
+    expected_history_actions:
+      - promoted
+      - updated
+      - promoted
