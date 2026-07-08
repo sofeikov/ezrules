@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 
 /**
  * Page Object Model for the Create Rule page.
@@ -108,5 +108,16 @@ export class RuleCreatePage {
    */
   async getTestJsonValue(): Promise<string> {
     return await this.testJsonTextarea.inputValue();
+  }
+
+  async waitForVerifyResponse() {
+    const response = await this.page.waitForResponse(resp =>
+      resp.url().includes('/api/v2/rules/verify') && resp.request().method() === 'POST'
+    );
+    expect(response.ok()).toBeTruthy();
+  }
+
+  async waitForTestJsonToContain(value: string) {
+    await expect(this.testJsonTextarea).toHaveValue(new RegExp(value));
   }
 }

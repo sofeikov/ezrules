@@ -1,10 +1,17 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../support/fixtures';
 import { SettingsPage } from '../pages/settings.page';
-import { getApiBaseUrl, getAuthToken } from '../support/config';
+import {
+  expectRuntimeSettingsRestored,
+  getAIAuthoringSettings,
+  getOutcomeHierarchy,
+  getRuntimeSettings,
+  restoreAIAuthoringSettings,
+  restoreOutcomeHierarchy,
+  restoreRuntimeSettings,
+} from '../support/api-helpers';
+import { SETTINGS_TAG, STATEFUL_TAG } from '../support/tags';
 
-const API_BASE = getApiBaseUrl();
-
-test.describe('Settings Page', () => {
+test.describe(`Settings Page ${STATEFUL_TAG} ${SETTINGS_TAG}`, () => {
   let settingsPage: SettingsPage;
 
   test.beforeEach(async ({ page }) => {
@@ -39,10 +46,7 @@ test.describe('Settings Page', () => {
   });
 
   test('should allow choosing a neutral outcome and surface it in allowlist helper text', async ({ page, request }) => {
-    const authHeaders = { Authorization: `Bearer ${getAuthToken()}` };
-    const currentSettingsResponse = await request.get(`${API_BASE}/api/v2/settings/runtime`, { headers: authHeaders });
-    expect(currentSettingsResponse.ok()).toBeTruthy();
-    const currentSettings = await currentSettingsResponse.json();
+    const currentSettings = await getRuntimeSettings(request);
     try {
       await settingsPage.goto();
       await settingsPage.waitForPageToLoad();
@@ -60,15 +64,8 @@ test.describe('Settings Page', () => {
         `They must return !${nextNeutralOutcome}.`
       );
     } finally {
-      const restoreResponse = await request.put(`${API_BASE}/api/v2/settings/runtime`, {
-        headers: authHeaders,
-        data: {
-          rule_quality_lookback_days: currentSettings.rule_quality_lookback_days,
-          auto_promote_active_rule_updates: currentSettings.auto_promote_active_rule_updates,
-          neutral_outcome: currentSettings.neutral_outcome,
-        },
-      });
-      expect(restoreResponse.ok()).toBeTruthy();
+      await restoreRuntimeSettings(request, currentSettings);
+      await expectRuntimeSettingsRestored(request, currentSettings);
     }
   });
 
@@ -95,30 +92,37 @@ test.describe('Settings Page', () => {
 
     await targetRow.locator('button:has-text("Delete")').click();
     await expect(page.locator('text=Pair deleted successfully.')).toBeVisible();
+    await expect(targetRow).toHaveCount(0);
   });
 
-  test('should allow reordering the outcome hierarchy', async ({ page }) => {
-    await settingsPage.goto();
-    await settingsPage.waitForPageToLoad();
+  test('should allow reordering the outcome hierarchy', async ({ page, request }) => {
+    const originalHierarchy = await getOutcomeHierarchy(request);
+    try {
+      await settingsPage.goto();
+      await settingsPage.waitForPageToLoad();
 
-    const initialHierarchy = await settingsPage.getOutcomeHierarchy();
-    expect(initialHierarchy.length).toBeGreaterThan(1);
+      const initialHierarchy = await settingsPage.getOutcomeHierarchy();
+      expect(initialHierarchy.length).toBeGreaterThan(1);
 
-    const targetOutcome = initialHierarchy[0].trim();
-    await settingsPage.moveOutcomeDownByName(targetOutcome);
-    await settingsPage.saveOutcomeHierarchy();
+      const targetOutcome = initialHierarchy[0].trim();
+      await settingsPage.moveOutcomeDownByName(targetOutcome);
+      await settingsPage.saveOutcomeHierarchy();
 
-    await expect(page.locator('text=Outcome hierarchy saved successfully.')).toBeVisible();
+      await expect(page.locator('text=Outcome hierarchy saved successfully.')).toBeVisible();
 
-    const updatedHierarchy = (await settingsPage.getOutcomeHierarchy()).map(item => item.trim());
-    expect(updatedHierarchy[1]).toBe(targetOutcome);
+      const updatedHierarchy = (await settingsPage.getOutcomeHierarchy()).map(item => item.trim());
+      expect(updatedHierarchy[1]).toBe(targetOutcome);
+    } finally {
+      await restoreOutcomeHierarchy(request, originalHierarchy);
+      const restoredHierarchy = await getOutcomeHierarchy(request);
+      expect(restoredHierarchy.outcomes.map(outcome => outcome.ao_id)).toEqual(
+        originalHierarchy.outcomes.map(outcome => outcome.ao_id)
+      );
+    }
   });
 
   test('should allow configuring OpenAI AI authoring settings', async ({ request, page }) => {
-    const authHeaders = { Authorization: `Bearer ${getAuthToken()}` };
-    const currentSettingsResponse = await request.get(`${API_BASE}/api/v2/settings/ai-authoring`, { headers: authHeaders });
-    expect(currentSettingsResponse.ok()).toBeTruthy();
-    const currentSettings = await currentSettingsResponse.json();
+    const currentSettings = await getAIAuthoringSettings(request);
 
     try {
       await settingsPage.goto();
@@ -136,16 +140,11 @@ test.describe('Settings Page', () => {
       await expect(settingsPage.aiProviderSelect).toHaveValue('openai');
       await expect(settingsPage.aiModelInput).toHaveValue('gpt-4.1-mini');
     } finally {
-      const restoreResponse = await request.put(`${API_BASE}/api/v2/settings/ai-authoring`, {
-        headers: authHeaders,
-        data: {
-          provider: currentSettings.provider,
-          enabled: currentSettings.api_key_configured ? currentSettings.enabled : false,
-          model: currentSettings.model,
-          clear_api_key: currentSettings.api_key_configured ? undefined : true,
-        },
-      });
-      expect(restoreResponse.ok()).toBeTruthy();
+      const restoredSettings = await restoreAIAuthoringSettings(request, currentSettings);
+      expect(restoredSettings.provider).toBe(currentSettings.provider);
+      expect(restoredSettings.enabled).toBe(currentSettings.api_key_configured ? currentSettings.enabled : false);
+      expect(restoredSettings.model).toBe(currentSettings.model);
+      expect(restoredSettings.api_key_configured).toBe(currentSettings.api_key_configured);
     }
   });
 });

@@ -1,7 +1,19 @@
-import { test, expect, type APIRequestContext } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
+import { test, expect } from '../support/fixtures';
 import { RuleListPage } from '../pages/rule-list.page';
 import { SettingsPage } from '../pages/settings.page';
 import { getApiBaseUrl, getAuthToken } from '../support/config';
+import {
+  createRule,
+  deleteRuleById,
+  expectApiOk,
+  expectRuntimeSettingsRestored,
+  getRuntimeSettings,
+  promoteRule,
+  restoreRuntimeSettings,
+} from '../support/api-helpers';
+import { testResourceName } from '../support/test-data';
+import { SETTINGS_TAG, STATEFUL_TAG } from '../support/tags';
 
 const API_BASE = getApiBaseUrl();
 
@@ -17,55 +29,41 @@ async function apiRequest(
     headers: authHeaders,
     data,
   });
-  expect(response.ok()).toBeTruthy();
+  await expectApiOk(response, `${method} ${path}`);
   return response;
 }
 
 async function createMainRule(
   request: APIRequestContext,
-  authHeaders: Record<string, string>,
   rid: string,
   description: string,
   executionOrder: number,
 ) {
-  const response = await apiRequest(
-    request,
-    '/api/v2/rules',
-    'POST',
-    {
-      rid,
-      description,
-      logic: 'if $amount > 0:\n\treturn !HOLD',
-      execution_order: executionOrder,
-      evaluation_lane: 'main',
-    },
-    authHeaders,
-  );
-  const payload = await response.json();
-  const ruleId = payload.rule.r_id as number;
-  await apiRequest(request, `/api/v2/rules/${ruleId}/promote`, 'POST', {}, authHeaders);
+  const rule = await createRule(request, {
+    rid,
+    description,
+    logic: 'if $amount > 0:\n\treturn !HOLD',
+    evaluation_lane: 'main',
+    execution_order: executionOrder,
+  });
+  const ruleId = rule.r_id;
+  await promoteRule(request, ruleId);
   return ruleId;
 }
 
-function buildRuntimeSettingsPayload(
-  currentSettings: Record<string, unknown>,
-  overrides: Partial<Record<'main_rule_execution_mode', string>>,
-) {
-  return {
-    rule_quality_lookback_days: currentSettings.rule_quality_lookback_days,
-    auto_promote_active_rule_updates: currentSettings.auto_promote_active_rule_updates,
-    main_rule_execution_mode: overrides.main_rule_execution_mode ?? currentSettings.main_rule_execution_mode,
-    neutral_outcome: currentSettings.neutral_outcome,
-  };
+async function getActiveMainRuleIds(request: APIRequestContext, authHeaders: Record<string, string>) {
+  const rulesResponse = await request.get(`${API_BASE}/api/v2/rules`, { headers: authHeaders });
+  await expectApiOk(rulesResponse, 'List rules for order restore check');
+  const rulesPayload = await rulesResponse.json();
+  return (rulesPayload.rules as Array<{ r_id: number; evaluation_lane: string; status: string }>)
+    .filter((rule) => rule.evaluation_lane === 'main' && rule.status !== 'archived')
+    .map((rule) => rule.r_id);
 }
 
-test.describe('Main Rule Execution Mode', () => {
+test.describe(`Main Rule Execution Mode ${STATEFUL_TAG} ${SETTINGS_TAG} @global-order`, () => {
   test('should allow changing the main rule execution mode', async ({ page, request }) => {
     const settingsPage = new SettingsPage(page);
-    const authHeaders = { Authorization: `Bearer ${getAuthToken()}` };
-    const currentSettingsResponse = await request.get(`${API_BASE}/api/v2/settings/runtime`, { headers: authHeaders });
-    expect(currentSettingsResponse.ok()).toBeTruthy();
-    const currentSettings = await currentSettingsResponse.json();
+    const currentSettings = await getRuntimeSettings(request);
 
     try {
       await settingsPage.goto();
@@ -83,58 +81,48 @@ test.describe('Main Rule Execution Mode', () => {
       await expect(page.locator('text=Settings saved successfully.')).toBeVisible();
       await expect(executionModeSelect).toHaveValue(nextMode);
     } finally {
-      const restoreResponse = await request.put(`${API_BASE}/api/v2/settings/runtime`, {
-        headers: authHeaders,
-        data: buildRuntimeSettingsPayload(currentSettings, {}),
-      });
-      expect(restoreResponse.ok()).toBeTruthy();
+      await restoreRuntimeSettings(request, currentSettings);
+      await expectRuntimeSettingsRestored(request, currentSettings);
     }
   });
 
-  test('should show rule-order controls only when first-match mode is enabled', async ({ page, request }) => {
+  test('should show rule-order controls only when first-match mode is enabled', async ({ page, request }, testInfo) => {
     test.setTimeout(120000);
     const rulePage = new RuleListPage(page);
     const authHeaders = { Authorization: `Bearer ${getAuthToken()}` };
-    const currentSettingsResponse = await request.get(`${API_BASE}/api/v2/settings/runtime`, { headers: authHeaders });
-    expect(currentSettingsResponse.ok()).toBeTruthy();
-    const currentSettings = await currentSettingsResponse.json();
+    const currentSettings = await getRuntimeSettings(request);
     const createdRuleIds: number[] = [];
     let originalMainRuleIds: number[] = [];
 
     try {
-      await request.put(`${API_BASE}/api/v2/settings/runtime`, {
-        headers: authHeaders,
-        data: buildRuntimeSettingsPayload(currentSettings, { main_rule_execution_mode: 'all_matches' }),
+      await restoreRuntimeSettings(request, {
+        ...currentSettings,
+        main_rule_execution_mode: 'all_matches',
       });
 
       await page.goto('/rules');
       await expect(page.locator('th:has-text("Order")')).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Reorder Rules' })).toHaveCount(0);
 
-      await request.put(`${API_BASE}/api/v2/settings/runtime`, {
-        headers: authHeaders,
-        data: buildRuntimeSettingsPayload(currentSettings, { main_rule_execution_mode: 'first_match' }),
+      await restoreRuntimeSettings(request, {
+        ...currentSettings,
+        main_rule_execution_mode: 'first_match',
       });
 
       await page.goto('/rules');
       await expect(page.locator('th:has-text("Order")')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Reorder Rules' })).toBeVisible();
 
-      const originalRulesResponse = await request.get(`${API_BASE}/api/v2/rules`, { headers: authHeaders });
-      expect(originalRulesResponse.ok()).toBeTruthy();
-      const originalRulesPayload = await originalRulesResponse.json();
-      originalMainRuleIds = (originalRulesPayload.rules as Array<{ r_id: number; evaluation_lane: string; status: string }>)
-        .filter((rule) => rule.evaluation_lane === 'main' && rule.status !== 'archived')
-        .map((rule) => rule.r_id);
+      originalMainRuleIds = await getActiveMainRuleIds(request, authHeaders);
 
-      const unique = Date.now();
-      const ruleOneRid = `E2E_ORDER_RULE_1_${unique}`;
-      const ruleTwoRid = `E2E_ORDER_RULE_2_${unique}`;
-      const ruleThreeRid = `E2E_ORDER_RULE_3_${unique}`;
+      const unique = testResourceName(testInfo, 'E2E_ORDER', { maxLength: 48, uppercase: true });
+      const ruleOneRid = `${unique}_RULE_1`;
+      const ruleTwoRid = `${unique}_RULE_2`;
+      const ruleThreeRid = `${unique}_RULE_3`;
 
-      const ruleOneId = await createMainRule(request, authHeaders, ruleOneRid, 'E2E order first', 997);
-      const ruleTwoId = await createMainRule(request, authHeaders, ruleTwoRid, 'E2E order second', 998);
-      const ruleThreeId = await createMainRule(request, authHeaders, ruleThreeRid, 'E2E order third', 999);
+      const ruleOneId = await createMainRule(request, ruleOneRid, 'E2E order first', 997);
+      const ruleTwoId = await createMainRule(request, ruleTwoRid, 'E2E order second', 998);
+      const ruleThreeId = await createMainRule(request, ruleThreeRid, 'E2E order third', 999);
       createdRuleIds.push(ruleOneId, ruleTwoId, ruleThreeId);
 
       await rulePage.goto();
@@ -202,20 +190,15 @@ test.describe('Main Rule Execution Mode', () => {
       expect(persistedRowIndexes[1]).toBeLessThan(persistedRowIndexes[0]);
     } finally {
       for (const ruleId of createdRuleIds) {
-        const deleteResponse = await request.fetch(`${API_BASE}/api/v2/rules/${ruleId}`, {
-          method: 'DELETE',
-          headers: authHeaders,
-        });
-        expect(deleteResponse.ok()).toBeTruthy();
+        await deleteRuleById(request, ruleId);
       }
       if (originalMainRuleIds.length > 0) {
         await apiRequest(request, '/api/v2/rules/main-order', 'PUT', { ordered_r_ids: originalMainRuleIds }, authHeaders);
+        const restoredMainRuleIds = await getActiveMainRuleIds(request, authHeaders);
+        expect(restoredMainRuleIds).toEqual(originalMainRuleIds);
       }
-      const restoreResponse = await request.put(`${API_BASE}/api/v2/settings/runtime`, {
-        headers: authHeaders,
-        data: buildRuntimeSettingsPayload(currentSettings, {}),
-      });
-      expect(restoreResponse.ok()).toBeTruthy();
+      await restoreRuntimeSettings(request, currentSettings);
+      await expectRuntimeSettingsRestored(request, currentSettings);
     }
   });
 });

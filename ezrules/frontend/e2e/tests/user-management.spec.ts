@@ -1,10 +1,12 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../support/fixtures';
 import { UserManagementPage } from '../pages/user-management.page';
+import { testResourceName } from '../support/test-data';
+import { STATEFUL_TAG, TEST_DATA_TAG } from '../support/tags';
 
 /**
  * E2E tests for the User Management page.
  */
-test.describe('User Management Page', () => {
+test.describe(`User Management Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
   let userMgmtPage: UserManagementPage;
 
   test.beforeEach(async ({ page }) => {
@@ -76,11 +78,11 @@ test.describe('User Management Page', () => {
       await expect(userMgmtPage.createUserButton).toBeVisible();
     });
 
-    test('should create a new user and display it in the table', async ({ page }) => {
+    test('should create a new user and display it in the table', async ({ page }, testInfo) => {
       await userMgmtPage.goto();
       await userMgmtPage.waitForUsersToLoad();
 
-      const uniqueEmail = `e2e_test_${Date.now()}@example.com`;
+      const uniqueEmail = `${testResourceName(testInfo, 'e2e_test', { maxLength: 48 }).toLowerCase()}@example.com`;
 
       await userMgmtPage.createUser(uniqueEmail, 'testpass123');
 
@@ -109,11 +111,11 @@ test.describe('User Management Page', () => {
       );
     });
 
-    test('should show error for duplicate email', async ({ page }) => {
+    test('should show error for duplicate email', async ({ page }, testInfo) => {
       await userMgmtPage.goto();
       await userMgmtPage.waitForUsersToLoad();
 
-      const uniqueEmail = `e2e_dup_${Date.now()}@example.com`;
+      const uniqueEmail = `${testResourceName(testInfo, 'e2e_dup', { maxLength: 48 }).toLowerCase()}@example.com`;
 
       // Create user first time
       await userMgmtPage.createUser(uniqueEmail, 'testpass123');
@@ -149,12 +151,12 @@ test.describe('User Management Page', () => {
   });
 
   test.describe('Delete User', () => {
-    test('should delete a user after confirmation', async ({ page }) => {
+    test('should delete a user after confirmation', async ({ page }, testInfo) => {
       await userMgmtPage.goto();
       await userMgmtPage.waitForUsersToLoad();
 
       // Create a user to delete
-      const uniqueEmail = `e2e_del_${Date.now()}@example.com`;
+      const uniqueEmail = `${testResourceName(testInfo, 'e2e_del', { maxLength: 48 }).toLowerCase()}@example.com`;
       await userMgmtPage.createUser(uniqueEmail, 'testpass123');
 
       await page.waitForFunction(
@@ -186,12 +188,12 @@ test.describe('User Management Page', () => {
       expect(countAfter).toBe(countBefore - 1);
     });
 
-    test('should not delete a user when confirmation is dismissed', async ({ page }) => {
+    test('should not delete a user when confirmation is dismissed', async ({ page }, testInfo) => {
       await userMgmtPage.goto();
       await userMgmtPage.waitForUsersToLoad();
 
       // Create a user to test with
-      const uniqueEmail = `e2e_nodel_${Date.now()}@example.com`;
+      const uniqueEmail = `${testResourceName(testInfo, 'e2e_nodel', { maxLength: 48 }).toLowerCase()}@example.com`;
       await userMgmtPage.createUser(uniqueEmail, 'testpass123');
 
       await page.waitForFunction(
@@ -205,20 +207,19 @@ test.describe('User Management Page', () => {
 
       const countBefore = await userMgmtPage.getUserRowCount();
 
-      // Dismiss the confirmation dialog
-      page.on('dialog', dialog => dialog.dismiss());
-
+      const dismissDialogPromise = page.waitForEvent('dialog');
       await userMgmtPage.clickDeleteUser(uniqueEmail);
+      const dismissDialog = await dismissDialogPromise;
+      await dismissDialog.dismiss();
 
-      // Wait briefly and check count is unchanged
-      await page.waitForTimeout(500);
-      const countAfter = await userMgmtPage.getUserRowCount();
-      expect(countAfter).toBe(countBefore);
+      await expect(page.locator('table tbody tr')).toHaveCount(countBefore);
+      expect(await userMgmtPage.hasUserWithEmail(uniqueEmail)).toBe(true);
 
       // Cleanup
-      page.removeAllListeners('dialog');
-      page.on('dialog', dialog => dialog.accept());
+      const acceptDialogPromise = page.waitForEvent('dialog');
       await userMgmtPage.clickDeleteUser(uniqueEmail);
+      const acceptDialog = await acceptDialogPromise;
+      await acceptDialog.accept();
       await page.waitForFunction(
         (email: string) => {
           const rows = document.querySelectorAll('table tbody tr');
