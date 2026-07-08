@@ -68,23 +68,23 @@ export interface AIAuthoringSettingsUpdateRequest {
 }
 
 interface RuntimeSettingsV2 {
-  auto_promote_active_rule_updates: boolean;
-  default_auto_promote_active_rule_updates: boolean;
-  main_rule_execution_mode: string;
-  default_main_rule_execution_mode: string;
-  rule_quality_lookback_days: number;
-  default_rule_quality_lookback_days: number;
-  neutral_outcome: string;
-  default_neutral_outcome: string;
-  invalid_allowlist_rules: InvalidAllowlistRuleV2[];
+  auto_promote_active_rule_updates?: boolean | null;
+  default_auto_promote_active_rule_updates?: boolean | null;
+  main_rule_execution_mode?: string | null;
+  default_main_rule_execution_mode?: string | null;
+  rule_quality_lookback_days?: number | null;
+  default_rule_quality_lookback_days?: number | null;
+  neutral_outcome?: string | null;
+  default_neutral_outcome?: string | null;
+  invalid_allowlist_rules?: InvalidAllowlistRuleV2[] | null;
 }
 
 interface AIAuthoringSettingsV2 {
-  provider: string;
-  supported_providers: string[];
-  enabled: boolean;
-  model: string;
-  api_key_configured: boolean;
+  provider?: string | null;
+  supported_providers?: string[] | null;
+  enabled?: boolean | null;
+  model?: string | null;
+  api_key_configured?: boolean | null;
 }
 
 interface InvalidAllowlistRuleV2 {
@@ -105,12 +105,12 @@ interface RuleQualityPairV2 {
 }
 
 interface RuleQualityPairsListResponseV2 {
-  pairs: RuleQualityPairV2[];
+  pairs?: RuleQualityPairV2[] | null;
 }
 
 interface RuleQualityPairOptionsResponseV2 {
-  outcomes: string[];
-  labels: string[];
+  outcomes?: string[] | null;
+  labels?: string[] | null;
 }
 
 interface OutcomeHierarchyItemV2 {
@@ -120,7 +120,7 @@ interface OutcomeHierarchyItemV2 {
 }
 
 interface OutcomeHierarchyResponseV2 {
-  outcomes: OutcomeHierarchyItemV2[];
+  outcomes?: OutcomeHierarchyItemV2[] | null;
 }
 
 @Injectable({
@@ -154,11 +154,11 @@ export class RuntimeSettingsService {
   getAIAuthoringSettings(): Observable<AIAuthoringSettings> {
     return this.http.get<AIAuthoringSettingsV2>(this.aiAuthoringSettingsUrl).pipe(
       map(response => ({
-        provider: response.provider,
-        supportedProviders: response.supported_providers,
-        enabled: response.enabled,
-        model: response.model,
-        apiKeyConfigured: response.api_key_configured,
+        provider: response.provider ?? 'openai',
+        supportedProviders: response.supported_providers ?? ['openai'],
+        enabled: response.enabled ?? false,
+        model: response.model ?? '',
+        apiKeyConfigured: response.api_key_configured ?? false,
       }))
     );
   }
@@ -172,26 +172,26 @@ export class RuntimeSettingsService {
       clear_api_key: request.clearApiKey,
     }).pipe(
       map(response => ({
-        provider: response.provider,
-        supportedProviders: response.supported_providers,
-        enabled: response.enabled,
-        model: response.model,
-        apiKeyConfigured: response.api_key_configured,
+        provider: response.provider ?? 'openai',
+        supportedProviders: response.supported_providers ?? ['openai'],
+        enabled: response.enabled ?? false,
+        model: response.model ?? '',
+        apiKeyConfigured: response.api_key_configured ?? false,
       }))
     );
   }
 
   getRuleQualityPairs(): Observable<RuleQualityPair[]> {
     return this.http.get<RuleQualityPairsListResponseV2>(this.ruleQualityPairsUrl).pipe(
-      map(response => response.pairs.map(pair => this.mapRuleQualityPair(pair)))
+      map(response => (response.pairs ?? []).map(pair => this.mapRuleQualityPair(pair)))
     );
   }
 
   getRuleQualityPairOptions(): Observable<RuleQualityPairOptions> {
     return this.http.get<RuleQualityPairOptionsResponseV2>(`${this.ruleQualityPairsUrl}/options`).pipe(
       map(response => ({
-        outcomes: response.outcomes,
-        labels: response.labels
+        outcomes: response.outcomes ?? [],
+        labels: response.labels ?? []
       }))
     );
   }
@@ -219,7 +219,7 @@ export class RuntimeSettingsService {
 
   getOutcomeHierarchy(): Observable<OutcomeHierarchyItem[]> {
     return this.http.get<OutcomeHierarchyResponseV2>(this.outcomeHierarchyUrl).pipe(
-      map(response => response.outcomes.map(item => this.mapOutcomeHierarchyItem(item)))
+      map(response => (response.outcomes ?? []).map(item => this.mapOutcomeHierarchyItem(item)))
     );
   }
 
@@ -227,7 +227,7 @@ export class RuntimeSettingsService {
     return this.http.put<OutcomeHierarchyResponseV2>(this.outcomeHierarchyUrl, {
       ordered_ao_ids: orderedAoIds
     }).pipe(
-      map(response => response.outcomes.map(item => this.mapOutcomeHierarchyItem(item)))
+      map(response => (response.outcomes ?? []).map(item => this.mapOutcomeHierarchyItem(item)))
     );
   }
 
@@ -262,15 +262,15 @@ export class RuntimeSettingsService {
 
   private mapRuntimeSettings(response: RuntimeSettingsV2): RuntimeSettings {
     return {
-      autoPromoteActiveRuleUpdates: response.auto_promote_active_rule_updates,
-      defaultAutoPromoteActiveRuleUpdates: response.default_auto_promote_active_rule_updates,
-      mainRuleExecutionMode: response.main_rule_execution_mode,
-      defaultMainRuleExecutionMode: response.default_main_rule_execution_mode,
-      ruleQualityLookbackDays: response.rule_quality_lookback_days,
-      defaultRuleQualityLookbackDays: response.default_rule_quality_lookback_days,
-      neutralOutcome: response.neutral_outcome,
-      defaultNeutralOutcome: response.default_neutral_outcome,
-      invalidAllowlistRules: response.invalid_allowlist_rules.map((rule) => this.mapInvalidAllowlistRule(rule)),
+      autoPromoteActiveRuleUpdates: response.auto_promote_active_rule_updates ?? false,
+      defaultAutoPromoteActiveRuleUpdates: response.default_auto_promote_active_rule_updates ?? false,
+      mainRuleExecutionMode: response.main_rule_execution_mode ?? 'all_matches',
+      defaultMainRuleExecutionMode: response.default_main_rule_execution_mode ?? 'all_matches',
+      ruleQualityLookbackDays: response.rule_quality_lookback_days ?? response.default_rule_quality_lookback_days ?? 30,
+      defaultRuleQualityLookbackDays: response.default_rule_quality_lookback_days ?? 30,
+      neutralOutcome: response.neutral_outcome ?? '',
+      defaultNeutralOutcome: response.default_neutral_outcome ?? 'RELEASE',
+      invalidAllowlistRules: (response.invalid_allowlist_rules ?? []).map((rule) => this.mapInvalidAllowlistRule(rule)),
     };
   }
 }

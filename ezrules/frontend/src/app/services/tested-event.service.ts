@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 export interface TriggeredRule {
@@ -32,6 +33,12 @@ export interface TestedEventsResponse {
   events: TestedEvent[];
   total: number;
   limit: number;
+}
+
+interface TestedEventsApiResponse {
+  events?: TestedEvent[] | null;
+  total?: number | null;
+  limit?: number | null;
 }
 
 export interface TestedEventGraphNode {
@@ -85,7 +92,13 @@ export class TestedEventService {
     const params = new HttpParams()
       .set('limit', limit.toString())
       .set('include_referenced_fields', 'true');
-    return this.http.get<TestedEventsResponse>(this.apiUrl, { params });
+    return this.http.get<TestedEventsApiResponse>(this.apiUrl, { params }).pipe(
+      map(response => ({
+        events: response.events ?? [],
+        total: response.total ?? 0,
+        limit: response.limit ?? limit,
+      }))
+    );
   }
 
   getTestedEventGraph(evaluationDecisionId: number, options: TestedEventGraphOptions = {}): Observable<TestedEventGraphResponse> {

@@ -1,5 +1,10 @@
 # What's New
 
+## v1.28.7
+
+* **Negative UI state coverage**: Added Playwright coverage for expired sessions, failed refreshes, failed rule saves, settings permission failures, slow and unreachable APIs, failed backtest retry states, and nullable list payloads.
+* **Nullable response resilience**: Frontend settings, tested-events, and rule triggered-events readers now treat omitted or null list fields as empty lists so affected pages render their empty states instead of failing generically.
+
 ## v1.28.6
 
 * **CLI smoke coverage in CI**: Promoted the database-backed CLI smoke flow into pytest so GitHub's backend test workflow now exercises core CLI commands against Postgres, replacing the legacy shell helper.
