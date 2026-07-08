@@ -18,7 +18,7 @@ export default defineConfig({
 
   /* Keep local runs aligned with CI's single-worker invocation to avoid
    * overloading the dev API/database pool during full-suite browser runs. */
-  workers: process.env.CI ? 4 : 1,
+  workers: 1,
 
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [

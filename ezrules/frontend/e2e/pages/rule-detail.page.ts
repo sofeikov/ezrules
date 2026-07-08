@@ -219,7 +219,9 @@ export class RuleDetailPage {
   }
 
   async waitForTestJsonToContain(value: string) {
-    await expect(this.testJsonTextarea).toHaveValue(new RegExp(value));
+    await expect
+      .poll(async () => await this.testJsonTextarea.inputValue())
+      .toContain(value);
   }
 
   /**
