@@ -1,5 +1,9 @@
 # What's New
 
+## v1.28.7
+
+* **Canonical product journey coverage**: Expanded the business-scenario product journey suite with stable end-to-end stories for feature-aware evaluation, historical corrections, agent-tool replay, rule edit triggered-event snapshots, computed-feature backtesting, and rejected-operation no-side-effect guarantees.
+
 ## v1.28.6
 
 * **CLI smoke coverage in CI**: Promoted the database-backed CLI smoke flow into pytest so GitHub's backend test workflow now exercises core CLI commands against Postgres, replacing the legacy shell helper.
