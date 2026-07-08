@@ -1,7 +1,7 @@
 # Tooling
 1. The project uses uv for environment and package management. Only use uv for Python-related package management. Never create virtual environments manually.
 2. Code quality checks: `uv run poe check` (ruff format check, ty type check, ruff linting).
-3. CLI test helper: `./test_cli.sh`.
+3. CLI smoke test: `uv run pytest -q tests/test_cli_smoke.py`.
 
 # Verification Policy
 Default to GitHub-hosted verification instead of local test execution.

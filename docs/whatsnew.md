@@ -2,7 +2,7 @@
 
 ## v1.28.4
 
-* **CLI smoke coverage in CI**: Promoted the database-backed CLI smoke flow into pytest so GitHub's backend test workflow now exercises core CLI commands against Postgres.
+* **CLI smoke coverage in CI**: Promoted the database-backed CLI smoke flow into pytest so GitHub's backend test workflow now exercises core CLI commands against Postgres, replacing the legacy shell helper.
 
 ## v1.28.3
 

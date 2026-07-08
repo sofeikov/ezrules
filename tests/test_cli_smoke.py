@@ -1,4 +1,4 @@
-"""End-to-end smoke coverage for the CLI flows formerly kept in test_cli.sh."""
+"""End-to-end smoke coverage for core database-backed CLI flows."""
 
 import csv
 import os

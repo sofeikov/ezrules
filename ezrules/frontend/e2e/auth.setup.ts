@@ -8,7 +8,7 @@ setup('authenticate', async ({ page }) => {
   // Navigate to login page
   await page.goto('/login');
 
-  // Fill in credentials (uses the default test user created by test_cli.sh)
+  // Fill in credentials seeded by the Playwright test database setup.
   await page.fill('input#email', 'admin@test_org.com');
   await page.fill('input#password', '12345678');
   await page.click('button[type="submit"]');
