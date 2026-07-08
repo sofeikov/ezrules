@@ -145,10 +145,9 @@ test.describe(`Field Types Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
 
       await fieldTypesPage.waitForConfiguredField(fieldName);
 
-      const countBefore = await fieldTypesPage.getConfiguredCount();
       await dismissDialog(page, () => fieldTypesPage.deleteFieldType(fieldName));
 
-      await expect(fieldTypesPage.configuredRows).toHaveCount(countBefore);
+      await expect(fieldTypesPage.configuredFieldRow(fieldName)).toHaveCount(1);
       expect(await fieldTypesPage.hasConfiguredField(fieldName)).toBe(true);
 
       // Cleanup
