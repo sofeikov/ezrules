@@ -39,23 +39,6 @@ class LoginRequest(BaseModel):
     password: str
 
 
-class RefreshRequest(BaseModel):
-    """
-    Refresh token request payload.
-
-    Example JSON:
-    {
-        "refresh_token": "eyJhbGciOiJIUzI1NiIs..."
-    }
-
-    This is used by API clients when the access token expires and the client
-    wants a new one without re-entering their password. Browser clients can
-    instead rely on the HttpOnly refresh cookie set during login.
-    """
-
-    refresh_token: str | None = None
-
-
 class AcceptInviteRequest(BaseModel):
     """Accept-invite payload."""
 
@@ -88,7 +71,6 @@ class TokenResponse(BaseModel):
     Example response:
     {
         "access_token": "eyJhbGciOiJIUzI1NiIs...",
-        "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
         "token_type": "bearer",
         "expires_in": 1800
     }
@@ -96,11 +78,10 @@ class TokenResponse(BaseModel):
     The client will:
     1. Store the access token
     2. Send access_token in Authorization header: "Bearer eyJ..."
-    3. When access_token expires, use the refresh_token or HttpOnly refresh cookie to get a new pair
+    3. When access_token expires, use the HttpOnly refresh cookie to get a new access token
     """
 
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"  # Always "bearer" for JWT
     expires_in: int  # Seconds until access_token expires
 

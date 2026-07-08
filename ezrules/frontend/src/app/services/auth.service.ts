@@ -7,7 +7,6 @@ import { environment } from '../../environments/environment';
 
 export interface TokenResponse {
   access_token: string;
-  refresh_token: string;
   token_type: string;
   expires_in: number;
 }
@@ -31,7 +30,6 @@ export interface MessageResponse {
 export class AuthService {
   private readonly AUTH_URL = `${environment.apiUrl}/api/v2/auth`;
   private readonly ACCESS_TOKEN_KEY = 'ezrules_access_token';
-  private readonly LEGACY_REFRESH_TOKEN_KEY = 'ezrules_refresh_token';
 
   private loggedIn = new BehaviorSubject<boolean>(this.hasToken());
   private currentUser = new BehaviorSubject<AuthUser | null>(null);
@@ -68,7 +66,6 @@ export class AuthService {
     }).pipe(
       tap(response => {
         localStorage.setItem(this.ACCESS_TOKEN_KEY, response.access_token);
-        localStorage.removeItem(this.LEGACY_REFRESH_TOKEN_KEY);
         this.setCurrentUser(null);
         this.currentUserRequest$ = null;
         this.loggedIn.next(true);
@@ -85,7 +82,6 @@ export class AuthService {
     return this.http.post<TokenResponse>(`${this.AUTH_URL}/refresh`, null, { withCredentials: true }).pipe(
       tap(response => {
         localStorage.setItem(this.ACCESS_TOKEN_KEY, response.access_token);
-        localStorage.removeItem(this.LEGACY_REFRESH_TOKEN_KEY);
         this.currentUserRequest$ = null;
         this.loggedIn.next(true);
       }),
@@ -105,7 +101,6 @@ export class AuthService {
       });
     }
     localStorage.removeItem(this.ACCESS_TOKEN_KEY);
-    localStorage.removeItem(this.LEGACY_REFRESH_TOKEN_KEY);
     this.setCurrentUser(null);
     this.currentUserRequest$ = null;
     this.loggedIn.next(false);

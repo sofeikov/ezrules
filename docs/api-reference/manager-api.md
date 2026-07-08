@@ -41,26 +41,18 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 
 ### Session revocation (logout)
 
-Refresh tokens are tracked server-side in the `user_session` table as SHA-256 hashes. Browser logins also receive the refresh token in an HttpOnly `ezrules_refresh_token` cookie, so browser logout can revoke the session without exposing the refresh token to JavaScript:
+Refresh tokens are tracked server-side in the `user_session` table as SHA-256 hashes. Logins receive the refresh token only in an HttpOnly `ezrules_refresh_token` cookie, so logout can revoke the session without exposing the refresh token to JavaScript:
 
 ```bash
 curl -X POST http://localhost:8888/api/v2/auth/logout \
   --cookie "ezrules_refresh_token=<refresh_token>"
 ```
 
-API clients can still revoke a session by sending the refresh token in the request body:
-
-```bash
-curl -X POST http://localhost:8888/api/v2/auth/logout \
-  -H "Content-Type: application/json" \
-  -d '{"refresh_token": "<refresh_token>"}'
-```
-
 After a successful logout, the refresh token hash is deleted from the database and any subsequent attempt to use that refresh token returns `401`. Access tokens remain valid until their 30-minute expiry (stateless JWTs cannot be revoked).
 
 ### Refresh token rotation
 
-Each call to `POST /api/v2/auth/refresh` deletes the stored hash for the submitted refresh token and issues a new one. Browser clients can refresh by sending the HttpOnly cookie; API clients can continue sending `{"refresh_token": "<refresh_token>"}`. A refresh token can only be used once. Presenting a previously-used or revoked refresh token returns `401 Session not found or already revoked`.
+Each call to `POST /api/v2/auth/refresh` deletes the stored hash for the refresh token in the HttpOnly cookie and sets a new refresh cookie. Refresh tokens are not returned in JSON response bodies and cannot be supplied in request bodies. A refresh token can only be used once. Presenting a previously-used or revoked refresh token returns `401 Session not found or already revoked`.
 
 ## Endpoint Map
 
@@ -72,8 +64,8 @@ Each call to `POST /api/v2/auth/refresh` deletes the stored hash for the submitt
 | `POST` | `/api/v2/auth/accept-invite` | No | Accept invitation token and set password |
 | `POST` | `/api/v2/auth/forgot-password` | No | Send password reset email (always generic response) |
 | `POST` | `/api/v2/auth/reset-password` | No | Reset password using one-time token |
-| `POST` | `/api/v2/auth/refresh` | No (refresh cookie or body) | Exchanges refresh token (rotation — one-time use) |
-| `POST` | `/api/v2/auth/logout` | Refresh cookie or body | Revokes refresh token server-side |
+| `POST` | `/api/v2/auth/refresh` | Refresh cookie | Exchanges refresh token (rotation — one-time use) |
+| `POST` | `/api/v2/auth/logout` | Refresh cookie | Revokes refresh token server-side |
 | `GET` | `/api/v2/auth/me` | Bearer | Current user profile, including effective permission names |
 
 ### Rules

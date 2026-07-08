@@ -18,7 +18,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
-from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 
@@ -34,7 +34,6 @@ from ezrules.backend.api_v2.auth.schemas import (
     AcceptInviteRequest,
     ForgotPasswordRequest,
     MessageResponse,
-    RefreshRequest,
     ResetPasswordRequest,
     RoleResponse,
     TokenResponse,
@@ -150,9 +149,7 @@ def _clear_refresh_token_cookie(response: Response) -> None:
     )
 
 
-def _refresh_token_from_request(body: RefreshRequest | None, request: Request) -> str | None:
-    if body is not None and body.refresh_token:
-        return body.refresh_token
+def _refresh_token_from_cookie(request: Request) -> str | None:
     return request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
 
 
@@ -183,7 +180,8 @@ def login(
     """
     Authenticate user and return JWT tokens.
 
-    This endpoint accepts credentials and returns an access token + refresh token.
+    This endpoint accepts credentials, returns an access token, and sets the
+    refresh token in an HttpOnly cookie.
 
     **How to use:**
 
@@ -193,9 +191,8 @@ def login(
 
     2. On success, you get back:
        - access_token: Use this in Authorization header for API calls
-       - refresh_token: Use this to get new access tokens
-       - HttpOnly refresh cookie: Browser clients can refresh without storing
-         the refresh token in JavaScript-accessible storage
+       - HttpOnly refresh cookie: Refresh/logout use this cookie without exposing
+         the refresh token to JavaScript-accessible storage
        - expires_in: Seconds until access_token expires
 
     3. For subsequent API calls, include the header:
@@ -256,7 +253,6 @@ def login(
 
     return TokenResponse(
         access_token=access_token,
-        refresh_token=refresh_token,
         token_type="bearer",
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert to seconds
     )
@@ -419,7 +415,6 @@ def reset_password(
 def refresh_token(
     http_request: Request,
     response: Response,
-    body: RefreshRequest | None = Body(default=None),
     db: Any = Depends(get_db),
 ):
     """
@@ -433,9 +428,8 @@ def refresh_token(
 
     **How it works:**
 
-    1. Send your refresh_token in the request body, or use the HttpOnly
-       refresh cookie set during browser login
-    2. If valid, you get back a fresh pair of tokens
+    1. Send the HttpOnly refresh cookie set during login
+    2. If valid, you get back a fresh access token and a rotated refresh cookie
     3. The old refresh token is immediately invalidated (rotation)
 
     **Security note:**
@@ -444,7 +438,7 @@ def refresh_token(
     If an admin deactivates a user, their refresh tokens stop working.
     Each refresh token can only be used once (rotation).
     """
-    raw_refresh_token = _refresh_token_from_request(body, http_request)
+    raw_refresh_token = _refresh_token_from_cookie(http_request)
     if raw_refresh_token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -529,7 +523,6 @@ def refresh_token(
 
     return TokenResponse(
         access_token=access_token,
-        refresh_token=new_refresh_token,
         token_type="bearer",
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
@@ -550,7 +543,6 @@ def refresh_token(
 def logout(
     http_request: Request,
     response: Response,
-    body: RefreshRequest | None = Body(default=None),
     db: Any = Depends(get_db),
 ):
     """
@@ -558,14 +550,12 @@ def logout(
 
     **How to use:**
 
-    1. Browser clients can use the HttpOnly refresh cookie. API clients can
-       send the refresh token in the request body:
-       `{"refresh_token": "<refresh_token>"}`
+    1. Send the HttpOnly refresh cookie set during login or refresh.
 
     After this call the refresh token is deleted from the database and
     cannot be used again. The client should also clear local access-token state.
     """
-    raw_refresh_token = _refresh_token_from_request(body, http_request)
+    raw_refresh_token = _refresh_token_from_cookie(http_request)
     if raw_refresh_token is None:
         _clear_refresh_token_cookie(response)
         raise HTTPException(

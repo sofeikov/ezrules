@@ -4,8 +4,8 @@
 
 * **Hashed refresh sessions**: Refresh token sessions are now stored as SHA-256 hashes in `user_session`, including a migration that hashes any existing plaintext session rows during upgrade.
 * **HttpOnly browser refresh cookie**: Browser login and refresh flows now set the long-lived refresh token in an HttpOnly cookie and no longer persist it in frontend `localStorage`.
-* **Compatible refresh API**: API clients can still send refresh tokens in request bodies, while browser refresh/logout can use the cookie-backed flow.
-* **Refresh-token logout hardening**: Logout now revokes directly from the refresh token or HttpOnly cookie, so expired access tokens and empty JSON request bodies do not leave browser refresh sessions active.
+* **Cookie-only refresh API**: Refresh tokens are no longer returned in JSON response bodies or accepted in request bodies; refresh and logout now use only the HttpOnly cookie.
+* **Refresh-token logout hardening**: Logout now revokes directly from the HttpOnly refresh cookie, so expired access tokens do not leave browser refresh sessions active.
 
 ## v1.28.0
 

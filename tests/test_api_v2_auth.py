@@ -11,6 +11,7 @@ These tests verify:
 import hashlib
 import uuid
 from datetime import UTC, datetime, timedelta
+from http.cookies import SimpleCookie
 
 import bcrypt
 import pytest
@@ -29,6 +30,17 @@ from ezrules.models.backend_core import Invitation, Organisation, PasswordResetT
 
 def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _refresh_token_from_set_cookie(response) -> str:
+    cookies = SimpleCookie()
+    cookies.load(response.headers["set-cookie"])
+    return cookies[auth_routes.REFRESH_TOKEN_COOKIE_NAME].value
+
+
+def _replace_refresh_cookie(client: TestClient, refresh_token: str) -> None:
+    client.cookies.clear()
+    client.cookies.set(auth_routes.REFRESH_TOKEN_COOKIE_NAME, refresh_token)
 
 
 @pytest.fixture(scope="function")
@@ -177,7 +189,7 @@ class TestLoginEndpoint:
     """Tests for POST /api/v2/auth/login."""
 
     def test_login_valid_credentials(self, api_client, session):
-        """Login with valid credentials should return tokens."""
+        """Login with valid credentials should return an access token and refresh cookie."""
         response = api_client.post(
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
@@ -187,7 +199,7 @@ class TestLoginEndpoint:
         data = response.json()
 
         assert "access_token" in data
-        assert "refresh_token" in data
+        assert "refresh_token" not in data
         assert data["token_type"] == "bearer"
         assert data["expires_in"] == ACCESS_TOKEN_EXPIRE_MINUTES * 60
 
@@ -196,6 +208,10 @@ class TestLoginEndpoint:
         assert payload is not None
         assert payload.email == "testuser@example.com"
         assert payload.token_type == "access"
+
+        refresh_payload = decode_token(_refresh_token_from_set_cookie(response))
+        assert refresh_payload is not None
+        assert refresh_payload.token_type == "refresh"
 
     def test_login_invalid_password(self, api_client, session):
         """Login with wrong password should return 401."""
@@ -272,42 +288,38 @@ class TestRefreshEndpoint:
     """Tests for POST /api/v2/auth/refresh."""
 
     def test_refresh_valid_token(self, api_client, session):
-        """Refresh with valid token should return new tokens."""
+        """Refresh with valid cookie should return a new access token."""
         # First, login to get tokens
         login_response = api_client.post(
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
-        original_tokens = login_response.json()
+        assert login_response.status_code == 200
 
         # Now refresh
-        refresh_response = api_client.post(
-            "/api/v2/auth/refresh",
-            json={"refresh_token": original_tokens["refresh_token"]},
-        )
+        refresh_response = api_client.post("/api/v2/auth/refresh")
 
         assert refresh_response.status_code == 200
         new_tokens = refresh_response.json()
 
         assert "access_token" in new_tokens
-        assert "refresh_token" in new_tokens
+        assert "refresh_token" not in new_tokens
         assert new_tokens["token_type"] == "bearer"
+        assert _refresh_token_from_set_cookie(refresh_response)
         # Verify the new access token is valid and contains correct data
         payload = decode_token(new_tokens["access_token"])
         assert payload is not None
         assert payload.email == "testuser@example.com"
 
     def test_refresh_invalid_token(self, api_client, session):
-        """Refresh with invalid token should return 401."""
-        response = api_client.post(
-            "/api/v2/auth/refresh",
-            json={"refresh_token": "invalid.token.here"},
-        )
+        """Refresh with invalid cookie should return 401."""
+        _replace_refresh_cookie(api_client, "invalid.token.here")
+        response = api_client.post("/api/v2/auth/refresh")
 
         assert response.status_code == 401
 
     def test_refresh_with_access_token(self, api_client, session):
-        """Refresh with access token (wrong type) should return 401."""
+        """Refresh with an access token cookie (wrong type) should return 401."""
         # Login to get tokens
         login_response = api_client.post(
             "/api/v2/auth/login",
@@ -315,11 +327,9 @@ class TestRefreshEndpoint:
         )
         tokens = login_response.json()
 
-        # Try to refresh using the access token (should fail)
-        response = api_client.post(
-            "/api/v2/auth/refresh",
-            json={"refresh_token": tokens["access_token"]},  # Wrong token type!
-        )
+        # Try to refresh using the access token as the refresh cookie (should fail)
+        _replace_refresh_cookie(api_client, tokens["access_token"])
+        response = api_client.post("/api/v2/auth/refresh")
 
         assert response.status_code == 401
         assert "Invalid token type" in response.json()["detail"]
@@ -530,12 +540,12 @@ class TestMeEndpoint:
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
-        tokens = login_response.json()
+        refresh_token = _refresh_token_from_set_cookie(login_response)
 
         # Try to use refresh token for /me (should fail)
         response = api_client.get(
             "/api/v2/auth/me",
-            headers={"Authorization": f"Bearer {tokens['refresh_token']}"},
+            headers={"Authorization": f"Bearer {refresh_token}"},
         )
 
         assert response.status_code == 401
@@ -577,14 +587,12 @@ class TestSessionTracking:
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
         assert response.status_code == 200
-        tokens = response.json()
+        refresh_token = _refresh_token_from_set_cookie(response)
 
         session.expire_all()
-        session_row = (
-            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(tokens["refresh_token"])).first()
-        )
+        session_row = session.query(UserSession).filter(UserSession.refresh_token == _hash_token(refresh_token)).first()
         assert session_row is not None
-        assert session_row.refresh_token != tokens["refresh_token"]
+        assert session_row.refresh_token != refresh_token
         assert session_row.expires_at is not None
         assert session_row.user_id is not None
 
@@ -607,15 +615,11 @@ class TestSessionTracking:
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
-        original_tokens = login_response.json()
-        old_refresh_token = original_tokens["refresh_token"]
+        old_refresh_token = _refresh_token_from_set_cookie(login_response)
 
-        refresh_response = api_client.post(
-            "/api/v2/auth/refresh",
-            json={"refresh_token": old_refresh_token},
-        )
+        refresh_response = api_client.post("/api/v2/auth/refresh")
         assert refresh_response.status_code == 200
-        new_tokens = refresh_response.json()
+        new_refresh_token = _refresh_token_from_set_cookie(refresh_response)
 
         session.expire_all()
         # Old session must be gone
@@ -626,9 +630,7 @@ class TestSessionTracking:
 
         # New session must exist
         new_session = (
-            session.query(UserSession)
-            .filter(UserSession.refresh_token == _hash_token(new_tokens["refresh_token"]))
-            .first()
+            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(new_refresh_token)).first()
         )
         assert new_session is not None
 
@@ -639,11 +641,11 @@ class TestSessionTracking:
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
         assert login_response.status_code == 200
-        original_refresh_token = login_response.json()["refresh_token"]
+        original_refresh_token = _refresh_token_from_set_cookie(login_response)
 
         refresh_response = api_client.post("/api/v2/auth/refresh")
         assert refresh_response.status_code == 200
-        new_tokens = refresh_response.json()
+        new_refresh_token = _refresh_token_from_set_cookie(refresh_response)
 
         session.expire_all()
         assert (
@@ -651,23 +653,22 @@ class TestSessionTracking:
             is None
         )
         assert (
-            session.query(UserSession)
-            .filter(UserSession.refresh_token == _hash_token(new_tokens["refresh_token"]))
-            .first()
+            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(new_refresh_token)).first()
             is not None
         )
 
-    def test_refresh_accepts_cookie_with_empty_json_body(self, api_client, session):
-        """Cookie refresh should still work when a client sends an empty JSON object."""
+    def test_refresh_rejects_request_body_refresh_token(self, api_client, session):
+        """Refresh tokens are accepted only from the HttpOnly cookie, not request JSON."""
         login_response = api_client.post(
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
         assert login_response.status_code == 200
+        refresh_token = _refresh_token_from_set_cookie(login_response)
 
-        refresh_response = api_client.post("/api/v2/auth/refresh", json={})
-        assert refresh_response.status_code == 200
-        assert "refresh_token" in refresh_response.json()
+        api_client.cookies.clear()
+        refresh_response = api_client.post("/api/v2/auth/refresh", json={"refresh_token": refresh_token})
+        assert refresh_response.status_code == 401
 
     def test_refresh_token_can_only_be_used_once(self, api_client, session):
         """A refresh token should be invalid after it has been used once (rotation)."""
@@ -675,20 +676,15 @@ class TestSessionTracking:
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
-        original_refresh_token = login_response.json()["refresh_token"]
+        original_refresh_token = _refresh_token_from_set_cookie(login_response)
 
         # First use — succeeds and rotates the token
-        first_refresh = api_client.post(
-            "/api/v2/auth/refresh",
-            json={"refresh_token": original_refresh_token},
-        )
+        first_refresh = api_client.post("/api/v2/auth/refresh")
         assert first_refresh.status_code == 200
 
         # Second use of the same (now-deleted) token — must be rejected
-        second_refresh = api_client.post(
-            "/api/v2/auth/refresh",
-            json={"refresh_token": original_refresh_token},
-        )
+        _replace_refresh_cookie(api_client, original_refresh_token)
+        second_refresh = api_client.post("/api/v2/auth/refresh")
         assert second_refresh.status_code == 401
 
     def test_refresh_revoked_session_returns_401(self, api_client, session):
@@ -697,16 +693,13 @@ class TestSessionTracking:
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
-        tokens = login_response.json()
+        refresh_token = _refresh_token_from_set_cookie(login_response)
 
         # Manually revoke the session directly in the database
-        session.query(UserSession).filter(UserSession.refresh_token == _hash_token(tokens["refresh_token"])).delete()
+        session.query(UserSession).filter(UserSession.refresh_token == _hash_token(refresh_token)).delete()
         session.commit()
 
-        response = api_client.post(
-            "/api/v2/auth/refresh",
-            json={"refresh_token": tokens["refresh_token"]},
-        )
+        response = api_client.post("/api/v2/auth/refresh")
         assert response.status_code == 401
         assert "revoked" in response.json()["detail"].lower()
 
@@ -725,19 +718,14 @@ class TestLogoutEndpoint:
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
-        tokens = login_response.json()
+        refresh_token = _refresh_token_from_set_cookie(login_response)
 
-        logout_response = api_client.post(
-            "/api/v2/auth/logout",
-            json={"refresh_token": tokens["refresh_token"]},
-        )
+        logout_response = api_client.post("/api/v2/auth/logout")
         assert logout_response.status_code == 200
         assert logout_response.json()["message"] == "Logged out successfully"
 
         session.expire_all()
-        session_row = (
-            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(tokens["refresh_token"])).first()
-        )
+        session_row = session.query(UserSession).filter(UserSession.refresh_token == _hash_token(refresh_token)).first()
         assert session_row is None
 
     def test_logout_accepts_http_only_cookie(self, api_client, session):
@@ -746,33 +734,33 @@ class TestLogoutEndpoint:
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
-        tokens = login_response.json()
+        refresh_token = _refresh_token_from_set_cookie(login_response)
 
         logout_response = api_client.post("/api/v2/auth/logout")
         assert logout_response.status_code == 200
 
         session.expire_all()
         assert (
-            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(tokens["refresh_token"])).first()
-            is None
+            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(refresh_token)).first() is None
         )
         assert "ezrules_refresh_token=" in logout_response.headers.get("set-cookie", "")
 
-    def test_logout_accepts_cookie_with_empty_json_body(self, api_client, session):
-        """Cookie logout should still work when a client sends an empty JSON object."""
+    def test_logout_rejects_request_body_refresh_token(self, api_client, session):
+        """Logout tokens are accepted only from the HttpOnly cookie, not request JSON."""
         login_response = api_client.post(
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
-        tokens = login_response.json()
+        refresh_token = _refresh_token_from_set_cookie(login_response)
 
-        logout_response = api_client.post("/api/v2/auth/logout", json={})
-        assert logout_response.status_code == 200
+        api_client.cookies.clear()
+        logout_response = api_client.post("/api/v2/auth/logout", json={"refresh_token": refresh_token})
+        assert logout_response.status_code == 401
 
         session.expire_all()
         assert (
-            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(tokens["refresh_token"])).first()
-            is None
+            session.query(UserSession).filter(UserSession.refresh_token == _hash_token(refresh_token)).first()
+            is not None
         )
 
     def test_refresh_after_logout_returns_401(self, api_client, session):
@@ -781,17 +769,12 @@ class TestLogoutEndpoint:
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
-        tokens = login_response.json()
+        refresh_token = _refresh_token_from_set_cookie(login_response)
 
-        api_client.post(
-            "/api/v2/auth/logout",
-            json={"refresh_token": tokens["refresh_token"]},
-        )
+        api_client.post("/api/v2/auth/logout")
 
-        response = api_client.post(
-            "/api/v2/auth/refresh",
-            json={"refresh_token": tokens["refresh_token"]},
-        )
+        _replace_refresh_cookie(api_client, refresh_token)
+        response = api_client.post("/api/v2/auth/refresh")
         assert response.status_code == 401
 
     def test_logout_without_refresh_token_returns_401(self, api_client, session):
@@ -800,11 +783,9 @@ class TestLogoutEndpoint:
         assert response.status_code == 401
 
     def test_logout_with_invalid_refresh_token_returns_401(self, api_client, session):
-        """Logout with an invalid refresh token should be rejected."""
-        response = api_client.post(
-            "/api/v2/auth/logout",
-            json={"refresh_token": "sometoken"},
-        )
+        """Logout with an invalid refresh cookie should be rejected."""
+        _replace_refresh_cookie(api_client, "sometoken")
+        response = api_client.post("/api/v2/auth/logout")
         assert response.status_code == 401
 
     def test_logout_does_not_affect_other_sessions(self, api_client, session):
@@ -813,23 +794,19 @@ class TestLogoutEndpoint:
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
-        tokens1 = login1.json()
+        refresh_token1 = _refresh_token_from_set_cookie(login1)
 
         login2 = api_client.post(
             "/api/v2/auth/login",
             data={"username": "testuser@example.com", "password": "testpassword123"},
         )
-        tokens2 = login2.json()
+        refresh_token2 = _refresh_token_from_set_cookie(login2)
 
         # Logout the first session only
-        api_client.post(
-            "/api/v2/auth/logout",
-            json={"refresh_token": tokens1["refresh_token"]},
-        )
+        _replace_refresh_cookie(api_client, refresh_token1)
+        api_client.post("/api/v2/auth/logout")
 
         # Second session should still be usable
-        refresh_response = api_client.post(
-            "/api/v2/auth/refresh",
-            json={"refresh_token": tokens2["refresh_token"]},
-        )
+        _replace_refresh_cookie(api_client, refresh_token2)
+        refresh_response = api_client.post("/api/v2/auth/refresh")
         assert refresh_response.status_code == 200
