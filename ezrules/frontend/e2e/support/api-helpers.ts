@@ -107,49 +107,6 @@ export async function deleteRuleById(request: APIRequestContext, ruleId: number)
   await deleteIgnoringMissing(response, `Delete rule ${ruleId}`);
 }
 
-export async function deleteRuleByRid(request: APIRequestContext, rid: string): Promise<void> {
-  const response = await request.get(`${API_BASE}/api/v2/rules`, { headers: authHeaders() });
-  const body = await jsonResponse<{ rules: CreatedRule[] }>(response, `Find rule ${rid}`);
-  const rule = body.rules.find(candidate => candidate.rid === rid);
-  if (rule) {
-    await deleteRuleById(request, rule.r_id);
-  }
-}
-
-export async function createUserList(request: APIRequestContext, name: string): Promise<CreatedUserList> {
-  const response = await request.post(`${API_BASE}/api/v2/user-lists`, {
-    headers: authHeaders(),
-    data: { name },
-  });
-  const body = await jsonResponse<{ success: boolean; list?: CreatedUserList; error?: string }>(
-    response,
-    `Create user list ${name}`
-  );
-  if (!body.success || !body.list?.id) {
-    throw new Error(`Create user list returned an unsuccessful body: ${JSON.stringify(body)}`);
-  }
-  return body.list;
-}
-
-export async function createUserListEntry(
-  request: APIRequestContext,
-  listId: number,
-  value: string
-): Promise<{ id: number; value: string }> {
-  const response = await request.post(`${API_BASE}/api/v2/user-lists/${listId}/entries`, {
-    headers: authHeaders(),
-    data: { value },
-  });
-  const body = await jsonResponse<{ success: boolean; entry?: { id: number; value: string }; error?: string }>(
-    response,
-    `Create entry ${value} in user list ${listId}`
-  );
-  if (!body.success || !body.entry?.id) {
-    throw new Error(`Create user-list entry returned an unsuccessful body: ${JSON.stringify(body)}`);
-  }
-  return body.entry;
-}
-
 export async function deleteUserListById(request: APIRequestContext, listId: number): Promise<void> {
   const response = await request.delete(`${API_BASE}/api/v2/user-lists/${listId}`, {
     headers: authHeaders(),
@@ -164,28 +121,6 @@ export async function deleteUserListByName(request: APIRequestContext, name: str
   if (list) {
     await deleteUserListById(request, list.id);
   }
-}
-
-export async function createLabel(request: APIRequestContext, name: string): Promise<{ el_id: number; label: string }> {
-  const response = await request.post(`${API_BASE}/api/v2/labels`, {
-    headers: authHeaders(),
-    data: { label_name: name },
-  });
-  const body = await jsonResponse<{ success: boolean; label?: { el_id: number; label: string }; error?: string }>(
-    response,
-    `Create label ${name}`
-  );
-  if (!body.success || !body.label?.el_id) {
-    throw new Error(`Create label returned an unsuccessful body: ${JSON.stringify(body)}`);
-  }
-  return body.label;
-}
-
-export async function deleteLabelByName(request: APIRequestContext, name: string): Promise<void> {
-  const response = await request.delete(`${API_BASE}/api/v2/labels/${encodeURIComponent(name)}`, {
-    headers: authHeaders(),
-  });
-  await deleteIgnoringMissing(response, `Delete label ${name}`);
 }
 
 export async function deleteFieldTypeByName(request: APIRequestContext, fieldName: string): Promise<void> {

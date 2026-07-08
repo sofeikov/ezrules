@@ -31,10 +31,6 @@ function compactToken(value: string, maxLength: number): string {
   return fallback.slice(0, maxLength).replace(/_+$/g, '') || 'test';
 }
 
-export function sanitizeTestToken(value: string, maxLength = 48): string {
-  return compactToken(value, maxLength);
-}
-
 export function testResourceName(
   testInfo: TestInfo,
   prefix: string,
