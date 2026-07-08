@@ -1,7 +1,7 @@
 """Add dedicated rule-quality report generation permission.
 
-Revision ID: 20260707_0036
-Revises: 20260706_0035
+Revision ID: 20260707_0037
+Revises: 20260707_0036
 Create Date: 2026-07-07 12:00:00.000000
 """
 
@@ -11,8 +11,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "20260707_0036"
-down_revision = "20260706_0035"
+revision = "20260707_0037"
+down_revision = "20260707_0036"
 branch_labels = None
 depends_on = None
 
