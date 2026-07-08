@@ -1,5 +1,9 @@
 # What's New
 
+## v1.28.4
+
+* **Live Redis/Celery CI smoke lane**: Backend CI now includes a focused Postgres, Redis, and Celery worker job that exercises real queue draining, Redis locking, broker dispatch, result handling, and Redis-backed cache invalidation.
+
 ## v1.28.3
 
 * **Rule-quality report generation permission**: Added a dedicated `generate_rule_quality_reports` permission so readonly users can view existing rule-quality snapshots without being able to enqueue expensive refreshes or trigger synchronous report computation.
