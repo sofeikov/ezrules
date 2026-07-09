@@ -40,6 +40,7 @@ dependencies = [
 
 [tool.uv]
 dev-dependencies = [
+    "hypothesis>=6.156.4",
     "pytest-cov",
     "pytest",
     "coverage",
@@ -88,6 +89,9 @@ deprecated = "ignore"
 [tool.pytest.ini_options]
 addopts = "--tb=short --disable-warnings"
 console_output_style = "count"
+markers = [
+    "property: property/fuzz tests over generated pure-layer inputs",
+]
 
 [tool.poe.tasks]
 check = [
