@@ -1,10 +1,13 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../support/fixtures';
 import { LabelsPage } from '../pages/labels.page';
+import { acceptDialog, dismissDialog } from '../support/dialogs';
+import { testResourceName } from '../support/test-data';
+import { STATEFUL_TAG, TEST_DATA_TAG } from '../support/tags';
 
 /**
  * E2E tests for the Labels management page.
  */
-test.describe('Labels Page', () => {
+test.describe(`Labels Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
   let labelsPage: LabelsPage;
 
   test.beforeEach(async ({ page }) => {
@@ -73,11 +76,11 @@ test.describe('Labels Page', () => {
       await expect(labelsPage.addLabelButton).toBeVisible();
     });
 
-    test('should create a new label and display it in the list', async ({ page }) => {
+    test('should create a new label and display it in the list', async ({ page }, testInfo) => {
       await labelsPage.goto();
       await labelsPage.waitForLabelsToLoad();
 
-      const uniqueLabel = `E2ETEST${Date.now()}`;
+      const uniqueLabel = testResourceName(testInfo, 'E2ETEST', { maxLength: 48, uppercase: true });
 
       await page.route('**/labels', async (route) => {
         if (route.request().method() === 'POST') {
@@ -102,8 +105,7 @@ test.describe('Labels Page', () => {
       await expect(await labelsPage.hasLabel(uniqueLabel)).toBe(true);
 
       // Cleanup: delete the label we created
-      page.on('dialog', dialog => dialog.accept());
-      await labelsPage.clickDelete(uniqueLabel);
+      await acceptDialog(page, () => labelsPage.clickDelete(uniqueLabel));
       await page.waitForFunction(
         (label: string) => {
           const items = document.querySelectorAll('ul li');
@@ -133,12 +135,12 @@ test.describe('Labels Page', () => {
   });
 
   test.describe('Delete Label', () => {
-    test('should delete a label after confirmation', async ({ page }) => {
+    test('should delete a label after confirmation', async ({ page }, testInfo) => {
       await labelsPage.goto();
       await labelsPage.waitForLabelsToLoad();
 
       // First create a label to delete
-      const uniqueLabel = `DELTEST${Date.now()}`;
+      const uniqueLabel = testResourceName(testInfo, 'DELTEST', { maxLength: 48, uppercase: true });
       await labelsPage.addLabel(uniqueLabel);
 
       await page.waitForFunction(
@@ -150,11 +152,8 @@ test.describe('Labels Page', () => {
         { timeout: 5000 }
       );
 
-      // Accept the confirmation dialog
-      page.on('dialog', dialog => dialog.accept());
-
       const countBefore = await labelsPage.getLabelCount();
-      await labelsPage.clickDelete(uniqueLabel);
+      await acceptDialog(page, () => labelsPage.clickDelete(uniqueLabel));
 
       // Wait for the label to disappear
       await page.waitForFunction(
@@ -176,17 +175,10 @@ test.describe('Labels Page', () => {
 
       const countBefore = await labelsPage.getLabelCount();
 
-      // Dismiss the confirmation dialog
-      page.on('dialog', dialog => dialog.dismiss());
-
-      // Click delete on the first label
       const firstDeleteButton = page.locator('button:has-text("Delete")').first();
-      await firstDeleteButton.click();
+      await dismissDialog(page, () => firstDeleteButton.click());
 
-      // Wait briefly and check count is unchanged
-      await page.waitForTimeout(500);
-      const countAfter = await labelsPage.getLabelCount();
-      expect(countAfter).toBe(countBefore);
+      await expect(page.locator('ul li')).toHaveCount(countBefore);
     });
   });
 

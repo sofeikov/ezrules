@@ -1,5 +1,9 @@
 # What's New
 
+## v1.28.7
+
+* **Playwright E2E hardening**: Added shared deterministic test data, API setup/cleanup helpers, stateful-spec tags, failure diagnostics, and event-based waits so flaky runs are easier to debug.
+
 ## v1.28.6
 
 * **CLI smoke coverage in CI**: Promoted the database-backed CLI smoke flow into pytest so GitHub's backend test workflow now exercises core CLI commands against Postgres, replacing the legacy shell helper.

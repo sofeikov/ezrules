@@ -49,6 +49,7 @@ npm run test:e2e
 e2e/
 ├── tests/           # Test specifications
 ├── pages/           # Page Object Models
+├── support/         # Shared config, API helpers, fixtures, and deterministic test data
 └── README.md        # This file
 ```
 
@@ -134,6 +135,9 @@ npm run test:e2e -- rule-list.spec.ts
 # Run tests matching a pattern
 npm run test:e2e -- --grep "should display"
 
+# Run stateful specs with repeats
+npm run test:e2e -- --grep "@stateful" --project=chromium --workers=1 --repeat-each=5
+
 # Run a specific test by line number
 npm run test:e2e -- rule-list.spec.ts:42
 ```
@@ -179,8 +183,9 @@ test('example test', async ({ page }) => {
 
 Example template:
 ```typescript
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../support/fixtures';
 import { YourPage } from '../pages/your-page.page';
+import { testResourceName } from '../support/test-data';
 
 test.describe('Your Feature', () => {
   let yourPage: YourPage;
@@ -193,12 +198,13 @@ test.describe('Your Feature', () => {
   test('should do something', async () => {
     // Arrange
     await yourPage.waitForPageLoad();
+    const name = testResourceName(test.info(), 'E2E_RESOURCE');
 
     // Act
-    await yourPage.clickSomething();
+    await yourPage.createSomething(name);
 
     // Assert
-    await expect(yourPage.someElement).toBeVisible();
+    await expect(yourPage.rowFor(name)).toBeVisible();
   });
 });
 ```
@@ -250,11 +256,12 @@ Main configuration is in `playwright.config.ts`:
 - **Base URL**: `E2E_BASE_URL` (defaults to `http://localhost:4200`)
 - **Timeout**: 30s per test
 - **Retries**: 2 on CI, 0 locally
-- **Workers**: 4 parallel (1 on CI)
+- **Workers**: 1 locally, 4 on CI
 - **Browsers**: Chromium (Firefox and WebKit available)
 - **Screenshots**: On failure only
 - **Videos**: Retained on failure
-- **Traces**: On first retry
+- **Traces**: Retained on failure
+- **Diagnostics**: Specs importing `../support/fixtures` attach console errors, page errors, failed requests, and failed API response bodies on failure
 
 ## CI/CD Integration
 
@@ -287,9 +294,11 @@ Tests can be integrated into CI/CD pipelines. Example GitHub Actions workflow:
 
 ### Tests are flaky
 
-1. **Add explicit waits**: Use `waitFor()` instead of fixed `sleep()`
+1. **Add event-based waits**: Wait for responses, URL changes, toast text, modal close, row counts, or polling status instead of fixed sleeps
 2. **Check network timing**: Ensure API responses are awaited
-3. **Increase timeout**: For slow operations, use `test.setTimeout(60000)`
+3. **Use deterministic data**: Build names with `testResourceName(test.info(), ...)` so cleanup failures are easy to find
+4. **Tag stateful specs**: Add `@stateful` to settings/auth/global-order/data-mutating specs so they can be repeated with `--grep`
+5. **Increase timeout**: For slow operations, use `test.setTimeout(60000)`
 
 ### "Connection refused" errors
 
@@ -328,8 +337,10 @@ Likely a frontend/API topology mismatch rather than a bad password.
 3. **Clean state**: Each test should be independent
 4. **Descriptive names**: Test names should describe expected behavior
 5. **Arrange-Act-Assert**: Follow AAA pattern in tests
-6. **Wait explicitly**: Don't use `sleep()`, use `waitFor()` methods
-7. **Test user workflows**: Focus on real user journeys, not implementation details
+6. **Wait explicitly**: Don't use `sleep()`, use event-based waits or page-object wait helpers
+7. **Clean with API helpers**: Use `e2e/support/api-helpers.ts` for setup/cleanup such as rules, labels, user lists, field types, runtime settings, and outcome order
+8. **Assert restoration**: Specs that mutate shared state should restore the original value and assert it was restored
+9. **Test user workflows**: Focus on real user journeys, not implementation details
 
 ## Resources
 
