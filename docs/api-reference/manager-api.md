@@ -203,6 +203,9 @@ Rule quality query params:
 - `force_refresh` on report requests: `false` returns existing snapshot only, `true` enqueues a new snapshot and requires `GENERATE_RULE_QUALITY_REPORTS`
 - `freeze_at` is returned in responses to indicate snapshot timestamp
 - Reports include only active curated pairs configured under Settings.
+- For an `outcome -> label` pair, `actual_positives` includes every labeled served decision in the frozen window where that rule was evaluated and the configured label was assigned, including evaluations where the rule produced no result. Those missed matches contribute to `false_negative` and recall; rules skipped by first-match execution are not treated as evaluated.
+- Legacy decisions without an `all_rule_results` evaluation snapshot are excluded because the service cannot distinguish a non-firing rule from a rule that was not evaluated.
+- `precision` is `null` when `predicted_positives` is zero, `recall` is `null` when `actual_positives` is zero, and `f1` is `null` when either input metric is undefined. When both metrics are defined and zero, `f1` is `0`.
 
 Rule activity query params:
 - `aggregation` (default `6h`; valid values `1h`, `6h`, `12h`, `24h`, `30d`)
