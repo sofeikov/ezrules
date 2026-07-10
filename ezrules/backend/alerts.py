@@ -2,6 +2,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 
 from ezrules.backend.cases import ensure_case_for_decision, record_case_event
@@ -73,25 +74,23 @@ def _link_incident_to_cases(
         )
         if result.case_id is None:
             continue
-        existing = (
-            db.query(AlertIncidentCase.aic_id)
-            .filter(
-                AlertIncidentCase.alert_incident_id == incident.ai_id,
-                AlertIncidentCase.evaluation_decision_id == decision.ed_id,
+        inserted_link_id = db.execute(
+            pg_insert(AlertIncidentCase)
+            .values(
+                o_id=int(incident.o_id),
+                alert_incident_id=int(incident.ai_id),
+                case_id=result.case_id,
+                evaluation_decision_id=int(decision.ed_id),
+                created_at=_utcnow(),
             )
-            .first()
-        )
-        if existing is not None:
+            .on_conflict_do_nothing(
+                index_elements=[AlertIncidentCase.alert_incident_id, AlertIncidentCase.evaluation_decision_id]
+            )
+            .returning(AlertIncidentCase.aic_id)
+        ).scalar_one_or_none()
+        if inserted_link_id is None:
             case_ids.append(result.case_id)
             continue
-        link = AlertIncidentCase(
-            o_id=int(incident.o_id),
-            alert_incident_id=int(incident.ai_id),
-            case_id=result.case_id,
-            evaluation_decision_id=int(decision.ed_id),
-        )
-        db.add(link)
-        db.flush()
         case = db.query(Case).filter(Case.o_id == incident.o_id, Case.case_id == result.case_id).one()
         record_case_event(
             db,

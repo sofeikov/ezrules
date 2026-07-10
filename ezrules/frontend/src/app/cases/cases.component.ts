@@ -597,7 +597,12 @@ export class CasesComponent implements OnInit {
     this.loadIntegrationEvents();
     this.route.queryParamMap.subscribe(params => {
       const alertIncidentId = Number(params.get('alert_incident_id'));
-      this.alertIncidentIdFilter = Number.isInteger(alertIncidentId) && alertIncidentId > 0 ? alertIncidentId : undefined;
+      const nextIncidentId = Number.isInteger(alertIncidentId) && alertIncidentId > 0 ? alertIncidentId : undefined;
+      if (nextIncidentId !== this.alertIncidentIdFilter) {
+        this.selected = null;
+        this.detail = null;
+      }
+      this.alertIncidentIdFilter = nextIncidentId;
       this.loadCases();
     });
   }
@@ -625,6 +630,10 @@ export class CasesComponent implements OnInit {
       next: (response) => {
         this.cases = response.cases;
         this.loading = false;
+        if (this.selected && !this.cases.some(item => item.id === this.selected?.id)) {
+          this.selected = null;
+          this.detail = null;
+        }
         if (!this.selected && this.cases.length > 0) {
           this.selectCase(this.cases[0]);
         }

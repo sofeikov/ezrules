@@ -46,6 +46,7 @@ async function mockAuthentication(page: Page) {
 test('filters the case queue from a spike notification and shows alert evidence', async ({ page }) => {
   await mockAuthentication(page);
   const listUrls: string[] = [];
+  let detailRequestCount = 0;
   await page.route('**/api/v2/cases?**', async route => {
     listUrls.push(route.request().url());
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ cases: [caseItem], total: 1 }) });
@@ -55,28 +56,31 @@ test('filters the case queue from a spike notification and shows alert evidence'
     contentType: 'application/json',
     body: JSON.stringify({ users: [] }),
   }));
-  await page.route('**/api/v2/cases/84', route => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({
-      case: caseItem,
-      alerts: [{
-        incident_id: 73,
-        alert_rule_id: 12,
-        alert_rule_name: 'Cancellation volume surge',
-        evaluation_decision_id: 284,
-        outcome: 'CANCEL',
-        severity: 'critical',
-        observed_count: 52,
-        threshold: 50,
-        window_start: '2026-07-10T08:00:00Z',
-        window_end: '2026-07-10T09:00:00Z',
-        triggered_at: '2026-07-10T09:00:00Z',
-      }],
-      evaluation: null,
-      events: [],
-    }),
-  }));
+  await page.route('**/api/v2/cases/84', async route => {
+    detailRequestCount += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        case: caseItem,
+        alerts: [{
+          incident_id: 73,
+          alert_rule_id: 12,
+          alert_rule_name: 'Cancellation volume surge',
+          evaluation_decision_id: 284,
+          outcome: 'CANCEL',
+          severity: 'critical',
+          observed_count: 52,
+          threshold: 50,
+          window_start: '2026-07-10T08:00:00Z',
+          window_end: '2026-07-10T09:00:00Z',
+          triggered_at: '2026-07-10T09:00:00Z',
+        }],
+        evaluation: null,
+        events: [],
+      }),
+    });
+  });
   await page.route('**/api/v2/integration-events?**', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -96,6 +100,7 @@ test('filters the case queue from a spike notification and shows alert evidence'
     window.dispatchEvent(new PopStateEvent('popstate'));
   });
   await expect.poll(() => listUrls.some(url => new URL(url).searchParams.get('alert_incident_id') === '74')).toBe(true);
+  await expect.poll(() => detailRequestCount).toBeGreaterThan(1);
   await page.locator('[data-testid="case-clear-filters"]').click();
   await expect(page).toHaveURL(/\/cases$/);
   await page.reload();
