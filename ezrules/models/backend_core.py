@@ -721,10 +721,35 @@ class AlertIncident(Base):
     window_start = Column(DateTime, nullable=False)
     window_end = Column(DateTime, nullable=False)
     dedupe_key = Column(String(255), nullable=False)
+    severity = Column(String(32), nullable=False, default="critical")
     status = Column(String(32), nullable=False, default="open")
     triggered_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
     acknowledged_at = Column(DateTime, nullable=True)
     acknowledged_by = Column(String(255), nullable=True)
+
+
+class AlertIncidentCase(Base):
+    __tablename__ = "alert_incident_cases"
+    __table_args__ = (
+        Index("ix_alert_incident_cases_o_id_case", "o_id", "case_id"),
+        Index("ix_alert_incident_cases_incident", "alert_incident_id"),
+        UniqueConstraint(
+            "alert_incident_id",
+            "evaluation_decision_id",
+            name="uq_alert_incident_cases_incident_decision",
+        ),
+    )
+
+    aic_id = Column(Integer, unique=True, primary_key=True)
+    o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), nullable=False)
+    alert_incident_id: Mapped[int] = mapped_column(
+        ForeignKey("alert_incidents.ai_id", ondelete="CASCADE"), nullable=False
+    )
+    case_id: Mapped[int] = mapped_column(ForeignKey("cases.case_id", ondelete="CASCADE"), nullable=False)
+    evaluation_decision_id: Mapped[int] = mapped_column(
+        ForeignKey("evaluation_decisions.ed_id", ondelete="CASCADE"), nullable=False
+    )
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.UTC), nullable=False)
 
 
 _CONFIG_NOT_PROVIDED = object()

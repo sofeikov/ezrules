@@ -502,7 +502,7 @@ wheels = [
 
 [[package]]
 name = "ezrules"
-version = "1.28.7"
+version = "1.29.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },

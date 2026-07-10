@@ -4,8 +4,9 @@ from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 
+from ezrules.backend.cases import ensure_case_for_decision, record_case_event
 from ezrules.backend.notifications import NotificationMessage, dispatch_notification
-from ezrules.models.backend_core import AlertIncident, AlertRule, EvaluationDecision
+from ezrules.models.backend_core import AlertIncident, AlertIncidentCase, AlertRule, Case, EvaluationDecision
 from ezrules.settings import app_settings
 
 logger = logging.getLogger(__name__)
@@ -37,8 +38,10 @@ def _cooldown_allows_incident(db: Any, rule: AlertRule, now: datetime) -> bool:
     return existing is None
 
 
-def _count_matching_decisions(db: Any, *, o_id: int, outcome: str, window_start: datetime, window_end: datetime) -> int:
-    return int(
+def _matching_decisions(
+    db: Any, *, o_id: int, outcome: str, window_start: datetime, window_end: datetime
+) -> list[EvaluationDecision]:
+    return list(
         db.query(EvaluationDecision)
         .filter(
             EvaluationDecision.o_id == o_id,
@@ -49,8 +52,65 @@ def _count_matching_decisions(db: Any, *, o_id: int, outcome: str, window_start:
             EvaluationDecision.evaluated_at >= window_start,
             EvaluationDecision.evaluated_at <= window_end,
         )
-        .count()
+        .order_by(EvaluationDecision.ed_id.asc())
+        .all()
     )
+
+
+def _link_incident_to_cases(
+    db: Any,
+    *,
+    incident: AlertIncident,
+    rule: AlertRule,
+    decisions: list[EvaluationDecision],
+) -> list[int]:
+    case_ids: list[int] = []
+    for decision in decisions:
+        result = ensure_case_for_decision(
+            db,
+            o_id=int(incident.o_id),
+            evaluation_decision_id=int(decision.ed_id),
+        )
+        if result.case_id is None:
+            continue
+        existing = (
+            db.query(AlertIncidentCase.aic_id)
+            .filter(
+                AlertIncidentCase.alert_incident_id == incident.ai_id,
+                AlertIncidentCase.evaluation_decision_id == decision.ed_id,
+            )
+            .first()
+        )
+        if existing is not None:
+            case_ids.append(result.case_id)
+            continue
+        link = AlertIncidentCase(
+            o_id=int(incident.o_id),
+            alert_incident_id=int(incident.ai_id),
+            case_id=result.case_id,
+            evaluation_decision_id=int(decision.ed_id),
+        )
+        db.add(link)
+        db.flush()
+        case = db.query(Case).filter(Case.o_id == incident.o_id, Case.case_id == result.case_id).one()
+        record_case_event(
+            db,
+            case=case,
+            event_type="alert_linked",
+            source_ed_id=int(decision.ed_id),
+            details={
+                "alert_incident_id": int(incident.ai_id),
+                "alert_rule_id": int(rule.ar_id),
+                "alert_rule_name": str(rule.name),
+                "outcome": str(incident.outcome),
+                "observed_count": int(incident.observed_count),
+                "threshold": int(incident.threshold),
+                "window_start": incident.window_start.isoformat(),
+                "window_end": incident.window_end.isoformat(),
+            },
+        )
+        case_ids.append(result.case_id)
+    return case_ids
 
 
 def detect_alerts_for_outcome(db: Any, *, o_id: int, outcome: str, now: datetime | None = None) -> list[int]:
@@ -73,13 +133,14 @@ def detect_alerts_for_outcome(db: Any, *, o_id: int, outcome: str, now: datetime
     for rule in rules:
         window_end = checked_at
         window_start = window_end - timedelta(seconds=int(rule.window_seconds))
-        observed_count = _count_matching_decisions(
+        decisions = _matching_decisions(
             db,
             o_id=o_id,
             outcome=normalized_outcome,
             window_start=window_start,
             window_end=window_end,
         )
+        observed_count = len(decisions)
         if observed_count <= int(rule.threshold):
             continue
         if not _cooldown_allows_incident(db, rule, checked_at):
@@ -94,6 +155,7 @@ def detect_alerts_for_outcome(db: Any, *, o_id: int, outcome: str, now: datetime
             window_start=window_start,
             window_end=window_end,
             dedupe_key=_dedupe_key(rule, window_end),
+            severity="critical",
             status="open",
             triggered_at=checked_at,
         )
@@ -104,6 +166,8 @@ def detect_alerts_for_outcome(db: Any, *, o_id: int, outcome: str, now: datetime
             db.rollback()
             continue
 
+        case_ids = _link_incident_to_cases(db, incident=incident, rule=rule, decisions=decisions)
+
         message = NotificationMessage(
             title=f"{normalized_outcome} spike detected",
             body=(
@@ -112,12 +176,13 @@ def detect_alerts_for_outcome(db: Any, *, o_id: int, outcome: str, now: datetime
             severity="critical",
             source_type="alert_incident",
             source_id=int(incident.ai_id),
-            action_url="/alerts",
+            action_url=f"/cases?alert_incident_id={incident.ai_id}",
             metadata={
                 "outcome": normalized_outcome,
                 "observed_count": observed_count,
                 "threshold": int(rule.threshold),
                 "window_seconds": int(rule.window_seconds),
+                "case_ids": case_ids,
             },
         )
         dispatch_notification(

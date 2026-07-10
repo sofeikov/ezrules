@@ -12,6 +12,7 @@ from ezrules.backend.api_v2.auth.dependencies import (
     require_permission,
 )
 from ezrules.backend.api_v2.schemas.cases import (
+    CaseAlertEvidenceResponse,
     CaseAssigneeResponse,
     CaseAssigneesResponse,
     CaseDetailResponse,
@@ -44,6 +45,9 @@ from ezrules.backend.cases import (
 from ezrules.backend.integrations import list_integration_events
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
+    AlertIncident,
+    AlertIncidentCase,
+    AlertRule,
     Case,
     CaseEvent,
     EvaluationDecision,
@@ -317,6 +321,11 @@ def list_cases(
     created_to: str | None = None,
     updated_from: str | None = None,
     updated_to: str | None = None,
+    alert_incident_id: int | None = Query(default=None, ge=1),
+    alert_rule_id: int | None = Query(default=None, ge=1),
+    alert_severity: str | None = None,
+    alerted_from: str | None = None,
+    alerted_to: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_active_user),
@@ -325,6 +334,26 @@ def list_cases(
     db: Any = Depends(get_db),
 ) -> CaseListResponse:
     query = db.query(Case).filter(Case.o_id == current_org_id)
+    alert_filter_requested = any(
+        value is not None for value in (alert_incident_id, alert_rule_id, alert_severity, alerted_from, alerted_to)
+    )
+    if alert_filter_requested:
+        query = query.join(AlertIncidentCase, AlertIncidentCase.case_id == Case.case_id).join(
+            AlertIncident, AlertIncident.ai_id == AlertIncidentCase.alert_incident_id
+        )
+        if alert_incident_id is not None:
+            query = query.filter(AlertIncident.ai_id == alert_incident_id)
+        if alert_rule_id is not None:
+            query = query.filter(AlertIncident.alert_rule_id == alert_rule_id)
+        if alert_severity:
+            query = query.filter(sa.func.lower(AlertIncident.severity) == alert_severity.strip().lower())
+        alerted_from_value = _parse_case_filter_datetime(alerted_from, param_name="alerted_from")
+        alerted_to_value = _parse_case_filter_datetime(alerted_to, param_name="alerted_to", end_of_day=True)
+        if alerted_from_value is not None:
+            query = query.filter(AlertIncident.triggered_at >= alerted_from_value)
+        if alerted_to_value is not None:
+            query = query.filter(AlertIncident.triggered_at <= alerted_to_value)
+        query = query.distinct()
     if status_filter:
         query = query.filter(Case.status == status_filter)
     if outcome:
@@ -397,10 +426,34 @@ def get_case(
         .all()
     )
     user_emails = _user_emails_for_cases(db, cases=[case], current_org_id=current_org_id)
+    alert_rows = (
+        db.query(AlertIncidentCase, AlertIncident, AlertRule)
+        .join(AlertIncident, AlertIncident.ai_id == AlertIncidentCase.alert_incident_id)
+        .join(AlertRule, AlertRule.ar_id == AlertIncident.alert_rule_id)
+        .filter(AlertIncidentCase.o_id == current_org_id, AlertIncidentCase.case_id == case_id)
+        .order_by(AlertIncident.triggered_at.desc(), AlertIncident.ai_id.desc())
+        .all()
+    )
     return CaseDetailResponse(
         case=_case_to_response(case, user_emails),
         events=[_case_event_to_response(event) for event in events],
         evaluation=_case_evaluation_to_response(db, current_org_id=current_org_id, case=case),
+        alerts=[
+            CaseAlertEvidenceResponse(
+                incident_id=int(incident.ai_id),
+                alert_rule_id=int(rule.ar_id),
+                alert_rule_name=str(rule.name),
+                evaluation_decision_id=int(link.evaluation_decision_id),
+                outcome=str(incident.outcome),
+                severity=str(incident.severity),
+                observed_count=int(incident.observed_count),
+                threshold=int(incident.threshold),
+                window_start=incident.window_start,
+                window_end=incident.window_end,
+                triggered_at=incident.triggered_at,
+            )
+            for link, incident, rule in alert_rows
+        ],
     )
 
 
