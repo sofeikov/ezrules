@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any
 
 from ezrules.backend.features import FeatureResolutionError, FeatureResolver
+from ezrules.backend.quality_metrics import compute_quality_metric_values
 from ezrules.core.rule import MissingFieldLookupError, MissingStatLookupError
 from ezrules.core.type_casting import (
     CastError,
@@ -95,32 +96,24 @@ def _build_quality_metrics(
             if actual_positives <= 0:
                 continue
 
-            true_positive = accumulator.outcome_label_counts.get((outcome, label), 0)
-            false_positive = predicted_positives - true_positive
-            false_negative = actual_positives - true_positive
-
-            precision = true_positive / predicted_positives if predicted_positives > 0 else None
-            recall = true_positive / actual_positives if actual_positives > 0 else None
-
-            f1 = None
-            if precision is not None and recall is not None:
-                if (precision + recall) > 0:
-                    f1 = 2 * precision * recall / (precision + recall)
-                else:
-                    f1 = 0.0
+            values = compute_quality_metric_values(
+                true_positive=accumulator.outcome_label_counts.get((outcome, label), 0),
+                predicted_positives=predicted_positives,
+                actual_positives=actual_positives,
+            )
 
             metrics.append(
                 {
                     "outcome": outcome,
                     "label": label,
-                    "true_positive": true_positive,
-                    "false_positive": false_positive,
-                    "false_negative": false_negative,
-                    "predicted_positives": predicted_positives,
-                    "actual_positives": actual_positives,
-                    "precision": _safe_round(precision),
-                    "recall": _safe_round(recall),
-                    "f1": _safe_round(f1),
+                    "true_positive": values["true_positive"],
+                    "false_positive": values["false_positive"],
+                    "false_negative": values["false_negative"],
+                    "predicted_positives": values["predicted_positives"],
+                    "actual_positives": values["actual_positives"],
+                    "precision": _safe_round(values["precision"]),
+                    "recall": _safe_round(values["recall"]),
+                    "f1": _safe_round(values["f1"]),
                 }
             )
 

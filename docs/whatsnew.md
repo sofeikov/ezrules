@@ -6,6 +6,11 @@
 * **Immutable alert evidence**: Case detail records the alert rule, severity, outcome count, threshold, rolling window, and source evaluation, while idempotent `case.alert_linked` events make the linkage auditable and integration-ready.
 * **Alert-aware case queue**: Spike notifications now open the Cases queue filtered to the incident, with additional alert-rule and severity filters for operational review.
 
+## v1.28.8
+
+* **Complete rule-quality recall**: Rule Quality now counts labeled events where a rule did not fire as false negatives, so recall reflects the full labeled ground-truth population rather than only matched rule results.
+* **Consistent quality metrics**: Rule Quality and backtesting now share the same precision, recall, F1, and zero-denominator semantics.
+
 ## v1.28.7
 
 * **Playwright E2E hardening**: Added shared deterministic test data, API setup/cleanup helpers, stateful-spec tags, failure diagnostics, and event-based waits so flaky runs are easier to debug.

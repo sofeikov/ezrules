@@ -18,6 +18,7 @@ from ezrules.models.backend_core import (
     CaseEvent,
     EvaluationDecision,
     EventVersion,
+    InAppNotification,
     Organisation,
     Role,
     User,
@@ -57,7 +58,9 @@ def alert_case_client(session):
         yield client, token
 
 
-def _decision(session, *, transaction_id: str, evaluated_at: datetime.datetime) -> EvaluationDecision:
+def _decision(
+    session, *, transaction_id: str, evaluated_at: datetime.datetime, outcome: str = "CANCEL"
+) -> EvaluationDecision:
     event = EventVersion(
         o_id=1,
         transaction_id=transaction_id,
@@ -77,8 +80,8 @@ def _decision(session, *, transaction_id: str, evaluated_at: datetime.datetime) 
         decision_type="served",
         served=True,
         is_current=True,
-        outcome_counters={"CANCEL": 1},
-        resolved_outcome="CANCEL",
+        outcome_counters={outcome: 1},
+        resolved_outcome=outcome,
         all_rule_results={},
         evaluated_at=evaluated_at,
     )
@@ -143,9 +146,16 @@ def test_spike_incident_links_matching_decisions_to_reusable_cases(session, aler
     assert filtered.status_code == 200
     assert filtered.json()["total"] == 2
 
+    later_decision = _decision(session, transaction_id="spike-later", evaluated_at=now)
     assert detect_alerts_for_outcome(session, o_id=1, outcome="CANCEL", now=now) == []
-    assert session.query(AlertIncidentCase).count() == 2
-    assert session.query(CaseEvent).filter(CaseEvent.event_type == "alert_linked").count() == 2
+    assert session.query(AlertIncidentCase).count() == 3
+    assert (
+        session.query(AlertIncidentCase)
+        .filter(AlertIncidentCase.evaluation_decision_id == later_decision.ed_id)
+        .count()
+        == 1
+    )
+    assert session.query(CaseEvent).filter(CaseEvent.event_type == "alert_linked").count() == 3
 
 
 def test_alert_case_filters_remain_org_scoped(session, alert_case_client):
@@ -157,3 +167,27 @@ def test_alert_case_filters_remain_org_scoped(session, alert_case_client):
     )
     assert response.status_code == 200
     assert response.json() == {"cases": [], "total": 0}
+
+
+def test_neutral_spike_notification_falls_back_to_alerts_page(session, alert_case_client):
+    now = datetime.datetime.now(datetime.UTC)
+    session.add(
+        AlertRule(
+            o_id=1,
+            name="Release volume",
+            outcome="RELEASE",
+            threshold=1,
+            window_seconds=3600,
+            cooldown_seconds=1800,
+            enabled=True,
+        )
+    )
+    session.commit()
+    _decision(session, transaction_id="release-1", evaluated_at=now, outcome="RELEASE")
+    _decision(session, transaction_id="release-2", evaluated_at=now, outcome="RELEASE")
+
+    detect_alerts_for_outcome(session, o_id=1, outcome="RELEASE", now=now)
+
+    assert session.query(AlertIncidentCase).count() == 0
+    assert session.query(Case).count() == 0
+    assert session.query(InAppNotification).one().action_url == "/alerts"

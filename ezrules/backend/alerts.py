@@ -22,20 +22,20 @@ def _dedupe_key(rule: AlertRule, window_end: datetime) -> str:
     return f"rule:{rule.ar_id}:outcome:{rule.outcome}:bucket:{bucket}"
 
 
-def _cooldown_allows_incident(db: Any, rule: AlertRule, now: datetime) -> bool:
+def _incident_in_cooldown(db: Any, rule: AlertRule, now: datetime) -> AlertIncident | None:
     cooldown_seconds = int(rule.cooldown_seconds or 0)
     if cooldown_seconds <= 0:
-        return True
+        return None
     cooldown_start = now - timedelta(seconds=cooldown_seconds)
-    existing = (
-        db.query(AlertIncident.ai_id)
+    return (
+        db.query(AlertIncident)
         .filter(
             AlertIncident.alert_rule_id == rule.ar_id,
             AlertIncident.triggered_at >= cooldown_start,
         )
+        .order_by(AlertIncident.triggered_at.desc(), AlertIncident.ai_id.desc())
         .first()
     )
-    return existing is None
 
 
 def _matching_decisions(
@@ -143,7 +143,10 @@ def detect_alerts_for_outcome(db: Any, *, o_id: int, outcome: str, now: datetime
         observed_count = len(decisions)
         if observed_count <= int(rule.threshold):
             continue
-        if not _cooldown_allows_incident(db, rule, checked_at):
+        active_incident = _incident_in_cooldown(db, rule, checked_at)
+        if active_incident is not None:
+            _link_incident_to_cases(db, incident=active_incident, rule=rule, decisions=decisions)
+            db.commit()
             continue
 
         incident = AlertIncident(
@@ -164,6 +167,17 @@ def detect_alerts_for_outcome(db: Any, *, o_id: int, outcome: str, now: datetime
             db.flush()
         except IntegrityError:
             db.rollback()
+            existing_incident = (
+                db.query(AlertIncident)
+                .filter(
+                    AlertIncident.alert_rule_id == rule.ar_id,
+                    AlertIncident.dedupe_key == _dedupe_key(rule, window_end),
+                )
+                .first()
+            )
+            if existing_incident is not None:
+                _link_incident_to_cases(db, incident=existing_incident, rule=rule, decisions=decisions)
+                db.commit()
             continue
 
         case_ids = _link_incident_to_cases(db, incident=incident, rule=rule, decisions=decisions)
@@ -176,7 +190,7 @@ def detect_alerts_for_outcome(db: Any, *, o_id: int, outcome: str, now: datetime
             severity="critical",
             source_type="alert_incident",
             source_id=int(incident.ai_id),
-            action_url=f"/cases?alert_incident_id={incident.ai_id}",
+            action_url=f"/cases?alert_incident_id={incident.ai_id}" if case_ids else "/alerts",
             metadata={
                 "outcome": normalized_outcome,
                 "observed_count": observed_count,

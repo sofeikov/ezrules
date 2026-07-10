@@ -118,6 +118,8 @@ Tip:
 - Configure curated pairs in **Settings → General** so reports focus only on the mappings your team tracks.
 - Use the pair table to decide which outcome-label mapping best represents each rule.
 
+For each configured `outcome -> label` pair, precision measures how often that rule outcome was attached to the configured label. Recall uses every labeled served event where the rule was evaluated in the frozen report window as ground truth, including evaluations where the rule did not fire. Such missed labeled events count as false negatives; rules skipped by first-match execution are not counted as evaluated. Legacy decisions without a complete rule-results snapshot are excluded because their rule exposure cannot be reconstructed. A metric is unavailable when its denominator is zero; when precision and recall are both defined but zero, F1 is `0`.
+
 Healthy signal:
 
 - high precision on fraud-related mappings (few false positives)
@@ -144,7 +146,7 @@ Healthy signal:
 
 Tip: responses are structured for Chart.js (`labels` + dataset series).
 
-Source-of-truth note: Dashboard volume, outcome, rule activity, per-rule performance, and labeled-transaction charts read canonical served decisions. Label analytics and rule quality use canonical `event_version_labels` linked to those served event versions.
+Source-of-truth note: Dashboard volume, outcome, rule activity, per-rule performance, and labeled-transaction charts read canonical served decisions. Label analytics and rule quality use canonical `event_version_labels` linked to those served event versions. Rule Quality joins matched rule results to each rule's evaluated labeled-decision population so non-firing evaluations still accumulate false negatives.
 
 ---
 

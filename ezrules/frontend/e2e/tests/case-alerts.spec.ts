@@ -91,6 +91,16 @@ test('filters the case queue from a spike notification and shows alert evidence'
   await expect(page.locator('[data-testid="case-alert-evidence"]')).toContainText('52 CANCEL decisions; threshold 50');
   expect(listUrls.some(url => new URL(url).searchParams.get('alert_incident_id') === '73')).toBe(true);
 
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/cases?alert_incident_id=74');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect.poll(() => listUrls.some(url => new URL(url).searchParams.get('alert_incident_id') === '74')).toBe(true);
+  await page.locator('[data-testid="case-clear-filters"]').click();
+  await expect(page).toHaveURL(/\/cases$/);
+  await page.reload();
+  await expect.poll(() => listUrls.some(url => new URL(url).searchParams.get('alert_incident_id') === null)).toBe(true);
+
   await page.locator('[data-testid="case-alert-severity-filter"]').selectOption('critical');
   await page.locator('[data-testid="case-alert-rule-filter"]').fill('12');
   await page.locator('[data-testid="case-outcome-filter"]').fill('CANCEL');

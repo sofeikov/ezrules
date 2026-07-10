@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { SidebarComponent } from '../components/sidebar.component';
 import { AuthService, AuthUser } from '../services/auth.service';
 import { CaseAssignee, CaseDetail, CaseItem, CaseService, IntegrationEvent } from '../services/case.service';
@@ -573,6 +573,7 @@ export class CasesComponent implements OnInit {
     private caseService: CaseService,
     private authService: AuthService,
     private route: ActivatedRoute,
+    private router: Router,
   ) {}
 
   outcomeCounterEntries(counters: Record<string, number>): Array<{ key: string; value: number }> {
@@ -584,8 +585,6 @@ export class CasesComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    const alertIncidentId = Number(this.route.snapshot.queryParamMap.get('alert_incident_id'));
-    this.alertIncidentIdFilter = Number.isInteger(alertIncidentId) && alertIncidentId > 0 ? alertIncidentId : undefined;
     this.authService.getCurrentUser().subscribe({
       next: (user) => {
         this.currentUser = user;
@@ -595,8 +594,12 @@ export class CasesComponent implements OnInit {
       }
     });
     this.loadAssignees();
-    this.loadCases();
     this.loadIntegrationEvents();
+    this.route.queryParamMap.subscribe(params => {
+      const alertIncidentId = Number(params.get('alert_incident_id'));
+      this.alertIncidentIdFilter = Number.isInteger(alertIncidentId) && alertIncidentId > 0 ? alertIncidentId : undefined;
+      this.loadCases();
+    });
   }
 
   loadCases(): void {
@@ -642,6 +645,7 @@ export class CasesComponent implements OnInit {
   }
 
   clearFilters(): void {
+    const hadIncidentFilter = this.alertIncidentIdFilter !== undefined;
     this.statusFilter = '';
     this.outcomeFilter = '';
     this.assignedToFilter = '';
@@ -657,7 +661,15 @@ export class CasesComponent implements OnInit {
     this.alertedFromFilter = '';
     this.alertedToFilter = '';
     this.searchQuery = '';
-    this.loadCases();
+    if (hadIncidentFilter) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { alert_incident_id: null },
+        queryParamsHandling: 'merge',
+      });
+    } else {
+      this.loadCases();
+    }
   }
 
   selectCase(item: CaseItem): void {
