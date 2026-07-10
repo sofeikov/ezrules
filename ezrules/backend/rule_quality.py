@@ -8,7 +8,9 @@ from collections import defaultdict
 from typing import Any
 
 import sqlalchemy
+from sqlalchemy.dialects.postgresql import JSONB
 
+from ezrules.backend.quality_metrics import compute_quality_metric_values
 from ezrules.models.backend_core import (
     EvaluationDecision,
     EvaluationRuleResult,
@@ -87,12 +89,19 @@ def compute_rule_quality_metrics(
     """Compute precision/recall metrics for outcome->label pairs."""
     start_time = freeze_at - datetime.timedelta(days=lookback_days)
     selected_pairs = normalize_rule_quality_pairs(curated_pairs)
+    raw_all_rule_results = sqlalchemy.cast(EvaluationDecision.all_rule_results, JSONB)
+    has_complete_rule_results = sqlalchemy.func.jsonb_typeof(raw_all_rule_results) == "object"
+    safe_all_rule_results = sqlalchemy.case(
+        (has_complete_rule_results, raw_all_rule_results),
+        else_=sqlalchemy.cast(sqlalchemy.literal("{}"), JSONB),
+    )
 
     base_filters: list[Any] = [
         EvaluationDecision.served.is_(True),
         EvaluationDecision.decision_type == "served",
         EvaluationDecision.evaluated_at >= start_time,
         EvaluationDecision.evaluated_at <= freeze_at,
+        has_complete_rule_results,
         EventVersionLabel.assigned_at <= freeze_at,
     ]
     if max_decision_id is not None and max_decision_id > 0:
@@ -100,16 +109,20 @@ def compute_rule_quality_metrics(
     if o_id is not None:
         base_filters.append(EvaluationDecision.o_id == o_id)
 
-    total_labeled_events = (
-        db.query(sqlalchemy.func.count(sqlalchemy.func.distinct(EvaluationDecision.ed_id)))
+    label_count_rows = (
+        db.query(
+            Label.label,
+            sqlalchemy.func.count(sqlalchemy.func.distinct(EvaluationDecision.ed_id)).label("count"),
+        )
         .join(EventVersionLabel, EventVersionLabel.ev_id == EvaluationDecision.ev_id)
         .join(Label, Label.el_id == EventVersionLabel.el_id)
         .filter(*base_filters)
         .filter(EventVersionLabel.o_id == o_id if o_id is not None else sqlalchemy.true())
         .filter(Label.o_id == o_id if o_id is not None else sqlalchemy.true())
-        .scalar()
-        or 0
+        .group_by(Label.label)
+        .all()
     )
+    total_labeled_events = sum(int(count) for _label_name, count in label_count_rows)
 
     if not selected_pairs:
         return {
@@ -122,6 +135,7 @@ def compute_rule_quality_metrics(
             "worst_rules": [],
         }
 
+    expanded_results = sqlalchemy.func.jsonb_each(safe_all_rule_results).table_valued("key", "value").lateral()
     grouped_rows = (
         db.query(
             EvaluationRuleResult.r_id,
@@ -129,9 +143,10 @@ def compute_rule_quality_metrics(
             RuleModel.description,
             EvaluationRuleResult.rule_result,
             Label.label,
-            sqlalchemy.func.count(EvaluationRuleResult.err_id).label("count"),
+            sqlalchemy.func.count(sqlalchemy.func.distinct(EvaluationDecision.ed_id)).label("count"),
         )
         .join(EvaluationDecision, EvaluationDecision.ed_id == EvaluationRuleResult.ed_id)
+        .join(expanded_results, sqlalchemy.cast(EvaluationRuleResult.r_id, sqlalchemy.String) == expanded_results.c.key)
         .join(EventVersionLabel, EventVersionLabel.ev_id == EvaluationDecision.ev_id)
         .join(Label, Label.el_id == EventVersionLabel.el_id)
         .join(RuleModel, RuleModel.r_id == EvaluationRuleResult.r_id)
@@ -148,10 +163,36 @@ def compute_rule_quality_metrics(
         .all()
     )
 
+    exposure_rows = (
+        db.query(
+            RuleModel.r_id,
+            RuleModel.rid,
+            RuleModel.description,
+            Label.label,
+            sqlalchemy.func.count(sqlalchemy.func.distinct(EvaluationDecision.ed_id)).label("count"),
+        )
+        .select_from(EvaluationDecision)
+        .join(expanded_results, sqlalchemy.true())
+        .join(RuleModel, sqlalchemy.cast(RuleModel.r_id, sqlalchemy.String) == expanded_results.c.key)
+        .join(EventVersionLabel, EventVersionLabel.ev_id == EvaluationDecision.ev_id)
+        .join(Label, Label.el_id == EventVersionLabel.el_id)
+        .filter(*base_filters)
+        .filter(EventVersionLabel.o_id == o_id if o_id is not None else sqlalchemy.true())
+        .filter(Label.o_id == o_id if o_id is not None else sqlalchemy.true())
+        .group_by(RuleModel.r_id, RuleModel.rid, RuleModel.description, Label.label)
+        .all()
+    )
+
     rule_meta: dict[int, tuple[str, str]] = {}
     rule_matrix: dict[int, dict[tuple[str, str], int]] = defaultdict(dict)
+    evaluated_label_totals: dict[int, dict[str, int]] = defaultdict(dict)
     outcomes_by_rule: dict[int, set[str]] = defaultdict(set)
     labels_by_rule: dict[int, set[str]] = defaultdict(set)
+
+    for r_id, rid, description, label_name, count in exposure_rows:
+        rule_meta[r_id] = (rid, description)
+        evaluated_label_totals[r_id][label_name] = count
+        labels_by_rule[r_id].add(label_name)
 
     for r_id, rid, description, outcome, label_name, count in grouped_rows:
         rule_meta[r_id] = (rid, description)
@@ -169,26 +210,18 @@ def compute_rule_quality_metrics(
         matrix = rule_matrix[r_id]
 
         outcome_totals = {outcome: sum(matrix.get((outcome, label), 0) for label in labels) for outcome in outcomes}
-        label_totals = {
-            label_name: sum(matrix.get((outcome, label_name), 0) for outcome in outcomes) for label_name in labels
-        }
-
         rule_pairs: list[dict[str, Any]] = []
         for outcome, label_name in selected_pairs:
             predicted_positives = outcome_totals.get(outcome, 0)
-            actual_positives = label_totals.get(label_name, 0)
+            actual_positives = evaluated_label_totals[r_id].get(label_name, 0)
             if predicted_positives < min_support and actual_positives < min_support:
                 continue
 
-            true_positive = matrix.get((outcome, label_name), 0)
-            false_positive = predicted_positives - true_positive
-            false_negative = actual_positives - true_positive
-
-            precision = true_positive / predicted_positives if predicted_positives > 0 else None
-            recall = true_positive / actual_positives if actual_positives > 0 else None
-            f1 = None
-            if precision is not None and recall is not None and (precision + recall) > 0:
-                f1 = 2 * precision * recall / (precision + recall)
+            values = compute_quality_metric_values(
+                true_positive=matrix.get((outcome, label_name), 0),
+                predicted_positives=predicted_positives,
+                actual_positives=actual_positives,
+            )
 
             metric = {
                 "r_id": r_id,
@@ -196,14 +229,14 @@ def compute_rule_quality_metrics(
                 "description": description,
                 "outcome": outcome,
                 "label": label_name,
-                "true_positive": true_positive,
-                "false_positive": false_positive,
-                "false_negative": false_negative,
-                "predicted_positives": predicted_positives,
-                "actual_positives": actual_positives,
-                "precision": _safe_round(precision),
-                "recall": _safe_round(recall),
-                "f1": _safe_round(f1),
+                "true_positive": values["true_positive"],
+                "false_positive": values["false_positive"],
+                "false_negative": values["false_negative"],
+                "predicted_positives": values["predicted_positives"],
+                "actual_positives": values["actual_positives"],
+                "precision": _safe_round(values["precision"]),
+                "recall": _safe_round(values["recall"]),
+                "f1": _safe_round(values["f1"]),
             }
             pair_metrics.append(metric)
             rule_pairs.append(metric)
@@ -229,7 +262,7 @@ def compute_rule_quality_metrics(
                 "r_id": r_id,
                 "rid": rid,
                 "description": description,
-                "labeled_events": sum(outcome_totals.values()),
+                "labeled_events": sum(evaluated_label_totals[r_id].values()),
                 "pair_count": len(rule_pairs),
                 "average_precision": _safe_round(average_precision),
                 "average_recall": _safe_round(average_recall),

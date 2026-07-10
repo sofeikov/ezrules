@@ -1,5 +1,10 @@
 # What's New
 
+## v1.28.8
+
+* **Complete rule-quality recall**: Rule Quality now counts labeled events where a rule did not fire as false negatives, so recall reflects the full labeled ground-truth population rather than only matched rule results.
+* **Consistent quality metrics**: Rule Quality and backtesting now share the same precision, recall, F1, and zero-denominator semantics.
+
 ## v1.28.7
 
 * **Playwright E2E hardening**: Added shared deterministic test data, API setup/cleanup helpers, stateful-spec tags, failure diagnostics, and event-based waits so flaky runs are easier to debug.
