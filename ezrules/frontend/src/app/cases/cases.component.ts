@@ -569,6 +569,7 @@ export class CasesComponent implements OnInit {
   error: string | null = null;
   success: string | null = null;
   private caseLoadRequestId = 0;
+  private caseDetailRequestId = 0;
 
   constructor(
     private caseService: CaseService,
@@ -600,6 +601,7 @@ export class CasesComponent implements OnInit {
       const alertIncidentId = Number(params.get('alert_incident_id'));
       const nextIncidentId = Number.isInteger(alertIncidentId) && alertIncidentId > 0 ? alertIncidentId : undefined;
       if (nextIncidentId !== this.alertIncidentIdFilter) {
+        this.caseDetailRequestId += 1;
         this.selected = null;
         this.detail = null;
       }
@@ -636,6 +638,7 @@ export class CasesComponent implements OnInit {
         this.cases = response.cases;
         this.loading = false;
         if (this.selected && !this.cases.some(item => item.id === this.selected?.id)) {
+          this.caseDetailRequestId += 1;
           this.selected = null;
           this.detail = null;
         }
@@ -690,17 +693,24 @@ export class CasesComponent implements OnInit {
   }
 
   selectCase(item: CaseItem): void {
+    const requestId = ++this.caseDetailRequestId;
     this.selected = item;
     this.selectedAssigneeId = item.assigned_to_user_id;
     this.noteText = '';
     this.resetResolutionForm();
     this.caseService.getCase(item.id).subscribe({
       next: (detail) => {
+        if (requestId !== this.caseDetailRequestId || this.selected?.id !== item.id) {
+          return;
+        }
         this.detail = detail;
         this.selected = detail.case;
         this.selectedAssigneeId = detail.case.assigned_to_user_id;
       },
       error: () => {
+        if (requestId !== this.caseDetailRequestId || this.selected?.id !== item.id) {
+          return;
+        }
         this.error = 'Failed to load case details.';
       }
     });
