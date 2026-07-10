@@ -5,6 +5,7 @@
 * **Playwright E2E hardening**: Added shared deterministic test data, API setup/cleanup helpers, stateful-spec tags, failure diagnostics, and event-based waits so flaky runs are easier to debug.
 * **Negative UI state coverage**: Added Playwright coverage for expired sessions, failed refreshes, failed rule saves, settings permission failures, slow and unreachable APIs, failed backtest retry states, and nullable list payloads.
 * **Nullable response resilience**: Frontend settings, tested-events, and rule triggered-events readers now treat omitted or null list fields as empty lists so affected pages render their empty states instead of failing generically.
+* **Canonical product journey coverage**: Expanded the business-scenario product journey suite with stable end-to-end stories for feature-aware evaluation, historical corrections, agent-tool replay, rule edit triggered-event snapshots, computed-feature backtesting, and rejected-operation no-side-effect guarantees.
 
 ## v1.28.6
 

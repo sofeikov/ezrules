@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import bcrypt
 import pytest
 from fastapi.testclient import TestClient
@@ -5,6 +7,8 @@ from fastapi.testclient import TestClient
 from ezrules.backend.api_v2.auth.jwt import create_access_token
 from ezrules.backend.api_v2.main import app
 from ezrules.backend.api_v2.routes import evaluator as evaluator_router
+from ezrules.backend.tasks import app as celery_app
+from ezrules.backend.tasks import execute_backtest_rule_change
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import (
@@ -13,18 +17,23 @@ from ezrules.models.backend_core import (
     EvaluationRuleResult,
     EventVersion,
     EventVersionLabel,
+    FeatureDefinition,
+    FeatureSnapshotResolution,
     Label,
     Organisation,
     Role,
+    RuleBackTestingResult,
     RuleDeploymentResultsLog,
     RuleHistory,
     RuleQualityPair,
+    TransactionCurrentVersion,
     User,
+    UserList,
     UserListEntry,
     UserListHistory,
 )
 from ezrules.models.backend_core import Rule as RuleModel
-
+from tests.canonical_helpers import _hash_payload, add_served_decision
 
 BUSINESS_OUTCOMES = ("CANCEL", "HOLD", "REVIEW", "RELEASE")
 
@@ -52,7 +61,7 @@ def _token_with_permissions(session, *, email: str, permissions: list[Permission
     role = Role(name=f"journey_role_{email}", description="Product journey role", o_id=int(org.o_id))
     user = User(
         email=email,
-        password=bcrypt.hashpw("journeypass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
+        password=bcrypt.hashpw(b"journeypass", bcrypt.gensalt()).decode("utf-8"),
         active=True,
         fs_uniquifier=email,
         o_id=int(org.o_id),
@@ -93,6 +102,8 @@ def _manager_token(session, *, email: str = "journey-manager@example.com") -> st
             PermissionAction.DELETE_LIST,
             PermissionAction.VIEW_LABELS,
             PermissionAction.CREATE_LABEL,
+            PermissionAction.VIEW_FEATURES,
+            PermissionAction.MODIFY_FEATURES,
             PermissionAction.ACCESS_AUDIT_TRAIL,
         ],
     )
@@ -130,18 +141,541 @@ def _get_rule(client: TestClient, token: str, rule_id: int) -> dict:
     return response.json()
 
 
-def _evaluate(client: TestClient, api_key: str, *, transaction_id: str, event_data: dict) -> dict:
+def _evaluate(
+    client: TestClient,
+    api_key: str,
+    *,
+    transaction_id: str,
+    event_data: dict,
+    effective_at: int | str = 1710000000,
+    observed_at: int | str | None = None,
+) -> dict:
+    payload = {
+        "transaction_id": transaction_id,
+        "effective_at": effective_at,
+        "event_data": event_data,
+    }
+    if observed_at is not None:
+        payload["observed_at"] = observed_at
     response = client.post(
         "/api/v2/evaluate",
         headers={"X-API-Key": api_key},
+        json=payload,
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def _create_active_sum_feature(
+    client: TestClient,
+    token: str,
+    *,
+    name: str = "Sender sent amount 24h",
+    feature_name: str = "sent_amount_sum_24h",
+) -> int:
+    response = client.post(
+        "/api/v2/features",
+        headers={"Authorization": f"Bearer {token}"},
         json={
-            "transaction_id": transaction_id,
-            "effective_at": 1710000000,
-            "event_data": event_data,
+            "name": name,
+            "description": "Canonical journey sender velocity feature",
+            "entity": "sender",
+            "feature_name": feature_name,
+            "entity_key": "sender_id",
+            "aggregation_type": "sum",
+            "source_field": "amount",
+            "window_seconds": 86400,
+            "filters": [],
         },
     )
-    assert response.status_code == 200
-    return response.json()
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["success"] is True
+    feature_id = int(payload["feature"]["fd_id"])
+
+    activate = client.post(f"/api/v2/features/{feature_id}/activate", headers={"Authorization": f"Bearer {token}"})
+    assert activate.status_code == 200
+    assert activate.json()["feature"]["status"] == "active"
+    return feature_id
+
+
+def _add_feature_source_event(
+    session,
+    *,
+    org_id: int,
+    transaction_id: str,
+    effective_at: datetime,
+    event_data: dict,
+    observed_at: datetime | None = None,
+) -> EventVersion:
+    latest = (
+        session.query(EventVersion)
+        .filter(EventVersion.o_id == org_id, EventVersion.transaction_id == transaction_id)
+        .order_by(EventVersion.event_version.desc(), EventVersion.ev_id.desc())
+        .first()
+    )
+    event = EventVersion(
+        o_id=org_id,
+        transaction_id=transaction_id,
+        event_version=1 if latest is None else int(latest.event_version) + 1,
+        effective_at=effective_at,
+        observed_at=observed_at or effective_at,
+        event_data=event_data,
+        payload_hash=_hash_payload(event_data),
+        supersedes_ev_id=None if latest is None else int(latest.ev_id),
+    )
+    session.add(event)
+    session.flush()
+    return event
+
+
+def _mark_event_label(client: TestClient, token: str, *, transaction_id: str, label_name: str) -> None:
+    mark = client.post(
+        "/api/v2/labels/mark-event",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"transaction_id": transaction_id, "label_name": label_name},
+    )
+    assert mark.status_code == 200
+    assert mark.json()["success"] is True
+
+
+def _create_label(client: TestClient, token: str, *, label_name: str) -> str:
+    response = client.post(
+        "/api/v2/labels",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"label_name": label_name},
+    )
+    assert response.status_code == 201
+    return str(response.json()["label"]["label"])
+
+
+def test_feature_aware_evaluation_product_journey(session, live_api_key):
+    org = session.query(Organisation).one()
+    _seed_business_outcomes(session, org_id=int(org.o_id))
+    token = _manager_token(session, email="journey-feature@example.com")
+
+    with TestClient(app) as client:
+        feature_id = _create_active_sum_feature(client, token)
+
+        _evaluate(
+            client,
+            live_api_key,
+            transaction_id="journey-feature-prior",
+            effective_at="2026-05-05T12:00:00Z",
+            observed_at="2026-05-05T12:00:10Z",
+            event_data={"sender_id": "S1", "amount": 60},
+        )
+        _evaluate(
+            client,
+            live_api_key,
+            transaction_id="journey-feature-future-noise",
+            effective_at="2026-05-06T13:00:00Z",
+            observed_at="2026-05-06T13:00:10Z",
+            event_data={"sender_id": "S1", "amount": 10_000},
+        )
+
+        hold_rule_id = _create_rule(
+            client,
+            token,
+            rid="JOURNEY_FEATURE_HOLD",
+            description="Hold senders with prior 24h volume",
+            logic="if stat[sender.sent_amount_sum_24h] >= 50:\n\treturn !HOLD",
+        )
+        leak_guard_rule_id = _create_rule(
+            client,
+            token,
+            rid="JOURNEY_FEATURE_LEAK_GUARD",
+            description="Cancel only if current or future data leaked into the snapshot",
+            logic="if stat[sender.sent_amount_sum_24h] >= 100:\n\treturn !CANCEL",
+        )
+        _promote_rule(client, token, hold_rule_id)
+        _promote_rule(client, token, leak_guard_rule_id)
+        evaluator_router._lre = None
+
+        served = _evaluate(
+            client,
+            live_api_key,
+            transaction_id="journey-feature-current",
+            effective_at="2026-05-05T13:00:00Z",
+            event_data={"sender_id": "S1", "amount": 45},
+        )
+        assert served["resolved_outcome"] == "HOLD"
+        assert served["rule_results"] == {str(hold_rule_id): "HOLD"}
+        assert str(leak_guard_rule_id) not in served["rule_results"]
+
+        tested_events = client.get(
+            "/api/v2/tested-events?limit=200&include_referenced_fields=true",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert tested_events.status_code == 200
+        current_event = next(
+            event for event in tested_events.json()["events"] if event["transaction_id"] == "journey-feature-current"
+        )
+        assert current_event["resolved_outcome"] == "HOLD"
+        assert current_event["triggered_rules"][0]["rid"] == "JOURNEY_FEATURE_HOLD"
+        assert current_event["triggered_rules"][0]["metadata_source"] == "evaluation_snapshot"
+
+    decision = (
+        session.query(EvaluationDecision).filter(EvaluationDecision.transaction_id == "journey-feature-current").one()
+    )
+    assert decision.resolved_outcome == "HOLD"
+    trace = session.query(FeatureSnapshotResolution).filter_by(ed_id=int(decision.ed_id)).one()
+    assert int(trace.fd_id) == feature_id
+    assert trace.stat_path == "sender.sent_amount_sum_24h"
+    assert trace.resolution_status == "resolved"
+    assert trace.matched_event_count == 1
+    assert trace.as_of.replace(tzinfo=UTC) == datetime(2026, 5, 5, 13, 0, tzinfo=UTC)
+
+
+def test_historical_correction_product_journey(session, live_api_key):
+    org = session.query(Organisation).one()
+    org_id = int(org.o_id)
+    _seed_business_outcomes(session, org_id=org_id)
+    token = _manager_token(session, email="journey-correction@example.com")
+
+    with TestClient(app) as client:
+        rule_id = _create_rule(
+            client,
+            token,
+            rid="JOURNEY_CORRECTION_HOLD",
+            description="Hold the original high amount",
+            logic="if $amount >= 100:\n\treturn !HOLD",
+        )
+        _promote_rule(client, token, rule_id)
+
+        original = _evaluate(
+            client,
+            live_api_key,
+            transaction_id="journey-corrected-transaction",
+            effective_at="2026-05-05T12:00:00Z",
+            observed_at="2026-05-05T12:01:00Z",
+            event_data={"amount": 150, "sender_id": "S1"},
+        )
+        correction = _evaluate(
+            client,
+            live_api_key,
+            transaction_id="journey-corrected-transaction",
+            effective_at="2026-05-05T12:00:00Z",
+            observed_at="2026-05-05T12:30:00Z",
+            event_data={"amount": 50, "sender_id": "S1"},
+        )
+
+    assert original["evaluation_status"] == "new"
+    assert correction["evaluation_status"] == "superseding"
+    assert original["resolved_outcome"] == "HOLD"
+    assert correction["resolved_outcome"] is None
+
+    decisions = (
+        session.query(EvaluationDecision)
+        .filter(EvaluationDecision.transaction_id == "journey-corrected-transaction")
+        .order_by(EvaluationDecision.event_version.asc())
+        .all()
+    )
+    assert [bool(decision.is_current) for decision in decisions] == [False, True]
+    assert int(decisions[0].superseded_by_ed_id) == int(decisions[1].ed_id)
+
+    current = (
+        session.query(TransactionCurrentVersion)
+        .filter(
+            TransactionCurrentVersion.o_id == org_id,
+            TransactionCurrentVersion.transaction_id == "journey-corrected-transaction",
+        )
+        .one()
+    )
+    assert int(current.current_ed_id) == int(decisions[1].ed_id)
+    assert int(current.current_ev_id) == int(decisions[1].ev_id)
+
+    backtest = execute_backtest_rule_change(
+        rule_id,
+        "if $amount >= 125:\n\treturn !HOLD",
+        org_id,
+    )
+    assert backtest["total_records"] == 2
+    assert backtest["eligible_records"] == 2
+    assert backtest["skipped_records"] == 0
+    assert backtest["stored_result"] == {"HOLD": 1}
+    assert backtest["proposed_result"] == {"HOLD": 1}
+
+    original_result = (
+        session.query(EvaluationRuleResult).filter(EvaluationRuleResult.ed_id == int(decisions[0].ed_id)).one()
+    )
+    assert original_result.rule_rid == "JOURNEY_CORRECTION_HOLD"
+    assert original_result.rule_description == "Hold the original high amount"
+    assert original_result.referenced_fields == ["amount"]
+
+
+def test_agent_tool_replay_product_journey(session, live_api_key):
+    org = session.query(Organisation).one()
+    org_id = int(org.o_id)
+    _seed_business_outcomes(session, org_id=org_id)
+    token = _manager_token(session, email="journey-agent-tools@example.com")
+    viewer_token = _token_with_permissions(
+        session,
+        email="journey-agent-viewer@example.com",
+        permissions=[PermissionAction.VIEW_RULES],
+    )
+
+    with TestClient(app) as client:
+        rule_id = _create_rule(
+            client,
+            token,
+            rid="JOURNEY_AGENT_THRESHOLD",
+            description="Hold high amount agent replay events",
+            logic="if $amount > 100:\n\treturn !HOLD",
+        )
+        _promote_rule(client, token, rule_id)
+        fraud_label = _create_label(client, token, label_name="journey_agent_fraud")
+        normal_label = _create_label(client, token, label_name="journey_agent_normal")
+
+        records = [
+            ("journey-agent-fraud-high-us", 200, "US", fraud_label),
+            ("journey-agent-normal-borderline-us", 130, "US", normal_label),
+            ("journey-agent-normal-low-gb", 80, "GB", normal_label),
+            ("journey-agent-fraud-high-gb", 170, "GB", fraud_label),
+            ("journey-agent-fraud-borderline-gb", 120, "GB", fraud_label),
+            ("journey-agent-fraud-missed-us", 60, "US", fraud_label),
+        ]
+        for transaction_id, amount, country, label_name in records:
+            _evaluate(
+                client,
+                live_api_key,
+                transaction_id=transaction_id,
+                event_data={"amount": amount, "country": country},
+            )
+            _mark_event_label(client, token, transaction_id=transaction_id, label_name=label_name)
+
+        _evaluate(
+            client,
+            live_api_key,
+            transaction_id="journey-agent-rescored",
+            observed_at="2026-05-05T12:01:00Z",
+            event_data={"amount": 130, "country": "US"},
+        )
+        _mark_event_label(client, token, transaction_id="journey-agent-rescored", label_name=normal_label)
+        _evaluate(
+            client,
+            live_api_key,
+            transaction_id="journey-agent-rescored",
+            observed_at="2026-05-05T12:30:00Z",
+            event_data={"amount": 80, "country": "US"},
+        )
+        _mark_event_label(client, token, transaction_id="journey-agent-rescored", label_name=normal_label)
+
+        other_org = Organisation(name="journey_agent_other_org")
+        session.add(other_org)
+        session.flush()
+        add_served_decision(
+            session,
+            org_id=int(other_org.o_id),
+            transaction_id="journey-agent-other-org",
+            event_data={"amount": 130, "country": "LEAK"},
+            resolved_outcome="HOLD",
+            rule_results={rule_id: "HOLD"},
+        )
+        session.commit()
+
+        before_invalid_counts = (
+            session.query(EventVersion).count(),
+            session.query(EvaluationDecision).count(),
+            session.query(RuleBackTestingResult).count(),
+        )
+        invalid = client.post(
+            "/api/v2/agent-tools/rule-blast-radius",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"rule_id": rule_id, "proposed_logic": "if $amount >"},
+        )
+        assert invalid.status_code == 400
+        assert (
+            session.query(EventVersion).count(),
+            session.query(EvaluationDecision).count(),
+            session.query(RuleBackTestingResult).count(),
+        ) == before_invalid_counts
+
+        blast = client.post(
+            "/api/v2/agent-tools/rule-blast-radius",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "rule_id": rule_id,
+                "proposed_logic": "if $amount > 150:\n\treturn !HOLD",
+                "group_by": ["country"],
+                "sample_limit": 1,
+                "max_records": 20,
+            },
+        )
+        assert blast.status_code == 200
+        blast_payload = blast.json()
+        assert blast_payload["total_records"] == 7
+        assert blast_payload["eligible_records"] == 7
+        assert blast_payload["stored_result"] == {"HOLD": 4, "NO_OUTCOME": 3}
+        assert blast_payload["proposed_result"] == {"HOLD": 2, "NO_OUTCOME": 5}
+        assert blast_payload["changed_rule_outcome_count"] == 2
+        assert len(blast_payload["flipped_events"]) == 1
+        assert blast_payload["flipped_events"][0]["transaction_id"] in {
+            "journey-agent-normal-borderline-us",
+            "journey-agent-fraud-borderline-gb",
+        }
+        assert "journey-agent-rescored" not in {event["transaction_id"] for event in blast_payload["flipped_events"]}
+        assert "journey-agent-other-org" not in {event["transaction_id"] for event in blast_payload["flipped_events"]}
+
+        groups = {row["group"]["country"]: row for row in blast_payload["group_deltas"]}
+        assert groups["US"]["changed_rule_outcome_count"] == 1
+        assert groups["GB"]["changed_rule_outcome_count"] == 1
+
+        counterexamples = client.post(
+            "/api/v2/agent-tools/rule-counterexamples",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "rule_id": rule_id,
+                "proposed_logic": "if $amount > 150:\n\treturn !HOLD",
+                "positive_labels": [fraud_label],
+                "negative_labels": [normal_label],
+                "target_outcomes": ["HOLD"],
+                "sample_limit": 10,
+                "max_records": 20,
+            },
+        )
+        assert counterexamples.status_code == 200
+        buckets = counterexamples.json()["buckets"]
+        assert {event["transaction_id"] for event in buckets["fired_but_negative"]} == {
+            "journey-agent-normal-borderline-us"
+        }
+        assert {event["transaction_id"] for event in buckets["missed_positive"]} == {"journey-agent-fraud-missed-us"}
+        assert {event["transaction_id"] for event in buckets["candidate_fixes_existing"]} == {
+            "journey-agent-normal-borderline-us"
+        }
+        assert {event["transaction_id"] for event in buckets["candidate_introduces_new_errors"]} == {
+            "journey-agent-fraud-borderline-gb"
+        }
+
+        viewer_blast = client.post(
+            "/api/v2/agent-tools/rule-blast-radius",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+            json={
+                "rule_id": rule_id,
+                "proposed_logic": "if $amount > 150:\n\treturn !HOLD",
+                "sample_limit": 10,
+                "max_records": 20,
+            },
+        )
+        assert viewer_blast.status_code == 200
+        assert all(event["label_name"] is None for event in viewer_blast.json()["flipped_events"])
+
+        viewer_counterexamples = client.post(
+            "/api/v2/agent-tools/rule-counterexamples",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+            json={"rule_id": rule_id},
+        )
+        assert viewer_counterexamples.status_code == 403
+
+
+def test_backtesting_with_computed_features_product_journey(session, live_api_key):
+    org = session.query(Organisation).one()
+    org_id = int(org.o_id)
+    _seed_business_outcomes(session, org_id=org_id)
+    token = _manager_token(session, email="journey-backtesting-feature@example.com")
+    previous_always_eager = celery_app.conf.task_always_eager
+    previous_eager_propagates = celery_app.conf.task_eager_propagates
+
+    try:
+        celery_app.conf.task_always_eager = True
+        celery_app.conf.task_eager_propagates = True
+
+        with TestClient(app) as client:
+            _create_active_sum_feature(client, token)
+            _add_feature_source_event(
+                session,
+                org_id=org_id,
+                transaction_id="journey-backtest-feature-prior",
+                effective_at=datetime(2026, 5, 5, 12, 0, tzinfo=UTC),
+                event_data={"sender_id": "S1", "amount": 60},
+            )
+            session.commit()
+
+            rule_id = _create_rule(
+                client,
+                token,
+                rid="JOURNEY_BACKTEST_FEATURE_BASELINE",
+                description="Baseline release rule for feature backtesting",
+                logic="if $amount >= 0:\n\treturn !RELEASE",
+            )
+            _promote_rule(client, token, rule_id)
+            fraud_label = _create_label(client, token, label_name="journey_backtest_fraud")
+
+            _evaluate(
+                client,
+                live_api_key,
+                transaction_id="journey-backtest-feature-hit",
+                effective_at="2026-05-05T13:00:00Z",
+                event_data={"sender_id": "S1", "amount": 5},
+            )
+            _mark_event_label(
+                client,
+                token,
+                transaction_id="journey-backtest-feature-hit",
+                label_name=fraud_label,
+            )
+            _evaluate(
+                client,
+                live_api_key,
+                transaction_id="journey-backtest-missing-sender",
+                effective_at="2026-05-05T14:00:00Z",
+                event_data={"amount": 8},
+            )
+
+            trigger = client.post(
+                "/api/v2/backtesting",
+                headers={"Authorization": f"Bearer {token}"},
+                json={
+                    "r_id": rule_id,
+                    "new_rule_logic": (
+                        "if stat[sender.sent_amount_sum_24h] and stat[sender.sent_amount_sum_24h] > 50:\n\treturn !HOLD"
+                    ),
+                },
+            )
+            assert trigger.status_code == 200
+            task_id = trigger.json()["task_id"]
+            task_response = client.get(
+                f"/api/v2/backtesting/task/{task_id}", headers={"Authorization": f"Bearer {token}"}
+            )
+            assert task_response.status_code == 200
+            payload = task_response.json()
+    finally:
+        celery_app.conf.task_always_eager = previous_always_eager
+        celery_app.conf.task_eager_propagates = previous_eager_propagates
+
+    assert payload["queue_status"] == "done"
+    assert payload["total_records"] == 1
+    assert payload["eligible_records"] == 1
+    assert payload["skipped_records"] == 1
+    assert payload["stored_result"] == {"RELEASE": 1}
+    assert payload["proposed_result"] == {"HOLD": 1}
+    assert payload["label_counts"] == {fraud_label: 1}
+    proposed_metric = next(
+        metric
+        for metric in payload["proposed_quality_metrics"]
+        if metric["outcome"] == "HOLD" and metric["label"] == fraud_label
+    )
+    assert proposed_metric["true_positive"] == 1
+    assert proposed_metric["precision"] == pytest.approx(1.0)
+    assert proposed_metric["recall"] == pytest.approx(1.0)
+    assert any("computed stats could not be resolved" in warning for warning in payload["warnings"])
+
+    snapshot = payload["feature_snapshots"][0]
+    assert snapshot["stat_path"] == "sender.sent_amount_sum_24h"
+    assert snapshot["matched_event_count_min"] == 0
+    assert snapshot["matched_event_count_max"] == 1
+    assert snapshot["resolution_status_counts"] == {"failed": 1, "resolved": 1}
+    assert payload["feature_snapshot_warnings"] == [
+        "Event is missing entity key 'sender_id' required for stat[sender.sent_amount_sum_24h]"
+    ]
+
+    traces = (
+        session.query(FeatureSnapshotResolution)
+        .filter(FeatureSnapshotResolution.backtest_task_id == task_id)
+        .order_by(FeatureSnapshotResolution.backtest_record_index.asc())
+        .all()
+    )
+    assert [trace.resolution_status for trace in traces] == ["resolved", "failed"]
 
 
 def test_rule_authoring_to_served_decision_product_journey(session, live_api_key):
@@ -293,6 +827,58 @@ def test_negative_product_journeys_leave_no_side_effects(session):
     )
 
     with TestClient(app) as client:
+        feature_count = session.query(FeatureDefinition).filter(FeatureDefinition.o_id == int(org.o_id)).count()
+        invalid_feature = client.post(
+            "/api/v2/features",
+            headers={"Authorization": f"Bearer {manager_token}"},
+            json={
+                "name": "Invalid journey feature",
+                "entity": "sender",
+                "feature_name": "invalid_sent_amount_sum",
+                "entity_key": "sender_id",
+                "aggregation_type": "sum",
+                "source_field": "amount",
+                "window_seconds": 123,
+            },
+        )
+        assert invalid_feature.status_code == 422
+        assert session.query(FeatureDefinition).filter(FeatureDefinition.o_id == int(org.o_id)).count() == feature_count
+
+        inactive_feature = client.post(
+            "/api/v2/features",
+            headers={"Authorization": f"Bearer {manager_token}"},
+            json={
+                "name": "Inactive journey feature",
+                "entity": "sender",
+                "feature_name": "inactive_sent_amount_sum_24h",
+                "entity_key": "sender_id",
+                "aggregation_type": "sum",
+                "source_field": "amount",
+                "window_seconds": 86400,
+            },
+        )
+        assert inactive_feature.status_code == 201
+        assert inactive_feature.json()["feature"]["status"] == "draft"
+
+        inactive_feature_rule = client.post(
+            "/api/v2/rules",
+            headers={"Authorization": f"Bearer {manager_token}"},
+            json={
+                "rid": "JOURNEY_INACTIVE_FEATURE_RULE",
+                "description": "Inactive feature rules should not persist",
+                "logic": "if stat[sender.inactive_sent_amount_sum_24h] > 0:\n\treturn !HOLD",
+                "evaluation_lane": "main",
+            },
+        )
+        assert inactive_feature_rule.status_code == 201
+        assert inactive_feature_rule.json()["success"] is False
+        assert (
+            session.query(RuleModel)
+            .filter(RuleModel.o_id == int(org.o_id), RuleModel.rid == "JOURNEY_INACTIVE_FEATURE_RULE")
+            .count()
+            == 0
+        )
+
         invalid_allowlist = client.post(
             "/api/v2/rules",
             headers={"Authorization": f"Bearer {manager_token}"},
@@ -312,6 +898,30 @@ def test_negative_product_journeys_leave_no_side_effects(session):
             == 0
         )
 
+        agent_rule_id = _create_rule(
+            client,
+            manager_token,
+            rid="JOURNEY_AGENT_TOOL_SIDE_EFFECT_BASELINE",
+            description="Baseline for invalid agent tool logic",
+            logic="if $amount > 100:\n\treturn !HOLD",
+        )
+        before_agent_tool_failure = (
+            session.query(EventVersion).count(),
+            session.query(EvaluationDecision).count(),
+            session.query(RuleBackTestingResult).count(),
+        )
+        invalid_agent_tool_logic = client.post(
+            "/api/v2/agent-tools/rule-blast-radius",
+            headers={"Authorization": f"Bearer {manager_token}"},
+            json={"rule_id": agent_rule_id, "proposed_logic": "if $amount >"},
+        )
+        assert invalid_agent_tool_logic.status_code == 400
+        assert (
+            session.query(EventVersion).count(),
+            session.query(EvaluationDecision).count(),
+            session.query(RuleBackTestingResult).count(),
+        ) == before_agent_tool_failure
+
         forbidden_create = client.post(
             "/api/v2/rules",
             headers={"Authorization": f"Bearer {viewer_token}"},
@@ -329,6 +939,24 @@ def test_negative_product_journeys_leave_no_side_effects(session):
             .count()
             == 0
         )
+
+        label_count = session.query(Label).filter(Label.o_id == int(org.o_id)).count()
+        forbidden_label = client.post(
+            "/api/v2/labels",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+            json={"label_name": "journey_forbidden_label"},
+        )
+        assert forbidden_label.status_code == 403
+        assert session.query(Label).filter(Label.o_id == int(org.o_id)).count() == label_count
+
+        list_count = session.query(UserList).filter(UserList.o_id == int(org.o_id)).count()
+        forbidden_list = client.post(
+            "/api/v2/user-lists",
+            headers={"Authorization": f"Bearer {viewer_token}"},
+            json={"name": "JourneyForbiddenList"},
+        )
+        assert forbidden_list.status_code == 403
+        assert session.query(UserList).filter(UserList.o_id == int(org.o_id)).count() == list_count
 
         invalid_key_eval = client.post(
             "/api/v2/evaluate",
@@ -469,6 +1097,33 @@ def test_rule_edit_requires_promotion_before_serving_new_logic(session, live_api
         )
         assert after_promote["resolved_outcome"] == "HOLD"
         assert after_promote["rule_results"] == {str(rule_id): "HOLD"}
+
+        tested_events = client.get(
+            "/api/v2/tested-events?limit=200&include_referenced_fields=true",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert tested_events.status_code == 200
+        by_transaction = {event["transaction_id"]: event for event in tested_events.json()["events"]}
+        assert by_transaction["journey-edit-before"]["triggered_rules"] == [
+            {
+                "r_id": rule_id,
+                "rid": "JOURNEY_EDIT_RULE",
+                "description": "Review high amount before edit",
+                "outcome": "REVIEW",
+                "metadata_source": "evaluation_snapshot",
+                "referenced_fields": ["amount"],
+            }
+        ]
+        assert by_transaction["journey-edit-after"]["triggered_rules"] == [
+            {
+                "r_id": rule_id,
+                "rid": "JOURNEY_EDIT_RULE",
+                "description": "Hold high amount after edit",
+                "outcome": "HOLD",
+                "metadata_source": "evaluation_snapshot",
+                "referenced_fields": ["amount"],
+            }
+        ]
 
         history = client.get(f"/api/v2/rules/{rule_id}/history", headers={"Authorization": f"Bearer {token}"})
         assert history.status_code == 200
