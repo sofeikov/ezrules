@@ -568,6 +568,7 @@ export class CasesComponent implements OnInit {
   saving = false;
   error: string | null = null;
   success: string | null = null;
+  private caseLoadRequestId = 0;
 
   constructor(
     private caseService: CaseService,
@@ -608,6 +609,7 @@ export class CasesComponent implements OnInit {
   }
 
   loadCases(): void {
+    const requestId = ++this.caseLoadRequestId;
     this.loading = true;
     this.error = null;
     this.caseService.getCases({
@@ -628,6 +630,9 @@ export class CasesComponent implements OnInit {
       alertedTo: this.alertedToFilter || undefined,
     }).subscribe({
       next: (response) => {
+        if (requestId !== this.caseLoadRequestId) {
+          return;
+        }
         this.cases = response.cases;
         this.loading = false;
         if (this.selected && !this.cases.some(item => item.id === this.selected?.id)) {
@@ -639,6 +644,9 @@ export class CasesComponent implements OnInit {
         }
       },
       error: () => {
+        if (requestId !== this.caseLoadRequestId) {
+          return;
+        }
         this.error = 'Failed to load cases.';
         this.loading = false;
       }

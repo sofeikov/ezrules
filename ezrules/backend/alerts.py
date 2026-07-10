@@ -2,6 +2,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from sqlalchemy import exists
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 
@@ -40,10 +41,36 @@ def _incident_in_cooldown(db: Any, rule: AlertRule, now: datetime) -> AlertIncid
 
 
 def _matching_decisions(
-    db: Any, *, o_id: int, outcome: str, window_start: datetime, window_end: datetime
+    db: Any,
+    *,
+    o_id: int,
+    outcome: str,
+    window_start: datetime,
+    window_end: datetime,
+    exclude_incident_id: int | None = None,
 ) -> list[EvaluationDecision]:
-    return list(
-        db.query(EvaluationDecision)
+    query = db.query(EvaluationDecision).filter(
+        EvaluationDecision.o_id == o_id,
+        EvaluationDecision.served.is_(True),
+        EvaluationDecision.decision_type == "served",
+        EvaluationDecision.is_current.is_(True),
+        EvaluationDecision.resolved_outcome == outcome,
+        EvaluationDecision.evaluated_at >= window_start,
+        EvaluationDecision.evaluated_at <= window_end,
+    )
+    if exclude_incident_id is not None:
+        query = query.filter(
+            ~exists().where(
+                (AlertIncidentCase.alert_incident_id == exclude_incident_id)
+                & (AlertIncidentCase.evaluation_decision_id == EvaluationDecision.ed_id)
+            )
+        )
+    return list(query.order_by(EvaluationDecision.ed_id.asc()).all())
+
+
+def _count_matching_decisions(db: Any, *, o_id: int, outcome: str, window_start: datetime, window_end: datetime) -> int:
+    return int(
+        db.query(EvaluationDecision.ed_id)
         .filter(
             EvaluationDecision.o_id == o_id,
             EvaluationDecision.served.is_(True),
@@ -53,8 +80,7 @@ def _matching_decisions(
             EvaluationDecision.evaluated_at >= window_start,
             EvaluationDecision.evaluated_at <= window_end,
         )
-        .order_by(EvaluationDecision.ed_id.asc())
-        .all()
+        .count()
     )
 
 
@@ -132,6 +158,29 @@ def detect_alerts_for_outcome(db: Any, *, o_id: int, outcome: str, now: datetime
     for rule in rules:
         window_end = checked_at
         window_start = window_end - timedelta(seconds=int(rule.window_seconds))
+        observed_count = _count_matching_decisions(
+            db,
+            o_id=o_id,
+            outcome=normalized_outcome,
+            window_start=window_start,
+            window_end=window_end,
+        )
+        if observed_count <= int(rule.threshold):
+            continue
+        active_incident = _incident_in_cooldown(db, rule, checked_at)
+        if active_incident is not None:
+            decisions = _matching_decisions(
+                db,
+                o_id=o_id,
+                outcome=normalized_outcome,
+                window_start=window_start,
+                window_end=window_end,
+                exclude_incident_id=int(active_incident.ai_id),
+            )
+            _link_incident_to_cases(db, incident=active_incident, rule=rule, decisions=decisions)
+            db.commit()
+            continue
+
         decisions = _matching_decisions(
             db,
             o_id=o_id,
@@ -139,14 +188,6 @@ def detect_alerts_for_outcome(db: Any, *, o_id: int, outcome: str, now: datetime
             window_start=window_start,
             window_end=window_end,
         )
-        observed_count = len(decisions)
-        if observed_count <= int(rule.threshold):
-            continue
-        active_incident = _incident_in_cooldown(db, rule, checked_at)
-        if active_incident is not None:
-            _link_incident_to_cases(db, incident=active_incident, rule=rule, decisions=decisions)
-            db.commit()
-            continue
 
         incident = AlertIncident(
             o_id=o_id,

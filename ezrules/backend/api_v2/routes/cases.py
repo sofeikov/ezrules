@@ -334,8 +334,12 @@ def list_cases(
     db: Any = Depends(get_db),
 ) -> CaseListResponse:
     query = db.query(Case).filter(Case.o_id == current_org_id)
-    alert_filter_requested = any(
-        value is not None for value in (alert_incident_id, alert_rule_id, alert_severity, alerted_from, alerted_to)
+    alert_filter_requested = (
+        alert_incident_id is not None
+        or alert_rule_id is not None
+        or bool(alert_severity and alert_severity.strip())
+        or bool(alerted_from and alerted_from.strip())
+        or bool(alerted_to and alerted_to.strip())
     )
     if alert_filter_requested:
         query = query.join(AlertIncidentCase, AlertIncidentCase.case_id == Case.case_id).join(
