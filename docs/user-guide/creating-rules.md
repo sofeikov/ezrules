@@ -135,7 +135,7 @@ if stat[sender.sent_amount_sum_24h] > 10000:
     return !HOLD
 ```
 
-Computed features are defined in **Features** and are resolved as of the event timestamp. Features use bounded preset windows such as `10m`, `1h`, `24h`, `7d`, `30d`, `90d`, and `180d`; arbitrary lifetime windows are intentionally not allowed for online rule evaluation. Repeated transaction versions are handled as-of the event timestamp, so corrected or superseded versions do not double-count in backtests. Graph features can also expose bounded relationship counts, for example unique cards reachable from a user through configured transaction entity fields.
+Computed features are defined in **Features** and are resolved as of the event timestamp. Features use bounded preset windows such as `10m`, `1h`, `24h`, `7d`, `30d`, `90d`, and `180d`; arbitrary lifetime windows are intentionally not allowed for online rule evaluation. Repeated transaction versions are handled as-of the event timestamp, so corrected or superseded versions do not double-count in backtests. Aggregate entity and filter values preserve JSON scalar types, and invalid/non-finite numeric source values are excluded with trace warnings. See the [computed feature math contract](../architecture/feature-math-contract.md) for exact window, null, aggregation, and precision semantics. Graph features can also expose bounded relationship counts, for example unique cards reachable from a user through configured transaction entity fields.
 
 ### Allowlist pattern
 

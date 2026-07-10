@@ -65,6 +65,7 @@ nav:
   - Architecture:
       - Overview: architecture/overview.md
       - Decisions: architecture/decisions.md
+      - Feature Math Contract: architecture/feature-math-contract.md
       - Deployment: architecture/deployment.md
   - What's New: whatsnew.md
   - Contributing: contributing.md
