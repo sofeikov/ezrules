@@ -152,6 +152,13 @@ def test_spike_incident_links_matching_decisions_to_reusable_cases(session, aler
     )
     assert unfiltered.status_code == 200
     assert unfiltered.json()["total"] == 2
+    whitespace_severity = client.get(
+        "/api/v2/cases",
+        params={"alert_rule_id": int(rule.ar_id), "alert_severity": "   "},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert whitespace_severity.status_code == 200
+    assert whitespace_severity.json()["total"] == 2
 
     later_decision = _decision(session, transaction_id="spike-later", evaluated_at=now)
     assert detect_alerts_for_outcome(session, o_id=1, outcome="CANCEL", now=now) == []

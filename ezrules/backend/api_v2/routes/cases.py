@@ -334,10 +334,11 @@ def list_cases(
     db: Any = Depends(get_db),
 ) -> CaseListResponse:
     query = db.query(Case).filter(Case.o_id == current_org_id)
+    normalized_alert_severity = alert_severity.strip().lower() if alert_severity else ""
     alert_filter_requested = (
         alert_incident_id is not None
         or alert_rule_id is not None
-        or bool(alert_severity and alert_severity.strip())
+        or bool(normalized_alert_severity)
         or bool(alerted_from and alerted_from.strip())
         or bool(alerted_to and alerted_to.strip())
     )
@@ -349,8 +350,8 @@ def list_cases(
             query = query.filter(AlertIncident.ai_id == alert_incident_id)
         if alert_rule_id is not None:
             query = query.filter(AlertIncident.alert_rule_id == alert_rule_id)
-        if alert_severity:
-            query = query.filter(sa.func.lower(AlertIncident.severity) == alert_severity.strip().lower())
+        if normalized_alert_severity:
+            query = query.filter(sa.func.lower(AlertIncident.severity) == normalized_alert_severity)
         alerted_from_value = _parse_case_filter_datetime(alerted_from, param_name="alerted_from")
         alerted_to_value = _parse_case_filter_datetime(alerted_to, param_name="alerted_to", end_of_day=True)
         if alerted_from_value is not None:

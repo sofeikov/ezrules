@@ -220,6 +220,10 @@ def detect_alerts_for_outcome(db: Any, *, o_id: int, outcome: str, now: datetime
                 .first()
             )
             if existing_incident is not None:
+                existing_incident.observed_count = observed_count
+                existing_incident.window_start = window_start
+                existing_incident.window_end = window_end
+                db.flush()
                 _link_incident_to_cases(db, incident=existing_incident, rule=rule, decisions=decisions)
                 db.commit()
             continue
