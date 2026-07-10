@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import type { TestedEvent } from './tested-event.service';
 
@@ -121,6 +122,13 @@ export interface RuleTriggeredEventsResponse {
   total: number;
   limit: number;
   offset: number;
+}
+
+interface RuleTriggeredEventsApiResponse {
+  events?: TestedEvent[] | null;
+  total?: number | null;
+  limit?: number | null;
+  offset?: number | null;
 }
 
 export interface UpdateRuleRequest {
@@ -320,7 +328,14 @@ export class RuleService {
     const params = new HttpParams()
       .set('limit', limit.toString())
       .set('offset', offset.toString());
-    return this.http.get<RuleTriggeredEventsResponse>(`${this.apiUrl}/${ruleId}/triggered-events`, { params });
+    return this.http.get<RuleTriggeredEventsApiResponse>(`${this.apiUrl}/${ruleId}/triggered-events`, { params }).pipe(
+      map(response => ({
+        events: response.events ?? [],
+        total: response.total ?? 0,
+        limit: response.limit ?? limit,
+        offset: response.offset ?? offset,
+      }))
+    );
   }
 
   rollbackRule(ruleId: number, revisionNumber: number): Observable<UpdateRuleResponse> {
