@@ -156,6 +156,10 @@ def test_spike_incident_links_matching_decisions_to_reusable_cases(session, aler
     later_decision = _decision(session, transaction_id="spike-later", evaluated_at=now)
     assert detect_alerts_for_outcome(session, o_id=1, outcome="CANCEL", now=now) == []
     assert session.query(AlertIncidentCase).count() == 3
+    session.refresh(incident)
+    assert incident.observed_count == 3
+    assert incident.window_start == (now - datetime.timedelta(seconds=3600)).replace(tzinfo=None)
+    assert incident.window_end == now.replace(tzinfo=None)
     assert (
         session.query(AlertIncidentCase)
         .filter(AlertIncidentCase.evaluation_decision_id == later_decision.ed_id)

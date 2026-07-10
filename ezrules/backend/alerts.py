@@ -169,6 +169,10 @@ def detect_alerts_for_outcome(db: Any, *, o_id: int, outcome: str, now: datetime
             continue
         active_incident = _incident_in_cooldown(db, rule, checked_at)
         if active_incident is not None:
+            active_incident.observed_count = observed_count
+            active_incident.window_start = window_start
+            active_incident.window_end = window_end
+            db.flush()
             decisions = _matching_decisions(
                 db,
                 o_id=o_id,
