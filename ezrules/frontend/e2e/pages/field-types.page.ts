@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 
 /**
  * Page Object Model for the Field Types management page.
@@ -10,6 +10,8 @@ export class FieldTypesPage {
   readonly typeSelect: Locator;
   readonly saveButton: Locator;
   readonly loadingSpinner: Locator;
+  readonly configuredSection: Locator;
+  readonly configuredRows: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -18,6 +20,8 @@ export class FieldTypesPage {
     this.typeSelect = page.locator('select');
     this.saveButton = page.locator('button:has-text("Save")');
     this.loadingSpinner = page.locator('.animate-spin');
+    this.configuredSection = page.locator('h2:has-text("Configured Fields")').locator('../..');
+    this.configuredRows = this.configuredSection.locator('tbody tr');
   }
 
   async goto() {
@@ -29,20 +33,12 @@ export class FieldTypesPage {
   }
 
   async getConfiguredCount(): Promise<number> {
-    // Count rows in the Configured Fields table
-    const section = this.page.locator('h2:has-text("Configured Fields")').locator('../..');
-    const rows = section.locator('tbody tr');
-    const count = await rows.count();
-    return count;
+    return await this.configuredRows.count();
   }
 
   async hasConfiguredField(fieldName: string): Promise<boolean> {
     await this.waitForLoad();
-    return await this.page
-      .locator('tbody tr td:first-child')
-      .filter({ hasText: fieldName })
-      .isVisible()
-      .catch(() => false);
+    return await this.configuredFieldRow(fieldName).isVisible().catch(() => false);
   }
 
   async saveFieldType(fieldName: string, type: string) {
@@ -52,7 +48,19 @@ export class FieldTypesPage {
   }
 
   async deleteFieldType(fieldName: string) {
-    const row = this.page.locator('tbody tr').filter({ hasText: fieldName }).first();
+    const row = this.configuredFieldRow(fieldName).first();
     await row.locator('button:has-text("Delete")').click();
+  }
+
+  configuredFieldRow(fieldName: string): Locator {
+    return this.configuredRows.filter({ hasText: fieldName });
+  }
+
+  async waitForConfiguredField(fieldName: string) {
+    await expect(this.configuredFieldRow(fieldName)).toBeVisible();
+  }
+
+  async waitForConfiguredFieldRemoved(fieldName: string) {
+    await expect(this.configuredFieldRow(fieldName)).toHaveCount(0);
   }
 }

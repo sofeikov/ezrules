@@ -1,10 +1,13 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../support/fixtures';
 import { RoleManagementPage } from '../pages/role-management.page';
+import { acceptDialog, dismissDialog } from '../support/dialogs';
+import { testResourceName } from '../support/test-data';
+import { STATEFUL_TAG, TEST_DATA_TAG } from '../support/tags';
 
 /**
  * E2E tests for the Role Management page.
  */
-test.describe('Role Management Page', () => {
+test.describe(`Role Management Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
   let roleManagementPage: RoleManagementPage;
 
   test.beforeEach(async ({ page }) => {
@@ -78,11 +81,11 @@ test.describe('Role Management Page', () => {
       await expect(roleManagementPage.createRoleButton).toBeVisible();
     });
 
-    test('should create a new role and display it in the table', async ({ page }) => {
+    test('should create a new role and display it in the table', async ({ page }, testInfo) => {
       await roleManagementPage.goto();
       await roleManagementPage.waitForPageToLoad();
 
-      const uniqueName = `e2e_role_${Date.now()}`;
+      const uniqueName = testResourceName(testInfo, 'e2e_role').toLowerCase();
 
       await roleManagementPage.createRole(uniqueName, 'Test role description');
 
@@ -102,8 +105,7 @@ test.describe('Role Management Page', () => {
       expect(await roleManagementPage.hasRoleWithName(uniqueName)).toBe(true);
 
       // Cleanup: delete the created role
-      page.on('dialog', dialog => dialog.accept());
-      await roleManagementPage.clickDeleteRole(uniqueName);
+      await acceptDialog(page, () => roleManagementPage.clickDeleteRole(uniqueName));
       await page.waitForFunction(
         (name: string) => {
           const tables = document.querySelectorAll('table');
@@ -116,11 +118,11 @@ test.describe('Role Management Page', () => {
       );
     });
 
-    test('should show error for duplicate role name', async ({ page }) => {
+    test('should show error for duplicate role name', async ({ page }, testInfo) => {
       await roleManagementPage.goto();
       await roleManagementPage.waitForPageToLoad();
 
-      const uniqueName = `e2e_duprole_${Date.now()}`;
+      const uniqueName = testResourceName(testInfo, 'e2e_duprole').toLowerCase();
 
       // Create role first time
       await roleManagementPage.createRole(uniqueName);
@@ -144,8 +146,7 @@ test.describe('Role Management Page', () => {
       await expect(errorText).toBeVisible();
 
       // Cleanup
-      page.on('dialog', dialog => dialog.accept());
-      await roleManagementPage.clickDeleteRole(uniqueName);
+      await acceptDialog(page, () => roleManagementPage.clickDeleteRole(uniqueName));
       await page.waitForFunction(
         (name: string) => {
           const tables = document.querySelectorAll('table');
@@ -160,12 +161,12 @@ test.describe('Role Management Page', () => {
   });
 
   test.describe('Delete Role', () => {
-    test('should delete a role after confirmation', async ({ page }) => {
+    test('should delete a role after confirmation', async ({ page }, testInfo) => {
       await roleManagementPage.goto();
       await roleManagementPage.waitForPageToLoad();
 
       // Create a role to delete
-      const uniqueName = `e2e_delrole_${Date.now()}`;
+      const uniqueName = testResourceName(testInfo, 'e2e_delrole').toLowerCase();
       await roleManagementPage.createRole(uniqueName);
 
       await page.waitForFunction(
@@ -179,11 +180,8 @@ test.describe('Role Management Page', () => {
         { timeout: 5000 }
       );
 
-      // Accept the confirmation dialog
-      page.on('dialog', dialog => dialog.accept());
-
       const countBefore = await roleManagementPage.getRoleRowCount();
-      await roleManagementPage.clickDeleteRole(uniqueName);
+      await acceptDialog(page, () => roleManagementPage.clickDeleteRole(uniqueName));
 
       // Wait for the role to disappear
       await page.waitForFunction(
@@ -201,12 +199,12 @@ test.describe('Role Management Page', () => {
       expect(countAfter).toBe(countBefore - 1);
     });
 
-    test('should not delete a role when confirmation is dismissed', async ({ page }) => {
+    test('should not delete a role when confirmation is dismissed', async ({ page }, testInfo) => {
       await roleManagementPage.goto();
       await roleManagementPage.waitForPageToLoad();
 
       // Create a role
-      const uniqueName = `e2e_nodelrole_${Date.now()}`;
+      const uniqueName = testResourceName(testInfo, 'e2e_nodelrole').toLowerCase();
       await roleManagementPage.createRole(uniqueName);
 
       await page.waitForFunction(
@@ -222,20 +220,13 @@ test.describe('Role Management Page', () => {
 
       const countBefore = await roleManagementPage.getRoleRowCount();
 
-      // Dismiss the confirmation dialog
-      page.on('dialog', dialog => dialog.dismiss());
+      await dismissDialog(page, () => roleManagementPage.clickDeleteRole(uniqueName));
 
-      await roleManagementPage.clickDeleteRole(uniqueName);
-
-      // Wait briefly and check count is unchanged
-      await page.waitForTimeout(500);
-      const countAfter = await roleManagementPage.getRoleRowCount();
-      expect(countAfter).toBe(countBefore);
+      await expect(roleManagementPage.rolesTable.locator('tbody tr')).toHaveCount(countBefore);
+      expect(await roleManagementPage.hasRoleWithName(uniqueName)).toBe(true);
 
       // Cleanup
-      page.removeAllListeners('dialog');
-      page.on('dialog', dialog => dialog.accept());
-      await roleManagementPage.clickDeleteRole(uniqueName);
+      await acceptDialog(page, () => roleManagementPage.clickDeleteRole(uniqueName));
       await page.waitForFunction(
         (name: string) => {
           const tables = document.querySelectorAll('table');

@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 
 /**
  * Page Object Model for the User Lists management page.
@@ -15,6 +15,8 @@ export class UserListsPage {
   readonly errorMessage: Locator;
   readonly listCountText: Locator;
   readonly entryCountText: Locator;
+  readonly listItems: Locator;
+  readonly entryItems: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -27,6 +29,8 @@ export class UserListsPage {
     this.errorMessage = page.locator('.bg-red-50.border-red-200');
     this.listCountText = page.locator('text=/\\d+ lists? total/');
     this.entryCountText = page.locator('.w-2\\/3 .bg-gray-50 p');
+    this.listItems = page.locator('.w-1\\/3 ul li');
+    this.entryItems = page.locator('.w-2\\/3 ul li');
   }
 
   /**
@@ -48,8 +52,7 @@ export class UserListsPage {
    */
   async getListCount(): Promise<number> {
     await this.waitForListsToLoad();
-    // Lists are in the left panel (w-1/3) ul
-    return await this.page.locator('.w-1\\/3 ul li').count();
+    return await this.listItems.count();
   }
 
   /**
@@ -57,7 +60,7 @@ export class UserListsPage {
    */
   async hasListWithName(name: string): Promise<boolean> {
     await this.waitForListsToLoad();
-    return await this.page.locator('.w-1\\/3 li:has-text("' + name + '")').isVisible();
+    return await this.listItem(name).isVisible();
   }
 
   /**
@@ -72,16 +75,14 @@ export class UserListsPage {
    * Click on a list to select it and view its entries
    */
   async selectList(name: string) {
-    const listItem = this.page.locator('.w-1\\/3 li', { hasText: name });
-    await listItem.click();
+    await this.listItem(name).click();
   }
 
   /**
    * Click the Delete button for a specific list
    */
   async clickDeleteList(name: string) {
-    const row = this.page.locator('.w-1\\/3 li', { hasText: name });
-    await row.locator('button:has-text("Delete")').click();
+    await this.listItem(name).locator('button:has-text("Delete")').click();
   }
 
   /**
@@ -96,15 +97,14 @@ export class UserListsPage {
    * Check if an entry with the given value exists in the right panel
    */
   async hasEntry(value: string): Promise<boolean> {
-    return await this.page.locator('.w-2\\/3 li:has-text("' + value + '")').isVisible();
+    return await this.entryItem(value).isVisible();
   }
 
   /**
    * Click the Delete button for a specific entry
    */
   async clickDeleteEntry(value: string) {
-    const row = this.page.locator('.w-2\\/3 li', { hasText: value });
-    await row.locator('button:has-text("Delete")').click();
+    await this.entryItem(value).locator('button:has-text("Delete")').click();
   }
 
   /**
@@ -112,5 +112,29 @@ export class UserListsPage {
    */
   async waitForEntriesToLoad() {
     await this.entryCountText.waitFor({ state: 'visible' });
+  }
+
+  listItem(name: string): Locator {
+    return this.listItems.filter({ hasText: name });
+  }
+
+  entryItem(value: string): Locator {
+    return this.entryItems.filter({ hasText: value });
+  }
+
+  async waitForList(name: string) {
+    await expect(this.listItem(name)).toBeVisible();
+  }
+
+  async waitForListRemoved(name: string) {
+    await expect(this.listItem(name)).toHaveCount(0);
+  }
+
+  async waitForEntry(value: string) {
+    await expect(this.entryItem(value)).toBeVisible();
+  }
+
+  async waitForEntryRemoved(value: string) {
+    await expect(this.entryItem(value)).toHaveCount(0);
   }
 }

@@ -1,10 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../support/fixtures';
 import { RuleListPage } from '../pages/rule-list.page';
 import { RuleCreatePage } from '../pages/rule-create.page';
 import { RuleDetailPage } from '../pages/rule-detail.page';
-import { getApiBaseUrl, getAuthToken } from '../support/config';
-
-const API_BASE = getApiBaseUrl();
+import { deleteRuleById } from '../support/api-helpers';
+import { testResourceName } from '../support/test-data';
+import { TEST_DATA_TAG } from '../support/tags';
 
 /**
  * E2E tests for the Create Rule page.
@@ -14,7 +14,7 @@ const API_BASE = getApiBaseUrl();
  * and delete it in afterEach, keeping the DB clean across parallel runs.
  */
 
-test.describe('Rule Create Page', () => {
+test.describe(`Rule Create Page ${TEST_DATA_TAG}`, () => {
   let ruleListPage: RuleListPage;
   let ruleCreatePage: RuleCreatePage;
   let ruleDetailPage: RuleDetailPage;
@@ -29,9 +29,7 @@ test.describe('Rule Create Page', () => {
 
   test.afterEach(async ({ request }) => {
     if (testRuleId) {
-      await request.delete(`${API_BASE}/api/v2/rules/${testRuleId}`, {
-        headers: { Authorization: `Bearer ${getAuthToken()}` },
-      });
+      await deleteRuleById(request, testRuleId);
       testRuleId = 0;
     }
   });
@@ -141,11 +139,10 @@ test.describe('Rule Create Page', () => {
       await ruleCreatePage.goto();
 
       // Fill in logic with a rule that uses $amount parameter
+      const verifyResponsePromise = ruleCreatePage.waitForVerifyResponse();
       await ruleCreatePage.fillLogic("if $amount > 100:\n\treturn !HOLD");
-
-      // Wait for the verify API call to complete and populate testJson
-      await page.waitForResponse(resp => resp.url().includes('/api/v2/rules/verify'));
-      await page.waitForTimeout(500);
+      await verifyResponsePromise;
+      await ruleCreatePage.waitForTestJsonToContain('amount');
 
       const testJsonValue = await ruleCreatePage.getTestJsonValue();
       expect(testJsonValue).toContain('amount');
@@ -155,11 +152,10 @@ test.describe('Rule Create Page', () => {
       await ruleCreatePage.goto();
 
       // Fill in logic
+      const verifyResponsePromise = ruleCreatePage.waitForVerifyResponse();
       await ruleCreatePage.fillLogic("if $amount > 100:\n\treturn !HOLD");
-
-      // Wait for params to populate
-      await page.waitForResponse(resp => resp.url().includes('/api/v2/rules/verify'));
-      await page.waitForTimeout(500);
+      await verifyResponsePromise;
+      await ruleCreatePage.waitForTestJsonToContain('amount');
 
       // Fill in test JSON with a value that triggers HOLD
       await ruleCreatePage.fillTestJson('{"amount": 500}');
@@ -184,11 +180,11 @@ test.describe('Rule Create Page', () => {
   });
 
   test.describe('Rule Creation', () => {
-    test('should create a rule and navigate to the detail page', async ({ page }) => {
+    test('should create a rule and navigate to the detail page', async ({ page }, testInfo) => {
       await ruleCreatePage.goto();
 
-      const uniqueRid = 'E2E_CREATE_' + Date.now();
-      const description = 'E2E test rule created at ' + Date.now();
+      const uniqueRid = testResourceName(testInfo, 'E2E_CREATE', { uppercase: true });
+      const description = `E2E test rule for ${uniqueRid}`;
       const logic = "if $amount > 100:\n\treturn !HOLD";
 
       await ruleCreatePage.fillRuleId(uniqueRid);
@@ -214,10 +210,10 @@ test.describe('Rule Create Page', () => {
       expect(displayedRuleId).toBe(uniqueRid);
     });
 
-    test('should display error for invalid logic syntax', async ({ page }) => {
+    test('should display error for invalid logic syntax', async ({ page }, testInfo) => {
       await ruleCreatePage.goto();
 
-      await ruleCreatePage.fillRuleId('INVALID_LOGIC_TEST');
+      await ruleCreatePage.fillRuleId(testResourceName(testInfo, 'INVALID_LOGIC', { uppercase: true }));
       await ruleCreatePage.fillDescription('Test with bad logic');
       await ruleCreatePage.fillLogic('this is not valid python syntax !!!');
 
@@ -246,7 +242,7 @@ test.describe('Rule Create Page', () => {
       await expect(page).toHaveURL(/\/rules\/create/);
     });
 
-    test('should send POST request with correct body to /api/v2/rules', async ({ page }) => {
+    test('should send POST request with correct body to /api/v2/rules', async ({ page }, testInfo) => {
       let postRequestBody: any = null;
 
       page.on('request', request => {
@@ -257,7 +253,7 @@ test.describe('Rule Create Page', () => {
 
       await ruleCreatePage.goto();
 
-      const uniqueRid = 'E2E_POST_CHECK_' + Date.now();
+      const uniqueRid = testResourceName(testInfo, 'E2E_POST_CHECK', { uppercase: true });
       const description = 'POST body test';
       const logic = "if $amount > 50:\n\treturn !RELEASE";
 

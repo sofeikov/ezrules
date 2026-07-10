@@ -18,7 +18,7 @@ export default defineConfig({
 
   /* Keep local runs aligned with CI's single-worker invocation to avoid
    * overloading the dev API/database pool during full-suite browser runs. */
-  workers: process.env.CI ? 4 : 1,
+  workers: 1,
 
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
@@ -31,8 +31,8 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:4200',
 
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    /* Keep a trace for failed tests even in local no-retry runs. */
+    trace: 'retain-on-failure',
 
     /* Screenshot only on failure */
     screenshot: 'only-on-failure',

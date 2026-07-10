@@ -1,5 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../support/fixtures';
 import { ApiKeysPage } from '../pages/api-keys.page';
+import { testResourceName } from '../support/test-data';
 
 test.describe('API Keys Page', () => {
   let apiKeysPage: ApiKeysPage;
@@ -57,11 +58,11 @@ test.describe('API Keys Page', () => {
       await expect(apiKeysPage.createDialog).not.toBeVisible();
     });
 
-    test('should create a key and show the raw key once', async ({ page }) => {
+    test('should create a key and show the raw key once', async ({ page }, testInfo) => {
       await apiKeysPage.goto();
       await apiKeysPage.waitForLoad();
 
-      const label = `e2e-key-${Date.now()}`;
+      const label = testResourceName(testInfo, 'e2e-key', { maxLength: 48 });
       await apiKeysPage.createBtn.click();
       await apiKeysPage.labelInput.fill(label);
       await apiKeysPage.confirmCreateBtn.click();
@@ -83,6 +84,8 @@ test.describe('API Keys Page', () => {
 
       // Key should now appear in the table
       await expect(page.locator('[data-testid="api-key-row"]').filter({ hasText: label })).toBeVisible();
+      await apiKeysPage.revokeKeyByLabel(label);
+      await expect(page.locator('[data-testid="api-key-row"]').filter({ hasText: label })).not.toBeVisible();
     });
 
     test('confirm button should be disabled when label is empty', async () => {
@@ -94,11 +97,11 @@ test.describe('API Keys Page', () => {
   });
 
   test.describe('Revoke API Key', () => {
-    test('should revoke a key and remove it from the list', async ({ page }) => {
+    test('should revoke a key and remove it from the list', async ({ page }, testInfo) => {
       await apiKeysPage.goto();
       await apiKeysPage.waitForLoad();
 
-      const label = `e2e-revoke-${Date.now()}`;
+      const label = testResourceName(testInfo, 'e2e-revoke', { maxLength: 48 });
       await apiKeysPage.createKey(label);
 
       // Key should be in the list
@@ -106,10 +109,7 @@ test.describe('API Keys Page', () => {
 
       const initialCount = await apiKeysPage.getKeyCount();
 
-      // Revoke it
-      page.on('dialog', d => d.accept());
-      const row = page.locator('[data-testid="api-key-row"]').filter({ hasText: label });
-      await row.locator('[data-testid="revoke-btn"]').click();
+      await apiKeysPage.revokeKeyByLabel(label);
 
       // Row should disappear
       await expect(page.locator('[data-testid="api-key-row"]').filter({ hasText: label })).not.toBeVisible();
