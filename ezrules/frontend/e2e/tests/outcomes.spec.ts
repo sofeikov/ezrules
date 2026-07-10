@@ -1,10 +1,13 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../support/fixtures';
 import { OutcomesPage } from '../pages/outcomes.page';
+import { acceptDialog, dismissDialog } from '../support/dialogs';
+import { testResourceName } from '../support/test-data';
+import { STATEFUL_TAG, TEST_DATA_TAG } from '../support/tags';
 
 /**
  * E2E tests for the Outcomes management page.
  */
-test.describe('Outcomes Page', () => {
+test.describe(`Outcomes Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
   let outcomesPage: OutcomesPage;
 
   test.beforeEach(async ({ page }) => {
@@ -82,11 +85,11 @@ test.describe('Outcomes Page', () => {
       await expect(outcomesPage.addOutcomeButton).toBeVisible();
     });
 
-    test('should create a new outcome and display it in the list', async ({ page }) => {
+    test('should create a new outcome and display it in the list', async ({ page }, testInfo) => {
       await outcomesPage.goto();
       await outcomesPage.waitForOutcomesToLoad();
 
-      const uniqueOutcome = `E2ETEST${Date.now()}`;
+      const uniqueOutcome = testResourceName(testInfo, 'E2ETEST', { maxLength: 48, uppercase: true });
 
       await outcomesPage.addOutcome(uniqueOutcome);
 
@@ -104,8 +107,7 @@ test.describe('Outcomes Page', () => {
       await expect(await outcomesPage.hasOutcome(upperOutcome)).toBe(true);
 
       // Cleanup: delete the outcome we created
-      page.on('dialog', dialog => dialog.accept());
-      await outcomesPage.clickDelete(upperOutcome);
+      await acceptDialog(page, () => outcomesPage.clickDelete(upperOutcome));
       await page.waitForFunction(
         (name: string) => {
           const items = document.querySelectorAll('ul li');
@@ -130,12 +132,12 @@ test.describe('Outcomes Page', () => {
   });
 
   test.describe('Delete Outcome', () => {
-    test('should delete an outcome after confirmation', async ({ page }) => {
+    test('should delete an outcome after confirmation', async ({ page }, testInfo) => {
       await outcomesPage.goto();
       await outcomesPage.waitForOutcomesToLoad();
 
       // First create an outcome to delete
-      const uniqueOutcome = `DELTEST${Date.now()}`;
+      const uniqueOutcome = testResourceName(testInfo, 'DELTEST', { maxLength: 48, uppercase: true });
       await outcomesPage.addOutcome(uniqueOutcome);
       const upperOutcome = uniqueOutcome.toUpperCase();
 
@@ -148,11 +150,8 @@ test.describe('Outcomes Page', () => {
         { timeout: 5000 }
       );
 
-      // Accept the confirmation dialog
-      page.on('dialog', dialog => dialog.accept());
-
       const countBefore = await outcomesPage.getOutcomeCount();
-      await outcomesPage.clickDelete(upperOutcome);
+      await acceptDialog(page, () => outcomesPage.clickDelete(upperOutcome));
 
       // Wait for the outcome to disappear
       await page.waitForFunction(
@@ -174,17 +173,10 @@ test.describe('Outcomes Page', () => {
 
       const countBefore = await outcomesPage.getOutcomeCount();
 
-      // Dismiss the confirmation dialog
-      page.on('dialog', dialog => dialog.dismiss());
-
-      // Click delete on the first outcome
       const firstDeleteButton = page.locator('button:has-text("Delete")').first();
-      await firstDeleteButton.click();
+      await dismissDialog(page, () => firstDeleteButton.click());
 
-      // Wait briefly and check count is unchanged
-      await page.waitForTimeout(500);
-      const countAfter = await outcomesPage.getOutcomeCount();
-      expect(countAfter).toBe(countBefore);
+      await expect(page.locator('ul li')).toHaveCount(countBefore);
     });
   });
 });

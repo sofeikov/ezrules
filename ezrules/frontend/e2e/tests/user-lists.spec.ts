@@ -1,14 +1,48 @@
-import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from '../support/fixtures';
 import { UserListsPage } from '../pages/user-lists.page';
+import { deleteUserListByName } from '../support/api-helpers';
+import { acceptDialog, dismissDialog } from '../support/dialogs';
+import { testResourceName } from '../support/test-data';
+import { STATEFUL_TAG, TEST_DATA_TAG } from '../support/tags';
 
 /**
  * E2E tests for the User Lists management page.
  */
-test.describe('User Lists Page', () => {
+test.describe(`User Lists Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
   let userListsPage: UserListsPage;
+  let createdListNames: string[];
+
+  async function createListAndWait(name: string) {
+    await userListsPage.createList(name);
+    await userListsPage.waitForList(name);
+    createdListNames.push(name);
+  }
+
+  async function deleteListAndWait(page: Page, name: string) {
+    await acceptDialog(page, () => userListsPage.clickDeleteList(name));
+    await userListsPage.waitForListRemoved(name);
+  }
+
+  async function addEntryAndWait(value: string) {
+    await userListsPage.addEntry(value);
+    await userListsPage.waitForEntry(value);
+  }
+
+  async function deleteEntryAndWait(page: Page, value: string) {
+    await acceptDialog(page, () => userListsPage.clickDeleteEntry(value));
+    await userListsPage.waitForEntryRemoved(value);
+  }
 
   test.beforeEach(async ({ page }) => {
     userListsPage = new UserListsPage(page);
+    createdListNames = [];
+  });
+
+  test.afterEach(async ({ request }) => {
+    for (const listName of createdListNames) {
+      await deleteUserListByName(request, listName);
+    }
   });
 
   test.describe('Page Structure', () => {
@@ -54,55 +88,25 @@ test.describe('User Lists Page', () => {
       await expect(userListsPage.createListButton).toBeVisible();
     });
 
-    test('should create a new list and display it', async ({ page }) => {
+    test('should create a new list and display it', async ({ page }, testInfo) => {
       await userListsPage.goto();
       await userListsPage.waitForListsToLoad();
 
-      const uniqueName = `E2ELIST${Date.now()}`;
-
-      await userListsPage.createList(uniqueName);
-
-      // Wait for the list to appear
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        uniqueName,
-        { timeout: 5000 }
-      );
+      const uniqueName = testResourceName(testInfo, 'E2ELIST', { uppercase: true });
+      await createListAndWait(uniqueName);
 
       expect(await userListsPage.hasListWithName(uniqueName)).toBe(true);
 
       // Cleanup: delete the list we created
-      page.on('dialog', dialog => dialog.accept());
-      await userListsPage.clickDeleteList(uniqueName);
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return !Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        uniqueName,
-        { timeout: 5000 }
-      );
+      await deleteListAndWait(page, uniqueName);
     });
 
-    test('should show error for duplicate list name', async ({ page }) => {
+    test('should show error for duplicate list name', async ({ page }, testInfo) => {
       await userListsPage.goto();
       await userListsPage.waitForListsToLoad();
 
-      // Create a unique list first
-      const uniqueName = `DUPTEST${Date.now()}`;
-      await userListsPage.createList(uniqueName);
-
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        uniqueName,
-        { timeout: 5000 }
-      );
+      const uniqueName = testResourceName(testInfo, 'DUPTEST', { uppercase: true });
+      await createListAndWait(uniqueName);
 
       // Try to create the same list again
       await userListsPage.createList(uniqueName);
@@ -112,96 +116,38 @@ test.describe('User Lists Page', () => {
       await expect(errorText).toBeVisible();
 
       // Cleanup
-      page.on('dialog', dialog => dialog.accept());
-      await userListsPage.clickDeleteList(uniqueName);
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return !Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        uniqueName,
-        { timeout: 5000 }
-      );
+      await deleteListAndWait(page, uniqueName);
     });
 
-    test('should delete a list after confirmation', async ({ page }) => {
+    test('should delete a list after confirmation', async ({ page }, testInfo) => {
       await userListsPage.goto();
       await userListsPage.waitForListsToLoad();
 
-      // Create a list to delete
-      const uniqueName = `DELLIST${Date.now()}`;
-      await userListsPage.createList(uniqueName);
-
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        uniqueName,
-        { timeout: 5000 }
-      );
-
-      // Accept the confirmation dialog
-      page.on('dialog', dialog => dialog.accept());
+      const uniqueName = testResourceName(testInfo, 'DELLIST', { uppercase: true });
+      await createListAndWait(uniqueName);
 
       const countBefore = await userListsPage.getListCount();
-      await userListsPage.clickDeleteList(uniqueName);
+      await deleteListAndWait(page, uniqueName);
 
-      // Wait for the list to disappear
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return !Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        uniqueName,
-        { timeout: 5000 }
-      );
-
-      const countAfter = await userListsPage.getListCount();
-      expect(countAfter).toBe(countBefore - 1);
+      await expect(userListsPage.listItems).toHaveCount(countBefore - 1);
     });
 
-    test('should not delete a list when confirmation is dismissed', async ({ page }) => {
+    test('should not delete a list when confirmation is dismissed', async ({ page }, testInfo) => {
       await userListsPage.goto();
       await userListsPage.waitForListsToLoad();
 
-      // Create a list to test with
-      const uniqueName = `NODELL${Date.now()}`;
-      await userListsPage.createList(uniqueName);
-
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        uniqueName,
-        { timeout: 5000 }
-      );
+      const uniqueName = testResourceName(testInfo, 'NODELL', { uppercase: true });
+      await createListAndWait(uniqueName);
 
       const countBefore = await userListsPage.getListCount();
 
-      // Dismiss the confirmation dialog
-      page.on('dialog', dialog => dialog.dismiss());
+      await dismissDialog(page, () => userListsPage.clickDeleteList(uniqueName));
 
-      await userListsPage.clickDeleteList(uniqueName);
+      await expect(userListsPage.listItems).toHaveCount(countBefore);
+      await expect(userListsPage.listItem(uniqueName)).toBeVisible();
 
-      // Wait briefly and check count is unchanged
-      await page.waitForTimeout(500);
-      const countAfter = await userListsPage.getListCount();
-      expect(countAfter).toBe(countBefore);
-
-      // Cleanup: need to re-register with accept
-      page.removeAllListeners('dialog');
-      page.on('dialog', dialog => dialog.accept());
-      await userListsPage.clickDeleteList(uniqueName);
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return !Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        uniqueName,
-        { timeout: 5000 }
-      );
+      // Cleanup
+      await deleteListAndWait(page, uniqueName);
     });
   });
 
@@ -214,29 +160,18 @@ test.describe('User Lists Page', () => {
       await expect(emptyState).toBeVisible();
     });
 
-    test('should show entries panel when a list is selected', async ({ page }) => {
+    test('should show entries panel when a list is selected', async ({ page }, testInfo) => {
       await userListsPage.goto();
       await userListsPage.waitForListsToLoad();
 
-      // Create a list to select
-      const uniqueName = `ENTRYTEST${Date.now()}`;
-      await userListsPage.createList(uniqueName);
+      const uniqueName = testResourceName(testInfo, 'ENTRYTEST', { uppercase: true });
+      await createListAndWait(uniqueName);
 
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        uniqueName,
-        { timeout: 5000 }
-      );
-
-      // Select the list
       await userListsPage.selectList(uniqueName);
       await userListsPage.waitForEntriesToLoad();
 
       // Should show the list name as heading in right panel
-      const listHeading = page.locator('.w-2\\/3 h2:has-text("' + uniqueName + '")');
+      const listHeading = page.locator('.w-2\\/3 h2').filter({ hasText: uniqueName });
       await expect(listHeading).toBeVisible();
 
       // Should show Add Entry form
@@ -244,99 +179,40 @@ test.describe('User Lists Page', () => {
       await expect(userListsPage.addEntryButton).toBeVisible();
 
       // Cleanup
-      page.on('dialog', dialog => dialog.accept());
-      await userListsPage.clickDeleteList(uniqueName);
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return !Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        uniqueName,
-        { timeout: 5000 }
-      );
+      await deleteListAndWait(page, uniqueName);
     });
 
-    test('should add an entry to a list', async ({ page }) => {
+    test('should add an entry to a list', async ({ page }, testInfo) => {
       await userListsPage.goto();
       await userListsPage.waitForListsToLoad();
 
-      // Create a list
-      const listName = `ADDENTRY${Date.now()}`;
-      await userListsPage.createList(listName);
+      const listName = testResourceName(testInfo, 'ADDENTRY', { uppercase: true });
+      await createListAndWait(listName);
 
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        listName,
-        { timeout: 5000 }
-      );
-
-      // Select the list
       await userListsPage.selectList(listName);
       await userListsPage.waitForEntriesToLoad();
 
-      // Add an entry
-      const entryValue = `VAL${Date.now()}`;
-      await userListsPage.addEntry(entryValue);
-
-      // Wait for the entry to appear
-      await page.waitForFunction(
-        (val: string) => {
-          const items = document.querySelectorAll('.w-2\\/3 ul li');
-          return Array.from(items).some(item => item.textContent?.includes(val));
-        },
-        entryValue,
-        { timeout: 5000 }
-      );
+      const entryValue = testResourceName(testInfo, 'VAL', { uppercase: true });
+      await addEntryAndWait(entryValue);
 
       expect(await userListsPage.hasEntry(entryValue)).toBe(true);
 
       // Cleanup
-      page.on('dialog', dialog => dialog.accept());
-      await userListsPage.clickDeleteList(listName);
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return !Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        listName,
-        { timeout: 5000 }
-      );
+      await deleteListAndWait(page, listName);
     });
 
-    test('should show error for duplicate entry', async ({ page }) => {
+    test('should show error for duplicate entry', async ({ page }, testInfo) => {
       await userListsPage.goto();
       await userListsPage.waitForListsToLoad();
 
-      // Create a list and add an entry
-      const listName = `DUPENTRY${Date.now()}`;
-      await userListsPage.createList(listName);
-
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        listName,
-        { timeout: 5000 }
-      );
+      const listName = testResourceName(testInfo, 'DUPENTRY', { uppercase: true });
+      await createListAndWait(listName);
 
       await userListsPage.selectList(listName);
       await userListsPage.waitForEntriesToLoad();
 
-      const entryValue = `DUP${Date.now()}`;
-      await userListsPage.addEntry(entryValue);
-
-      await page.waitForFunction(
-        (val: string) => {
-          const items = document.querySelectorAll('.w-2\\/3 ul li');
-          return Array.from(items).some(item => item.textContent?.includes(val));
-        },
-        entryValue,
-        { timeout: 5000 }
-      );
+      const entryValue = testResourceName(testInfo, 'DUP', { uppercase: true });
+      await addEntryAndWait(entryValue);
 
       // Try to add the same entry again
       await userListsPage.addEntry(entryValue);
@@ -346,76 +222,28 @@ test.describe('User Lists Page', () => {
       await expect(errorText).toBeVisible();
 
       // Cleanup
-      page.on('dialog', dialog => dialog.accept());
-      await userListsPage.clickDeleteList(listName);
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return !Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        listName,
-        { timeout: 5000 }
-      );
+      await deleteListAndWait(page, listName);
     });
 
-    test('should delete an entry after confirmation', async ({ page }) => {
+    test('should delete an entry after confirmation', async ({ page }, testInfo) => {
       await userListsPage.goto();
       await userListsPage.waitForListsToLoad();
 
-      // Create a list and add an entry
-      const listName = `DELENTRY${Date.now()}`;
-      await userListsPage.createList(listName);
-
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        listName,
-        { timeout: 5000 }
-      );
+      const listName = testResourceName(testInfo, 'DELENTRY', { uppercase: true });
+      await createListAndWait(listName);
 
       await userListsPage.selectList(listName);
       await userListsPage.waitForEntriesToLoad();
 
-      const entryValue = `TODEL${Date.now()}`;
-      await userListsPage.addEntry(entryValue);
+      const entryValue = testResourceName(testInfo, 'TODEL', { uppercase: true });
+      await addEntryAndWait(entryValue);
 
-      await page.waitForFunction(
-        (val: string) => {
-          const items = document.querySelectorAll('.w-2\\/3 ul li');
-          return Array.from(items).some(item => item.textContent?.includes(val));
-        },
-        entryValue,
-        { timeout: 5000 }
-      );
-
-      // Accept the confirmation dialog and delete the entry
-      page.on('dialog', dialog => dialog.accept());
-      await userListsPage.clickDeleteEntry(entryValue);
-
-      // Wait for the entry to disappear
-      await page.waitForFunction(
-        (val: string) => {
-          const items = document.querySelectorAll('.w-2\\/3 ul li');
-          return !Array.from(items).some(item => item.textContent?.includes(val));
-        },
-        entryValue,
-        { timeout: 5000 }
-      );
+      await deleteEntryAndWait(page, entryValue);
 
       expect(await userListsPage.hasEntry(entryValue)).toBe(false);
 
       // Cleanup: delete the list
-      await userListsPage.clickDeleteList(listName);
-      await page.waitForFunction(
-        (name: string) => {
-          const items = document.querySelectorAll('.w-1\\/3 ul li');
-          return !Array.from(items).some(item => item.textContent?.includes(name));
-        },
-        listName,
-        { timeout: 5000 }
-      );
+      await deleteListAndWait(page, listName);
     });
   });
 });

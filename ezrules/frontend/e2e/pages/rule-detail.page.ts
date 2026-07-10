@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 
 /**
  * Page Object Model for the Rule Detail page.
@@ -216,6 +216,12 @@ export class RuleDetailPage {
    */
   async waitForSaveSuccess() {
     await this.saveSuccessMessage.waitFor({ state: 'visible', timeout: 10000 });
+  }
+
+  async waitForTestJsonToContain(value: string) {
+    await expect
+      .poll(async () => await this.testJsonTextarea.inputValue())
+      .toContain(value);
   }
 
   /**

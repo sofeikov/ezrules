@@ -1,8 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../support/fixtures';
 import { RuleListPage } from '../pages/rule-list.page';
 import { RuleDetailPage } from '../pages/rule-detail.page';
 import { BacktestingPage } from '../pages/backtesting.page';
 import { getApiBaseUrl, getAuthToken } from '../support/config';
+import { createRule, deleteRuleById, expectApiOk } from '../support/api-helpers';
+import { deterministicUnixTimestamp, testResourceName } from '../support/test-data';
+import { TEST_DATA_TAG } from '../support/tags';
 
 const API_BASE = getApiBaseUrl();
 
@@ -54,38 +57,29 @@ function buildEvaluatedEventData(eventId: string, amount: number) {
  * in parallel with other files.
  */
 
-test.describe('Rule Detail Page', () => {
+test.describe(`Rule Detail Page ${TEST_DATA_TAG}`, () => {
   let ruleListPage: RuleListPage;
   let ruleDetailPage: RuleDetailPage;
   let backtestingPage: BacktestingPage;
   let testRuleId: number;
 
-  test.beforeEach(async ({ page, request }) => {
+  test.beforeEach(async ({ page, request }, testInfo) => {
     ruleListPage = new RuleListPage(page);
     ruleDetailPage = new RuleDetailPage(page);
     backtestingPage = new BacktestingPage(page);
 
     // Create a dedicated rule via Node.js request context (no browser/CORS involved)
-    const resp = await request.post(`${API_BASE}/api/v2/rules`, {
-      headers: { Authorization: `Bearer ${getAuthToken()}` },
-      data: {
-        rid: `E2E_DETAIL_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        description: 'E2E test rule for rule detail tests',
-        logic: "if $amount > 100:\n\treturn !HOLD",
-      },
+    const rule = await createRule(request, {
+      rid: testResourceName(testInfo, 'E2E_DETAIL', { uppercase: true }),
+      description: 'E2E test rule for rule detail tests',
+      logic: "if $amount > 100:\n\treturn !HOLD",
     });
-    const data = await resp.json();
-    if (!data.success || !data.rule?.r_id) {
-      throw new Error(`Failed to create test rule: ${JSON.stringify(data)}`);
-    }
-    testRuleId = data.rule.r_id;
+    testRuleId = rule.r_id;
   });
 
   test.afterEach(async ({ request }) => {
     if (testRuleId) {
-      await request.delete(`${API_BASE}/api/v2/rules/${testRuleId}`, {
-        headers: { Authorization: `Bearer ${getAuthToken()}` },
-      });
+      await deleteRuleById(request, testRuleId);
       testRuleId = 0;
     }
   });
@@ -222,12 +216,10 @@ test.describe('Rule Detail Page', () => {
       await ruleDetailPage.goto(testRuleId);
       await ruleDetailPage.waitForRuleToLoad();
 
-      // Wait a bit for the fillInExampleParams to execute
-      await ruleDetailPage.page.waitForTimeout(1000);
+      await ruleDetailPage.waitForTestJsonToContain('amount');
 
       const testJson = await ruleDetailPage.testJsonTextarea.inputValue();
-      // Should have some JSON (could be empty object or populated with params)
-      expect(testJson.length).toBeGreaterThanOrEqual(0);
+      expect(testJson).toContain('amount');
     });
 
     test('should allow entering custom test JSON', async () => {
@@ -279,11 +271,12 @@ test.describe('Rule Detail Page', () => {
   });
 
   test.describe('Backtesting', () => {
-    test('should refresh completed backtest status without expanding the result card', async ({ page, request }) => {
-      const timestamp = Math.floor(Date.now() / 1000);
+    test('should refresh completed backtest status without expanding the result card', async ({ page, request }, testInfo) => {
+      const timestamp = deterministicUnixTimestamp(testInfo);
+      const eventIdPrefix = testResourceName(testInfo, `e2e_backtest_${testRuleId}`);
 
       for (const [index, amount] of [90, 180, 260].entries()) {
-        const eventId = `e2e-backtest-${testRuleId}-${Date.now()}-${index}`;
+        const eventId = `${eventIdPrefix}_${index}`;
         const evaluateResponse = await request.post(`${API_BASE}/api/v2/evaluate`, {
           headers: { Authorization: `Bearer ${getAuthToken()}` },
           data: {
@@ -292,7 +285,7 @@ test.describe('Rule Detail Page', () => {
             event_data: buildEvaluatedEventData(eventId, amount),
           },
         });
-        expect(evaluateResponse.ok()).toBeTruthy();
+        await expectApiOk(evaluateResponse, `Seed evaluated event ${eventId}`);
       }
 
       await ruleDetailPage.goto(testRuleId);

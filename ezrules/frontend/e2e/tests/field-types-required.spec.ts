@@ -1,10 +1,12 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/fixtures';
 import { FieldTypesPage } from '../pages/field-types.page';
+import { acceptDialog } from '../support/dialogs';
+import { testResourceName } from '../support/test-data';
 
 test.describe('Field Types Required Flag', () => {
-  test('should save a required field configuration and show the required badge', async ({ page }) => {
+  test('should save a required field configuration and show the required badge', async ({ page }, testInfo) => {
     const fieldTypesPage = new FieldTypesPage(page);
-    const fieldName = `required_field_${Date.now()}`;
+    const fieldName = testResourceName(testInfo, 'required_field');
 
     await fieldTypesPage.goto();
     await fieldTypesPage.waitForLoad();
@@ -18,7 +20,6 @@ test.describe('Field Types Required Flag', () => {
     await expect(row).toBeVisible();
     await expect(row).toContainText('required');
 
-    page.on('dialog', dialog => dialog.accept());
-    await row.getByRole('button', { name: 'Delete' }).click();
+    await acceptDialog(page, () => row.getByRole('button', { name: 'Delete' }).click());
   });
 });

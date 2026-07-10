@@ -1,11 +1,23 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../support/fixtures';
 import { FieldTypesPage } from '../pages/field-types.page';
+import { deleteFieldTypeByName } from '../support/api-helpers';
+import { acceptDialog, dismissDialog } from '../support/dialogs';
+import { testResourceName } from '../support/test-data';
+import { STATEFUL_TAG, TEST_DATA_TAG } from '../support/tags';
 
-test.describe('Field Types Page', () => {
+test.describe(`Field Types Page ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => {
   let fieldTypesPage: FieldTypesPage;
+  let createdFieldNames: string[];
 
   test.beforeEach(async ({ page }) => {
     fieldTypesPage = new FieldTypesPage(page);
+    createdFieldNames = [];
+  });
+
+  test.afterEach(async ({ request }) => {
+    for (const fieldName of createdFieldNames) {
+      await deleteFieldTypeByName(request, fieldName);
+    }
   });
 
   test.describe('Page Structure', () => {
@@ -56,37 +68,21 @@ test.describe('Field Types Page', () => {
   });
 
   test.describe('Configure Field Type', () => {
-    test('should save a new field type configuration and show it in the table', async ({ page }) => {
+    test('should save a new field type configuration and show it in the table', async ({ page }, testInfo) => {
       await fieldTypesPage.goto();
       await fieldTypesPage.waitForLoad();
 
-      const fieldName = `e2e_field_${Date.now()}`;
+      const fieldName = testResourceName(testInfo, 'e2e_field');
+      createdFieldNames.push(fieldName);
 
       await fieldTypesPage.saveFieldType(fieldName, 'integer');
-
-      // Wait for the row to appear in the table
-      await page.waitForFunction(
-        (name: string) => {
-          const cells = document.querySelectorAll('tbody tr td:first-child');
-          return Array.from(cells).some(c => c.textContent?.trim() === name);
-        },
-        fieldName,
-        { timeout: 5000 }
-      );
+      await fieldTypesPage.waitForConfiguredField(fieldName);
 
       expect(await fieldTypesPage.hasConfiguredField(fieldName)).toBe(true);
 
       // Cleanup
-      page.on('dialog', d => d.accept());
-      await fieldTypesPage.deleteFieldType(fieldName);
-      await page.waitForFunction(
-        (name: string) => {
-          const cells = document.querySelectorAll('tbody tr td:first-child');
-          return !Array.from(cells).some(c => c.textContent?.trim() === name);
-        },
-        fieldName,
-        { timeout: 5000 }
-      );
+      await acceptDialog(page, () => fieldTypesPage.deleteFieldType(fieldName));
+      await fieldTypesPage.waitForConfiguredFieldRemoved(fieldName);
     });
 
     test('should show all type options in the select', async ({ page }) => {
@@ -122,71 +118,41 @@ test.describe('Field Types Page', () => {
   });
 
   test.describe('Delete Field Type', () => {
-    test('should delete a configuration after confirmation', async ({ page }) => {
+    test('should delete a configuration after confirmation', async ({ page }, testInfo) => {
       await fieldTypesPage.goto();
       await fieldTypesPage.waitForLoad();
 
-      const fieldName = `del_e2e_${Date.now()}`;
+      const fieldName = testResourceName(testInfo, 'del_e2e');
+      createdFieldNames.push(fieldName);
       await fieldTypesPage.saveFieldType(fieldName, 'float');
 
-      await page.waitForFunction(
-        (name: string) => {
-          const cells = document.querySelectorAll('tbody tr td:first-child');
-          return Array.from(cells).some(c => c.textContent?.trim() === name);
-        },
-        fieldName,
-        { timeout: 5000 }
-      );
+      await fieldTypesPage.waitForConfiguredField(fieldName);
 
-      page.on('dialog', d => d.accept());
-      await fieldTypesPage.deleteFieldType(fieldName);
+      await acceptDialog(page, () => fieldTypesPage.deleteFieldType(fieldName));
 
-      await page.waitForFunction(
-        (name: string) => {
-          const cells = document.querySelectorAll('tbody tr td:first-child');
-          return !Array.from(cells).some(c => c.textContent?.trim() === name);
-        },
-        fieldName,
-        { timeout: 5000 }
-      );
+      await fieldTypesPage.waitForConfiguredFieldRemoved(fieldName);
 
       expect(await fieldTypesPage.hasConfiguredField(fieldName)).toBe(false);
     });
 
-    test('should not delete when confirmation is dismissed', async ({ page }) => {
+    test('should not delete when confirmation is dismissed', async ({ page }, testInfo) => {
       await fieldTypesPage.goto();
       await fieldTypesPage.waitForLoad();
 
-      const fieldName = `nodelete_e2e_${Date.now()}`;
+      const fieldName = testResourceName(testInfo, 'nodelete_e2e');
+      createdFieldNames.push(fieldName);
       await fieldTypesPage.saveFieldType(fieldName, 'string');
 
-      await page.waitForFunction(
-        (name: string) => {
-          const cells = document.querySelectorAll('tbody tr td:first-child');
-          return Array.from(cells).some(c => c.textContent?.trim() === name);
-        },
-        fieldName,
-        { timeout: 5000 }
-      );
+      await fieldTypesPage.waitForConfiguredField(fieldName);
 
-      page.on('dialog', d => d.dismiss());
-      await fieldTypesPage.deleteFieldType(fieldName);
+      await dismissDialog(page, () => fieldTypesPage.deleteFieldType(fieldName));
 
-      await page.waitForTimeout(500);
+      await expect(fieldTypesPage.configuredFieldRow(fieldName)).toHaveCount(1);
       expect(await fieldTypesPage.hasConfiguredField(fieldName)).toBe(true);
 
       // Cleanup
-      page.removeAllListeners('dialog');
-      page.on('dialog', d => d.accept());
-      await fieldTypesPage.deleteFieldType(fieldName);
-      await page.waitForFunction(
-        (name: string) => {
-          const cells = document.querySelectorAll('tbody tr td:first-child');
-          return !Array.from(cells).some(c => c.textContent?.trim() === name);
-        },
-        fieldName,
-        { timeout: 5000 }
-      );
+      await acceptDialog(page, () => fieldTypesPage.deleteFieldType(fieldName));
+      await fieldTypesPage.waitForConfiguredFieldRemoved(fieldName);
     });
   });
 });
