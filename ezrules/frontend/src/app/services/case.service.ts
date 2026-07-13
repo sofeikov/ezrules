@@ -69,6 +69,21 @@ export interface CaseDetail {
   case: CaseItem;
   events: CaseEvent[];
   evaluation: CaseEvaluation | null;
+  alerts: CaseAlertEvidence[];
+}
+
+export interface CaseAlertEvidence {
+  incident_id: number;
+  alert_rule_id: number;
+  alert_rule_name: string;
+  evaluation_decision_id: number;
+  outcome: string;
+  severity: string;
+  observed_count: number;
+  threshold: number;
+  window_start: string;
+  window_end: string;
+  triggered_at: string;
 }
 
 export interface CaseFilters {
@@ -83,6 +98,11 @@ export interface CaseFilters {
   createdTo?: string;
   updatedFrom?: string;
   updatedTo?: string;
+  alertIncidentId?: number;
+  alertRuleId?: number | null;
+  alertSeverity?: string;
+  alertedFrom?: string;
+  alertedTo?: string;
 }
 
 export interface CaseAssignee {
@@ -144,6 +164,21 @@ export class CaseService {
     }
     if (filters.updatedTo) {
       params = params.set('updated_to', filters.updatedTo);
+    }
+    if (filters.alertIncidentId) {
+      params = params.set('alert_incident_id', String(filters.alertIncidentId));
+    }
+    if (filters.alertRuleId) {
+      params = params.set('alert_rule_id', String(filters.alertRuleId));
+    }
+    if (filters.alertSeverity) {
+      params = params.set('alert_severity', filters.alertSeverity);
+    }
+    if (filters.alertedFrom) {
+      params = params.set('alerted_from', filters.alertedFrom);
+    }
+    if (filters.alertedTo) {
+      params = params.set('alerted_to', filters.alertedTo);
     }
     return this.http.get<{ cases: CaseItem[]; total: number }>(`${this.apiUrl}/cases`, { params });
   }

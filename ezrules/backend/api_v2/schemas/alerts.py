@@ -68,6 +68,7 @@ class AlertIncidentResponse(BaseModel):
     outcome: str
     observed_count: int
     threshold: int
+    severity: str
     window_start: datetime
     window_end: datetime
     status: AlertIncidentStatus

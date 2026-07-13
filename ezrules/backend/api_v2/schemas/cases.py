@@ -81,10 +81,25 @@ class CaseEvaluationResponse(BaseModel):
     triggered_rules: list[TriggeredRuleItem] = Field(default_factory=list)
 
 
+class CaseAlertEvidenceResponse(BaseModel):
+    incident_id: int
+    alert_rule_id: int
+    alert_rule_name: str
+    evaluation_decision_id: int
+    outcome: str
+    severity: str
+    observed_count: int
+    threshold: int
+    window_start: datetime
+    window_end: datetime
+    triggered_at: datetime
+
+
 class CaseDetailResponse(BaseModel):
     case: CaseResponse
     events: list[CaseEventResponse]
     evaluation: CaseEvaluationResponse | None = None
+    alerts: list[CaseAlertEvidenceResponse] = Field(default_factory=list)
 
 
 class CaseUpdateRequest(BaseModel):

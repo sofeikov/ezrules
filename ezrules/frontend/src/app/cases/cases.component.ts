@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { SidebarComponent } from '../components/sidebar.component';
 import { AuthService, AuthUser } from '../services/auth.service';
 import { CaseAssignee, CaseDetail, CaseItem, CaseService, IntegrationEvent } from '../services/case.service';
@@ -51,7 +52,60 @@ import { CaseAssignee, CaseDetail, CaseItem, CaseService, IntegrationEvent } fro
           </button>
         </div>
 
-        <div class="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-4 lg:grid-cols-4 xl:grid-cols-8">
+        <div class="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-4 lg:grid-cols-4 xl:grid-cols-7">
+          <label class="block text-sm">
+            <span class="mb-1 block font-medium text-gray-700">Outcome</span>
+            <input
+              data-testid="case-outcome-filter"
+              [(ngModel)]="outcomeFilter"
+              (change)="loadCases()"
+              placeholder="CANCEL"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+          <label class="block text-sm">
+            <span class="mb-1 block font-medium text-gray-700">Alert severity</span>
+            <select
+              data-testid="case-alert-severity-filter"
+              [(ngModel)]="alertSeverityFilter"
+              (change)="loadCases()"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">Any</option>
+              <option value="critical">Critical</option>
+            </select>
+          </label>
+          <label class="block text-sm">
+            <span class="mb-1 block font-medium text-gray-700">Alert rule ID</span>
+            <input
+              data-testid="case-alert-rule-filter"
+              type="number"
+              min="1"
+              [(ngModel)]="alertRuleIdFilter"
+              (change)="loadCases()"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+          <label class="block text-sm">
+            <span class="mb-1 block font-medium text-gray-700">Alerted from</span>
+            <input
+              data-testid="case-alerted-from-filter"
+              type="date"
+              [(ngModel)]="alertedFromFilter"
+              (change)="loadCases()"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+          <label class="block text-sm">
+            <span class="mb-1 block font-medium text-gray-700">Alerted to</span>
+            <input
+              data-testid="case-alerted-to-filter"
+              type="date"
+              [(ngModel)]="alertedToFilter"
+              (change)="loadCases()"
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            />
+          </label>
           <label class="block text-sm">
             <span class="mb-1 block font-medium text-gray-700">Status</span>
             <select
@@ -237,6 +291,18 @@ import { CaseAssignee, CaseDetail, CaseItem, CaseService, IntegrationEvent } fro
                   data-testid="case-rescored-banner"
                 >
                   Current score no longer matches the original case outcome.
+                </div>
+
+                <div *ngIf="detail?.alerts?.length" class="rounded-md border border-red-200 bg-red-50 p-3" data-testid="case-alert-evidence">
+                  <h3 class="mb-2 text-sm font-semibold text-red-900">Alert evidence</h3>
+                  <div *ngFor="let alert of detail?.alerts" class="border-b border-red-100 py-2 text-sm last:border-0">
+                    <div class="flex items-center justify-between gap-3">
+                      <span class="font-semibold text-red-900">{{ alert.alert_rule_name }}</span>
+                      <span class="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold uppercase text-red-800">{{ alert.severity }}</span>
+                    </div>
+                    <p class="mt-1 text-red-800">{{ alert.observed_count }} {{ alert.outcome }} decisions; threshold {{ alert.threshold }}</p>
+                    <p class="mt-1 text-xs text-red-700">Window {{ alert.window_start | date:'short' }} – {{ alert.window_end | date:'short' }}</p>
+                  </div>
                 </div>
 
                 <div *ngIf="selected.status !== 'resolved'" class="space-y-3 rounded-md border border-gray-200 bg-gray-50 p-3">
@@ -479,6 +545,7 @@ export class CasesComponent implements OnInit {
     { label: 'Unassigned', value: 'unassigned', testId: 'unassigned' },
   ];
   statusFilter = '';
+  outcomeFilter = '';
   assignedToFilter = '';
   decisionStateFilter = '';
   priorityMinFilter: number | null = null;
@@ -486,6 +553,11 @@ export class CasesComponent implements OnInit {
   createdToFilter = '';
   updatedFromFilter = '';
   updatedToFilter = '';
+  alertIncidentIdFilter: number | undefined;
+  alertRuleIdFilter: number | null = null;
+  alertSeverityFilter = '';
+  alertedFromFilter = '';
+  alertedToFilter = '';
   searchQuery = '';
   selectedAssigneeId: number | null = null;
   noteText = '';
@@ -496,8 +568,15 @@ export class CasesComponent implements OnInit {
   saving = false;
   error: string | null = null;
   success: string | null = null;
+  private caseLoadRequestId = 0;
+  private caseDetailRequestId = 0;
 
-  constructor(private caseService: CaseService, private authService: AuthService) {}
+  constructor(
+    private caseService: CaseService,
+    private authService: AuthService,
+    private route: ActivatedRoute,
+    private router: Router,
+  ) {}
 
   outcomeCounterEntries(counters: Record<string, number>): Array<{ key: string; value: number }> {
     return Object.entries(counters).map(([key, value]) => ({ key, value }));
@@ -517,15 +596,27 @@ export class CasesComponent implements OnInit {
       }
     });
     this.loadAssignees();
-    this.loadCases();
     this.loadIntegrationEvents();
+    this.route.queryParamMap.subscribe(params => {
+      const alertIncidentId = Number(params.get('alert_incident_id'));
+      const nextIncidentId = Number.isInteger(alertIncidentId) && alertIncidentId > 0 ? alertIncidentId : undefined;
+      if (nextIncidentId !== this.alertIncidentIdFilter) {
+        this.caseDetailRequestId += 1;
+        this.selected = null;
+        this.detail = null;
+      }
+      this.alertIncidentIdFilter = nextIncidentId;
+      this.loadCases();
+    });
   }
 
   loadCases(): void {
+    const requestId = ++this.caseLoadRequestId;
     this.loading = true;
     this.error = null;
     this.caseService.getCases({
       status: this.statusFilter || undefined,
+      outcome: this.outcomeFilter.trim() || undefined,
       assignedTo: this.assignedToFilter || undefined,
       priorityMin: this.priorityMinFilter,
       decisionState: this.decisionStateFilter || undefined,
@@ -534,15 +625,31 @@ export class CasesComponent implements OnInit {
       createdTo: this.createdToFilter || undefined,
       updatedFrom: this.updatedFromFilter || undefined,
       updatedTo: this.updatedToFilter || undefined,
+      alertIncidentId: this.alertIncidentIdFilter,
+      alertRuleId: this.alertRuleIdFilter,
+      alertSeverity: this.alertSeverityFilter || undefined,
+      alertedFrom: this.alertedFromFilter || undefined,
+      alertedTo: this.alertedToFilter || undefined,
     }).subscribe({
       next: (response) => {
+        if (requestId !== this.caseLoadRequestId) {
+          return;
+        }
         this.cases = response.cases;
         this.loading = false;
+        if (this.selected && !this.cases.some(item => item.id === this.selected?.id)) {
+          this.caseDetailRequestId += 1;
+          this.selected = null;
+          this.detail = null;
+        }
         if (!this.selected && this.cases.length > 0) {
           this.selectCase(this.cases[0]);
         }
       },
       error: () => {
+        if (requestId !== this.caseLoadRequestId) {
+          return;
+        }
         this.error = 'Failed to load cases.';
         this.loading = false;
       }
@@ -558,7 +665,9 @@ export class CasesComponent implements OnInit {
   }
 
   clearFilters(): void {
+    const hadIncidentFilter = this.alertIncidentIdFilter !== undefined;
     this.statusFilter = '';
+    this.outcomeFilter = '';
     this.assignedToFilter = '';
     this.decisionStateFilter = '';
     this.priorityMinFilter = null;
@@ -566,22 +675,42 @@ export class CasesComponent implements OnInit {
     this.createdToFilter = '';
     this.updatedFromFilter = '';
     this.updatedToFilter = '';
+    this.alertIncidentIdFilter = undefined;
+    this.alertRuleIdFilter = null;
+    this.alertSeverityFilter = '';
+    this.alertedFromFilter = '';
+    this.alertedToFilter = '';
     this.searchQuery = '';
-    this.loadCases();
+    if (hadIncidentFilter) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { alert_incident_id: null },
+        queryParamsHandling: 'merge',
+      });
+    } else {
+      this.loadCases();
+    }
   }
 
   selectCase(item: CaseItem): void {
+    const requestId = ++this.caseDetailRequestId;
     this.selected = item;
     this.selectedAssigneeId = item.assigned_to_user_id;
     this.noteText = '';
     this.resetResolutionForm();
     this.caseService.getCase(item.id).subscribe({
       next: (detail) => {
+        if (requestId !== this.caseDetailRequestId || this.selected?.id !== item.id) {
+          return;
+        }
         this.detail = detail;
         this.selected = detail.case;
         this.selectedAssigneeId = detail.case.assigned_to_user_id;
       },
       error: () => {
+        if (requestId !== this.caseDetailRequestId || this.selected?.id !== item.id) {
+          return;
+        }
         this.error = 'Failed to load case details.';
       }
     });

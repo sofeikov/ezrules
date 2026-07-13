@@ -21,6 +21,7 @@ export interface AlertIncident {
   outcome: string;
   observed_count: number;
   threshold: number;
+  severity: string;
   window_start: string;
   window_end: string;
   status: string;

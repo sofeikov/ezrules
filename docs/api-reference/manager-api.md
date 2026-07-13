@@ -268,6 +268,8 @@ Replay semantics:
 Alert detection source of truth:
 - Alert rules count canonical served `evaluation_decisions` by `resolved_outcome`.
 - Evaluation-time detection is queued after the served decision is persisted; Celery beat also sweeps enabled alert rules as a repair loop.
+- Each decision contributing to a triggered spike is linked idempotently to its existing case. The incident remains aggregate evidence; assignment, analyst notes, disposition, and resolution remain owned by the Case workflow.
+- In-app spike notifications link to `/cases?alert_incident_id=<id>` so analysts enter the filtered review queue directly.
 - V1 delivers via the in-app notification channel. Notification channel and policy tables are intentionally separate so email, Slack, PagerDuty, and webhook channels can be added later.
 - Notification channel configs are encrypted at rest, validated against an explicit schema per channel type, and redacted before safe display or dispatch-error persistence.
 
@@ -275,7 +277,7 @@ Alert detection source of truth:
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| `GET` | `/api/v2/cases` | Bearer + `VIEW_CASES` | List case-management work items for non-neutral served decisions; supports queue/search filters such as `status`, `assigned_to`, `outcome`, `priority_min`, `decision_state`, `transaction_id`, `q`, `created_from`, `created_to`, `updated_from`, and `updated_to` |
+| `GET` | `/api/v2/cases` | Bearer + `VIEW_CASES` | List case-management work items; supports the existing queue/search filters plus `alert_incident_id`, `alert_rule_id`, `alert_severity`, `alerted_from`, and `alerted_to` |
 | `GET` | `/api/v2/cases/assignees` | Bearer + `VIEW_CASES` | List active same-org users available for case assignment |
 | `GET` | `/api/v2/cases/{case_id}` | Bearer + `VIEW_CASES` | Read one case, its immutable case-event timeline, and the current evaluation context |
 | `PATCH` | `/api/v2/cases/{case_id}` | Bearer + `MANAGE_CASES` | Assign or unassign a case |
@@ -291,7 +293,8 @@ Case lifecycle notes:
 - Case queues are assignment filters over the case list: `assigned_to=me` for the caller's queue, `assigned_to=unassigned` for unclaimed work, or `assigned_to=<user_id>` for a specific analyst.
 - Case date filters accept ISO datetimes or plain `YYYY-MM-DD` dates; date-only upper bounds include the full day.
 - `decision_state` filters exact stored case states, currently `current`, `rescored_neutral`, and `rescored_non_caseable`.
-- Case detail includes the current transaction payload, event/evaluation identifiers, resolved outcome counters, and triggered-rule metadata when available.
+- Case detail includes the current transaction payload, event/evaluation identifiers, resolved outcome counters, triggered-rule metadata, and any linked spike-alert evidence.
+- Alert linkage emits `case.alert_linked`; retries and repair sweeps do not duplicate incident/evaluation links or timeline events.
 - Assignment changes emit `case.assigned`; analyst notes emit `case.note`; structured resolutions emit `case.resolved` with disposition and intended action.
 - Case lifecycle integration payloads include top-level consumer fields (`case_id`, `transaction_id`, `case_event_type`, actor/source IDs, current evaluation/event IDs, status, decision state, resolution fields, and `downstream_action`) plus nested `case` and `case_event` objects for full context.
 - `downstream_action` records analyst intent only. For example, `resolution_action=release_transaction` means an external consumer should decide whether and how to release the transaction in its own system; ezrules does not execute the release/cancel/block action itself.

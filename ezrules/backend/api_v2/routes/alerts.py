@@ -57,6 +57,7 @@ def _alert_incident_to_response(incident: AlertIncident) -> AlertIncidentRespons
         outcome=str(incident.outcome),
         observed_count=int(incident.observed_count),
         threshold=int(incident.threshold),
+        severity=str(incident.severity),
         window_start=incident.window_start,  # type: ignore[arg-type]
         window_end=incident.window_end,  # type: ignore[arg-type]
         status=incident.status,  # type: ignore[arg-type]
