@@ -3,7 +3,7 @@ branch = True
 source = ezrules
 
 [report]
-fail_under = 0
+fail_under = 80
 precision = 2
 show_missing = True
 

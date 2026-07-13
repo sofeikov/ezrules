@@ -63,11 +63,25 @@ jobs:
         --cov-report=html
         tests
 
+    - name: Enforce Python line and branch coverage baselines
+      run: |
+        if ! jq -e '
+          (.totals.covered_lines / .totals.num_statements * 100) >= 83 and
+          (.totals.covered_branches / .totals.num_branches * 100) >= 64
+        ' coverage.json > /dev/null; then
+          jq '{
+            line_percent: (.totals.covered_lines / .totals.num_statements * 100),
+            branch_percent: (.totals.covered_branches / .totals.num_branches * 100)
+          }' coverage.json
+          exit 1
+        fi
+
     - name: Publish Python coverage summary
+      if: always() && hashFiles('coverage.json') != ''
       run: |
         echo "## Python coverage" >> "$GITHUB_STEP_SUMMARY"
         echo >> "$GITHUB_STEP_SUMMARY"
-        uv run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+        uv run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY" || true
 
     - name: Upload Python coverage report
       if: always()
@@ -80,6 +94,7 @@ jobs:
           coverage.xml
           htmlcov
         if-no-files-found: warn
+        include-hidden-files: true
 
   redis-celery-smoke:
     runs-on: ubuntu-latest

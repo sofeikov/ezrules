@@ -52,7 +52,7 @@ jobs:
             echo
             echo "| Metric | Covered | Total | Coverage |"
             echo "| --- | ---: | ---: | ---: |"
-            jq -r '.total | to_entries[] | "| \(.key) | \(.value.covered) | \(.value.total) | \(.value.pct)% |"' "$summary_path"
+            jq -r '.total | to_entries[] | select(.key != "branchesTrue") | "| \(.key) | \(.value.covered) | \(.value.total) | \(.value.pct)% |"' "$summary_path"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload frontend coverage report
