@@ -9,13 +9,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Detect project version change
+      id: version_change
+      run: |
+        base_version="$(git show "${{ github.event.pull_request.base.sha }}:pyproject.toml" | sed -n 's/^version = "\(.*\)"/\1/p' | head -1)"
+        current_version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)"
+        if [ "$base_version" = "$current_version" ]; then
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+          echo "Project version remains $current_version; skipping the PyPI availability check."
+        else
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "Project version changed from $base_version to $current_version."
+        fi
 
     - name: Install UV
+      if: steps.version_change.outputs.changed == 'true'
       uses: astral-sh/setup-uv@v4
       with:
         enable-cache: true
 
     - name: Extract version from pyproject.toml
+      if: steps.version_change.outputs.changed == 'true'
       id: version
       run: |
         VERSION=$(grep '^version = ' pyproject.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
@@ -23,6 +40,7 @@ jobs:
         echo "Proposed version: $VERSION"
 
     - name: Fail if version already exists on PyPI
+      if: steps.version_change.outputs.changed == 'true'
       run: |
         TMPDIR=$(mktemp -d)
         cd "$TMPDIR"
