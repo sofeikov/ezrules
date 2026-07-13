@@ -341,6 +341,7 @@ AI authoring settings notes:
 - `enabled` defaults to `true` for orgs that have not saved an AI authoring setting.
 - `GET /api/v2/settings/ai-authoring` returns `provider`, `supported_providers`, `enabled`, `model`, and `api_key_configured`.
 - `PUT /api/v2/settings/ai-authoring` accepts `provider`, `enabled`, `model`, optional `api_key`, and `clear_api_key`.
+- Organisation-specific provider API keys are encrypted at rest using `EZRULES_APP_SECRET`. The API reports only whether a key is configured and never returns the credential.
 
 ### Users and Roles
 

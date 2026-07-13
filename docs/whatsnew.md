@@ -1,5 +1,10 @@
 # What's New
 
+## v1.29.1
+
+* **Encrypted AI provider credentials**: Organisation-specific AI authoring API keys are now encrypted at rest with the application secret, including explicit cleared-key records, so database dumps no longer contain usable provider credentials.
+* **Fail-closed secret handling**: Invalid or undecryptable stored credentials no longer fall back to a deployment-wide provider key, while organisations without an override continue to use the configured environment default.
+
 ## v1.29.0
 
 * **Alert-backed case review**: Outcome-spike incidents now attach every contributing current evaluation to its existing case, preserving one assignment, notes, disposition, and audit workflow instead of introducing a parallel alert queue.
