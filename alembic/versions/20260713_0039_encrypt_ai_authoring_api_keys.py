@@ -10,7 +10,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
-from ezrules.core.secret_encryption import decrypt_secret, encrypt_secret
+from ezrules.core.secret_encryption import SECRET_ENCRYPTION_PREFIX, decrypt_secret, encrypt_secret
 from ezrules.settings import app_settings
 
 revision: str = "20260713_0039"
@@ -44,7 +44,7 @@ def upgrade() -> None:
             {
                 "key": _AI_AUTHORING_API_KEY,
                 "o_id": row["o_id"],
-                "value": encrypt_secret(str(row["value"])),
+                "value": _encrypt_legacy_value(str(row["value"])),
             },
         )
 
@@ -79,3 +79,10 @@ def downgrade() -> None:
 def _require_real_app_secret(rows: Sequence[object]) -> None:
     if rows and app_settings.APP_SECRET == _ALEMBIC_PLACEHOLDER_SECRET:
         raise RuntimeError("EZRULES_APP_SECRET must be set to migrate stored AI authoring API keys")
+
+
+def _encrypt_legacy_value(value: str) -> str:
+    if value.startswith(SECRET_ENCRYPTION_PREFIX):
+        decrypt_secret(value)
+        return value
+    return encrypt_secret(value)

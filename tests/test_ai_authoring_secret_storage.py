@@ -120,16 +120,26 @@ def test_ai_authoring_secret_preserves_fallback_clear_and_fail_closed_semantics(
 def test_ai_authoring_secret_migration_round_trip_and_placeholder_refusal(session, monkeypatch):
     migration = runpy.run_path(str(_MIGRATION_PATH))
     org = Organisation(name="AI Secret Migration Org")
-    session.add(org)
+    already_encrypted_org = Organisation(name="AI Secret Already Encrypted Migration Org")
+    session.add_all([org, already_encrypted_org])
     session.commit()
+    already_encrypted_value = encrypt_secret("sk-already-encrypted-secret")
     session.execute(
         sa.text(
             """
             INSERT INTO runtime_settings (key, o_id, value_type, value, created_at, updated_at)
-            VALUES (:key, :o_id, 'string', :value, NOW(), NOW())
+            VALUES
+                (:key, :plaintext_o_id, 'string', :plaintext_value, NOW(), NOW()),
+                (:key, :encrypted_o_id, 'secret', :encrypted_value, NOW(), NOW())
             """
         ),
-        {"key": AI_AUTHORING_API_KEY_KEY, "o_id": int(org.o_id), "value": "sk-migration-secret"},
+        {
+            "key": AI_AUTHORING_API_KEY_KEY,
+            "plaintext_o_id": int(org.o_id),
+            "plaintext_value": "sk-migration-secret",
+            "encrypted_o_id": int(already_encrypted_org.o_id),
+            "encrypted_value": already_encrypted_value,
+        },
     )
     session.flush()
 
@@ -157,6 +167,19 @@ def test_ai_authoring_secret_migration_round_trip_and_placeholder_refusal(sessio
     assert upgraded["value_type"] == "secret"
     assert str(upgraded["value"]).startswith(SECRET_ENCRYPTION_PREFIX)
     assert decrypt_secret(str(upgraded["value"])) == "sk-migration-secret"
+    assert (
+        session.execute(
+            sa.text(
+                """
+            SELECT value
+            FROM runtime_settings
+            WHERE key = :key AND o_id = :o_id
+            """
+            ),
+            {"key": AI_AUTHORING_API_KEY_KEY, "o_id": int(already_encrypted_org.o_id)},
+        ).scalar_one()
+        == already_encrypted_value
+    )
 
     migration["downgrade"]()
     downgraded = (
