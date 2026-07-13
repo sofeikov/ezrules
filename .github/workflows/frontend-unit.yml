@@ -1,0 +1,54 @@
+name: Frontend Unit Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ezrules/frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ezrules/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run frontend unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Publish frontend coverage summary
+        if: always() && hashFiles('ezrules/frontend/coverage/ezrules-frontend/coverage-summary.json') != ''
+        run: |
+          summary_path="coverage/ezrules-frontend/coverage-summary.json"
+          {
+            echo "## Frontend coverage"
+            echo
+            echo "| Metric | Covered | Total | Coverage |"
+            echo "| --- | ---: | ---: | ---: |"
+            jq -r '.total | to_entries[] | "| \(.key) | \(.value.covered) | \(.value.total) | \(.value.pct)% |"' "$summary_path"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload frontend coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-${{ github.sha }}
+          path: ezrules/frontend/coverage/ezrules-frontend
+          if-no-files-found: warn

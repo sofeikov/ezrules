@@ -53,8 +53,33 @@ jobs:
     - name: Apply database migrations
       run: uv run alembic upgrade head
 
-    - name: Run backend and CLI tests
-      run: uv run pytest -q --cov=ezrules.backend --cov=ezrules.core --cov-report=xml tests
+    - name: Run backend and CLI tests with coverage
+      run: >-
+        uv run pytest -q
+        --cov
+        --cov-report=term-missing
+        --cov-report=xml
+        --cov-report=json
+        --cov-report=html
+        tests
+
+    - name: Publish Python coverage summary
+      run: |
+        echo "## Python coverage" >> "$GITHUB_STEP_SUMMARY"
+        echo >> "$GITHUB_STEP_SUMMARY"
+        uv run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload Python coverage report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-coverage-${{ github.sha }}
+        path: |
+          .coverage
+          coverage.json
+          coverage.xml
+          htmlcov
+        if-no-files-found: warn
 
   redis-celery-smoke:
     runs-on: ubuntu-latest
