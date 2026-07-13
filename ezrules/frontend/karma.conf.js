@@ -29,10 +29,10 @@ module.exports = function configureKarma(config) {
       ],
       check: {
         global: {
-          statements: 1.9,
-          branches: 0.2,
+          statements: 1.93,
+          branches: 0.26,
           functions: 0.08,
-          lines: 2,
+          lines: 2.01,
         },
       },
     },
