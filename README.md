@@ -14,6 +14,7 @@ ezrules gives fraud, risk, and compliance administrators a web workspace for man
 - **See what happened.** Review canonical served decisions, the outcome returned, every rule that fired, and the exact event version those rules used.
 - **Work the exceptions.** Turn non-neutral decisions into resolvable cases, track rescoring changes, and publish case/evaluation events to external systems.
 - **Improve rules with evidence.** Use labels, precision/recall reports, backtests, shadow rules, and percentage rollouts before changing production decisions.
+- **Use reproducible historical features.** Computed counts, distinct values, sums, averages, extrema, standard deviation, and days-since features follow documented point-in-time, correction, null, and type semantics.
 - **Run with admin controls.** Manage roles, permissions, API keys, outcomes, user lists, field types, traffic persistence, and audit history inside the product.
 - **Self-host it.** Run the full stack yourself with PostgreSQL, Redis, FastAPI, Celery, and the web UI.
 

@@ -5,9 +5,10 @@ import math
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from typing import Any, cast
 
-from sqlalchemy import false, func, or_, text, tuple_
+from sqlalchemy import Numeric, and_, case, false, func, or_, text, tuple_
 
 from ezrules.backend.api_v2.schemas.features import ALLOWED_WINDOW_SECONDS, FeatureAggregation
 from ezrules.core.field_paths import get_field_value, split_field_path
@@ -41,6 +42,7 @@ class FeatureComputationResult:
     as_of: datetime
     window_start: datetime
     entity_value_hash: str | None = None
+    warning: str | None = None
 
 
 @dataclass(frozen=True)
@@ -101,11 +103,37 @@ def _filter_matches(event_data: dict[str, Any], filters: list[dict[str, Any]]) -
         value = _safe_get(event_data, str(filter_config.get("field")))
         operator = filter_config.get("operator", "eq")
         expected = filter_config.get("value")
-        if operator == "eq" and value != expected:
+        if operator == "eq" and not _json_scalar_values_equal(value, expected):
             return False
-        if operator == "in" and value not in (expected if isinstance(expected, list) else []):
+        if operator == "in" and not any(
+            _json_scalar_values_equal(value, item) for item in (expected if isinstance(expected, list) else [])
+        ):
             return False
     return True
+
+
+def _json_scalar_identity(value: Any) -> tuple[str, str] | None:
+    if value is None:
+        return ("null", "null")
+    if isinstance(value, bool):
+        return ("boolean", "true" if value else "false")
+    if isinstance(value, str):
+        return ("string", value)
+    if isinstance(value, int | float):
+        try:
+            numeric_value = Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            return None
+        if not numeric_value.is_finite():
+            return None
+        normalized = format(numeric_value.normalize(), "f")
+        return ("number", "0" if normalized == "-0" else normalized)
+    return None
+
+
+def _json_scalar_values_equal(left: Any, right: Any) -> bool:
+    left_identity = _json_scalar_identity(left)
+    return left_identity is not None and left_identity == _json_scalar_identity(right)
 
 
 def _jsonb_text_value(value: Any) -> str | None:
@@ -121,10 +149,10 @@ def _graph_entity_value_hash(entity_value: str) -> str:
 
 
 def _entity_value_hash(entity_value: Any) -> str | None:
-    text_value = _jsonb_text_value(entity_value)
-    if not text_value:
+    identity = _json_scalar_identity(entity_value)
+    if identity is None:
         return None
-    return _graph_entity_value_hash(text_value)
+    return _graph_entity_value_hash(f"{identity[0]}:{identity[1]}")
 
 
 def _graph_entity_values(event_data: dict[str, Any], field_path: str) -> list[str]:
@@ -181,48 +209,63 @@ def _event_data_text_expression(path: str) -> Any:
     return func.jsonb_extract_path_text(EventVersion.event_data, *split_field_path(path))
 
 
+def _event_data_json_expression(path: str) -> Any:
+    return func.jsonb_extract_path(EventVersion.event_data, *split_field_path(path))
+
+
+def _jsonb_scalar_predicate(path: str, expected: Any) -> Any:
+    text_expression = _event_data_text_expression(path)
+    if expected is None:
+        return text_expression.is_(None)
+
+    identity = _json_scalar_identity(expected)
+    if identity is None:
+        return false()
+
+    json_type, normalized_value = identity
+    type_expression = func.jsonb_typeof(_event_data_json_expression(path))
+    if json_type == "number":
+        numeric_expression = case(
+            (type_expression == "number", text_expression.cast(Numeric)),
+            else_=None,
+        )
+        return numeric_expression == Decimal(normalized_value)
+    return and_(type_expression == json_type, text_expression == normalized_value)
+
+
 def _apply_jsonb_filter(query: Any, filter_config: dict[str, Any]) -> Any:
     field = str(filter_config.get("field") or "")
     if not field:
         return query
 
-    expression = _event_data_text_expression(field)
     operator = filter_config.get("operator", "eq")
     expected = filter_config.get("value")
 
     if operator == "eq":
-        expected_value = _jsonb_text_value(expected)
-        return query.filter(expression.is_(None) if expected_value is None else expression == expected_value)
+        return query.filter(_jsonb_scalar_predicate(field, expected))
 
     if operator == "in":
         expected_values = expected if isinstance(expected, list) else []
         if not expected_values:
             return query.filter(false())
-        text_values = [_jsonb_text_value(item) for item in expected_values]
-        non_null_values = [item for item in text_values if item is not None]
-        predicates = []
-        if non_null_values:
-            predicates.append(expression.in_(non_null_values))
-        if None in text_values:
-            predicates.append(expression.is_(None))
+        predicates = [_jsonb_scalar_predicate(field, item) for item in expected_values]
         return query.filter(or_(*predicates) if predicates else false())
 
     return query
 
 
-def _coerce_number(value: Any, *, null_handling: str) -> float | None:
+def _coerce_number(value: Any, *, null_handling: str) -> tuple[float | None, bool]:
     if value is None:
-        return 0.0 if null_handling == "zero" else None
+        return (0.0 if null_handling == "zero" else None, False)
     if isinstance(value, bool):
-        return float(value)
-    if isinstance(value, int | float):
-        if math.isnan(value) or math.isinf(value):
-            return None
-        return float(value)
+        return (None, True)
     try:
-        return float(str(value))
-    except (TypeError, ValueError):
-        return None
+        numeric_value = float(value)
+    except (OverflowError, TypeError, ValueError):
+        return (None, True)
+    if not math.isfinite(numeric_value):
+        return (None, True)
+    return (numeric_value, False)
 
 
 def _compute_aggregate(
@@ -230,39 +273,54 @@ def _compute_aggregate(
     matched_events: list[EventVersion],
     *,
     as_of: datetime,
-) -> Any:
+) -> tuple[Any, int, bool]:
     aggregation = str(feature.aggregation_type)
     if aggregation == FeatureAggregation.COUNT.value:
-        return len(matched_events)
+        return len(matched_events), 0, False
 
     values = [_safe_get(cast(dict[str, Any], event.event_data), str(feature.source_field)) for event in matched_events]
 
     if aggregation == FeatureAggregation.COUNT_DISTINCT.value:
-        return len({value for value in values if value is not None})
+        identities = {_json_scalar_identity(value) for value in values if value is not None}
+        return len({identity for identity in identities if identity is not None}), 0, False
 
     if aggregation == FeatureAggregation.DAYS_SINCE_FIRST_SEEN.value:
         if not matched_events:
-            return None
+            return None, 0, False
         first_seen = min(normalize_as_utc(cast(datetime, event.effective_at)) for event in matched_events)
-        return max(0, (as_of - first_seen).days)
+        return max(0, (as_of - first_seen).days), 0, False
 
-    numeric_values = [_coerce_number(value, null_handling=str(feature.null_handling)) for value in values]
-    numeric_values = [value for value in numeric_values if value is not None]
+    coerced_values = [_coerce_number(value, null_handling=str(feature.null_handling)) for value in values]
+    numeric_values = [value for value, _invalid in coerced_values if value is not None]
+    invalid_count = sum(1 for _value, invalid in coerced_values if invalid)
 
     if not numeric_values:
-        return None
-    if aggregation == FeatureAggregation.SUM.value:
-        return sum(numeric_values)
-    if aggregation == FeatureAggregation.AVG.value:
-        return sum(numeric_values) / len(numeric_values)
-    if aggregation == FeatureAggregation.MIN.value:
-        return min(numeric_values)
-    if aggregation == FeatureAggregation.MAX.value:
-        return max(numeric_values)
-    if aggregation == FeatureAggregation.STDDEV.value:
-        mean = sum(numeric_values) / len(numeric_values)
-        return math.sqrt(sum((value - mean) ** 2 for value in numeric_values) / len(numeric_values))
-    raise FeatureResolutionError(f"Unsupported feature aggregation '{aggregation}'")
+        return None, invalid_count, False
+    try:
+        if aggregation == FeatureAggregation.SUM.value:
+            result = math.fsum(numeric_values)
+        elif aggregation == FeatureAggregation.AVG.value:
+            result = math.fsum(value / len(numeric_values) for value in numeric_values)
+        elif aggregation == FeatureAggregation.MIN.value:
+            result = min(numeric_values)
+        elif aggregation == FeatureAggregation.MAX.value:
+            result = max(numeric_values)
+        elif aggregation == FeatureAggregation.STDDEV.value:
+            scale = max(abs(value) for value in numeric_values)
+            if scale == 0:
+                result = 0.0
+            else:
+                scaled_values = [value / scale for value in numeric_values]
+                scaled_mean = math.fsum(scaled_values) / len(scaled_values)
+                scaled_variance = math.fsum((value - scaled_mean) ** 2 for value in scaled_values) / len(scaled_values)
+                result = scale * math.sqrt(scaled_variance)
+        else:
+            raise FeatureResolutionError(f"Unsupported feature aggregation '{aggregation}'")
+    except OverflowError:
+        return None, invalid_count, True
+    if not math.isfinite(result):
+        return None, invalid_count, True
+    return result, invalid_count, False
 
 
 def _compute_aggregate_feature(
@@ -289,13 +347,15 @@ def _compute_aggregate_feature(
     except Exception as exc:
         raise FeatureResolutionError("Unable to apply feature query timeout") from exc
 
-    entity_text_value = _jsonb_text_value(entity_value)
+    entity_identity = _json_scalar_identity(entity_value)
+    if entity_identity is None:
+        raise FeatureResolutionError(f"Feature entity key '{feature.entity_key}' must contain a JSON scalar")
     query = db.query(EventVersion).filter(
         EventVersion.o_id == o_id,
         EventVersion.effective_at >= window_start,
         EventVersion.effective_at < as_of,
         EventVersion.observed_at <= as_of,
-        _event_data_text_expression(str(feature.entity_key)) == entity_text_value,
+        _jsonb_scalar_predicate(str(feature.entity_key), entity_value),
     )
     filters = list(cast(list[dict[str, Any]], feature.filters or []))
     for filter_config in filters:
@@ -308,12 +368,21 @@ def _compute_aggregate_feature(
         as_of,
     )
     matched_events = [event for event in candidate_events if int(event.ev_id) in current_event_ids]
+    aggregate_value, invalid_numeric_count, aggregate_overflow = _compute_aggregate(
+        feature, matched_events, as_of=as_of
+    )
+    warnings = []
+    if invalid_numeric_count:
+        warnings.append(f"Excluded {invalid_numeric_count} invalid or non-finite numeric source value(s)")
+    if aggregate_overflow:
+        warnings.append("Aggregate result exceeded the finite binary floating-point range")
     return FeatureComputationResult(
-        value=_compute_aggregate(feature, matched_events, as_of=as_of),
+        value=aggregate_value,
         matched_event_count=len(matched_events),
         as_of=as_of,
         window_start=window_start,
         entity_value_hash=_entity_value_hash(entity_value),
+        warning="; ".join(warnings) or None,
     )
 
 
@@ -353,6 +422,7 @@ def _current_event_version_ids_as_of(db: Any, o_id: int, transaction_ids: set[st
             EventVersion.o_id == o_id,
             EventVersion.transaction_id.in_(sorted(transaction_ids)),
             EventVersion.observed_at <= as_of,
+            EventVersion.effective_at < as_of,
         )
         .subquery()
     )
@@ -415,7 +485,7 @@ def _compute_graph_distinct_count(
             matched_event_count=0,
             as_of=as_of,
             window_start=window_start,
-            entity_value_hash=_entity_value_hash(entity_value),
+            entity_value_hash=_graph_entity_value_hash(seed_text_value) if seed_text_value is not None else None,
         )
 
     seed = (str(feature.entity), _graph_entity_value_hash(seed_text_value))
@@ -486,7 +556,7 @@ def _compute_graph_distinct_count(
         matched_event_count=len(visited_event_ids),
         as_of=as_of,
         window_start=window_start,
-        entity_value_hash=_entity_value_hash(entity_value),
+        entity_value_hash=_graph_entity_value_hash(seed_text_value),
     )
 
 
@@ -508,7 +578,7 @@ class FeatureResolver:
     def __init__(self, db: Any, o_id: int):
         self.db = db
         self.o_id = o_id
-        self._cache: dict[tuple[str, str, datetime], FeatureComputationResult] = {}
+        self._cache: dict[tuple[str, str, str, datetime], FeatureComputationResult] = {}
         self.last_resolution_traces: list[FeatureResolutionTrace] = []
 
     def resolve(self, event_data: dict[str, Any], as_of: datetime, stat_paths: set[str]) -> dict[str, Any]:
@@ -560,8 +630,10 @@ class FeatureResolver:
                 raise FeatureResolutionError(
                     f"Event is missing entity key '{feature.entity_key}' required for stat[{stat_path}]"
                 )
-            entity_value = str(entity_value)
-            cache_key = (stat_path, entity_value, as_of)
+            entity_identity = _json_scalar_identity(entity_value)
+            if entity_identity is None:
+                raise FeatureResolutionError(f"Feature entity key '{feature.entity_key}' must contain a JSON scalar")
+            cache_key = (stat_path, entity_identity[0], entity_identity[1], as_of)
             if cache_key not in self._cache:
                 self._cache[cache_key] = compute_feature(self.db, self.o_id, feature, event_data, as_of)
             result = self._cache[cache_key]
@@ -577,6 +649,7 @@ class FeatureResolver:
                     matched_event_count=result.matched_event_count,
                     entity_value_hash=result.entity_value_hash,
                     resolution_status="resolved",
+                    warning=result.warning,
                 )
             )
         self.last_resolution_traces = traces
