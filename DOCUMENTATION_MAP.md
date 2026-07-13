@@ -12,6 +12,7 @@ This file is the quick reference for where documentation lives and what code is 
 - `docs/api-reference/evaluator-api.md`: `/api/v2/evaluate` contract and examples.
 - `docs/user-guide/*.md`: operator workflows (analyst/admin/monitoring/rules/labels/lists/shadow-deployment/rule-rollouts).
 - `docs/architecture/overview.md`: system boundaries and flows.
+- `docs/architecture/feature-math-contract.md`: point-in-time population, type, null, aggregation, and precision semantics for computed features.
 - `docs/architecture/deployment.md`: local deployment/runtime guide.
 - `docs/troubleshooting.md`: symptom -> diagnosis -> fix.
 - `docs/whatsnew.md`: release notes/changelog.

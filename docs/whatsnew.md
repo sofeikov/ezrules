@@ -1,5 +1,11 @@
 # What's New
 
+## v1.28.9
+
+* **Computed-feature math contract**: Documented and regression-tested every aggregate, point-in-time window boundary, correction rule, null policy, JSON scalar identity rule, and floating-point tolerance.
+* **Safer aggregate inputs**: Numeric aggregates now exclude booleans, invalid strings, NaN, infinity, and out-of-range values with trace warnings; distinct counts ignore containers and preserve JSON scalar types.
+* **Stable historical inference**: Feature matching is type-sensitive, standard deviation uses a cancellation-resistant population calculation, and future-effective corrections no longer replace historical versions early.
+
 ## v1.28.8
 
 * **Complete rule-quality recall**: Rule Quality now counts labeled events where a rule did not fire as false negatives, so recall reflects the full labeled ground-truth population rather than only matched rule results.
