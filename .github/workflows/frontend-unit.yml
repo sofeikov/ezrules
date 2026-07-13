@@ -33,6 +33,16 @@ jobs:
       - name: Run frontend unit tests with coverage
         run: npm run test:coverage
 
+      - name: Verify frontend coverage inventory
+        run: |
+          summary_path="coverage/ezrules-frontend/coverage-summary.json"
+          expected_count="$(find src/app -type f -name '*.ts' ! -name '*.spec.ts' | wc -l | xargs)"
+          reported_count="$(jq '[keys[] | select(. != "total" and contains("src/app/"))] | length' "$summary_path")"
+          if [ "$reported_count" != "$expected_count" ]; then
+            echo "Expected coverage for $expected_count application files, found $reported_count." >&2
+            exit 1
+          fi
+
       - name: Publish frontend coverage summary
         if: always() && hashFiles('ezrules/frontend/coverage/ezrules-frontend/coverage-summary.json') != ''
         run: |

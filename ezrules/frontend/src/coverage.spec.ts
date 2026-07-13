@@ -1,18 +1,70 @@
-type WebpackContext = {
-  keys(): string[];
-  (modulePath: string): unknown;
-};
-
-declare const require: {
-  context(directory: string, includeSubdirectories: boolean, pattern: RegExp): WebpackContext;
-};
+import './app/accept-invite/accept-invite.component';
+import './app/access-denied/access-denied.component';
+import './app/alerts/alerts.component';
+import './app/api-keys/api-keys.component';
+import './app/app.component';
+import './app/app.config';
+import './app/app.routes';
+import './app/audit-trail/audit-trail.component';
+import './app/auth/auth.guard';
+import './app/auth/auth.interceptor';
+import './app/auth/permission.guard';
+import './app/auth/permissions';
+import './app/cases/cases.component';
+import './app/components/ai-rule-authoring-panel.component';
+import './app/components/notification-bell.component';
+import './app/components/rule-logic-editor.component';
+import './app/components/sidebar.component';
+import './app/dashboard/dashboard.component';
+import './app/event-tester/event-tester.component';
+import './app/features/features.component';
+import './app/field-types/field-types.component';
+import './app/forgot-password/forgot-password.component';
+import './app/label-analytics/label-analytics.component';
+import './app/labels/labels.component';
+import './app/login/login.component';
+import './app/outcomes/outcomes.component';
+import './app/reset-password/reset-password.component';
+import './app/role-management/role-management.component';
+import './app/role-permissions/role-permissions.component';
+import './app/rollouts/rollouts.component';
+import './app/rule-create/rule-create.component';
+import './app/rule-detail/rule-detail.component';
+import './app/rule-history/rule-history.component';
+import './app/rule-list/rule-list.component';
+import './app/rule-quality/rule-quality.component';
+import './app/services/alert.service';
+import './app/services/api-key.service';
+import './app/services/audit.service';
+import './app/services/auth.service';
+import './app/services/backtesting.service';
+import './app/services/case.service';
+import './app/services/dashboard.service';
+import './app/services/event-test.service';
+import './app/services/feature.service';
+import './app/services/field-type.service';
+import './app/services/label-analytics.service';
+import './app/services/label.service';
+import './app/services/outcome.service';
+import './app/services/role.service';
+import './app/services/rule-editor-assist.service';
+import './app/services/rule-quality.service';
+import './app/services/rule-test-data.service';
+import './app/services/rule.service';
+import './app/services/runtime-settings.service';
+import './app/services/tested-event.service';
+import './app/services/user-list.service';
+import './app/services/user.service';
+import './app/settings/settings.component';
+import './app/shadow-rules/shadow-rules.component';
+import './app/tested-events/tested-event-graph.component';
+import './app/tested-events/tested-events.component';
+import './app/user-lists/user-lists.component';
+import './app/user-management/user-management.component';
+import './app/utils/field-paths';
 
 describe('frontend coverage inventory', () => {
   it('loads every production application module into the coverage bundle', () => {
-    const applicationModules = require.context('./app', true, /^(?!.*\.spec\.ts$).*\.ts$/);
-    const modulePaths = applicationModules.keys();
-
-    expect(modulePaths.length).toBeGreaterThan(0);
-    modulePaths.forEach((modulePath) => applicationModules(modulePath));
+    expect(true).toBeTrue();
   });
 });

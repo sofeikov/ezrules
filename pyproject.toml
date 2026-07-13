@@ -93,24 +93,6 @@ markers = [
     "property: property/fuzz tests over generated pure-layer inputs",
 ]
 
-[tool.coverage.run]
-branch = true
-source = ["ezrules"]
-
-[tool.coverage.report]
-fail_under = 0
-precision = 2
-show_missing = true
-
-[tool.coverage.html]
-directory = "htmlcov"
-
-[tool.coverage.json]
-output = "coverage.json"
-
-[tool.coverage.xml]
-output = "coverage.xml"
-
 [tool.poe.tasks]
 check = [
     {cmd = "uv lock --locked"},
