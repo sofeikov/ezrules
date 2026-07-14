@@ -86,7 +86,7 @@ Each call to `POST /api/v2/auth/refresh` deletes the submitted refresh token and
 | `POST` | `/api/v2/rules/{rule_id}/resume` | Bearer + `PROMOTE_RULES` | Resume paused rule to active |
 | `POST` | `/api/v2/rules/{rule_id}/archive` | Bearer + `MODIFY_RULE` | Archive rule |
 | `POST` | `/api/v2/rules/{rule_id}/rollback` | Bearer + `MODIFY_RULE` | Create a new draft version from a historical revision (`revision_number` in body) |
-| `POST` | `/api/v2/rules/verify` | Bearer + permission | Verify rule source, extracted params, and advisory warnings for unseen fields |
+| `POST` | `/api/v2/rules/verify` | Bearer + permission | Verify rule source, the `None`/direct-`!OUTCOME` return contract, extracted params, and advisory warnings for unseen fields |
 | `POST` | `/api/v2/rules/ai/draft` | Bearer + `CREATE_RULE` or `MODIFY_RULE` | Generate an AI-assisted rule draft (`mode=create|edit`) |
 | `POST` | `/api/v2/rules/ai/apply` | Bearer + `CREATE_RULE` or `MODIFY_RULE` | Record that an AI draft was explicitly applied in the editor |
 | `POST` | `/api/v2/rules/test` | Bearer + permission | Test rule payload |

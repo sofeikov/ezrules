@@ -196,6 +196,8 @@ def validate_rule_source(
             ),
         )
 
+    params: list[str] = []
+    warnings: list[str] = []
     try:
         compiled_rule = Rule(
             rid=rid,
@@ -205,6 +207,7 @@ def validate_rule_source(
         )
         params = sorted(compiled_rule.get_rule_params(), key=str)
         warnings = build_rule_warnings(db, org_id, params)
+        compiled_rule.validate_return_contract()
         if evaluation_lane == RULE_EVALUATION_LANE_ALLOWLIST:
             allowlist_error = validate_allowlist_rule(compiled_rule, get_neutral_outcome(db, org_id))
             if allowlist_error is not None:
@@ -238,11 +241,11 @@ def validate_rule_source(
             compiled_rule=None,
             response=RuleVerifyResponse(
                 valid=False,
-                params=[],
+                params=params,
                 referenced_lists=referenced_lists,
                 referenced_outcomes=referenced_outcomes,
                 referenced_features=referenced_features,
-                warnings=[],
+                warnings=warnings,
                 errors=[
                     build_verify_error(
                         message=str(exc),

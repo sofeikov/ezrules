@@ -125,6 +125,10 @@ class Rule:
     def get_rule_stats(self):
         return set(self._rule_stats)
 
+    def validate_return_contract(self) -> None:
+        """Require every explicit result to be either ``None`` or a direct outcome."""
+        RuleReturnContractValidator().visit(self._rule_ast)
+
     def __call__(self, t, stats: dict[str, Any] | None = None) -> Any:
         """Executes rule logic."""
         try:
@@ -233,8 +237,47 @@ class OutcomeReturnSyntaxError(SyntaxError):
         if outcome_name:
             message = f"Use return !{outcome_name} instead of indirect or quoted outcome returns."
         else:
-            message = "Outcome returns must use direct `return !OUTCOME` syntax."
+            message = "Rules may return only `None` or a direct configured outcome using `return !OUTCOME`."
         super().__init__(message)
+
+
+class RuleReturnContractValidator(ast.NodeVisitor):
+    """Validate the result boundary applied to persisted and deployed rules."""
+
+    def __init__(self) -> None:
+        self._function_depth = 0
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:
+        self._function_depth += 1
+        try:
+            self.generic_visit(node)
+        finally:
+            self._function_depth -= 1
+        return node
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> Any:
+        self._function_depth += 1
+        try:
+            self.generic_visit(node)
+        finally:
+            self._function_depth -= 1
+        return node
+
+    def visit_Return(self, node: ast.Return) -> Any:
+        if self._function_depth != 1:
+            return node
+        if node.value is None:
+            return node
+        if isinstance(node.value, ast.Constant) and node.value.value is None:
+            return node
+        if extract_outcome_helper_value(node.value) is not None:
+            return node
+        raise OutcomeReturnSyntaxError(
+            outcome_name="",
+            line=node.value.lineno,
+            column=node.value.col_offset + 1,
+            end_column=node.value.end_col_offset or (node.value.col_offset + 1),
+        )
 
 
 class OutcomeReturnSyntaxValidator(ast.NodeVisitor):

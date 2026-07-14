@@ -51,7 +51,8 @@ Notes:
 - Use `$field_name` to read event fields (for example `$amount`, `$country`)
 - Use dotted paths for nested JSON values (for example `$customer.profile.age`, `$device.location.country`)
 - Use `stat[entity.feature_name]` to read active computed historical features from **Features**
-- If no condition matches, return nothing
+- A rule may return only a configured outcome with direct `return !OUTCOME` syntax, or no result with `return None`, a bare `return`, or by reaching the end of the rule
+- Boolean, numeric, quoted or dynamically computed strings, containers, and other Python expressions are rejected as rule results
 - If the rule is in the allowlist lane, it must return the configured neutral outcome using `!OUTCOME`
 
 Checkpoint:
@@ -179,6 +180,7 @@ if 2 <= $hour <= 5 and $amount > 1000:
 ## Step 5: Avoid Common Mistakes
 
 - Returning an outcome that is not configured in **Outcomes**
+- Returning a predicate such as `return $amount > 100`; put the predicate in an `if` statement and return a configured `!OUTCOME` from the matching branch
 - Using field names that do not exist in event payloads
 - Packing too many unrelated conditions into one rule
 - Running expensive lookups per event inside rule logic

@@ -1,11 +1,30 @@
 from collections import Counter
-from typing import Any
+from typing import Any, TypedDict
 
 from ezrules.core.rule import Rule, RuleFactory
 from ezrules.core.user_lists import AbstractUserListManager
 
 RULE_EXECUTION_MODE_ALL_MATCHES = "all_matches"
 RULE_EXECUTION_MODE_FIRST_MATCH = "first_match"
+RULE_EXECUTION_MODES = frozenset(
+    {
+        RULE_EXECUTION_MODE_ALL_MATCHES,
+        RULE_EXECUTION_MODE_FIRST_MATCH,
+    }
+)
+
+RuleIdentifier = int | str
+
+
+class RuleEngineResult(TypedDict):
+    rule_results: dict[RuleIdentifier, str]
+    all_rule_results: dict[RuleIdentifier, str | None]
+    outcome_counters: dict[str, int]
+    outcome_set: list[str]
+
+
+class InvalidRuleResultError(TypeError):
+    """Raised when a rule returns a value that cannot represent an outcome."""
 
 
 class RuleEngine:
@@ -23,8 +42,38 @@ class RuleEngine:
         :param rules: list of :class:`core.rule.Rule`
         :param result_aggregation: a member of :class:`core.rule_engine.ResultAggregation`
         """
+        if execution_mode not in RULE_EXECUTION_MODES:
+            raise ValueError(f"Unknown rule execution mode: {execution_mode!r}")
+
+        seen_identifiers: set[RuleIdentifier] = set()
+        for rule in rules:
+            identifier = self._rule_identifier(rule)
+            if identifier in seen_identifiers:
+                raise ValueError(f"Duplicate rule identifier: {identifier!r}")
+            seen_identifiers.add(identifier)
+
         self.rules = rules
         self.execution_mode = execution_mode
+
+    @staticmethod
+    def _rule_identifier(rule: Rule) -> RuleIdentifier:
+        return rule.r_id if rule.r_id is not None else rule.rid
+
+    @staticmethod
+    def _validate_rule_result(rule_identifier: RuleIdentifier, rule_result: Any) -> str | None:
+        if rule_result is None:
+            return None
+        if not isinstance(rule_result, str):
+            raise InvalidRuleResultError(
+                f"Rule {rule_identifier!r} returned {type(rule_result).__name__}; "
+                "expected None or a non-empty outcome string"
+            )
+        if not rule_result:
+            raise InvalidRuleResultError(
+                f"Rule {rule_identifier!r} returned an empty outcome string; "
+                "expected None or a non-empty outcome string"
+            )
+        return rule_result
 
     def get_rule_stats(self) -> set[str]:
         stat_paths: set[str] = set()
@@ -32,7 +81,7 @@ class RuleEngine:
             stat_paths.update(rule.get_rule_stats())
         return stat_paths
 
-    def __call__(self, t: dict, stats: dict[str, Any] | None = None) -> Any:
+    def __call__(self, t: dict, stats: dict[str, Any] | None = None) -> RuleEngineResult:
         """
         Execute the rules and aggregated the results.
 
@@ -41,17 +90,17 @@ class RuleEngine:
         checks will be in place.
         :return: aggregated results, either as a list of unique decisions, or a counter for each decision.
         """
-        all_rule_results: dict[Any, Any] = {}
+        all_rule_results: dict[RuleIdentifier, str | None] = {}
         for rule in self.rules:
-            rule_id = rule.r_id or rule.rid
-            rule_result = rule(t, stats=stats)
+            rule_id = self._rule_identifier(rule)
+            rule_result = self._validate_rule_result(rule_id, rule(t, stats=stats))
             all_rule_results[rule_id] = rule_result
             if self.execution_mode == RULE_EXECUTION_MODE_FIRST_MATCH and rule_result is not None:
                 break
         rule_results = {r: res for r, res in all_rule_results.items() if res is not None}
         outcome_counters = dict(Counter(rule_results.values()))
         outcome_set = sorted(set(outcome_counters.keys()))
-        results = {
+        results: RuleEngineResult = {
             "rule_results": rule_results,
             "all_rule_results": all_rule_results,
             "outcome_counters": outcome_counters,
