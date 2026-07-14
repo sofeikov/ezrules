@@ -34,7 +34,7 @@ from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule import MissingFieldLookupError, MissingStatLookupError, RuleFactory
-from ezrules.core.rule_engine import RULE_EXECUTION_MODE_FIRST_MATCH
+from ezrules.core.rule_engine import RULE_EXECUTION_MODE_FIRST_MATCH, validate_rule_result
 from ezrules.core.rule_updater import (
     ALLOWLIST_CONFIG_LABEL,
     DEPLOYMENT_MODE_SPLIT,
@@ -203,12 +203,12 @@ def _evaluate_rollout_result(
     ordered_rules = list(lre.rule_engine.rules if lre.rule_engine is not None else [])
     rollout_by_rule_id = {int(entry["r_id"]): entry for entry in rollout_entries if "r_id" in entry}
     rule_metadata_by_id = data_utils.build_rule_metadata_from_rules(ordered_rules)
-    all_rule_results: dict[int, Any] = {}
+    all_rule_results: dict[int, str | None] = {}
     rollout_logs: list[dict[str, Any]] = []
 
     for control_rule in ordered_rules:
         rule_id = int(control_rule.r_id)
-        control_result = control_rule(event_data, stats=stats)
+        control_result = validate_rule_result(rule_id, control_rule(event_data, stats=stats))
         returned_result = control_result
 
         entry = rollout_by_rule_id.get(rule_id)
@@ -219,7 +219,7 @@ def _evaluate_rollout_result(
             candidate_succeeded = False
             try:
                 candidate_rule = RuleFactory.from_json(entry, list_values_provider=list_provider)
-                candidate_result = candidate_rule(event_data, stats=stats)
+                candidate_result = validate_rule_result(rule_id, candidate_rule(event_data, stats=stats))
                 candidate_succeeded = True
             except Exception:
                 candidate_result = None
@@ -357,6 +357,21 @@ def evaluate(
             list_provider=list_provider,
         )
         production_result = lre.evaluate_rules(event.event_data, as_of=event.effective_at, stats=stats)
+        rollout_logs: list[dict[str, Any]] = []
+        if rollout_entries:
+            assert list_provider is not None
+            assignment_key = _get_assignment_key(event)
+            result, rollout_logs, rule_metadata_by_id = _evaluate_rollout_result(
+                event_data=event.event_data,
+                lre=lre,
+                rollout_entries=rollout_entries,
+                assignment_key=assignment_key,
+                list_provider=list_provider,
+                stats=stats,
+            )
+            result["_rule_metadata_by_id"] = rule_metadata_by_id
+        else:
+            result = production_result
     except (FeatureResolutionError, MissingFieldLookupError, MissingStatLookupError) as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -367,22 +382,6 @@ def evaluate(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Evaluation failed",
         ) from exc
-
-    rollout_logs: list[dict[str, Any]] = []
-    if rollout_entries:
-        assert list_provider is not None
-        assignment_key = _get_assignment_key(event)
-        result, rollout_logs, rule_metadata_by_id = _evaluate_rollout_result(
-            event_data=event.event_data,
-            lre=lre,
-            rollout_entries=rollout_entries,
-            assignment_key=assignment_key,
-            list_provider=list_provider,
-            stats=stats,
-        )
-        result["_rule_metadata_by_id"] = rule_metadata_by_id
-    else:
-        result = production_result
 
     try:
         # `result` already contains the merged served outcome; passing it avoids a second rule evaluation.

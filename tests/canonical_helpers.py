@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from ezrules.models.backend_core import (
+    AllowedOutcome,
     EvaluationDecision,
     EvaluationRuleResult,
     EventVersion,
@@ -11,6 +12,21 @@ from ezrules.models.backend_core import (
     Label,
     TransactionCurrentVersion,
 )
+
+
+def ensure_allowed_outcomes(session, *, org_id: int, outcome_names: list[str]) -> None:
+    existing = {
+        str(outcome.outcome_name): int(outcome.severity_rank)
+        for outcome in session.query(AllowedOutcome).filter(AllowedOutcome.o_id == org_id).all()
+    }
+    next_rank = max(existing.values(), default=0) + 1
+    for outcome_name in outcome_names:
+        if outcome_name in existing:
+            continue
+        session.add(AllowedOutcome(outcome_name=outcome_name, severity_rank=next_rank, o_id=org_id))
+        existing[outcome_name] = next_rank
+        next_rank += 1
+    session.commit()
 
 
 def _hash_payload(event_data: dict[str, Any]) -> str:

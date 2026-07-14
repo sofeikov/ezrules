@@ -2,8 +2,8 @@
 
 ## v1.29.1
 
-* **Strict rule authoring results**: Rule verification, save, backtesting, and agent-tool proposal flows now accept only no result (`None`, a bare return, or fall-through) or a direct configured `return !OUTCOME`; predicates, numbers, containers, dynamic strings, generator syntax, reserved internal helpers, and other expressions are rejected with source diagnostics before metrics run.
-* **Fail-fast rule outcome contract**: Rule-set evaluation now rejects malformed boolean, numeric, empty, container, and callable results before aggregation instead of producing corrupt counters or partial decisions.
+* **Strict rule authoring results**: Rule verification, save, rollout deployment, backtesting, and agent-tool proposal flows now accept only no result (`None`, a bare return, or fall-through) or a direct configured `return !OUTCOME`; predicates, numbers, containers, dynamic strings, generator syntax, reserved internal helpers, and other expressions are rejected with source diagnostics before deployment or metrics run.
+* **Fail-fast rule outcome contract**: Rule-set and split-rollout evaluation now reject malformed boolean, numeric, empty, container, and callable results before aggregation instead of producing corrupt counters or partial decisions; invalid legacy rollout candidates fall back to their validated control result.
 * **Stable rule-engine results**: Empty and non-matching rule sets retain one documented result shape, zero-valued database rule identifiers remain intact, duplicate identifiers fail before execution, and unsupported execution modes can no longer silently fall back to all-matches behavior.
 
 ## v1.29.0

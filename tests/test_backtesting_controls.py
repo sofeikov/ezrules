@@ -10,7 +10,7 @@ from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Organisation, Role, RuleBackTestingResult, User
 from ezrules.models.backend_core import Rule as RuleModel
-from tests.canonical_helpers import add_served_decision
+from tests.canonical_helpers import add_served_decision, ensure_allowed_outcomes
 
 
 def _ensure_org(session) -> Organisation:
@@ -19,6 +19,7 @@ def _ensure_org(session) -> Organisation:
         org = Organisation(o_id=1, name="Backtesting Controls Org")
         session.add(org)
         session.commit()
+    ensure_allowed_outcomes(session, org_id=int(org.o_id), outcome_names=["HOLD", "BLOCK", "IGNORE"])
     return org
 
 

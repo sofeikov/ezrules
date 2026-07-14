@@ -1,6 +1,6 @@
-import bcrypt
 import time
 
+import bcrypt
 import pytest
 from fastapi.testclient import TestClient
 
@@ -12,7 +12,7 @@ from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import FieldTypeConfig, Organisation, Role, User
 from ezrules.models.backend_core import Rule as RuleModel
-from tests.canonical_helpers import add_served_decision
+from tests.canonical_helpers import add_served_decision, ensure_allowed_outcomes
 
 
 def _get_or_create_org(session):
@@ -21,6 +21,7 @@ def _get_or_create_org(session):
         org = Organisation(o_id=1, name="Test Org")
         session.add(org)
         session.commit()
+    ensure_allowed_outcomes(session, org_id=int(org.o_id), outcome_names=["HOLD", "BLOCK"])
     return org
 
 
@@ -48,7 +49,7 @@ def backtest_guardrail_client(session):
     celery_app.conf.task_eager_propagates = True
     celery_app.conf.task_store_eager_result = True
 
-    hashed_password = bcrypt.hashpw("guardrailpass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    hashed_password = bcrypt.hashpw(b"guardrailpass", bcrypt.gensalt()).decode("utf-8")
     org = _get_or_create_org(session)
 
     role = session.query(Role).filter(Role.name == "backtest_guardrail_manager").first()

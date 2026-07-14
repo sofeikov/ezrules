@@ -5,10 +5,10 @@ from datetime import UTC, datetime
 import pytest
 from fastapi.testclient import TestClient
 
-from ezrules.backend.backtesting import BacktestRecord, compute_backtest_metrics
-from ezrules.backend.features import FeatureResolver
 from ezrules.backend.api_v2.main import app
 from ezrules.backend.api_v2.routes import evaluator as evaluator_router
+from ezrules.backend.backtesting import BacktestRecord, compute_backtest_metrics
+from ezrules.backend.features import FeatureResolver
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.tasks import app as celery_app
 from ezrules.backend.tasks import backtest_rule_change, execute_backtest_rule_change
@@ -16,7 +16,7 @@ from ezrules.core.rule import Rule
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
 from ezrules.models.backend_core import EventVersion, FeatureDefinition, FeatureSnapshotResolution, Organisation
 from ezrules.models.backend_core import Rule as RuleModel
-from tests.canonical_helpers import _hash_payload, add_served_decision
+from tests.canonical_helpers import _hash_payload, add_served_decision, ensure_allowed_outcomes
 
 
 def _ensure_org(session) -> Organisation:
@@ -25,6 +25,7 @@ def _ensure_org(session) -> Organisation:
         org = Organisation(o_id=1, name="Test Org")
         session.add(org)
         session.commit()
+    ensure_allowed_outcomes(session, org_id=int(org.o_id), outcome_names=["HOLD", "PASS"])
     return org
 
 

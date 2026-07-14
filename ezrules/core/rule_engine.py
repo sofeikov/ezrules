@@ -27,6 +27,22 @@ class InvalidRuleResultError(TypeError):
     """Raised when a rule returns a value that cannot represent an outcome."""
 
 
+def validate_rule_result(rule_identifier: RuleIdentifier, rule_result: Any) -> str | None:
+    """Return a valid outcome result or reject values that cannot be aggregated."""
+    if rule_result is None:
+        return None
+    if not isinstance(rule_result, str):
+        raise InvalidRuleResultError(
+            f"Rule {rule_identifier!r} returned {type(rule_result).__name__}; "
+            "expected None or a non-empty outcome string"
+        )
+    if not rule_result:
+        raise InvalidRuleResultError(
+            f"Rule {rule_identifier!r} returned an empty outcome string; expected None or a non-empty outcome string"
+        )
+    return rule_result
+
+
 class RuleEngine:
     """Main class for executing a set of :class:`core.rule.Rule` objects. It
     is defined as a set of rules and the way the results are aggregated. The ways the results are
@@ -59,22 +75,6 @@ class RuleEngine:
     def _rule_identifier(rule: Rule) -> RuleIdentifier:
         return rule.r_id if rule.r_id is not None else rule.rid
 
-    @staticmethod
-    def _validate_rule_result(rule_identifier: RuleIdentifier, rule_result: Any) -> str | None:
-        if rule_result is None:
-            return None
-        if not isinstance(rule_result, str):
-            raise InvalidRuleResultError(
-                f"Rule {rule_identifier!r} returned {type(rule_result).__name__}; "
-                "expected None or a non-empty outcome string"
-            )
-        if not rule_result:
-            raise InvalidRuleResultError(
-                f"Rule {rule_identifier!r} returned an empty outcome string; "
-                "expected None or a non-empty outcome string"
-            )
-        return rule_result
-
     def get_rule_stats(self) -> set[str]:
         stat_paths: set[str] = set()
         for rule in self.rules:
@@ -93,7 +93,7 @@ class RuleEngine:
         all_rule_results: dict[RuleIdentifier, str | None] = {}
         for rule in self.rules:
             rule_id = self._rule_identifier(rule)
-            rule_result = self._validate_rule_result(rule_id, rule(t, stats=stats))
+            rule_result = validate_rule_result(rule_id, rule(t, stats=stats))
             all_rule_results[rule_id] = rule_result
             if self.execution_mode == RULE_EXECUTION_MODE_FIRST_MATCH and rule_result is not None:
                 break

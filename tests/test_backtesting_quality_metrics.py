@@ -10,7 +10,7 @@ from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Label, Organisation, Role, RuleBackTestingResult, User
 from ezrules.models.backend_core import Rule as RuleModel
-from tests.canonical_helpers import add_served_decision
+from tests.canonical_helpers import add_served_decision, ensure_allowed_outcomes
 
 
 @pytest.fixture(scope="function")
@@ -70,6 +70,8 @@ def labeled_backtest_fixture(session):
         org = Organisation(o_id=1, name="Backtesting Quality Org")
         session.add(org)
         session.commit()
+
+    ensure_allowed_outcomes(session, org_id=int(org.o_id), outcome_names=["HOLD", "BLOCK"])
 
     fraud_label = Label(label="FRAUD", o_id=int(org.o_id))
     normal_label = Label(label="NORMAL", o_id=int(org.o_id))

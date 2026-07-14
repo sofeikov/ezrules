@@ -1,11 +1,12 @@
 from ezrules.backend.tasks import backtest_rule_change
 from ezrules.models.backend_core import Organisation
 from ezrules.models.backend_core import Rule as RuleModel
-from tests.canonical_helpers import add_served_decision
+from tests.canonical_helpers import add_served_decision, ensure_allowed_outcomes
 
 
 def test_backtest_skips_records_when_proposed_score_field_never_appeared_in_history(session):
     org = session.query(Organisation).filter(Organisation.o_id == 1).one()
+    ensure_allowed_outcomes(session, org_id=int(org.o_id), outcome_names=["HOLD"])
     rule = RuleModel(
         rid="BT_SCORE_REGRESSION_001",
         logic="if $amount > 100:\n\treturn !HOLD",

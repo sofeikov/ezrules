@@ -53,6 +53,7 @@ from ezrules.backend.api_v2.schemas.shadow import ShadowDeployRequest, ShadowDep
 from ezrules.backend.features import FeatureResolutionError, FeatureResolver
 from ezrules.backend.rule_validation import (
     build_outcome_notation_errors,
+    compile_validated_rule_source,
     get_list_provider,
     validate_rule_source,
 )
@@ -1518,9 +1519,16 @@ def deploy_to_rollout(
             detail="Allowlist rules cannot be rolled out",
         )
     if request.logic is not None:
-        outcome_errors = build_outcome_notation_errors(db, current_org_id, request.logic)
-        if outcome_errors:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=outcome_errors[0].message)
+        try:
+            compile_validated_rule_source(
+                db,
+                current_org_id,
+                request.logic,
+                rid=str(rule.rid),
+                description=request.description or str(rule.description),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     try:
         deploy_rule_to_rollout(

@@ -10,7 +10,7 @@ from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Organisation, Role, RuleBackTestingResult, User
 from ezrules.models.backend_core import Rule as RuleModel
-from tests.canonical_helpers import add_served_decision
+from tests.canonical_helpers import add_served_decision, ensure_allowed_outcomes
 
 
 @pytest.fixture(scope="function")
@@ -84,6 +84,8 @@ def sample_rule_for_bt(session):
         org = Organisation(o_id=1, name="Test Org")
         session.add(org)
         session.commit()
+
+    ensure_allowed_outcomes(session, org_id=int(org.o_id), outcome_names=["HOLD", "BLOCK", "FLAG"])
 
     rule = RuleModel(
         rid="bt_rule_001",

@@ -9,12 +9,13 @@ from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.models.backend_core import Label, Organisation, Role, User
 from ezrules.models.backend_core import Rule as RuleModel
-from tests.canonical_helpers import add_served_decision
+from tests.canonical_helpers import add_served_decision, ensure_allowed_outcomes
 
 
 @pytest.fixture(scope="function")
 def agent_tools_client(session):
     org = session.query(Organisation).filter(Organisation.o_id == 1).one()
+    ensure_allowed_outcomes(session, org_id=int(org.o_id), outcome_names=["HOLD"])
     role = Role(
         name="agent_tools_viewer",
         description="Can use deterministic agent analysis tools",
