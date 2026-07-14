@@ -17,15 +17,15 @@ jobs:
       run: |
         base_version="$(git show "${{ github.event.pull_request.base.sha }}:pyproject.toml" | sed -n 's/^version = "\(.*\)"/\1/p' | head -1)"
         current_version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)"
-        if [ -z "$base_version" ] || [ -z "$current_version" ]; then
-          echo "::error::Could not parse the project version from the base or current pyproject.toml."
-          exit 1
-        fi
-        if [ "$base_version" = "$current_version" ]; then
-          echo "changed=false" >> "$GITHUB_OUTPUT"
+        changed_files="$(git -c core.quotePath=false diff --name-only --diff-filter=ACMRD \
+          "${{ github.event.pull_request.base.sha }}" \
+          "${{ github.event.pull_request.head.sha }}")"
+        policy_result="$(printf '%s\n' "$changed_files" | \
+          bash .github/scripts/check-version-policy.sh "$base_version" "$current_version")"
+        echo "$policy_result" >> "$GITHUB_OUTPUT"
+        if [ "$policy_result" = "changed=false" ]; then
           echo "Project version remains $current_version; skipping the PyPI availability check."
         else
-          echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "Project version changed from $base_version to $current_version."
         fi
 
