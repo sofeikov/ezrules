@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 POLICY_SCRIPT = Path(__file__).parents[1] / ".github" / "scripts" / "check-version-policy.sh"
+CHANGED_FILES_SCRIPT = Path(__file__).parents[1] / ".github" / "scripts" / "list-pr-changes.sh"
 
 
 def _run_policy(base_version: str, current_version: str, changed_paths: list[str]) -> subprocess.CompletedProcess[str]:
@@ -16,6 +17,33 @@ def _run_policy(base_version: str, current_version: str, changed_paths: list[str
         check=False,
         text=True,
     )
+
+
+def _git(repo: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def _commit_file(repo: Path, path: str, content: str, message: str) -> None:
+    target = repo / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content)
+    _git(repo, "add", path)
+    _git(repo, "commit", "-m", message)
+
+
+def _initialize_repo(repo: Path) -> None:
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.name", "Version Policy Test")
+    _git(repo, "config", "user.email", "version-policy@example.com")
+    _commit_file(repo, "README.md", "initial\n", "initial")
 
 
 def test_unchanged_version_allows_explicit_non_release_paths() -> None:
@@ -76,3 +104,53 @@ def test_missing_version_fails_closed(base_version: str, current_version: str) -
     assert result.returncode == 2
     assert result.stdout == ""
     assert "Could not parse" in result.stderr
+
+
+def test_pr_changes_use_merge_base_when_feature_branch_is_behind_main(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _initialize_repo(repo)
+    _git(repo, "branch", "feature")
+
+    _commit_file(repo, "ezrules/main_only.py", "released = True\n", "main release")
+    base_sha = _git(repo, "rev-parse", "main")
+
+    _git(repo, "checkout", "feature")
+    _commit_file(repo, "docs/pr-only.md", "documentation\n", "docs only")
+    head_sha = _git(repo, "rev-parse", "feature")
+
+    changed = subprocess.run(
+        ["bash", str(CHANGED_FILES_SCRIPT), base_sha, head_sha],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+
+    assert changed.stdout.splitlines() == ["docs/pr-only.md"]
+    policy = _run_policy("1.29.0", "1.29.0", changed.stdout.splitlines())
+    assert policy.returncode == 0
+    assert policy.stdout.strip() == "changed=false"
+
+
+def test_pr_changes_include_deleted_paths_without_git_quoting(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _initialize_repo(repo)
+    _commit_file(repo, "ezrules/retiré.py", "retired = True\n", "add unicode path")
+    _git(repo, "branch", "feature")
+    base_sha = _git(repo, "rev-parse", "main")
+
+    _git(repo, "checkout", "feature")
+    (repo / "ezrules" / "retiré.py").unlink()
+    _git(repo, "add", "--all")
+    _git(repo, "commit", "-m", "remove unicode path")
+    head_sha = _git(repo, "rev-parse", "feature")
+
+    changed = subprocess.run(
+        ["bash", str(CHANGED_FILES_SCRIPT), base_sha, head_sha],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+
+    assert changed.stdout.splitlines() == ["ezrules/retiré.py"]
