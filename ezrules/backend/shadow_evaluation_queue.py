@@ -6,6 +6,7 @@ from functools import lru_cache
 from typing import Any
 
 from redis import Redis
+from sqlalchemy.dialects.postgresql import insert
 
 from ezrules.backend.reliable_redis_queue import ReliableRedisQueue
 from ezrules.backend.runtime_settings import get_main_rule_execution_mode
@@ -142,50 +143,31 @@ def _persist_shadow_results(payload: dict[str, Any]) -> int:
     try:
         for r_id, rule_result in shadow_result.get("all_rule_results", {}).items():
             normalized_rule_id = int(r_id)
-            shadow_result_exists = (
-                db_session.query(ShadowResultsLog.sr_id)
-                .filter(
-                    ShadowResultsLog.ed_id == evaluation_decision_id,
-                    ShadowResultsLog.r_id == normalized_rule_id,
-                )
-                .first()
-                is not None
+            production_result = production_all_rule_results.get(normalized_rule_id)
+            shadow_insert = insert(ShadowResultsLog).values(
+                ed_id=evaluation_decision_id,
+                r_id=normalized_rule_id,
+                rule_result=str(rule_result),
             )
-            deployment_result_exists = (
-                db_session.query(RuleDeploymentResultsLog.dr_id)
-                .filter(
-                    RuleDeploymentResultsLog.ed_id == evaluation_decision_id,
-                    RuleDeploymentResultsLog.r_id == normalized_rule_id,
-                    RuleDeploymentResultsLog.mode == DEPLOYMENT_MODE_SHADOW,
-                )
-                .first()
-                is not None
+            shadow_insert = shadow_insert.on_conflict_do_nothing(constraint="uq_shadow_results_log_ed_rule")
+            deployment_insert = insert(RuleDeploymentResultsLog).values(
+                ed_id=evaluation_decision_id,
+                r_id=normalized_rule_id,
+                o_id=o_id,
+                mode=DEPLOYMENT_MODE_SHADOW,
+                selected_variant=DEPLOYMENT_VARIANT_CONTROL,
+                traffic_percent=None,
+                bucket=None,
+                control_result=str(production_result) if production_result is not None else None,
+                candidate_result=str(rule_result) if rule_result is not None else None,
+                returned_result=str(production_result) if production_result is not None else None,
             )
-            if not shadow_result_exists:
-                db_session.add(
-                    ShadowResultsLog(
-                        ed_id=evaluation_decision_id,
-                        r_id=normalized_rule_id,
-                        rule_result=str(rule_result),
-                    )
-                )
-            if not deployment_result_exists:
-                production_result = production_all_rule_results.get(normalized_rule_id)
-                db_session.add(
-                    RuleDeploymentResultsLog(
-                        ed_id=evaluation_decision_id,
-                        r_id=normalized_rule_id,
-                        o_id=o_id,
-                        mode=DEPLOYMENT_MODE_SHADOW,
-                        selected_variant=DEPLOYMENT_VARIANT_CONTROL,
-                        traffic_percent=None,
-                        bucket=None,
-                        control_result=str(production_result) if production_result is not None else None,
-                        candidate_result=str(rule_result) if rule_result is not None else None,
-                        returned_result=str(production_result) if production_result is not None else None,
-                    )
-                )
-            if not shadow_result_exists or not deployment_result_exists:
+            deployment_insert = deployment_insert.on_conflict_do_nothing(
+                constraint="uq_rule_deployment_results_log_ed_rule_mode"
+            )
+            shadow_result_row = db_session.execute(shadow_insert)
+            deployment_result_row = db_session.execute(deployment_insert)
+            if shadow_result_row.rowcount or deployment_result_row.rowcount:
                 persisted_logs += 1
         db_session.commit()
     except Exception:

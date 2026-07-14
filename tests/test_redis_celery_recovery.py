@@ -32,6 +32,7 @@ from ezrules.models.backend_core import (
     Organisation,
     RuleBackTestingResult,
     RuleDeploymentResultsLog,
+    RuleQualityReport,
     ShadowResultsLog,
 )
 from ezrules.models.backend_core import (
@@ -82,6 +83,9 @@ def _cleanup_database() -> None:
         session.query(RuleBackTestingResult).filter(
             RuleBackTestingResult.task_id.like(f"{RECOVERY_TRANSACTION_PREFIX}%")
         ).delete(synchronize_session=False)
+        session.query(RuleQualityReport).filter(RuleQualityReport.requested_by == RECOVERY_TRANSACTION_PREFIX).delete(
+            synchronize_session=False
+        )
         if recovery_rule_ids:
             session.query(RuleDeploymentResultsLog).filter(RuleDeploymentResultsLog.r_id.in_(recovery_rule_ids)).delete(
                 synchronize_session=False
@@ -349,6 +353,37 @@ def test_cancelled_backtest_is_revoked_by_broker_and_stays_cancelled(reset_recov
         record = session.query(RuleBackTestingResult).filter(RuleBackTestingResult.task_id == task_id).one()
         assert record.status == BACKTEST_QUEUE_CANCELLED
         assert record.result_metrics == {"error": "Backtest cancelled by operator"}
+
+
+def test_completed_quality_report_is_not_recomputed_on_redelivery(reset_recovery_state: Redis):
+    del reset_recovery_state
+    completed_at = datetime.now(UTC)
+    with _session_scope() as session:
+        report = RuleQualityReport(
+            status="SUCCESS",
+            min_support=1,
+            lookback_days=30,
+            freeze_at=completed_at,
+            max_decision_id=0,
+            pair_set_hash="",
+            pair_set=[],
+            requested_by=RECOVERY_TRANSACTION_PREFIX,
+            result={"sentinel": "already-computed"},
+            completed_at=completed_at,
+            o_id=RECOVERY_ORG_ID,
+        )
+        session.add(report)
+        session.flush()
+        report_id = int(report.rqr_id)
+
+    assert generate_rule_quality_report.apply_async(args=[report_id]).get(timeout=30) == {"status": "SUCCESS"}
+
+    with _session_scope() as session:
+        report = session.get(RuleQualityReport, report_id)
+        assert report is not None
+        assert report.status == "SUCCESS"
+        assert report.result == {"sentinel": "already-computed"}
+        assert report.completed_at == completed_at
 
 
 def test_worker_recovery_configuration_uses_late_acknowledgements(reset_recovery_state: Redis):

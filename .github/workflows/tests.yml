@@ -142,7 +142,7 @@ jobs:
         exit 1
 
     - name: Run Redis/Celery smoke tests
-      run: uv run pytest -q tests/test_redis_celery_smoke.py
+      run: uv run pytest -q tests/test_redis_celery_smoke.py tests/test_redis_celery_recovery.py
 
     - name: Show Celery worker log on failure
       if: failure()

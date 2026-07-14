@@ -301,6 +301,8 @@ def generate_rule_quality_report(report_id: int) -> dict[str, str]:
     report = db_session.get(RuleQualityReport, report_id)
     if report is None:
         return {"error": f"Rule quality report {report_id} not found"}
+    if report.status == "SUCCESS":
+        return {"status": "SUCCESS"}
 
     try:
         report.status = "RUNNING"
