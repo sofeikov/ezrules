@@ -8,7 +8,7 @@ from ezrules.backend.api_v2.schemas.rules import RuleVerifyError, RuleVerifyResp
 from ezrules.backend.features import extract_rule_stat_paths, validate_feature_reference_budget
 from ezrules.backend.runtime_settings import get_neutral_outcome
 from ezrules.core.outcomes import DatabaseOutcome
-from ezrules.core.rule import OutcomeReturnSyntaxError, Rule
+from ezrules.core.rule import OutcomeReturnSyntaxError, ReservedRuleIdentifierError, Rule
 from ezrules.core.rule_checkers import AllowedOutcomeReturnVisitor
 from ezrules.core.rule_helpers import OutcomeReferenceExtractor, UserListReferenceExtractor
 from ezrules.core.rule_updater import RULE_EVALUATION_LANE_ALLOWLIST, RULE_EVALUATION_LANE_MAIN
@@ -234,6 +234,27 @@ def validate_rule_source(
                 referenced_features=referenced_features,
                 warnings=warnings,
                 errors=[],
+            ),
+        )
+    except ReservedRuleIdentifierError as exc:
+        return RuleValidationResult(
+            compiled_rule=None,
+            response=RuleVerifyResponse(
+                valid=False,
+                params=[],
+                referenced_lists=referenced_lists,
+                referenced_outcomes=referenced_outcomes,
+                referenced_features=referenced_features,
+                warnings=[],
+                errors=[
+                    build_verify_error(
+                        message=str(exc),
+                        line=exc.lineno,
+                        column=exc.offset,
+                        end_line=exc.end_lineno,
+                        end_column=exc.end_offset,
+                    )
+                ],
             ),
         )
     except OutcomeReturnSyntaxError as exc:

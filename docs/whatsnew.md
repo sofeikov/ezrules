@@ -2,7 +2,7 @@
 
 ## v1.29.1
 
-* **Strict rule authoring results**: Rule verification and save flows now accept only no result (`None`, a bare return, or fall-through) or a direct configured `return !OUTCOME`; predicates, numbers, containers, dynamic strings, and other expressions are rejected with source diagnostics.
+* **Strict rule authoring results**: Rule verification and save flows now accept only no result (`None`, a bare return, or fall-through) or a direct configured `return !OUTCOME`; predicates, numbers, containers, dynamic strings, generator syntax, reserved internal helpers, and other expressions are rejected with source diagnostics.
 * **Fail-fast rule outcome contract**: Rule-set evaluation now rejects malformed boolean, numeric, empty, container, and callable results before aggregation instead of producing corrupt counters or partial decisions.
 * **Stable rule-engine results**: Empty and non-matching rule sets retain one documented result shape, zero-valued database rule identifiers remain intact, duplicate identifiers fail before execution, and unsupported execution modes can no longer silently fall back to all-matches behavior.
 

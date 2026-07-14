@@ -1,4 +1,6 @@
 import ast
+import io
+import tokenize
 from collections.abc import Callable
 from typing import Any, NamedTuple
 
@@ -93,6 +95,7 @@ class Rule:
     @logic.setter
     def logic(self, logic):
         """Compile the code."""
+        validate_reserved_rule_identifiers(logic)
         # Build a fresh converter per compilation to avoid shared parser state
         # across concurrent API requests.
         post_proc_logic = DollarNotationConverter().transform_rule(logic)
@@ -241,6 +244,50 @@ class OutcomeReturnSyntaxError(SyntaxError):
         super().__init__(message)
 
 
+class RuleGeneratorSyntaxError(OutcomeReturnSyntaxError):
+    """Raised when the outer rule body contains generator syntax."""
+
+    def __init__(self, line: int, column: int, end_column: int):
+        self.outcome_name = ""
+        self.lineno = line
+        self.offset = column
+        self.end_lineno = line
+        self.end_offset = end_column
+        SyntaxError.__init__(
+            self,
+            "Rules cannot use `yield` or `yield from`; return `None` or a direct configured `!OUTCOME`.",
+        )
+
+
+class ReservedRuleIdentifierError(SyntaxError):
+    """Raised when user source references a helper reserved for DSL conversion."""
+
+    def __init__(self, identifier: str, line: int, column: int, end_column: int):
+        self.identifier = identifier
+        self.lineno = line
+        self.offset = column
+        self.end_lineno = line
+        self.end_offset = end_column
+        super().__init__(f"Identifier '{identifier}' is reserved; use direct `return !OUTCOME` syntax.")
+
+
+def validate_reserved_rule_identifiers(rule_source: str) -> None:
+    """Reject executable references to internal helpers before DSL conversion introduces them."""
+    try:
+        tokens = tokenize.generate_tokens(io.StringIO(rule_source).readline)
+        for token in tokens:
+            if token.type == tokenize.NAME and token.string == OUTCOME_HELPER_NAME:
+                raise ReservedRuleIdentifierError(
+                    identifier=token.string,
+                    line=token.start[0],
+                    column=token.start[1] + 1,
+                    end_column=token.end[1] + 1,
+                )
+    except (IndentationError, tokenize.TokenError):
+        # Compilation reports malformed source with the existing structured diagnostics.
+        return
+
+
 class RuleReturnContractValidator(ast.NodeVisitor):
     """Validate the result boundary applied to persisted and deployed rules."""
 
@@ -277,6 +324,21 @@ class RuleReturnContractValidator(ast.NodeVisitor):
             line=node.value.lineno,
             column=node.value.col_offset + 1,
             end_column=node.value.end_col_offset or (node.value.col_offset + 1),
+        )
+
+    def visit_Yield(self, node: ast.Yield) -> Any:
+        return self._reject_outer_generator_syntax(node)
+
+    def visit_YieldFrom(self, node: ast.YieldFrom) -> Any:
+        return self._reject_outer_generator_syntax(node)
+
+    def _reject_outer_generator_syntax(self, node: ast.Yield | ast.YieldFrom) -> Any:
+        if self._function_depth != 1:
+            return node
+        raise RuleGeneratorSyntaxError(
+            line=node.lineno,
+            column=node.col_offset + 1,
+            end_column=node.end_col_offset or (node.col_offset + 1),
         )
 
 
