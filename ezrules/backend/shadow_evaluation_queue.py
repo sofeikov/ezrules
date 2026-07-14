@@ -7,6 +7,7 @@ from typing import Any
 
 from redis import Redis
 
+from ezrules.backend.reliable_redis_queue import ReliableRedisQueue
 from ezrules.backend.runtime_settings import get_main_rule_execution_mode
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
 from ezrules.core.rule_engine import RULE_EXECUTION_MODE_ALL_MATCHES, RuleEngineFactory
@@ -103,20 +104,6 @@ def enqueue_shadow_evaluation(
     return True
 
 
-def _normalize_batch(raw_batch: str | list[str] | None) -> list[str]:
-    if raw_batch is None:
-        return []
-    if isinstance(raw_batch, list):
-        return raw_batch
-    return [raw_batch]
-
-
-def _requeue_payloads(payloads: list[str]) -> None:
-    if not payloads:
-        return
-    get_shadow_evaluation_queue_client().rpush(app_settings.SHADOW_EVALUATION_QUEUE_KEY, *reversed(payloads))
-
-
 def _parse_enqueued_at(raw_value: Any) -> datetime | None:
     if raw_value is None:
         return None
@@ -154,32 +141,52 @@ def _persist_shadow_results(payload: dict[str, Any]) -> int:
     persisted_logs = 0
     try:
         for r_id, rule_result in shadow_result.get("all_rule_results", {}).items():
-            db_session.add(
-                ShadowResultsLog(
-                    ed_id=evaluation_decision_id,
-                    r_id=int(r_id),
-                    rule_result=str(rule_result),
+            normalized_rule_id = int(r_id)
+            shadow_result_exists = (
+                db_session.query(ShadowResultsLog.sr_id)
+                .filter(
+                    ShadowResultsLog.ed_id == evaluation_decision_id,
+                    ShadowResultsLog.r_id == normalized_rule_id,
                 )
+                .first()
+                is not None
             )
-            db_session.add(
-                RuleDeploymentResultsLog(
-                    ed_id=evaluation_decision_id,
-                    r_id=int(r_id),
-                    o_id=o_id,
-                    mode=DEPLOYMENT_MODE_SHADOW,
-                    selected_variant=DEPLOYMENT_VARIANT_CONTROL,
-                    traffic_percent=None,
-                    bucket=None,
-                    control_result=str(production_all_rule_results.get(int(r_id)))
-                    if production_all_rule_results.get(int(r_id)) is not None
-                    else None,
-                    candidate_result=str(rule_result) if rule_result is not None else None,
-                    returned_result=str(production_all_rule_results.get(int(r_id)))
-                    if production_all_rule_results.get(int(r_id)) is not None
-                    else None,
+            deployment_result_exists = (
+                db_session.query(RuleDeploymentResultsLog.dr_id)
+                .filter(
+                    RuleDeploymentResultsLog.ed_id == evaluation_decision_id,
+                    RuleDeploymentResultsLog.r_id == normalized_rule_id,
+                    RuleDeploymentResultsLog.mode == DEPLOYMENT_MODE_SHADOW,
                 )
+                .first()
+                is not None
             )
-            persisted_logs += 1
+            if not shadow_result_exists:
+                db_session.add(
+                    ShadowResultsLog(
+                        ed_id=evaluation_decision_id,
+                        r_id=normalized_rule_id,
+                        rule_result=str(rule_result),
+                    )
+                )
+            if not deployment_result_exists:
+                production_result = production_all_rule_results.get(normalized_rule_id)
+                db_session.add(
+                    RuleDeploymentResultsLog(
+                        ed_id=evaluation_decision_id,
+                        r_id=normalized_rule_id,
+                        o_id=o_id,
+                        mode=DEPLOYMENT_MODE_SHADOW,
+                        selected_variant=DEPLOYMENT_VARIANT_CONTROL,
+                        traffic_percent=None,
+                        bucket=None,
+                        control_result=str(production_result) if production_result is not None else None,
+                        candidate_result=str(rule_result) if rule_result is not None else None,
+                        returned_result=str(production_result) if production_result is not None else None,
+                    )
+                )
+            if not shadow_result_exists or not deployment_result_exists:
+                persisted_logs += 1
         db_session.commit()
     except Exception:
         db_session.rollback()
@@ -222,10 +229,14 @@ def drain_shadow_evaluation_queue(
     drained_batches = 0
     drained_messages = 0
     max_enqueue_lag_seconds = 0
+    queue = ReliableRedisQueue(client, app_settings.SHADOW_EVALUATION_QUEUE_KEY)
 
     try:
+        recovered = queue.recover()
+        if recovered:
+            logger.warning("Recovered %s interrupted shadow-evaluation messages", recovered)
         for _ in range(effective_max_batches):
-            payloads = _normalize_batch(client.rpop(app_settings.SHADOW_EVALUATION_QUEUE_KEY, effective_batch_size))
+            payloads = queue.reserve(effective_batch_size)
             if not payloads:
                 break
 
@@ -234,9 +245,11 @@ def drain_shadow_evaluation_queue(
                 for payload in payloads:
                     _persist_shadow_results(json.loads(payload))
             except Exception:
-                _requeue_payloads(payloads)
+                db_session.rollback()
+                queue.restore(payloads)
                 raise
 
+            queue.acknowledge(payloads)
             drained_batches += 1
             drained_messages += len(payloads)
             if len(payloads) < effective_batch_size:

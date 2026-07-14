@@ -93,6 +93,13 @@ jobs:
       EZRULES_OBSERVATION_QUEUE_REDIS_URL: redis://localhost:6379/0
       EZRULES_OBSERVATION_QUEUE_KEY: ezrules:ci:field_observation_queue
       EZRULES_OBSERVATION_QUEUE_LOCK_KEY: ezrules:ci:field_observation_queue:lock
+      EZRULES_OBSERVATION_QUEUE_DRAIN_BATCH_SIZE: "1"
+      EZRULES_OBSERVATION_QUEUE_MAX_BATCHES_PER_DRAIN: "10"
+      EZRULES_SHADOW_EVALUATION_QUEUE_REDIS_URL: redis://localhost:6379/0
+      EZRULES_SHADOW_EVALUATION_QUEUE_KEY: ezrules:ci:shadow_evaluation_queue
+      EZRULES_SHADOW_EVALUATION_QUEUE_LOCK_KEY: ezrules:ci:shadow_evaluation_queue:lock
+      EZRULES_SHADOW_EVALUATION_QUEUE_DRAIN_BATCH_SIZE: "1"
+      EZRULES_SHADOW_EVALUATION_QUEUE_MAX_BATCHES_PER_DRAIN: "10"
       EZRULES_LIVE_REDIS_CELERY_SMOKE: "true"
 
     steps:
@@ -114,21 +121,24 @@ jobs:
     - name: Apply database migrations
       run: uv run alembic upgrade head
 
-    - name: Start Celery worker
+    - name: Start Celery workers
       run: |
-        nohup uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo --concurrency=1 > /tmp/ezrules-worker.log 2>&1 &
-        echo $! > /tmp/ezrules-worker.pid
+        nohup uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo --concurrency=1 -n recovery-a@%h > /tmp/ezrules-worker-a.log 2>&1 &
+        echo $! > /tmp/ezrules-worker-a.pid
+        nohup uv run celery -A ezrules.backend.tasks worker -l INFO --pool=solo --concurrency=1 -n recovery-b@%h > /tmp/ezrules-worker-b.log 2>&1 &
+        echo $! > /tmp/ezrules-worker-b.pid
 
-    - name: Wait for Celery worker
+    - name: Wait for Celery workers
       run: |
         for i in {1..30}; do
-          if uv run celery -A ezrules.backend.tasks inspect ping --timeout=5 | grep -q "pong"; then
+          if [ "$(uv run celery -A ezrules.backend.tasks inspect ping --timeout=5 | grep -c "pong" || true)" -ge 2 ]; then
             exit 0
           fi
           sleep 2
         done
-        echo "Worker did not become ready in time"
-        cat /tmp/ezrules-worker.log || true
+        echo "Workers did not become ready in time"
+        cat /tmp/ezrules-worker-a.log || true
+        cat /tmp/ezrules-worker-b.log || true
         exit 1
 
     - name: Run Redis/Celery smoke tests
@@ -136,11 +146,15 @@ jobs:
 
     - name: Show Celery worker log on failure
       if: failure()
-      run: cat /tmp/ezrules-worker.log || true
+      run: |
+        cat /tmp/ezrules-worker-a.log || true
+        cat /tmp/ezrules-worker-b.log || true
 
-    - name: Stop Celery worker
+    - name: Stop Celery workers
       if: always()
       run: |
-        if [ -f /tmp/ezrules-worker.pid ]; then
-          kill "$(cat /tmp/ezrules-worker.pid)" || true
-        fi
+        for pid_file in /tmp/ezrules-worker-a.pid /tmp/ezrules-worker-b.pid; do
+          if [ -f "$pid_file" ]; then
+            kill "$(cat "$pid_file")" || true
+          fi
+        done

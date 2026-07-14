@@ -1,5 +1,11 @@
 # What's New
 
+## v1.29.1
+
+* **Recoverable asynchronous delivery**: Celery now acknowledges application tasks only after completion and requeues work when a worker is lost, while Redis-backed observation and shadow drains recover messages left in processing by interrupted workers.
+* **Idempotent shadow replay**: Duplicate shadow deliveries no longer create duplicate shadow or deployment-result ledger rows.
+* **Real multi-worker verification**: CI starts two Redis-backed Celery workers, executes every registered application task through the broker, and checks duplicate delivery, rollback, cancellation, orphan recovery, and queue locking contracts.
+
 ## v1.29.0
 
 * **Alert-backed case review**: Outcome-spike incidents now attach every contributing current evaluation to its existing case, preserving one assignment, notes, disposition, and audit workflow instead of introducing a parallel alert queue.

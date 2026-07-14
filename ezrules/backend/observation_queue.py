@@ -1,10 +1,10 @@
 import json
 import logging
-from collections.abc import Iterable
 from functools import lru_cache
 
 from redis import Redis
 
+from ezrules.backend.reliable_redis_queue import ReliableRedisQueue
 from ezrules.backend.utils import upsert_field_observations
 from ezrules.core.field_paths import iter_field_paths
 from ezrules.models.database import db_session
@@ -55,16 +55,8 @@ def enqueue_observations(event_data: dict, o_id: int) -> bool:
     return True
 
 
-def _normalize_batch(raw_batch: str | list[str] | None) -> list[str]:
-    if raw_batch is None:
-        return []
-    if isinstance(raw_batch, list):
-        return raw_batch
-    return [raw_batch]
-
-
 def _aggregate_payloads(
-    payloads: Iterable[str],
+    payloads: list[str],
 ) -> list[dict[str, str | int]]:
     observation_keys: set[ObservationKey] = set()
 
@@ -91,12 +83,6 @@ def _aggregate_payloads(
     ]
 
 
-def _requeue_payloads(payloads: list[str]) -> None:
-    if not payloads:
-        return
-    get_observation_queue_client().rpush(app_settings.OBSERVATION_QUEUE_KEY, *reversed(payloads))
-
-
 def drain_observation_queue(
     *,
     batch_size: int | None = None,
@@ -115,10 +101,14 @@ def drain_observation_queue(
     effective_max_batches = max_batches or app_settings.OBSERVATION_QUEUE_MAX_BATCHES_PER_DRAIN
     drained_batches = 0
     drained_messages = 0
+    queue = ReliableRedisQueue(client, app_settings.OBSERVATION_QUEUE_KEY)
 
     try:
+        recovered = queue.recover()
+        if recovered:
+            logger.warning("Recovered %s interrupted field-observation messages", recovered)
         for _ in range(effective_max_batches):
-            payloads = _normalize_batch(client.rpop(app_settings.OBSERVATION_QUEUE_KEY, effective_batch_size))
+            payloads = queue.reserve(effective_batch_size)
             if not payloads:
                 break
 
@@ -131,9 +121,10 @@ def drain_observation_queue(
                     )
             except Exception:
                 db_session.rollback()
-                _requeue_payloads(payloads)
+                queue.restore(payloads)
                 raise
 
+            queue.acknowledge(payloads)
             drained_batches += 1
             drained_messages += len(payloads)
             if len(payloads) < effective_batch_size:
