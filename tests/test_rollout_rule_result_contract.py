@@ -31,6 +31,7 @@ def _evaluate_direct_rollout(session, active_rule, *, candidate_logic: str) -> t
         description_override="Candidate contract test",
     )
     lre = LocalRuleExecutorSQL(db=session, o_id=int(active_rule.o_id), label="production")
+    lre.get_rule_stats()
     result, logs, _metadata = _evaluate_rollout_result(
         event_data={"amount": 200},
         lre=lre,

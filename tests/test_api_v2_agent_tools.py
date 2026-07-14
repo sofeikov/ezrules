@@ -52,6 +52,7 @@ def agent_tools_client(session):
 @pytest.fixture(scope="function")
 def agent_tools_fixture(session):
     org = session.query(Organisation).filter(Organisation.o_id == 1).one()
+    ensure_allowed_outcomes(session, org_id=int(org.o_id), outcome_names=["HOLD"])
     fraud_label = Label(label="FRAUD", o_id=int(org.o_id))
     normal_label = Label(label="NORMAL", o_id=int(org.o_id))
     session.add_all([fraud_label, normal_label])
