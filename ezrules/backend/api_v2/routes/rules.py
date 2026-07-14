@@ -1425,10 +1425,18 @@ def deploy_to_shadow(
         RULE_EVALUATION_LANE_ALLOWLIST
     ):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Allowlist rules cannot be deployed")
-    if request.logic is not None:
-        outcome_errors = build_outcome_notation_errors(db, current_org_id, request.logic)
-        if outcome_errors:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=outcome_errors[0].message)
+    candidate_logic = request.logic if request.logic is not None else str(rule.logic)
+    candidate_description = request.description if request.description is not None else str(rule.description)
+    try:
+        compile_validated_rule_source(
+            db,
+            current_org_id,
+            candidate_logic,
+            rid=str(rule.rid),
+            description=candidate_description,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     try:
         deploy_rule_to_shadow(
@@ -1478,6 +1486,15 @@ def promote_to_production(
     """Promote a rule from shadow config into the production config."""
     from ezrules.backend.api_v2.routes import evaluator as evaluator_module
 
+    def validate_stored_candidate(deployment_entry: dict[str, Any]) -> None:
+        compile_validated_rule_source(
+            db,
+            current_org_id,
+            str(deployment_entry["logic"]),
+            rid=str(deployment_entry.get("rid") or rule_id),
+            description=str(deployment_entry.get("description") or ""),
+        )
+
     try:
         promote_shadow_rule_to_production(
             db,
@@ -1485,6 +1502,7 @@ def promote_to_production(
             r_id=rule_id,
             changed_by=str(user.email),
             approved_by=int(user.id),
+            validate_candidate=validate_stored_candidate,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e

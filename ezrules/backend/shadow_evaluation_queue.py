@@ -9,7 +9,7 @@ from redis import Redis
 
 from ezrules.backend.runtime_settings import get_main_rule_execution_mode
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
-from ezrules.core.rule_engine import RULE_EXECUTION_MODE_ALL_MATCHES, RuleEngineFactory
+from ezrules.core.rule_engine import RULE_EXECUTION_MODE_ALL_MATCHES, InvalidRuleResultError, RuleEngineFactory
 from ezrules.core.rule_updater import (
     DEPLOYMENT_MODE_SHADOW,
     DEPLOYMENT_VARIANT_CONTROL,
@@ -230,12 +230,20 @@ def drain_shadow_evaluation_queue(
                 break
 
             max_enqueue_lag_seconds = max(max_enqueue_lag_seconds, _max_enqueue_lag_seconds(payloads))
-            try:
-                for payload in payloads:
-                    _persist_shadow_results(json.loads(payload))
-            except Exception:
-                _requeue_payloads(payloads)
-                raise
+            for index, payload in enumerate(payloads):
+                try:
+                    parsed_payload = json.loads(payload)
+                    _persist_shadow_results(parsed_payload)
+                except (InvalidRuleResultError, SyntaxError):
+                    logger.exception(
+                        "Dropping shadow evaluation with an invalid rule contract for event_id=%s org_id=%s",
+                        parsed_payload.get("event_id"),
+                        parsed_payload.get("o_id"),
+                    )
+                    continue
+                except Exception:
+                    _requeue_payloads(payloads[index:])
+                    raise
 
             drained_batches += 1
             drained_messages += len(payloads)

@@ -1,6 +1,7 @@
 import datetime
 from abc import ABC, abstractmethod
 from collections import namedtuple
+from collections.abc import Callable
 from typing import Any, cast
 
 from sqlalchemy.exc import NoResultFound
@@ -442,6 +443,7 @@ def promote_candidate_deployment_to_production(
     label: str,
     changed_by: str | None = None,
     approved_by: int | None = None,
+    validate_candidate: Callable[[dict[str, Any]], None] | None = None,
 ) -> None:
     config_obj = get_deployment_config(db, o_id=o_id, label=label, for_update=True)
     if config_obj is None:
@@ -454,6 +456,17 @@ def promote_candidate_deployment_to_production(
     rule = db.query(RuleModel).filter(RuleModel.r_id == r_id, RuleModel.o_id == o_id).first()
     if rule is None:
         raise ValueError(f"Rule {r_id} does not exist")
+
+    try:
+        candidate_rule = RuleFactory.from_json(
+            deployment_entry,
+            list_values_provider=PersistentUserListManager(db_session=db, o_id=o_id),
+        )
+        candidate_rule.validate_return_contract()
+    except (KeyError, SyntaxError) as exc:
+        raise ValueError(f"Invalid {label} candidate rule: {exc!s}") from exc
+    if validate_candidate is not None:
+        validate_candidate(deployment_entry)
 
     promoted_at = datetime.datetime.now(datetime.UTC)
     save_rule_history(
@@ -522,6 +535,7 @@ def promote_shadow_rule_to_production(
     r_id: int,
     changed_by: str | None = None,
     approved_by: int | None = None,
+    validate_candidate: Callable[[dict[str, Any]], None] | None = None,
 ) -> None:
     """Promote a rule from the shadow config into the production config.
 
@@ -534,6 +548,7 @@ def promote_shadow_rule_to_production(
         label=SHADOW_CONFIG_LABEL,
         changed_by=changed_by,
         approved_by=approved_by,
+        validate_candidate=validate_candidate,
     )
 
 

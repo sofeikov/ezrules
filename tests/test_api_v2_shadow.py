@@ -26,8 +26,9 @@ from ezrules.core.rule_updater import (
     RDBRuleManager,
     deploy_rule_to_shadow,
 )
-from ezrules.models.backend_core import AllowedOutcome, Organisation, Role, Rule as RuleModel
-from ezrules.models.backend_core import RuleEngineConfig, ShadowResultsLog, User
+from ezrules.models.backend_core import AllowedOutcome, Organisation, Role, RuleEngineConfig, ShadowResultsLog, User
+from ezrules.models.backend_core import Rule as RuleModel
+from tests.canonical_helpers import ensure_allowed_outcomes
 
 
 class FakeRedisLock:
@@ -89,7 +90,7 @@ class FakeRedis:
 @pytest.fixture(scope="function")
 def shadow_test_client(session):
     """Create a FastAPI test client with shadow-management and promotion permissions."""
-    hashed_password = bcrypt.hashpw("shadowpass".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    hashed_password = bcrypt.hashpw(b"shadowpass", bcrypt.gensalt()).decode("utf-8")
 
     org = session.query(Organisation).filter(Organisation.o_id == 1).first()
     if not org:
@@ -169,6 +170,8 @@ def shadow_rule(session):
         org = Organisation(o_id=1, name="Test Org")
         session.add(org)
         session.commit()
+
+    ensure_allowed_outcomes(session, org_id=int(org.o_id), outcome_names=["REVIEW", "SHADOW_OUTCOME"])
 
     rule = RuleModel(
         rid="shadow_test_rule",
@@ -505,7 +508,7 @@ class TestPromoteFromShadow:
 
     def test_promote_rule_without_promote_permission_returns_403(self, session, shadow_rule):
         """MODIFY_RULE alone should not allow promoting a shadow rule."""
-        hashed_password = bcrypt.hashpw("shadownopromote".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        hashed_password = bcrypt.hashpw(b"shadownopromote", bcrypt.gensalt()).decode("utf-8")
 
         role = session.query(Role).filter(Role.name == "shadow_modify_only").first()
         if not role:
