@@ -15,9 +15,8 @@ from ezrules.backend.api_v2.schemas.agent_tools import (
     RuleCounterexamplesRequest,
     RuleCounterexamplesResponse,
 )
+from ezrules.backend.rule_validation import compile_validated_rule_source
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.core.rule import Rule
-from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import User
 
 router = APIRouter(prefix="/api/v2/agent-tools", tags=["Agent Tools"])
@@ -25,7 +24,7 @@ router = APIRouter(prefix="/api/v2/agent-tools", tags=["Agent Tools"])
 
 def _validate_rule_logic(db: Any, org_id: int, logic: str) -> None:
     try:
-        Rule(rid="", logic=logic, list_values_provider=PersistentUserListManager(db, org_id))
+        compile_validated_rule_source(db, org_id, logic)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

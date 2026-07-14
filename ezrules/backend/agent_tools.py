@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from ezrules.backend.features import FeatureResolutionError, FeatureResolver
+from ezrules.backend.rule_validation import compile_validated_rule_source
 from ezrules.backend.utils import load_cast_configs
 from ezrules.core.field_paths import get_field_value
 from ezrules.core.rule import MissingFieldLookupError, MissingStatLookupError, Rule, RuleFactory
@@ -116,7 +117,7 @@ def _compile_rules(
     stored_rule = RuleFactory.from_json(rule_model.__dict__, list_values_provider=list_provider)
     proposed_rule = None
     if proposed_logic is not None:
-        proposed_rule = Rule(rid="", logic=proposed_logic, list_values_provider=list_provider)
+        proposed_rule = compile_validated_rule_source(db, org_id, proposed_logic)
     return stored_rule, proposed_rule
 
 

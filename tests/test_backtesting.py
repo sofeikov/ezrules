@@ -191,7 +191,7 @@ class TestBacktestPostEndpoint:
             headers={"Authorization": f"Bearer {token}"},
             json={
                 "r_id": sample_rule_for_bt.r_id,
-                "new_rule_logic": "return True",
+                "new_rule_logic": "return !BLOCK",
             },
         )
 

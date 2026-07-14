@@ -22,6 +22,31 @@ class RuleValidationResult:
     response: RuleVerifyResponse
 
 
+def compile_validated_rule_source(
+    db: Any,
+    org_id: int,
+    rule_source: str,
+    *,
+    evaluation_lane: str = RULE_EVALUATION_LANE_MAIN,
+    rid: str = "",
+    description: str = "",
+) -> Rule:
+    """Compile rule source only after applying the complete persisted-rule contract."""
+    result = validate_rule_source(
+        db,
+        org_id,
+        rule_source,
+        evaluation_lane=evaluation_lane,
+        rid=rid,
+        description=description,
+    )
+    if result.response.valid and result.compiled_rule is not None:
+        return result.compiled_rule
+
+    messages = [error.message for error in result.response.errors if error.message]
+    raise ValueError("; ".join(messages) or "Rule source is invalid")
+
+
 def get_list_provider(db: Any, org_id: int) -> PersistentUserListManager:
     return PersistentUserListManager(db_session=db, o_id=org_id)
 

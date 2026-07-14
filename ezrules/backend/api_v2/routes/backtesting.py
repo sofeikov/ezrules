@@ -27,11 +27,10 @@ from ezrules.backend.backtesting import (
     BACKTEST_QUEUE_PENDING,
     BACKTEST_QUEUE_RUNNING,
 )
+from ezrules.backend.rule_validation import compile_validated_rule_source
 from ezrules.backend.tasks import app as celery_app
 from ezrules.backend.tasks import backtest_rule_change, execute_backtest_rule_change
 from ezrules.core.permissions_constants import PermissionAction
-from ezrules.core.rule import Rule
-from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.backend_core import RuleBackTestingResult, User
 
@@ -215,11 +214,7 @@ def trigger_backtest(
         )
 
     try:
-        Rule(
-            rid="",
-            logic=request.new_rule_logic,
-            list_values_provider=PersistentUserListManager(db, current_org_id),
-        )
+        compile_validated_rule_source(db, current_org_id, request.new_rule_logic)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

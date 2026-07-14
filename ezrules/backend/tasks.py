@@ -21,10 +21,11 @@ from ezrules.backend.rule_quality import (
     get_active_rule_quality_pairs,
     normalize_rule_quality_pairs,
 )
+from ezrules.backend.rule_validation import compile_validated_rule_source
 from ezrules.backend.shadow_evaluation_queue import drain_shadow_evaluation_queue
 from ezrules.backend.utils import load_cast_configs
 from ezrules.core.application_context import set_organization_id, set_user_list_manager
-from ezrules.core.rule import Rule, RuleFactory
+from ezrules.core.rule import RuleFactory
 from ezrules.core.user_lists import PersistentUserListManager
 from ezrules.models.backend_core import (
     EvaluationDecision,
@@ -197,7 +198,7 @@ def execute_backtest_rule_change(
             return payload
 
         try:
-            proposed_rule = Rule(rid="", logic=proposed_logic, list_values_provider=list_provider)
+            proposed_rule = compile_validated_rule_source(db_session, org_id, proposed_logic)
         except Exception as e:
             payload = {"error": f"Failed to compile proposed rule logic: {e!s}"}
             if task_id is not None:
