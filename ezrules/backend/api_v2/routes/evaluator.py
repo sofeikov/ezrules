@@ -29,7 +29,10 @@ from ezrules.backend.features import FeatureResolutionError, FeatureResolutionTr
 from ezrules.backend.observation_queue import enqueue_observations
 from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.backend.runtime_settings import get_main_rule_execution_mode
-from ezrules.backend.shadow_evaluation_queue import enqueue_shadow_evaluation
+from ezrules.backend.shadow_evaluation_queue import (
+    enqueue_shadow_evaluation,
+    load_shadow_evaluation_snapshot,
+)
 from ezrules.backend.utils import load_cast_configs, record_observations
 from ezrules.core.outcomes import DatabaseOutcome
 from ezrules.core.permissions_constants import PermissionAction
@@ -162,16 +165,17 @@ def _build_event_test_rule_results(db: Any, o_id: int, all_rule_results: dict[An
     return results
 
 
-def _get_rollout_stat_paths(
-    rollout_entries: list[dict[str, Any]],
+def _get_deployment_stat_paths(
+    deployment_entries: list[dict[str, Any]],
     list_provider: PersistentUserListManager,
+    deployment_label: str,
 ) -> set[str]:
     stat_paths: set[str] = set()
-    for entry in rollout_entries:
+    for entry in deployment_entries:
         try:
             stat_paths.update(RuleFactory.from_json(entry, list_values_provider=list_provider).get_rule_stats())
         except Exception:
-            logger.debug("Skipping stat pre-resolution for invalid rollout candidate", exc_info=True)
+            logger.debug("Skipping stat pre-resolution for invalid %s candidate", deployment_label, exc_info=True)
     return stat_paths
 
 
@@ -183,11 +187,14 @@ def _resolve_evaluation_stats(
     as_of: datetime,
     lre: LocalRuleExecutorSQL,
     rollout_entries: list[dict[str, Any]],
+    shadow_entries: list[dict[str, Any]],
     list_provider: PersistentUserListManager | None,
 ) -> tuple[dict[str, Any], list[FeatureResolutionTrace]]:
     stat_paths = lre.get_rule_stats()
     if rollout_entries and list_provider is not None:
-        stat_paths.update(_get_rollout_stat_paths(rollout_entries, list_provider))
+        stat_paths.update(_get_deployment_stat_paths(rollout_entries, list_provider, ROLLOUT_CONFIG_LABEL))
+    if shadow_entries and list_provider is not None:
+        stat_paths.update(_get_deployment_stat_paths(shadow_entries, list_provider, "shadow"))
     return FeatureResolver(db, o_id).resolve_with_traces(event_data, as_of, stat_paths)
 
 
@@ -345,8 +352,10 @@ def evaluate(
                 superseded_evaluation_id=result.get("superseded_evaluation_id"),
             )
 
+        shadow_snapshot = load_shadow_evaluation_snapshot(db, lre.o_id)
+        shadow_entries = list(shadow_snapshot.config) if shadow_snapshot is not None else []
         rollout_entries = list_candidate_deployments(db, lre.o_id, ROLLOUT_CONFIG_LABEL)
-        list_provider = PersistentUserListManager(db, lre.o_id) if rollout_entries else None
+        list_provider = PersistentUserListManager(db, lre.o_id) if rollout_entries or shadow_entries else None
         stats, feature_traces = _resolve_evaluation_stats(
             db=db,
             o_id=lre.o_id,
@@ -354,6 +363,7 @@ def evaluate(
             as_of=event.effective_at,
             lre=lre,
             rollout_entries=rollout_entries,
+            shadow_entries=shadow_entries,
             list_provider=list_provider,
         )
         production_result = lre.evaluate_rules(event.event_data, as_of=event.effective_at, stats=stats)
@@ -446,16 +456,18 @@ def evaluate(
                     lre.o_id,
                 )
 
-    enqueue_shadow_evaluation(
-        db=db,
-        o_id=int(lre.o_id),
-        event_id=str(event.transaction_id),
-        event_data=event.event_data,
-        stats=stats,
-        production_all_rule_results=dict(production_result.get("all_rule_results", {})),
-        evaluation_decision_id=int(result["evaluation_id"]),
-        event_version_id=int(result["event_version_id"]),
-    )
+    if shadow_snapshot is not None:
+        enqueue_shadow_evaluation(
+            db=db,
+            o_id=int(lre.o_id),
+            event_id=str(event.transaction_id),
+            event_data=event.event_data,
+            stats=stats,
+            production_all_rule_results=dict(production_result.get("all_rule_results", {})),
+            evaluation_decision_id=int(result["evaluation_id"]),
+            event_version_id=int(result["event_version_id"]),
+            shadow_snapshot=shadow_snapshot,
+        )
 
     _persist_evaluate_observations(db, request_data.event_data, lre.o_id)
 
@@ -522,6 +534,7 @@ def test_event(
                 as_of=event.effective_at,
                 lre=lre,
                 rollout_entries=rollout_entries,
+                shadow_entries=[],
                 list_provider=list_provider,
             )
             production_result = lre.evaluate_rules(event.event_data, as_of=event.effective_at, stats=stats)

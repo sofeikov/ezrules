@@ -1,6 +1,8 @@
 import json
 import logging
 from collections.abc import Iterable
+from copy import deepcopy
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Any
@@ -24,6 +26,13 @@ from ezrules.settings import app_settings
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True, slots=True)
+class ShadowEvaluationSnapshot:
+    config: tuple[dict[str, Any], ...]
+    config_version: int
+    main_rule_execution_mode: str
+
+
 def _shadow_queue_url() -> str:
     return app_settings.SHADOW_EVALUATION_QUEUE_REDIS_URL or app_settings.CELERY_BROKER_URL
 
@@ -31,6 +40,17 @@ def _shadow_queue_url() -> str:
 @lru_cache(maxsize=1)
 def get_shadow_evaluation_queue_client() -> Redis:
     return Redis.from_url(_shadow_queue_url(), decode_responses=True)
+
+
+def load_shadow_evaluation_snapshot(db, o_id: int) -> ShadowEvaluationSnapshot | None:
+    config_obj = get_deployment_config(db, o_id=o_id, label=SHADOW_CONFIG_LABEL)
+    if config_obj is None or not isinstance(config_obj.config, list) or not config_obj.config:
+        return None
+    return ShadowEvaluationSnapshot(
+        config=tuple(deepcopy(config_obj.config)),
+        config_version=int(config_obj.version),
+        main_rule_execution_mode=get_main_rule_execution_mode(db, o_id),
+    )
 
 
 def _serialize_shadow_payload(
@@ -76,16 +96,15 @@ def enqueue_shadow_evaluation(
     transaction_id: str | None = None,
     evaluation_decision_id: int | None = None,
     event_version_id: int | None = None,
+    shadow_snapshot: ShadowEvaluationSnapshot | None = None,
 ) -> bool:
     event_id = event_id or transaction_id
     if event_id is None:
         raise ValueError("event_id or transaction_id is required")
-    config_obj = get_deployment_config(db, o_id=o_id, label=SHADOW_CONFIG_LABEL)
-    if config_obj is None or not config_obj.config:
+    shadow_snapshot = shadow_snapshot or load_shadow_evaluation_snapshot(db, o_id)
+    if shadow_snapshot is None:
         return False
-    shadow_config = list(config_obj.config) if isinstance(config_obj.config, list) else []
-    if not shadow_config:
-        return False
+    shadow_config = [deepcopy(entry) for entry in shadow_snapshot.config]
 
     payload = _serialize_shadow_payload(
         o_id=o_id,
@@ -96,8 +115,8 @@ def enqueue_shadow_evaluation(
         evaluation_decision_id=evaluation_decision_id,
         event_version_id=event_version_id,
         shadow_config=shadow_config,
-        shadow_config_version=int(config_obj.version),
-        main_rule_execution_mode=get_main_rule_execution_mode(db, o_id),
+        shadow_config_version=shadow_snapshot.config_version,
+        main_rule_execution_mode=shadow_snapshot.main_rule_execution_mode,
     )
     try:
         get_shadow_evaluation_queue_client().lpush(app_settings.SHADOW_EVALUATION_QUEUE_KEY, payload)
