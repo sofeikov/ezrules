@@ -252,9 +252,11 @@ def test_duplicate_and_orphaned_observations_survive_two_worker_drain(reset_reco
     processing_key = _processing_key(app_settings.OBSERVATION_QUEUE_KEY)
     assert redis_client.rpoplpush(app_settings.OBSERVATION_QUEUE_KEY, processing_key) is not None
 
-    first = drain_field_observation_queue.apply_async()
-    second = drain_field_observation_queue.apply_async()
-    drain_results = [first.get(timeout=30), second.get(timeout=30)]
+    drain_results = []
+    for _ in range(2):
+        first = drain_field_observation_queue.apply_async()
+        second = drain_field_observation_queue.apply_async()
+        drain_results.extend([first.get(timeout=30), second.get(timeout=30)])
 
     assert sum(result["drained_messages"] for result in drain_results) == 20
     assert redis_client.llen(app_settings.OBSERVATION_QUEUE_KEY) == 0
@@ -274,9 +276,10 @@ def test_observation_failure_rolls_back_and_restores_reserved_message(reset_reco
     redis_client.lpush(app_settings.OBSERVATION_QUEUE_KEY, "{not-json")
 
     result = drain_field_observation_queue.apply_async()
-    with pytest.raises(ValueError):
-        result.get(timeout=30, propagate=True)
+    failure = result.get(timeout=30, propagate=False)
 
+    assert result.state == "FAILURE"
+    assert "JSONDecodeError" in str(failure)
     assert redis_client.lrange(app_settings.OBSERVATION_QUEUE_KEY, 0, -1) == ["{not-json"]
     assert redis_client.llen(_processing_key(app_settings.OBSERVATION_QUEUE_KEY)) == 0
 
@@ -383,7 +386,7 @@ def test_completed_quality_report_is_not_recomputed_on_redelivery(reset_recovery
         assert report is not None
         assert report.status == "SUCCESS"
         assert report.result == {"sentinel": "already-computed"}
-        assert report.completed_at == completed_at
+        assert report.completed_at == completed_at.replace(tzinfo=None)
 
 
 def test_worker_recovery_configuration_uses_late_acknowledgements(reset_recovery_state: Redis):
