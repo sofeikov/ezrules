@@ -61,7 +61,7 @@ def _create_decision(session, *, o_id: int, event_id: str, as_of: datetime) -> i
     return int(decision_id)
 
 
-def test_shadow_only_stat_and_config_use_one_snapshot(session, monkeypatch) -> None:
+def _seed_shadow_stat_contract(session):
     org = _ensure_org(session)
     org_id = int(org.o_id)
     as_of = datetime.now(UTC).replace(microsecond=0)
@@ -110,17 +110,32 @@ def test_shadow_only_stat_and_config_use_one_snapshot(session, monkeypatch) -> N
 
     shadow_snapshot = shadow_evaluation_queue.load_shadow_evaluation_snapshot(session, org_id)
     assert shadow_snapshot is not None
+    return org_id, as_of, rule, shadow_snapshot
+
+
+def test_shadow_only_stat_and_config_use_one_snapshot(session, monkeypatch) -> None:
+    org_id, as_of, rule, shadow_snapshot = _seed_shadow_stat_contract(session)
     list_provider = PersistentUserListManager(session, org_id)
-    stats, _traces = evaluator_router._resolve_evaluation_stats(
+    production_stats, _traces = evaluator_router._resolve_evaluation_stats(
         db=session,
         o_id=org_id,
         event_data={"sender_id": "S1"},
         as_of=as_of,
         lre=RuleStatsStub(),  # type: ignore[arg-type]
         rollout_entries=[],
+        list_provider=list_provider,
+    )
+    assert production_stats == {}
+    stats = evaluator_router._resolve_shadow_evaluation_stats(
+        db=session,
+        o_id=org_id,
+        event_data={"sender_id": "S1"},
+        as_of=as_of,
+        production_stats=production_stats,
         shadow_entries=list(shadow_snapshot.config),
         list_provider=list_provider,
     )
+    assert stats is not None
     assert stats[SHADOW_STAT_PATH] == 125
 
     deploy_rule_to_shadow(
@@ -162,3 +177,30 @@ def test_shadow_only_stat_and_config_use_one_snapshot(session, monkeypatch) -> N
     assert persisted == 1
     shadow_log = session.query(ShadowResultsLog).filter(ShadowResultsLog.ed_id == decision_id).one()
     assert shadow_log.rule_result == "ESCALATE"
+
+
+def test_shadow_only_feature_failure_does_not_change_production_resolution(session) -> None:
+    org_id, as_of, _rule, shadow_snapshot = _seed_shadow_stat_contract(session)
+    list_provider = PersistentUserListManager(session, org_id)
+    production_stats, _traces = evaluator_router._resolve_evaluation_stats(
+        db=session,
+        o_id=org_id,
+        event_data={},
+        as_of=as_of,
+        lre=RuleStatsStub(),  # type: ignore[arg-type]
+        rollout_entries=[],
+        list_provider=list_provider,
+    )
+
+    shadow_stats = evaluator_router._resolve_shadow_evaluation_stats(
+        db=session,
+        o_id=org_id,
+        event_data={},
+        as_of=as_of,
+        production_stats=production_stats,
+        shadow_entries=list(shadow_snapshot.config),
+        list_provider=list_provider,
+    )
+
+    assert production_stats == {}
+    assert shadow_stats is None

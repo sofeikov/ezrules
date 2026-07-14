@@ -187,15 +187,41 @@ def _resolve_evaluation_stats(
     as_of: datetime,
     lre: LocalRuleExecutorSQL,
     rollout_entries: list[dict[str, Any]],
-    shadow_entries: list[dict[str, Any]],
     list_provider: PersistentUserListManager | None,
 ) -> tuple[dict[str, Any], list[FeatureResolutionTrace]]:
     stat_paths = lre.get_rule_stats()
     if rollout_entries and list_provider is not None:
         stat_paths.update(_get_deployment_stat_paths(rollout_entries, list_provider, ROLLOUT_CONFIG_LABEL))
-    if shadow_entries and list_provider is not None:
-        stat_paths.update(_get_deployment_stat_paths(shadow_entries, list_provider, "shadow"))
     return FeatureResolver(db, o_id).resolve_with_traces(event_data, as_of, stat_paths)
+
+
+def _resolve_shadow_evaluation_stats(
+    *,
+    db: Any,
+    o_id: int,
+    event_data: dict[str, Any],
+    as_of: datetime,
+    production_stats: dict[str, Any],
+    shadow_entries: list[dict[str, Any]],
+    list_provider: PersistentUserListManager,
+) -> dict[str, Any] | None:
+    shadow_stat_paths = _get_deployment_stat_paths(shadow_entries, list_provider, "shadow")
+    shadow_only_stat_paths = shadow_stat_paths.difference(production_stats)
+    if not shadow_only_stat_paths:
+        return dict(production_stats)
+    try:
+        shadow_only_stats, _traces = FeatureResolver(db, o_id).resolve_with_traces(
+            event_data,
+            as_of,
+            shadow_only_stat_paths,
+        )
+    except FeatureResolutionError as exc:
+        logger.warning("Skipping shadow evaluation after feature resolution failure for org_id=%s: %s", o_id, exc)
+        return None
+    except Exception:
+        logger.exception("Skipping shadow evaluation after unexpected feature resolution failure for org_id=%s", o_id)
+        return None
+    return {**production_stats, **shadow_only_stats}
 
 
 def _evaluate_rollout_result(
@@ -352,10 +378,14 @@ def evaluate(
                 superseded_evaluation_id=result.get("superseded_evaluation_id"),
             )
 
-        shadow_snapshot = load_shadow_evaluation_snapshot(db, lre.o_id)
+        try:
+            shadow_snapshot = load_shadow_evaluation_snapshot(db, lre.o_id)
+        except Exception:
+            logger.exception("Skipping shadow evaluation after snapshot load failure for org_id=%s", lre.o_id)
+            shadow_snapshot = None
         shadow_entries = list(shadow_snapshot.config) if shadow_snapshot is not None else []
         rollout_entries = list_candidate_deployments(db, lre.o_id, ROLLOUT_CONFIG_LABEL)
-        list_provider = PersistentUserListManager(db, lre.o_id) if rollout_entries or shadow_entries else None
+        list_provider = PersistentUserListManager(db, lre.o_id) if rollout_entries else None
         stats, feature_traces = _resolve_evaluation_stats(
             db=db,
             o_id=lre.o_id,
@@ -363,7 +393,6 @@ def evaluate(
             as_of=event.effective_at,
             lre=lre,
             rollout_entries=rollout_entries,
-            shadow_entries=shadow_entries,
             list_provider=list_provider,
         )
         production_result = lre.evaluate_rules(event.event_data, as_of=event.effective_at, stats=stats)
@@ -377,6 +406,22 @@ def evaluate(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Evaluation failed",
         ) from exc
+
+    shadow_queue_stats: dict[str, Any] | None = None
+    if shadow_snapshot is not None:
+        try:
+            shadow_list_provider = list_provider or PersistentUserListManager(db, lre.o_id)
+            shadow_queue_stats = _resolve_shadow_evaluation_stats(
+                db=db,
+                o_id=lre.o_id,
+                event_data=event.event_data,
+                as_of=event.effective_at,
+                production_stats=stats,
+                shadow_entries=shadow_entries,
+                list_provider=shadow_list_provider,
+            )
+        except Exception:
+            logger.exception("Skipping shadow evaluation after stat preparation failure for org_id=%s", lre.o_id)
 
     rollout_logs: list[dict[str, Any]] = []
     if rollout_entries:
@@ -456,13 +501,13 @@ def evaluate(
                     lre.o_id,
                 )
 
-    if shadow_snapshot is not None:
+    if shadow_snapshot is not None and shadow_queue_stats is not None:
         enqueue_shadow_evaluation(
             db=db,
             o_id=int(lre.o_id),
             event_id=str(event.transaction_id),
             event_data=event.event_data,
-            stats=stats,
+            stats=shadow_queue_stats,
             production_all_rule_results=dict(production_result.get("all_rule_results", {})),
             evaluation_decision_id=int(result["evaluation_id"]),
             event_version_id=int(result["event_version_id"]),
@@ -534,7 +579,6 @@ def test_event(
                 as_of=event.effective_at,
                 lre=lre,
                 rollout_entries=rollout_entries,
-                shadow_entries=[],
                 list_provider=list_provider,
             )
             production_result = lre.evaluate_rules(event.event_data, as_of=event.effective_at, stats=stats)
