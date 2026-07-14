@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
 from ezrules.backend import data_utils
 from ezrules.backend.alerts import enqueue_alert_detection
@@ -203,19 +204,25 @@ def _resolve_shadow_evaluation_stats(
     as_of: datetime,
     production_stats: dict[str, Any],
     shadow_entries: list[dict[str, Any]],
-    list_provider: PersistentUserListManager,
 ) -> dict[str, Any] | None:
-    shadow_stat_paths = _get_deployment_stat_paths(shadow_entries, list_provider, "shadow")
-    shadow_only_stat_paths = shadow_stat_paths.difference(production_stats)
-    if not shadow_only_stat_paths:
-        return dict(production_stats)
     try:
-        with db.begin_nested():
-            shadow_only_stats, _traces = FeatureResolver(db, o_id).resolve_with_traces(
+        shadow_db = Session(bind=db.get_bind(), join_transaction_mode="create_savepoint")
+        try:
+            shadow_list_provider = PersistentUserListManager(shadow_db, o_id)
+            shadow_stat_paths = _get_deployment_stat_paths(shadow_entries, shadow_list_provider, "shadow")
+            shadow_only_stat_paths = shadow_stat_paths.difference(production_stats)
+            if not shadow_only_stat_paths:
+                return dict(production_stats)
+            shadow_only_stats, _traces = FeatureResolver(shadow_db, o_id).resolve_with_traces(
                 event_data,
                 as_of,
                 shadow_only_stat_paths,
             )
+        finally:
+            try:
+                shadow_db.rollback()
+            finally:
+                shadow_db.close()
     except FeatureResolutionError as exc:
         logger.warning("Skipping shadow evaluation after feature resolution failure for org_id=%s: %s", o_id, exc)
         return None
@@ -411,7 +418,6 @@ def evaluate(
     shadow_queue_stats: dict[str, Any] | None = None
     if shadow_snapshot is not None:
         try:
-            shadow_list_provider = list_provider or PersistentUserListManager(db, lre.o_id)
             shadow_queue_stats = _resolve_shadow_evaluation_stats(
                 db=db,
                 o_id=lre.o_id,
@@ -419,7 +425,6 @@ def evaluate(
                 as_of=event.effective_at,
                 production_stats=stats,
                 shadow_entries=shadow_entries,
-                list_provider=shadow_list_provider,
             )
         except Exception:
             logger.exception("Skipping shadow evaluation after stat preparation failure for org_id=%s", lre.o_id)

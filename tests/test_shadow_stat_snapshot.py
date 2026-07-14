@@ -141,7 +141,6 @@ def test_shadow_only_stat_and_config_use_one_snapshot(session, monkeypatch) -> N
         as_of=as_of,
         production_stats=production_stats,
         shadow_entries=list(shadow_snapshot.config),
-        list_provider=list_provider,
     )
     assert stats is not None
     assert stats[SHADOW_STAT_PATH] == 125
@@ -207,14 +206,32 @@ def test_shadow_only_feature_failure_does_not_change_production_resolution(sessi
         as_of=as_of,
         production_stats=production_stats,
         shadow_entries=list(shadow_snapshot.config),
-        list_provider=list_provider,
     )
 
     assert production_stats == {}
     assert shadow_stats is None
 
 
-def test_shadow_stat_database_failure_rolls_back_only_savepoint(session, monkeypatch) -> None:
+def test_successful_shadow_stat_resolution_does_not_change_outer_timeout(session) -> None:
+    org_id, as_of, _rule, shadow_snapshot = _seed_shadow_stat_contract(session)
+    session.execute(text("SET LOCAL statement_timeout = '4321ms'"))
+    timeout_before = session.execute(text("SHOW statement_timeout")).scalar_one()
+
+    shadow_stats = evaluator_router._resolve_shadow_evaluation_stats(
+        db=session,
+        o_id=org_id,
+        event_data={"sender_id": "S1"},
+        as_of=as_of,
+        production_stats={},
+        shadow_entries=list(shadow_snapshot.config),
+    )
+
+    assert shadow_stats is not None
+    assert shadow_stats[SHADOW_STAT_PATH] == 125
+    assert session.execute(text("SHOW statement_timeout")).scalar_one() == timeout_before
+
+
+def test_shadow_stat_database_failure_leaves_outer_session_usable(session, monkeypatch) -> None:
     org_id, as_of, _rule, shadow_snapshot = _seed_shadow_stat_contract(session)
 
     class FailingFeatureResolver:
@@ -234,7 +251,6 @@ def test_shadow_stat_database_failure_rolls_back_only_savepoint(session, monkeyp
         as_of=as_of,
         production_stats={},
         shadow_entries=list(shadow_snapshot.config),
-        list_provider=PersistentUserListManager(session, org_id),
     )
 
     assert shadow_stats is None
