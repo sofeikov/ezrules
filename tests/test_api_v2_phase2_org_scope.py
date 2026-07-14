@@ -23,13 +23,13 @@ from ezrules.models.backend_core import (
     OutcomeHistory,
     Role,
     Rule,
+    RuleDeploymentResultsLog,
     RuleEngineConfig,
     RuleEngineConfigHistory,
     RuleHistory,
     RuleQualityPair,
     RuleQualityReport,
     RuntimeSetting,
-    RuleDeploymentResultsLog,
     ShadowResultsLog,
     User,
     UserList,
@@ -170,19 +170,26 @@ def test_rules_use_auth_org_context_for_lists_and_rule_queries(session):
 
     _create_user_list(session, org_id=int(org.o_id), list_name="Phase2Countries", entries=["GB"])
     _create_user_list(session, org_id=int(other_org.o_id), list_name="Phase2Countries", entries=["US"])
+    session.add_all(
+        [
+            AllowedOutcome(outcome_name="HOLD", severity_rank=1, o_id=int(org.o_id)),
+            AllowedOutcome(outcome_name="HOLD", severity_rank=1, o_id=int(other_org.o_id)),
+        ]
+    )
+    session.commit()
 
     org_rule = _create_rule(
         session,
         org_id=int(org.o_id),
         rid="PHASE2:ORG1",
-        logic="return $amount > 10",
+        logic="if $amount > 10:\n    return !HOLD",
         description="Org 1 rule",
     )
     other_rule = _create_rule(
         session,
         org_id=int(other_org.o_id),
         rid="PHASE2:ORG2",
-        logic="return $amount > 10",
+        logic="if $amount > 10:\n    return !HOLD",
         description="Org 2 rule",
     )
 
@@ -213,7 +220,7 @@ def test_rules_use_auth_org_context_for_lists_and_rule_queries(session):
             "/api/v2/rules/test",
             headers=_auth_headers(user),
             json={
-                "rule_source": "return $country in @Phase2Countries",
+                "rule_source": "if $country in @Phase2Countries:\n    return !HOLD",
                 "test_json": '{"country": "GB"}',
             },
         )
@@ -221,7 +228,7 @@ def test_rules_use_auth_org_context_for_lists_and_rule_queries(session):
             "/api/v2/rules/test",
             headers=_auth_headers(other_user),
             json={
-                "rule_source": "return $country in @Phase2Countries",
+                "rule_source": "if $country in @Phase2Countries:\n    return !HOLD",
                 "test_json": '{"country": "GB"}',
             },
         )
@@ -230,9 +237,9 @@ def test_rules_use_auth_org_context_for_lists_and_rule_queries(session):
         history_response = client.get(f"/api/v2/rules/{org_rule.r_id}/history", headers=_auth_headers(user))
 
     assert org_test_response.status_code == 200
-    assert org_test_response.json()["rule_outcome"] == "True"
+    assert org_test_response.json()["rule_outcome"] == "HOLD"
     assert other_test_response.status_code == 200
-    assert other_test_response.json()["rule_outcome"] == "False"
+    assert other_test_response.json()["rule_outcome"] is None
 
     observations = (
         session.query(FieldObservation)
@@ -678,14 +685,14 @@ def test_audit_endpoints_only_return_current_org_history(session):
         session,
         org_id=int(org.o_id),
         rid="PHASE2:AUDIT:ORG1",
-        logic="return True",
+        logic="return None",
         description="Org 1 audit rule",
     )
     other_rule = _create_rule(
         session,
         org_id=int(other_org.o_id),
         rid="PHASE2:AUDIT:ORG2",
-        logic="return True",
+        logic="return None",
         description="Org 2 audit rule",
     )
 

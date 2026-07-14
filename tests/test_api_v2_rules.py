@@ -868,7 +868,7 @@ class TestTestRule:
     """Tests for POST /api/v2/rules/test."""
 
     def test_test_rule_success_true(self, rules_test_client):
-        """Should return True for matching rule."""
+        """Should return the configured outcome for a matching rule."""
         token = rules_test_client.test_data["token"]
 
         # Rules use $variable notation and need a return statement
@@ -876,7 +876,7 @@ class TestTestRule:
             "/api/v2/rules/test",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "rule_source": "return $amount > 100",
+                "rule_source": "if $amount > 100:\n    return !HOLD",
                 "test_json": '{"amount": 150}',
             },
         )
@@ -884,17 +884,17 @@ class TestTestRule:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
-        assert data["rule_outcome"] == "True"
+        assert data["rule_outcome"] == "HOLD"
 
     def test_test_rule_success_false(self, rules_test_client):
-        """Should return False for non-matching rule."""
+        """Should return no outcome for a non-matching rule."""
         token = rules_test_client.test_data["token"]
 
         response = rules_test_client.post(
             "/api/v2/rules/test",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "rule_source": "return $amount > 100",
+                "rule_source": "if $amount > 100:\n    return !HOLD",
                 "test_json": '{"amount": 50}',
             },
         )
@@ -902,7 +902,7 @@ class TestTestRule:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
-        assert data["rule_outcome"] == "False"
+        assert data["rule_outcome"] is None
 
     def test_test_rule_string_outcome(self, rules_test_client):
         """Should return string outcome for rules that return strings."""

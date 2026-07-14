@@ -25,7 +25,7 @@ test.describe('Rule Logic Editor', () => {
     await request.post(`${API_BASE}/api/v2/rules/test`, {
       headers: authHeaders,
       data: {
-        rule_source: 'return True',
+        rule_source: 'return None',
         test_json: '{"editor_amount_signal": 1250}',
       },
     });
@@ -73,7 +73,7 @@ test.describe('Rule Logic Editor', () => {
       data: {
         rid: `EDITOR_DETAIL_${Date.now()}`,
         description: 'rule editor detail validation test',
-        logic: 'return True',
+        logic: 'return None',
       },
     });
     expect(createResponse.ok()).toBeTruthy();

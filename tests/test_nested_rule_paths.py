@@ -30,7 +30,7 @@ def test_verify_rule_returns_nested_params_and_suppresses_warning_for_observed_p
     session.commit()
 
     payload = verify_rule(
-        RuleVerifyRequest(rule_source="return $customer.profile.age >= 21"),
+        RuleVerifyRequest(rule_source="if $customer.profile.age >= 21:\n    return !HOLD"),
         user=None,
         _=None,
         current_org_id=int(org.o_id),
@@ -49,7 +49,7 @@ def test_rules_test_reports_missing_nested_lookup_with_full_path(session):
 
     payload = route_test_rule(
         RuleTestRequest(
-            rule_source="return $customer.profile.age >= 21",
+            rule_source="if $customer.profile.age >= 21:\n    return !HOLD",
             test_json='{"customer":{"profile":{}}}',
         ),
         user=None,

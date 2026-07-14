@@ -16,8 +16,7 @@ from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.core.permissions import PermissionManager
 from ezrules.core.permissions_constants import PermissionAction
 from ezrules.core.rule_updater import RDBRuleEngineConfigProducer, RDBRuleManager
-from ezrules.models.backend_core import FieldTypeConfig, Organisation, Role, Rule, User
-
+from ezrules.models.backend_core import AllowedOutcome, FieldTypeConfig, Organisation, Role, Rule, User
 
 # =============================================================================
 # SHARED HELPERS
@@ -49,6 +48,14 @@ def rules_client(session):
     hashed = bcrypt.hashpw("castpass".encode(), bcrypt.gensalt()).decode()
 
     org = _get_or_create_org(session)
+    if (
+        session.query(AllowedOutcome)
+        .filter(AllowedOutcome.o_id == int(org.o_id), AllowedOutcome.outcome_name == "HOLD")
+        .first()
+        is None
+    ):
+        session.add(AllowedOutcome(outcome_name="HOLD", severity_rank=1, o_id=int(org.o_id)))
+        session.commit()
 
     role = session.query(Role).filter(Role.name == "cast_tester", Role.o_id == org.o_id).first()
     if not role:
@@ -173,7 +180,7 @@ class TestRulesTestCasting:
             "/api/v2/rules/test",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "rule_source": "return $score > 0.5",
+                "rule_source": "if $score > 0.5:\n    return !HOLD",
                 "test_json": '{"score": "0.9"}',
             },
         )
@@ -181,7 +188,7 @@ class TestRulesTestCasting:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
-        assert data["rule_outcome"] == "True"
+        assert data["rule_outcome"] == "HOLD"
 
     def test_rules_test_cast_error_returns_error_status(self, rules_client, session):
         """An unparseable value for a configured type returns status='error'."""
@@ -196,7 +203,7 @@ class TestRulesTestCasting:
             "/api/v2/rules/test",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "rule_source": "return $amount > 100",
+                "rule_source": "if $amount > 100:\n    return !HOLD",
                 "test_json": '{"amount": "not-a-number"}',
             },
         )
@@ -214,7 +221,7 @@ class TestRulesTestCasting:
             "/api/v2/rules/test",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "rule_source": "return $amount > 100",
+                "rule_source": "if $amount > 100:\n    return !HOLD",
                 "test_json": '{"amount": 150}',
             },
         )
@@ -222,4 +229,4 @@ class TestRulesTestCasting:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
-        assert data["rule_outcome"] == "True"
+        assert data["rule_outcome"] == "HOLD"

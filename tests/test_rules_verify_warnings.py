@@ -65,7 +65,7 @@ class TestRuleVerifyWarnings:
         response = client.post(
             "/api/v2/rules/verify",
             headers={"Authorization": f"Bearer {token}"},
-            json={"rule_source": "return $never_seen > 0"},
+            json={"rule_source": "if $never_seen > 0:\n    return !HOLD"},
         )
 
         client.close()
@@ -87,7 +87,7 @@ class TestRuleVerifyWarnings:
         response = client.post(
             "/api/v2/rules/verify",
             headers={"Authorization": f"Bearer {token}"},
-            json={"rule_source": "return $amount > 0"},
+            json={"rule_source": "if $amount > 0:\n    return !HOLD"},
         )
 
         client.close()
@@ -111,7 +111,7 @@ class TestRuleTestNormalizationErrors:
             "/api/v2/rules/test",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "rule_source": "return True",
+                "rule_source": "return None",
                 "test_json": "{}",
             },
         )
@@ -132,7 +132,7 @@ class TestRuleTestNormalizationErrors:
             "/api/v2/rules/test",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "rule_source": 'return $country == "US"',
+                "rule_source": 'if $country == "US":\n    return !HOLD',
                 "test_json": '{"amount": 100}',
             },
         )

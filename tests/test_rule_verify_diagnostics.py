@@ -61,14 +61,14 @@ class TestRuleVerifyDiagnostics:
             response = client.post(
                 "/api/v2/rules/verify",
                 headers={"Authorization": f"Bearer {token}"},
-                json={"rule_source": 'return "US" in @VerifyCountries and $amount > 0'},
+                json={"rule_source": 'if "US" in @VerifyCountries and $amount > 0:\n    return !HOLD'},
             )
 
             assert response.status_code == 200
             data = response.json()
             assert data["valid"] is True
             assert data["referenced_lists"] == ["VerifyCountries"]
-            assert data["referenced_outcomes"] == []
+            assert data["referenced_outcomes"] == ["HOLD"]
             assert data["errors"] == []
             assert data["params"] == ["amount"]
         finally:
@@ -126,7 +126,7 @@ class TestRuleVerifyDiagnostics:
             response = client.post(
                 "/api/v2/rules/verify",
                 headers={"Authorization": f"Bearer {token}"},
-                json={"rule_source": "# TODO switch to !REVIEW later\nreturn True"},
+                json={"rule_source": "# TODO switch to !REVIEW later\nreturn None"},
             )
 
             assert response.status_code == 200
