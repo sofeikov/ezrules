@@ -583,6 +583,7 @@ def promote_rollout_rule_to_production(
     r_id: int,
     changed_by: str | None = None,
     approved_by: int | None = None,
+    validate_candidate: Callable[[dict[str, Any]], None] | None = None,
 ) -> None:
     promote_candidate_deployment_to_production(
         db=db,
@@ -591,6 +592,7 @@ def promote_rollout_rule_to_production(
         label=ROLLOUT_CONFIG_LABEL,
         changed_by=changed_by,
         approved_by=approved_by,
+        validate_candidate=validate_candidate,
     )
 
 

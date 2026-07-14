@@ -6,8 +6,13 @@ import pytest
 
 from ezrules.backend import shadow_evaluation_queue
 from ezrules.core.rule_updater import SHADOW_CONFIG_LABEL, deploy_rule_to_shadow
+from ezrules.models.backend_core import AllowedOutcome, FeatureDefinition
 from ezrules.models.backend_core import Rule as RuleModel
 from ezrules.models.backend_core import RuleEngineConfig, ShadowResultsLog
+from tests.test_api_v2_rollouts import (  # noqa: F401
+    active_rollout_rule,
+    rollout_test_client,
+)
 from tests.test_api_v2_shadow import (  # noqa: F401
     shadow_rule,
     shadow_test_client,
@@ -158,3 +163,113 @@ def test_valid_shadow_override_can_still_be_promoted(
     assert promote_response.status_code == 200
     session.expire_all()
     assert str(session.get(RuleModel, shadow_rule.r_id).logic) == "return !SHADOW_OUTCOME"
+
+
+def test_rollout_promotion_revalidates_outcome_removed_after_deployment(
+    rollout_test_client,
+    active_rollout_rule,
+) -> None:
+    token = rollout_test_client.test_data["token"]
+    session = rollout_test_client.test_data["session"]
+    original_logic = str(active_rollout_rule.logic)
+    deploy_response = rollout_test_client.post(
+        f"/api/v2/rules/{active_rollout_rule.r_id}/rollout",
+        json={"logic": "return !CANDIDATE", "description": "Candidate", "traffic_percent": 25},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert deploy_response.status_code == 200
+    session.query(AllowedOutcome).filter(
+        AllowedOutcome.o_id == active_rollout_rule.o_id,
+        AllowedOutcome.outcome_name == "CANDIDATE",
+    ).delete()
+    session.commit()
+
+    promote_response = rollout_test_client.post(
+        f"/api/v2/rules/{active_rollout_rule.r_id}/rollout/promote",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert promote_response.status_code == 400
+    assert "is not configured in Outcomes" in promote_response.json()["detail"]
+    session.expire_all()
+    assert str(session.get(RuleModel, active_rollout_rule.r_id).logic) == original_logic
+    rollout_config = (
+        session.query(RuleEngineConfig)
+        .filter(RuleEngineConfig.label == "rollout", RuleEngineConfig.o_id == active_rollout_rule.o_id)
+        .one()
+    )
+    assert next(entry for entry in rollout_config.config if entry["r_id"] == active_rollout_rule.r_id)["logic"] == (
+        "return !CANDIDATE"
+    )
+
+
+def test_rollout_promotion_revalidates_feature_deactivated_after_deployment(
+    rollout_test_client,
+    active_rollout_rule,
+) -> None:
+    token = rollout_test_client.test_data["token"]
+    session = rollout_test_client.test_data["session"]
+    original_logic = str(active_rollout_rule.logic)
+    feature = FeatureDefinition(
+        o_id=active_rollout_rule.o_id,
+        name="Sender sent amount 24h",
+        entity="sender",
+        feature_name="sent_amount_sum_24h",
+        entity_key="sender_id",
+        aggregation_type="sum",
+        source_field="amount",
+        window_seconds=86400,
+        filters=[],
+        status="active",
+    )
+    session.add(feature)
+    session.commit()
+    candidate_logic = "if stat[sender.sent_amount_sum_24h] > 100:\n\treturn !CANDIDATE\nreturn !CONTROL"
+    deploy_response = rollout_test_client.post(
+        f"/api/v2/rules/{active_rollout_rule.r_id}/rollout",
+        json={"logic": candidate_logic, "description": "Candidate", "traffic_percent": 25},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert deploy_response.status_code == 200
+    feature.status = "draft"
+    session.commit()
+
+    promote_response = rollout_test_client.post(
+        f"/api/v2/rules/{active_rollout_rule.r_id}/rollout/promote",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert promote_response.status_code == 400
+    assert "not active in Features" in promote_response.json()["detail"]
+    session.expire_all()
+    assert str(session.get(RuleModel, active_rollout_rule.r_id).logic) == original_logic
+    rollout_config = (
+        session.query(RuleEngineConfig)
+        .filter(RuleEngineConfig.label == "rollout", RuleEngineConfig.o_id == active_rollout_rule.o_id)
+        .one()
+    )
+    assert next(entry for entry in rollout_config.config if entry["r_id"] == active_rollout_rule.r_id)["logic"] == (
+        candidate_logic
+    )
+
+
+def test_valid_rollout_candidate_can_still_be_promoted(
+    rollout_test_client,
+    active_rollout_rule,
+) -> None:
+    token = rollout_test_client.test_data["token"]
+    session = rollout_test_client.test_data["session"]
+    deploy_response = rollout_test_client.post(
+        f"/api/v2/rules/{active_rollout_rule.r_id}/rollout",
+        json={"logic": "return !CANDIDATE", "description": "Candidate", "traffic_percent": 25},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    promote_response = rollout_test_client.post(
+        f"/api/v2/rules/{active_rollout_rule.r_id}/rollout/promote",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert deploy_response.status_code == 200
+    assert promote_response.status_code == 200
+    session.expire_all()
+    assert str(session.get(RuleModel, active_rollout_rule.r_id).logic) == "return !CANDIDATE"

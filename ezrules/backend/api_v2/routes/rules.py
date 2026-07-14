@@ -1589,6 +1589,15 @@ def promote_rollout_to_production(
 ) -> RolloutDeployResponse:
     from ezrules.backend.api_v2.routes import evaluator as evaluator_module
 
+    def validate_stored_candidate(deployment_entry: dict[str, Any]) -> None:
+        compile_validated_rule_source(
+            db,
+            current_org_id,
+            str(deployment_entry["logic"]),
+            rid=str(deployment_entry.get("rid") or rule_id),
+            description=str(deployment_entry.get("description") or ""),
+        )
+
     try:
         promote_rollout_rule_to_production(
             db,
@@ -1596,6 +1605,7 @@ def promote_rollout_to_production(
             r_id=rule_id,
             changed_by=str(user.email),
             approved_by=int(user.id),
+            validate_candidate=validate_stored_candidate,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
