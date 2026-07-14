@@ -16,6 +16,11 @@ It executes the active rule set against one event payload and stores results.
 `/api/v2/evaluate` requires credentials on every request.
 Two methods are accepted for live evaluation:
 
+Requests use `application/json` and are subject to the service-wide request-size limit. The default maximum
+declared body size is 1,024 KiB and can be changed with `EZRULES_MAX_BODY_SIZE_KB`. An oversized request returns
+`413` with `{"detail": "Request body too large"}`; malformed JSON and schema-validation failures return `422`
+with FastAPI's structured `detail` array.
+
 ### API Key (recommended for service-to-service)
 
 Pass the raw key in the `X-API-Key` header:

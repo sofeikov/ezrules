@@ -31,6 +31,24 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 - Access tokens include an `org_id` claim. Manager requests reject tokens whose `org_id` no longer matches the authenticated user's stored organisation.
 - `POST /api/v2/evaluate` requires either an `X-API-Key` header (recommended for service-to-service) or a valid Bearer token
 
+## Cross-cutting Request Contracts
+
+- JSON request bodies use `application/json`, except `POST /api/v2/auth/login`, which uses OAuth2
+  `application/x-www-form-urlencoded`, and `POST /api/v2/labels/upload`, which uses `multipart/form-data`.
+- The default maximum declared request size is 1,024 KiB. Deployments can change it with
+  `EZRULES_MAX_BODY_SIZE_KB`; requests whose `Content-Length` exceeds the configured limit return `413`.
+- HTTP errors use a JSON object with a `detail` field. For authentication, permission, and other application
+  errors, `detail` is a string. For FastAPI request-validation failures, `detail` is an array of structured
+  validation errors.
+- Invalid JSON and payloads sent with an incompatible content type return `422` in the validation-error shape.
+- Pagination bounds and defaults are part of the generated OpenAPI schema. In particular, `limit`, `offset`,
+  cursor, and graph-bound query parameters reject values below their documented minimum; finite page-size and
+  graph bounds also reject values above their documented maximum.
+
+The test suite maintains a normalized inventory of every API v2 OpenAPI operation. Adding or changing a route,
+request content type, security declaration, parameter bound, operation ID, or success status therefore requires
+an intentional contract-snapshot update.
+
 ### Organisation scoping
 
 - Users belong to exactly one organisation.

@@ -1,0 +1,3633 @@
+[
+  {
+    "method": "GET",
+    "operation_id": "root__get",
+    "parameters": [],
+    "path": "/",
+    "request_content": [],
+    "security": [],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "simulate_rule_blast_radius_api_v2_agent_tools_rule_blast_radius_post",
+    "parameters": [],
+    "path": "/api/v2/agent-tools/rule-blast-radius",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "find_rule_counterexamples_api_v2_agent_tools_rule_counterexamples_post",
+    "parameters": [],
+    "path": "/api/v2/agent-tools/rule-counterexamples",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_alert_incidents_api_v2_alerts_incidents_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/alerts/incidents",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "acknowledge_alert_incident_api_v2_alerts_incidents__incident_id__acknowledge_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "incident_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/alerts/incidents/{incident_id}/acknowledge",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_alert_rules_api_v2_alerts_rules_get",
+    "parameters": [],
+    "path": "/api/v2/alerts/rules",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "create_alert_rule_api_v2_alerts_rules_post",
+    "parameters": [],
+    "path": "/api/v2/alerts/rules",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "operation_id": "update_alert_rule_api_v2_alerts_rules__rule_id__patch",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/alerts/rules/{rule_id}",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_labeled_transaction_volume_api_v2_analytics_labeled_transaction_volume_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "aggregation",
+        "required": false,
+        "schema": {
+          "default": "1h",
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/analytics/labeled-transaction-volume",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_labels_distribution_api_v2_analytics_labels_distribution_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "aggregation",
+        "required": false,
+        "schema": {
+          "default": "1h",
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/analytics/labels-distribution",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_labels_summary_api_v2_analytics_labels_summary_get",
+    "parameters": [],
+    "path": "/api/v2/analytics/labels-summary",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_outcomes_distribution_api_v2_analytics_outcomes_distribution_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "aggregation",
+        "required": false,
+        "schema": {
+          "default": "1h",
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/analytics/outcomes-distribution",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_rule_activity_api_v2_analytics_rule_activity_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "aggregation",
+        "required": false,
+        "schema": {
+          "default": "6h",
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 5,
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/analytics/rule-activity",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_rule_quality_api_v2_analytics_rule_quality_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "lookback_days",
+        "required": false,
+        "schema": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "min_support",
+        "required": false,
+        "schema": {
+          "default": 1,
+          "minimum": 1,
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/analytics/rule-quality",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "request_rule_quality_report_api_v2_analytics_rule_quality_reports_post",
+    "parameters": [],
+    "path": "/api/v2/analytics/rule-quality/reports",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_rule_quality_report_api_v2_analytics_rule_quality_reports__report_id__get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "report_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/analytics/rule-quality/reports/{report_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_rule_outcomes_distribution_api_v2_analytics_rules__rule_id__outcomes_distribution_get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "aggregation",
+        "required": false,
+        "schema": {
+          "default": "6h",
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/analytics/rules/{rule_id}/outcomes-distribution",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_transaction_volume_api_v2_analytics_transaction_volume_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "aggregation",
+        "required": false,
+        "schema": {
+          "default": "1h",
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/analytics/transaction-volume",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_api_keys_api_v2_api_keys_get",
+    "parameters": [],
+    "path": "/api/v2/api-keys",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "create_api_key_api_v2_api_keys_post",
+    "parameters": [],
+    "path": "/api/v2/api-keys",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "revoke_api_key_api_v2_api_keys__gid__delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "gid",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/api-keys/{gid}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "204"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_audit_summary_api_v2_audit_get",
+    "parameters": [],
+    "path": "/api/v2/audit",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_ai_rule_authoring_history_api_v2_audit_ai_rule_authoring_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "action",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "end_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/audit/ai-rule-authoring",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_api_key_history_api_v2_audit_api_keys_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "end_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/audit/api-keys",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_config_history_api_v2_audit_config_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "config_id",
+        "required": false,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "end_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/audit/config",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_feature_definition_history_api_v2_audit_features_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "end_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "fd_id",
+        "required": false,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/audit/features",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_field_type_history_api_v2_audit_field_types_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "end_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "field_name",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/audit/field-types",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_label_history_api_v2_audit_labels_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "end_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/audit/labels",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_outcome_history_api_v2_audit_outcomes_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "end_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/audit/outcomes",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_role_permission_history_api_v2_audit_roles_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "end_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "role_id",
+        "required": false,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/audit/roles",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_rule_history_api_v2_audit_rules_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "end_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "rule_id",
+        "required": false,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/audit/rules",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_rule_audit_api_v2_audit_rules__rule_id__get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/audit/rules/{rule_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_strict_mode_history_api_v2_audit_strict_mode_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "end_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/audit/strict-mode",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_user_list_history_api_v2_audit_user_lists_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "end_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "list_id",
+        "required": false,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/audit/user-lists",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_user_account_history_api_v2_audit_users_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "end_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "user_id",
+        "required": false,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/audit/users",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "accept_invite_api_v2_auth_accept_invite_post",
+    "parameters": [],
+    "path": "/api/v2/auth/accept-invite",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "forgot_password_api_v2_auth_forgot_password_post",
+    "parameters": [],
+    "path": "/api/v2/auth/forgot-password",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "login_api_v2_auth_login_post",
+    "parameters": [],
+    "path": "/api/v2/auth/login",
+    "request_content": [
+      "application/x-www-form-urlencoded"
+    ],
+    "security": [],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "logout_api_v2_auth_logout_post",
+    "parameters": [],
+    "path": "/api/v2/auth/logout",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_current_user_info_api_v2_auth_me_get",
+    "parameters": [],
+    "path": "/api/v2/auth/me",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "refresh_token_api_v2_auth_refresh_post",
+    "parameters": [],
+    "path": "/api/v2/auth/refresh",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "reset_password_api_v2_auth_reset_password_post",
+    "parameters": [],
+    "path": "/api/v2/auth/reset-password",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "trigger_backtest_api_v2_backtesting_post",
+    "parameters": [],
+    "path": "/api/v2/backtesting",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_task_result_api_v2_backtesting_task__task_id__get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "task_id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/backtesting/task/{task_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_backtest_results_api_v2_backtesting__rule_id__get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/backtesting/{rule_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "cancel_backtest_api_v2_backtesting__task_id__delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "task_id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/backtesting/{task_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "retry_backtest_api_v2_backtesting__task_id__retry_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "task_id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/backtesting/{task_id}/retry",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_cases_api_v2_cases_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "alert_incident_id",
+        "required": false,
+        "schema": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "alert_rule_id",
+        "required": false,
+        "schema": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "alert_severity",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "alerted_from",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "alerted_to",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "assigned_to",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "created_from",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "created_to",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "decision_state",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "outcome",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "priority_min",
+        "required": false,
+        "schema": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "q",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "status",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "transaction_id",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "updated_from",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "updated_to",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/cases",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_case_assignees_api_v2_cases_assignees_get",
+    "parameters": [],
+    "path": "/api/v2/cases/assignees",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_case_api_v2_cases__case_id__get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "case_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/cases/{case_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "operation_id": "update_case_api_v2_cases__case_id__patch",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "case_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/cases/{case_id}",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "add_case_note_route_api_v2_cases__case_id__notes_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "case_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/cases/{case_id}/notes",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "resolve_case_route_api_v2_cases__case_id__resolve_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "case_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/cases/{case_id}/resolve",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "evaluate_api_v2_evaluate_post",
+    "parameters": [],
+    "path": "/api/v2/evaluate",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "test_event_api_v2_event_tests_post",
+    "parameters": [],
+    "path": "/api/v2/event-tests",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_features_api_v2_features_get",
+    "parameters": [],
+    "path": "/api/v2/features",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "create_feature_api_v2_features_post",
+    "parameters": [],
+    "path": "/api/v2/features",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "delete_feature_api_v2_features__feature_id__delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "feature_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/features/{feature_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "PUT",
+    "operation_id": "update_feature_api_v2_features__feature_id__put",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "feature_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/features/{feature_id}",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "activate_feature_api_v2_features__feature_id__activate_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "feature_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/features/{feature_id}/activate",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "feature_dependencies_api_v2_features__feature_id__dependencies_get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "feature_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/features/{feature_id}/dependencies",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "deprecate_feature_api_v2_features__feature_id__deprecate_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "feature_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/features/{feature_id}/deprecate",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "preview_feature_api_v2_features__feature_id__preview_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "feature_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/features/{feature_id}/preview",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_field_type_configs_api_v2_field_types_get",
+    "parameters": [],
+    "path": "/api/v2/field-types",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "upsert_field_type_config_api_v2_field_types_post",
+    "parameters": [],
+    "path": "/api/v2/field-types",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_field_observations_api_v2_field_types_observations_get",
+    "parameters": [],
+    "path": "/api/v2/field-types/observations",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "delete_field_type_config_api_v2_field_types__field_name__delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "field_name",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/field-types/{field_name}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "PUT",
+    "operation_id": "update_field_type_config_api_v2_field_types__field_name__put",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "field_name",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/field-types/{field_name}",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_events_api_v2_integration_events_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "cursor",
+        "required": false,
+        "schema": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "event_type",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 100,
+          "maximum": 500,
+          "minimum": 1,
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/integration-events",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_subscriptions_api_v2_integration_subscriptions_get",
+    "parameters": [],
+    "path": "/api/v2/integration-subscriptions",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "create_subscription_api_v2_integration_subscriptions_post",
+    "parameters": [],
+    "path": "/api/v2/integration-subscriptions",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "PATCH",
+    "operation_id": "update_subscription_api_v2_integration_subscriptions__subscription_id__patch",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "subscription_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/integration-subscriptions/{subscription_id}",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_labels_api_v2_labels_get",
+    "parameters": [],
+    "path": "/api/v2/labels",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "create_label_api_v2_labels_post",
+    "parameters": [],
+    "path": "/api/v2/labels",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "create_labels_bulk_api_v2_labels_bulk_post",
+    "parameters": [],
+    "path": "/api/v2/labels/bulk",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "mark_event_api_v2_labels_mark_event_post",
+    "parameters": [],
+    "path": "/api/v2/labels/mark-event",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "upload_labels_api_v2_labels_upload_post",
+    "parameters": [],
+    "path": "/api/v2/labels/upload",
+    "request_content": [
+      "multipart/form-data"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "delete_label_api_v2_labels__label_name__delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "label_name",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/labels/{label_name}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_notifications_api_v2_notifications_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 10,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "unread_only",
+        "required": false,
+        "schema": {
+          "default": false,
+          "type": "boolean"
+        }
+      }
+    ],
+    "path": "/api/v2/notifications",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "mark_all_notifications_read_api_v2_notifications_read_all_post",
+    "parameters": [],
+    "path": "/api/v2/notifications/read-all",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_unread_notification_count_api_v2_notifications_unread_count_get",
+    "parameters": [],
+    "path": "/api/v2/notifications/unread-count",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "mark_notification_read_api_v2_notifications__notification_id__read_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "notification_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/notifications/{notification_id}/read",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_outcomes_api_v2_outcomes_get",
+    "parameters": [],
+    "path": "/api/v2/outcomes",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "create_outcome_api_v2_outcomes_post",
+    "parameters": [],
+    "path": "/api/v2/outcomes",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "delete_outcome_api_v2_outcomes__outcome_name__delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "outcome_name",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    ],
+    "path": "/api/v2/outcomes/{outcome_name}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_roles_api_v2_roles_get",
+    "parameters": [],
+    "path": "/api/v2/roles",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "create_role_api_v2_roles_post",
+    "parameters": [],
+    "path": "/api/v2/roles",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_permissions_api_v2_roles_permissions_get",
+    "parameters": [],
+    "path": "/api/v2/roles/permissions",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "delete_role_api_v2_roles__role_id__delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "role_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/roles/{role_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_role_api_v2_roles__role_id__get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "role_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/roles/{role_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "PUT",
+    "operation_id": "update_role_api_v2_roles__role_id__put",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "role_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/roles/{role_id}",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_role_permissions_endpoint_api_v2_roles__role_id__permissions_get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "role_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/roles/{role_id}/permissions",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "PUT",
+    "operation_id": "update_role_permissions_api_v2_roles__role_id__permissions_put",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "role_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/roles/{role_id}/permissions",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_rollout_config_api_v2_rollouts_get",
+    "parameters": [],
+    "path": "/api/v2/rollouts",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_rollout_results_api_v2_rollouts_results_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rollouts/results",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_rollout_stats_api_v2_rollouts_stats_get",
+    "parameters": [],
+    "path": "/api/v2/rollouts/stats",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_rules_api_v2_rules_get",
+    "parameters": [],
+    "path": "/api/v2/rules",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "create_rule_api_v2_rules_post",
+    "parameters": [],
+    "path": "/api/v2/rules",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "record_ai_rule_draft_applied_api_v2_rules_ai_apply_post",
+    "parameters": [],
+    "path": "/api/v2/rules/ai/apply",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "generate_ai_rule_draft_api_v2_rules_ai_draft_post",
+    "parameters": [],
+    "path": "/api/v2/rules/ai/draft",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "PUT",
+    "operation_id": "update_main_rule_order_api_v2_rules_main_order_put",
+    "parameters": [],
+    "path": "/api/v2/rules/main-order",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "test_rule_api_v2_rules_test_post",
+    "parameters": [],
+    "path": "/api/v2/rules/test",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "verify_rule_api_v2_rules_verify_post",
+    "parameters": [],
+    "path": "/api/v2/rules/verify",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "delete_rule_api_v2_rules__rule_id__delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "204"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_rule_api_v2_rules__rule_id__get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "PUT",
+    "operation_id": "update_rule_api_v2_rules__rule_id__put",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "archive_rule_api_v2_rules__rule_id__archive_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/archive",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_rule_history_api_v2_rules__rule_id__history_get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 10,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/history",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "pause_rule_api_v2_rules__rule_id__pause_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/pause",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "promote_rule_api_v2_rules__rule_id__promote_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/promote",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "resume_rule_api_v2_rules__rule_id__resume_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/resume",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_rule_revision_api_v2_rules__rule_id__revisions__revision_number__get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "revision_number",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/revisions/{revision_number}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "rollback_rule_api_v2_rules__rule_id__rollback_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/rollback",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "remove_from_rollout_api_v2_rules__rule_id__rollout_delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/rollout",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "deploy_to_rollout_api_v2_rules__rule_id__rollout_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/rollout",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "promote_rollout_to_production_api_v2_rules__rule_id__rollout_promote_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/rollout/promote",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "remove_from_shadow_api_v2_rules__rule_id__shadow_delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/shadow",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "deploy_to_shadow_api_v2_rules__rule_id__shadow_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/shadow",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "promote_to_production_api_v2_rules__rule_id__shadow_promote_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/shadow/promote",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_rule_triggered_events_api_v2_rules__rule_id__triggered_events_get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "rule_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 10,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "schema": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/rules/{rule_id}/triggered-events",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_ai_authoring_settings_api_v2_settings_ai_authoring_get",
+    "parameters": [],
+    "path": "/api/v2/settings/ai-authoring",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "PUT",
+    "operation_id": "update_ai_authoring_settings_api_v2_settings_ai_authoring_put",
+    "parameters": [],
+    "path": "/api/v2/settings/ai-authoring",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_outcome_hierarchy_api_v2_settings_outcome_hierarchy_get",
+    "parameters": [],
+    "path": "/api/v2/settings/outcome-hierarchy",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "PUT",
+    "operation_id": "update_outcome_hierarchy_api_v2_settings_outcome_hierarchy_put",
+    "parameters": [],
+    "path": "/api/v2/settings/outcome-hierarchy",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_rule_quality_pairs_api_v2_settings_rule_quality_pairs_get",
+    "parameters": [],
+    "path": "/api/v2/settings/rule-quality-pairs",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "create_rule_quality_pair_api_v2_settings_rule_quality_pairs_post",
+    "parameters": [],
+    "path": "/api/v2/settings/rule-quality-pairs",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_rule_quality_pair_options_api_v2_settings_rule_quality_pairs_options_get",
+    "parameters": [],
+    "path": "/api/v2/settings/rule-quality-pairs/options",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "delete_rule_quality_pair_api_v2_settings_rule_quality_pairs__pair_id__delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "pair_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/settings/rule-quality-pairs/{pair_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "204"
+    ]
+  },
+  {
+    "method": "PUT",
+    "operation_id": "update_rule_quality_pair_api_v2_settings_rule_quality_pairs__pair_id__put",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "pair_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/settings/rule-quality-pairs/{pair_id}",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_runtime_settings_api_v2_settings_runtime_get",
+    "parameters": [],
+    "path": "/api/v2/settings/runtime",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "PUT",
+    "operation_id": "update_runtime_settings_api_v2_settings_runtime_put",
+    "parameters": [],
+    "path": "/api/v2/settings/runtime",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_shadow_config_api_v2_shadow_get",
+    "parameters": [],
+    "path": "/api/v2/shadow",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_shadow_results_api_v2_shadow_results_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/shadow/results",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_shadow_stats_api_v2_shadow_stats_get",
+    "parameters": [],
+    "path": "/api/v2/shadow/stats",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_tested_events_api_v2_tested_events_get",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "include_referenced_fields",
+        "required": false,
+        "schema": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 50,
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/tested-events",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "tested_event_graph_api_v2_tested_events__evaluation_decision_id__graph_get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "evaluation_decision_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "expand_entity_type",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "expand_entity_value_hash",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "max_events",
+        "required": false,
+        "schema": {
+          "default": 25,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      {
+        "in": "query",
+        "name": "max_hops",
+        "required": false,
+        "schema": {
+          "default": 3,
+          "maximum": 5,
+          "minimum": 1,
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/tested-events/{evaluation_decision_id}/graph",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_user_lists_api_v2_user_lists_get",
+    "parameters": [],
+    "path": "/api/v2/user-lists",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "create_user_list_api_v2_user_lists_post",
+    "parameters": [],
+    "path": "/api/v2/user-lists",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "delete_user_list_api_v2_user_lists__list_id__delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "list_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/user-lists/{list_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_user_list_api_v2_user_lists__list_id__get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "list_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/user-lists/{list_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "PUT",
+    "operation_id": "update_user_list_api_v2_user_lists__list_id__put",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "list_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/user-lists/{list_id}",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_list_entries_api_v2_user_lists__list_id__entries_get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "list_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/user-lists/{list_id}/entries",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "add_entry_api_v2_user_lists__list_id__entries_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "list_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/user-lists/{list_id}/entries",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "bulk_add_entries_api_v2_user_lists__list_id__entries_bulk_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "list_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/user-lists/{list_id}/entries/bulk",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "delete_entry_api_v2_user_lists__list_id__entries__entry_id__delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "entry_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "path",
+        "name": "list_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/user-lists/{list_id}/entries/{entry_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "list_users_api_v2_users_get",
+    "parameters": [],
+    "path": "/api/v2/users",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "create_user_api_v2_users_post",
+    "parameters": [],
+    "path": "/api/v2/users",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "201"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "invite_user_api_v2_users_invite_post",
+    "parameters": [],
+    "path": "/api/v2/users/invite",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "delete_user_api_v2_users__user_id__delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "user_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/users/{user_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "get_user_api_v2_users__user_id__get",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "user_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/users/{user_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "PUT",
+    "operation_id": "update_user_api_v2_users__user_id__put",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "user_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/users/{user_id}",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "POST",
+    "operation_id": "assign_role_api_v2_users__user_id__roles_post",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "user_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/users/{user_id}/roles",
+    "request_content": [
+      "application/json"
+    ],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "operation_id": "remove_role_api_v2_users__user_id__roles__role_id__delete",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "role_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      {
+        "in": "path",
+        "name": "user_id",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    ],
+    "path": "/api/v2/users/{user_id}/roles/{role_id}",
+    "request_content": [],
+    "security": [
+      "OAuth2PasswordBearer"
+    ],
+    "success_responses": [
+      "200"
+    ]
+  },
+  {
+    "method": "GET",
+    "operation_id": "ping_ping_get",
+    "parameters": [],
+    "path": "/ping",
+    "request_content": [],
+    "security": [],
+    "success_responses": [
+      "200"
+    ]
+  }
+]
