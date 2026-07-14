@@ -2,6 +2,8 @@ import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from sqlalchemy import text
+
 from ezrules.backend import shadow_evaluation_queue
 from ezrules.backend.api_v2.routes import evaluator as evaluator_router
 from ezrules.backend.data_utils import Event, store_eval_result
@@ -12,7 +14,13 @@ from ezrules.core.rule_updater import (
     get_deployment_config,
 )
 from ezrules.core.user_lists import PersistentUserListManager
-from ezrules.models.backend_core import EventVersion, FeatureDefinition, Organisation, ShadowResultsLog
+from ezrules.models.backend_core import (
+    EvaluationDecision,
+    EventVersion,
+    FeatureDefinition,
+    Organisation,
+    ShadowResultsLog,
+)
 from ezrules.models.backend_core import Rule as RuleModel
 from tests.canonical_helpers import _hash_payload
 
@@ -204,3 +212,37 @@ def test_shadow_only_feature_failure_does_not_change_production_resolution(sessi
 
     assert production_stats == {}
     assert shadow_stats is None
+
+
+def test_shadow_stat_database_failure_rolls_back_only_savepoint(session, monkeypatch) -> None:
+    org_id, as_of, _rule, shadow_snapshot = _seed_shadow_stat_contract(session)
+
+    class FailingFeatureResolver:
+        def __init__(self, db, o_id) -> None:
+            del o_id
+            self.db = db
+
+        def resolve_with_traces(self, event_data, resolution_time, stat_paths):
+            del event_data, resolution_time, stat_paths
+            self.db.execute(text("SELECT 1 / 0"))
+
+    monkeypatch.setattr(evaluator_router, "FeatureResolver", FailingFeatureResolver)
+    shadow_stats = evaluator_router._resolve_shadow_evaluation_stats(
+        db=session,
+        o_id=org_id,
+        event_data={"sender_id": "S1"},
+        as_of=as_of,
+        production_stats={},
+        shadow_entries=list(shadow_snapshot.config),
+        list_provider=PersistentUserListManager(session, org_id),
+    )
+
+    assert shadow_stats is None
+    assert session.execute(text("SELECT 1")).scalar_one() == 1
+    decision_id = _create_decision(
+        session,
+        o_id=org_id,
+        event_id="shadow-stat-db-failure-production-evaluation",
+        as_of=as_of,
+    )
+    assert session.query(EvaluationDecision).filter(EvaluationDecision.ed_id == decision_id).one()

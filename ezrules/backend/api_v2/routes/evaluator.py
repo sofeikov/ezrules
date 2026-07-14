@@ -210,11 +210,12 @@ def _resolve_shadow_evaluation_stats(
     if not shadow_only_stat_paths:
         return dict(production_stats)
     try:
-        shadow_only_stats, _traces = FeatureResolver(db, o_id).resolve_with_traces(
-            event_data,
-            as_of,
-            shadow_only_stat_paths,
-        )
+        with db.begin_nested():
+            shadow_only_stats, _traces = FeatureResolver(db, o_id).resolve_with_traces(
+                event_data,
+                as_of,
+                shadow_only_stat_paths,
+            )
     except FeatureResolutionError as exc:
         logger.warning("Skipping shadow evaluation after feature resolution failure for org_id=%s: %s", o_id, exc)
         return None
