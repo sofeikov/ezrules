@@ -154,3 +154,31 @@ def test_pr_changes_include_deleted_paths_without_git_quoting(tmp_path: Path) ->
     )
 
     assert changed.stdout.splitlines() == ["ezrules/retiré.py"]
+
+
+def test_pr_changes_expand_shipped_to_docs_rename_for_version_policy(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _initialize_repo(repo)
+    _commit_file(repo, "ezrules/rule_syntax.py", "syntax = 'strict'\n", "add shipped file")
+    _git(repo, "branch", "feature")
+    base_sha = _git(repo, "rev-parse", "main")
+
+    _git(repo, "checkout", "feature")
+    (repo / "docs").mkdir()
+    _git(repo, "mv", "ezrules/rule_syntax.py", "docs/rule-syntax.py")
+    _git(repo, "commit", "-m", "move shipped file into docs")
+    head_sha = _git(repo, "rev-parse", "feature")
+
+    changed = subprocess.run(
+        ["bash", str(CHANGED_FILES_SCRIPT), base_sha, head_sha],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+
+    changed_paths = changed.stdout.splitlines()
+    assert set(changed_paths) == {"docs/rule-syntax.py", "ezrules/rule_syntax.py"}
+    policy = _run_policy("1.29.0", "1.29.0", changed_paths)
+    assert policy.returncode == 1
+    assert "ezrules/rule_syntax.py" in policy.stderr

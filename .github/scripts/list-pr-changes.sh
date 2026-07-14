@@ -6,6 +6,7 @@ head_ref="${2:?head ref is required}"
 
 git -c core.quotePath=false diff \
   --merge-base \
+  --no-renames \
   --name-only \
   --diff-filter=ACMRD \
   "$base_ref" \
