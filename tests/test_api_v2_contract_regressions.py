@@ -60,7 +60,8 @@ def _operation_inventory(schema: dict[str, Any]) -> list[dict[str, Any]]:
                 parameter_schema = parameter.get("schema", {})
                 if "anyOf" in parameter_schema:
                     parameter_schema = next(
-                        candidate for candidate in parameter_schema["anyOf"] if candidate.get("type") != "null"
+                        (candidate for candidate in parameter_schema["anyOf"] if candidate.get("type") != "null"),
+                        parameter_schema,
                     )
                 tracked_parameters.append(
                     {
@@ -133,6 +134,35 @@ def test_openapi_operation_inventory_matches_snapshot() -> None:
     expected = json.loads(SNAPSHOT_PATH.read_text())
 
     assert _operation_inventory(app.openapi()) == expected
+
+
+def test_openapi_inventory_tolerates_null_only_any_of_parameter() -> None:
+    schema = {
+        "paths": {
+            "/example": {
+                "get": {
+                    "operationId": "example",
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "cursor",
+                            "schema": {"anyOf": [{"type": "null"}]},
+                        }
+                    ],
+                    "responses": {"200": {"description": "ok"}},
+                }
+            }
+        }
+    }
+
+    assert _operation_inventory(schema)[0]["parameters"] == [
+        {
+            "in": "query",
+            "name": "cursor",
+            "required": False,
+            "schema": {},
+        }
+    ]
 
 
 def test_openapi_has_unique_operation_ids_and_no_undeclared_public_routes() -> None:
