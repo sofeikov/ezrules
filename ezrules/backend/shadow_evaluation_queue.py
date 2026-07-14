@@ -38,6 +38,7 @@ def _serialize_shadow_payload(
     o_id: int,
     event_id: str,
     event_data: dict[str, Any],
+    stats: dict[str, Any],
     production_all_rule_results: dict[Any, Any],
     evaluation_decision_id: int | None,
     event_version_id: int | None,
@@ -50,6 +51,7 @@ def _serialize_shadow_payload(
             "o_id": o_id,
             "event_id": event_id,
             "event_data": event_data,
+            "stats": stats,
             "evaluation_decision_id": evaluation_decision_id,
             "event_version_id": event_version_id,
             "production_all_rule_results": {str(r_id): result for r_id, result in production_all_rule_results.items()},
@@ -68,6 +70,7 @@ def enqueue_shadow_evaluation(
     db,
     o_id: int,
     event_data: dict[str, Any],
+    stats: dict[str, Any] | None = None,
     production_all_rule_results: dict[Any, Any],
     event_id: str | None = None,
     transaction_id: str | None = None,
@@ -88,6 +91,7 @@ def enqueue_shadow_evaluation(
         o_id=o_id,
         event_id=event_id,
         event_data=event_data,
+        stats=dict(stats or {}),
         production_all_rule_results=production_all_rule_results,
         evaluation_decision_id=evaluation_decision_id,
         event_version_id=event_version_id,
@@ -131,6 +135,7 @@ def _persist_shadow_results(payload: dict[str, Any]) -> int:
     evaluation_decision_id = int(payload["evaluation_decision_id"])
     event_id = str(payload.get("event_id") or "")
     event_data = dict(payload.get("event_data") or {})
+    stats = dict(payload.get("stats") or {})
     production_all_rule_results = {
         int(r_id): result for r_id, result in dict(payload.get("production_all_rule_results") or {}).items()
     }
@@ -149,7 +154,7 @@ def _persist_shadow_results(payload: dict[str, Any]) -> int:
         list_values_provider=list_provider,
         execution_mode=main_rule_execution_mode,
     )
-    shadow_result = shadow_engine(event_data)
+    shadow_result = shadow_engine(event_data, stats=stats)
 
     persisted_logs = 0
     try:

@@ -451,6 +451,7 @@ def evaluate(
         o_id=int(lre.o_id),
         event_id=str(event.transaction_id),
         event_data=event.event_data,
+        stats=stats,
         production_all_rule_results=dict(production_result.get("all_rule_results", {})),
         evaluation_decision_id=int(result["evaluation_id"]),
         event_version_id=int(result["event_version_id"]),

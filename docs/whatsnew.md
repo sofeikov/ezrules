@@ -1,5 +1,10 @@
 # What's New
 
+## v1.29.1
+
+* **Cross-surface rule parity**: Live evaluation, Event Tester, Test Rule, backtesting, shadow candidates, percentage rollouts, and agent replay now share a generated regression contract for casting, computed features, rule ordering, matched and unmatched outcomes, and input errors.
+* **Feature-aware shadow evaluation**: Asynchronous shadow work now carries the computed-feature snapshot resolved for the served decision, so `stat[...]` rules compare candidates against the same point-in-time values used by production and rollout evaluation.
+
 ## v1.29.0
 
 * **Alert-backed case review**: Outcome-spike incidents now attach every contributing current evaluation to its existing case, preserving one assignment, notes, disposition, and audit workflow instead of introducing a parallel alert queue.

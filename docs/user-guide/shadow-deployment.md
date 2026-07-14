@@ -31,7 +31,7 @@ Backtesting is good for getting initial calibration and finding edge cases in yo
 Every call to `POST /api/v2/evaluate` runs two evaluations:
 
 1. The **production** evaluation against the active production config. Results are returned to the caller as normal.
-2. A **best-effort shadow** evaluation against the shadow config. Results are written to `shadow_results_log` and never returned.
+2. A **best-effort shadow** evaluation against the shadow config. Results are written to `shadow_results_log` and never returned. The queued shadow snapshot includes the computed `stat[...]` values resolved for the served decision, so shadow and production compare the same point-in-time feature inputs even though shadow execution happens later.
 
 If the shadow evaluation fails for any reason, the error is silenced. The main response is never affected.
 
