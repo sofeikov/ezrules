@@ -30,6 +30,7 @@ curl -X POST http://localhost:8888/api/v2/auth/login \
 - Send access token as `Authorization: Bearer <access_token>`
 - Access tokens include an `org_id` claim. Manager requests reject tokens whose `org_id` no longer matches the authenticated user's stored organisation.
 - `POST /api/v2/evaluate` requires either an `X-API-Key` header (recommended for service-to-service) or a valid Bearer token
+- OpenAPI exposes those evaluator credentials as alternative `ApiKeyAuth` or OAuth2 security requirements; clients do not need to send both.
 
 ## Cross-cutting Request Contracts
 

@@ -16,7 +16,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from ezrules.backend import data_utils
 from ezrules.backend.alerts import enqueue_alert_detection
-from ezrules.backend.api_v2.auth.dependencies import get_current_evaluator_org_id, get_db, require_permission
+from ezrules.backend.api_v2.auth.dependencies import (
+    get_current_evaluator_org_id,
+    get_current_org_id,
+    get_db,
+    require_permission,
+)
 from ezrules.backend.api_v2.schemas.evaluator import (
     EvaluateRequest,
     EvaluateResponse,
@@ -57,11 +62,8 @@ _shadow_lre: LocalRuleExecutorSQL | None = None
 _allowlist_lre: LocalRuleExecutorSQL | None = None
 
 
-def _get_rule_executor(
-    current_org_id: int = Depends(get_current_evaluator_org_id),
-    db=Depends(get_db),  # noqa: B008
-) -> LocalRuleExecutorSQL:
-    """Return the test-injected executor or a request-scoped production executor."""
+def _build_rule_executor(current_org_id: int, db: Any) -> LocalRuleExecutorSQL:
+    """Return the test-injected executor or a request-scoped production executor for an organisation."""
     if app_settings.TESTING and _lre is not None:
         return _lre
     return LocalRuleExecutorSQL(
@@ -69,6 +71,20 @@ def _get_rule_executor(
         o_id=current_org_id,
         execution_mode=get_main_rule_execution_mode(db, current_org_id),
     )
+
+
+def _get_rule_executor(
+    current_org_id: int = Depends(get_current_evaluator_org_id),
+    db=Depends(get_db),  # noqa: B008
+) -> LocalRuleExecutorSQL:
+    return _build_rule_executor(current_org_id, db)
+
+
+def _get_event_test_rule_executor(
+    current_org_id: int = Depends(get_current_org_id),
+    db=Depends(get_db),  # noqa: B008
+) -> LocalRuleExecutorSQL:
+    return _build_rule_executor(current_org_id, db)
 
 
 def _get_shadow_executor(
@@ -86,14 +102,25 @@ def _get_shadow_executor(
     )
 
 
+def _build_allowlist_executor(current_org_id: int, db: Any) -> LocalRuleExecutorSQL:
+    """Return the test-injected allowlist executor or a request-scoped executor for an organisation."""
+    if app_settings.TESTING and _allowlist_lre is not None:
+        return _allowlist_lre
+    return LocalRuleExecutorSQL(db=db, o_id=current_org_id, label=ALLOWLIST_CONFIG_LABEL)
+
+
 def _get_allowlist_executor(
     current_org_id: int = Depends(get_current_evaluator_org_id),
     db=Depends(get_db),  # noqa: B008
 ) -> LocalRuleExecutorSQL:
-    """Return the test-injected allowlist executor or a request-scoped executor."""
-    if app_settings.TESTING and _allowlist_lre is not None:
-        return _allowlist_lre
-    return LocalRuleExecutorSQL(db=db, o_id=current_org_id, label=ALLOWLIST_CONFIG_LABEL)
+    return _build_allowlist_executor(current_org_id, db)
+
+
+def _get_event_test_allowlist_executor(
+    current_org_id: int = Depends(get_current_org_id),
+    db=Depends(get_db),  # noqa: B008
+) -> LocalRuleExecutorSQL:
+    return _build_allowlist_executor(current_org_id, db)
 
 
 def _get_assignment_key(event: Event) -> str:
@@ -476,8 +503,8 @@ def evaluate(
 @router.post("/event-tests", response_model=EventTestResponse)
 def test_event(
     request_data: EvaluateRequest,
-    lre: LocalRuleExecutorSQL = Depends(_get_rule_executor),
-    allowlist_lre: LocalRuleExecutorSQL = Depends(_get_allowlist_executor),
+    lre: LocalRuleExecutorSQL = Depends(_get_event_test_rule_executor),
+    allowlist_lre: LocalRuleExecutorSQL = Depends(_get_event_test_allowlist_executor),
     db: Any = Depends(get_db),
     _: None = Depends(require_permission(PermissionAction.SUBMIT_TEST_EVENTS)),
 ) -> EventTestResponse:

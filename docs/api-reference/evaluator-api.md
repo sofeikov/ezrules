@@ -34,6 +34,8 @@ curl -X POST http://localhost:8888/api/v2/evaluate \
 
 API keys are created via `POST /api/v2/api-keys` (requires `MANAGE_API_KEYS` permission).
 The raw key is shown **once** at creation time and is never retrievable again.
+The generated OpenAPI document exposes this header as the `ApiKeyAuth` security scheme and lists it as an
+alternative to OAuth bearer authentication for `POST /api/v2/evaluate`; callers send one credential type, not both.
 
 ### Bearer token (for existing user sessions)
 

@@ -32,8 +32,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from fastapi import Depends, Header, HTTPException, Request, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from sqlalchemy.orm import joinedload, sessionmaker
 
 from ezrules.backend.api_key_cache import load_api_key_auth_metadata
@@ -58,6 +58,11 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # When you click it and enter credentials, Swagger POSTs to this URL.
 # auto_error=False allows unauthenticated requests (for optional auth mode)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v2/auth/login", auto_error=False)
+evaluator_api_key_scheme = APIKeyHeader(
+    name="X-API-Key",
+    scheme_name="ApiKeyAuth",
+    auto_error=False,
+)
 
 
 @dataclass(slots=True)
@@ -408,7 +413,7 @@ def require_permission(
 
 def get_evaluator_auth(
     request: Request,
-    api_key: str | None = Header(default=None, alias="X-API-Key"),
+    api_key: str | None = Depends(evaluator_api_key_scheme),
     token: str | None = Depends(oauth2_scheme),
     db: Any = Depends(get_db),
 ) -> int:

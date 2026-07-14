@@ -26,6 +26,8 @@ PUBLIC_OPERATIONS = {
     ("POST", "/api/v2/auth/refresh"),
     ("POST", "/api/v2/auth/reset-password"),
 }
+OAUTH_SECURITY = [["OAuth2PasswordBearer"]]
+EVALUATOR_SECURITY = [["ApiKeyAuth"], ["OAuth2PasswordBearer"]]
 REPRESENTATIVE_PROTECTED_READS = (
     "/api/v2/alerts/rules",
     "/api/v2/analytics/labels-summary",
@@ -76,7 +78,7 @@ def _operation_inventory(schema: dict[str, Any]) -> list[dict[str, Any]]:
                     }
                 )
 
-            security = sorted(scheme for requirement in operation.get("security", []) for scheme in requirement)
+            security = sorted(sorted(requirement) for requirement in operation.get("security", []))
             request_content = sorted(operation.get("requestBody", {}).get("content", {}).keys())
             operations.append(
                 {
@@ -177,10 +179,32 @@ def test_openapi_has_unique_operation_ids_and_no_undeclared_public_routes() -> N
     assert len(operation_ids) == len(set(operation_ids))
     assert public_operations == PUBLIC_OPERATIONS
     assert all(
-        operation["security"] == ["OAuth2PasswordBearer"]
+        operation["security"]
+        == (
+            EVALUATOR_SECURITY
+            if (operation["method"], operation["path"]) == ("POST", "/api/v2/evaluate")
+            else OAUTH_SECURITY
+        )
         for operation in operations
         if operation["path"].startswith("/api/v2") and (operation["method"], operation["path"]) not in PUBLIC_OPERATIONS
     )
+
+
+def test_evaluator_openapi_declares_api_key_or_oauth_security() -> None:
+    schema = app.openapi()
+
+    assert schema["components"]["securitySchemes"]["ApiKeyAuth"] == {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+    }
+    assert schema["paths"]["/api/v2/evaluate"]["post"]["security"] == [
+        {"ApiKeyAuth": []},
+        {"OAuth2PasswordBearer": []},
+    ]
+    assert schema["paths"]["/api/v2/event-tests"]["post"]["security"] == [
+        {"OAuth2PasswordBearer": []},
+    ]
 
 
 def test_openapi_declares_validation_errors_for_validated_inputs() -> None:

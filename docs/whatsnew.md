@@ -1,5 +1,10 @@
 # What's New
 
+## v1.29.1
+
+* **Accurate evaluator authentication schema**: OpenAPI now publishes `X-API-Key` and OAuth bearer authentication as alternatives for `POST /api/v2/evaluate`, matching the credentials accepted by the runtime and the documented service-to-service integration path.
+* **Security-alternative regression coverage**: The API contract inventory now preserves OpenAPI OR-versus-AND security semantics so future schema changes cannot silently narrow or combine supported authentication methods.
+
 ## v1.29.0
 
 * **Alert-backed case review**: Outcome-spike incidents now attach every contributing current evaluation to its existing case, preserving one assignment, notes, disposition, and audit workflow instead of introducing a parallel alert queue.

@@ -19,7 +19,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -34,7 +36,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -59,7 +63,9 @@
     "path": "/api/v2/alerts/incidents",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -81,7 +87,9 @@
     "path": "/api/v2/alerts/incidents/{incident_id}/acknowledge",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -94,7 +102,9 @@
     "path": "/api/v2/alerts/rules",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -109,7 +119,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -133,7 +145,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -156,7 +170,9 @@
     "path": "/api/v2/analytics/labeled-transaction-volume",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -179,7 +195,9 @@
     "path": "/api/v2/analytics/labels-distribution",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -192,7 +210,9 @@
     "path": "/api/v2/analytics/labels-summary",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -215,7 +235,9 @@
     "path": "/api/v2/analytics/outcomes-distribution",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -249,7 +271,9 @@
     "path": "/api/v2/analytics/rule-activity",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -282,7 +306,9 @@
     "path": "/api/v2/analytics/rule-quality",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -297,7 +323,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -319,7 +347,9 @@
     "path": "/api/v2/analytics/rule-quality/reports/{report_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -350,7 +380,9 @@
     "path": "/api/v2/analytics/rules/{rule_id}/outcomes-distribution",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -373,7 +405,9 @@
     "path": "/api/v2/analytics/transaction-volume",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -386,7 +420,9 @@
     "path": "/api/v2/api-keys",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -401,7 +437,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -423,7 +461,9 @@
     "path": "/api/v2/api-keys/{gid}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "204"
@@ -436,7 +476,9 @@
     "path": "/api/v2/audit",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -495,7 +537,9 @@
     "path": "/api/v2/audit/ai-rule-authoring",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -546,7 +590,9 @@
     "path": "/api/v2/audit/api-keys",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -605,7 +651,9 @@
     "path": "/api/v2/audit/config",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -664,7 +712,9 @@
     "path": "/api/v2/audit/features",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -723,7 +773,9 @@
     "path": "/api/v2/audit/field-types",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -774,7 +826,9 @@
     "path": "/api/v2/audit/labels",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -825,7 +879,9 @@
     "path": "/api/v2/audit/outcomes",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -884,7 +940,9 @@
     "path": "/api/v2/audit/roles",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -943,7 +1001,9 @@
     "path": "/api/v2/audit/rules",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -965,7 +1025,9 @@
     "path": "/api/v2/audit/rules/{rule_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1016,7 +1078,9 @@
     "path": "/api/v2/audit/strict-mode",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1075,7 +1139,9 @@
     "path": "/api/v2/audit/user-lists",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1134,7 +1200,9 @@
     "path": "/api/v2/audit/users",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1188,7 +1256,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1201,7 +1271,9 @@
     "path": "/api/v2/auth/me",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1242,7 +1314,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1264,7 +1338,9 @@
     "path": "/api/v2/backtesting/task/{task_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1286,7 +1362,9 @@
     "path": "/api/v2/backtesting/{rule_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1308,7 +1386,9 @@
     "path": "/api/v2/backtesting/{task_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1330,7 +1410,9 @@
     "path": "/api/v2/backtesting/{task_id}/retry",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1496,7 +1578,9 @@
     "path": "/api/v2/cases",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1509,7 +1593,9 @@
     "path": "/api/v2/cases/assignees",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1531,7 +1617,9 @@
     "path": "/api/v2/cases/{case_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1555,7 +1643,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1579,7 +1669,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -1603,7 +1695,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1618,7 +1712,12 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "ApiKeyAuth"
+      ],
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1633,7 +1732,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1646,7 +1747,9 @@
     "path": "/api/v2/features",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1661,7 +1764,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -1683,7 +1788,9 @@
     "path": "/api/v2/features/{feature_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1707,7 +1814,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1729,7 +1838,9 @@
     "path": "/api/v2/features/{feature_id}/activate",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1751,7 +1862,9 @@
     "path": "/api/v2/features/{feature_id}/dependencies",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1773,7 +1886,9 @@
     "path": "/api/v2/features/{feature_id}/deprecate",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1797,7 +1912,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1810,7 +1927,9 @@
     "path": "/api/v2/field-types",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1825,7 +1944,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -1838,7 +1959,9 @@
     "path": "/api/v2/field-types/observations",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1860,7 +1983,9 @@
     "path": "/api/v2/field-types/{field_name}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1884,7 +2009,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1926,7 +2053,9 @@
     "path": "/api/v2/integration-events",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1939,7 +2068,9 @@
     "path": "/api/v2/integration-subscriptions",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1954,7 +2085,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -1978,7 +2111,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -1991,7 +2126,9 @@
     "path": "/api/v2/labels",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2006,7 +2143,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -2021,7 +2160,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -2036,7 +2177,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2051,7 +2194,9 @@
       "multipart/form-data"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2073,7 +2218,9 @@
     "path": "/api/v2/labels/{label_name}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2107,7 +2254,9 @@
     "path": "/api/v2/notifications",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2120,7 +2269,9 @@
     "path": "/api/v2/notifications/read-all",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2133,7 +2284,9 @@
     "path": "/api/v2/notifications/unread-count",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2155,7 +2308,9 @@
     "path": "/api/v2/notifications/{notification_id}/read",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2168,7 +2323,9 @@
     "path": "/api/v2/outcomes",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2183,7 +2340,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -2205,7 +2364,9 @@
     "path": "/api/v2/outcomes/{outcome_name}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2218,7 +2379,9 @@
     "path": "/api/v2/roles",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2233,7 +2396,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -2246,7 +2411,9 @@
     "path": "/api/v2/roles/permissions",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2268,7 +2435,9 @@
     "path": "/api/v2/roles/{role_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2290,7 +2459,9 @@
     "path": "/api/v2/roles/{role_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2314,7 +2485,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2336,7 +2509,9 @@
     "path": "/api/v2/roles/{role_id}/permissions",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2360,7 +2535,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2373,7 +2550,9 @@
     "path": "/api/v2/rollouts",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2398,7 +2577,9 @@
     "path": "/api/v2/rollouts/results",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2411,7 +2592,9 @@
     "path": "/api/v2/rollouts/stats",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2424,7 +2607,9 @@
     "path": "/api/v2/rules",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2439,7 +2624,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -2454,7 +2641,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2469,7 +2658,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2484,7 +2675,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2499,7 +2692,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2514,7 +2709,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2536,7 +2733,9 @@
     "path": "/api/v2/rules/{rule_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "204"
@@ -2558,7 +2757,9 @@
     "path": "/api/v2/rules/{rule_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2582,7 +2783,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2604,7 +2807,9 @@
     "path": "/api/v2/rules/{rule_id}/archive",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2637,7 +2842,9 @@
     "path": "/api/v2/rules/{rule_id}/history",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2659,7 +2866,9 @@
     "path": "/api/v2/rules/{rule_id}/pause",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2681,7 +2890,9 @@
     "path": "/api/v2/rules/{rule_id}/promote",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2703,7 +2914,9 @@
     "path": "/api/v2/rules/{rule_id}/resume",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2733,7 +2946,9 @@
     "path": "/api/v2/rules/{rule_id}/revisions/{revision_number}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2757,7 +2972,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2779,7 +2996,9 @@
     "path": "/api/v2/rules/{rule_id}/rollout",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2803,7 +3022,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2825,7 +3046,9 @@
     "path": "/api/v2/rules/{rule_id}/rollout/promote",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2847,7 +3070,9 @@
     "path": "/api/v2/rules/{rule_id}/shadow",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2871,7 +3096,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2893,7 +3120,9 @@
     "path": "/api/v2/rules/{rule_id}/shadow/promote",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2936,7 +3165,9 @@
     "path": "/api/v2/rules/{rule_id}/triggered-events",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2949,7 +3180,9 @@
     "path": "/api/v2/settings/ai-authoring",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2964,7 +3197,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2977,7 +3212,9 @@
     "path": "/api/v2/settings/outcome-hierarchy",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -2992,7 +3229,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3005,7 +3244,9 @@
     "path": "/api/v2/settings/rule-quality-pairs",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3020,7 +3261,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3033,7 +3276,9 @@
     "path": "/api/v2/settings/rule-quality-pairs/options",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3055,7 +3300,9 @@
     "path": "/api/v2/settings/rule-quality-pairs/{pair_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "204"
@@ -3079,7 +3326,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3092,7 +3341,9 @@
     "path": "/api/v2/settings/runtime",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3107,7 +3358,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3120,7 +3373,9 @@
     "path": "/api/v2/shadow",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3145,7 +3400,9 @@
     "path": "/api/v2/shadow/results",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3158,7 +3415,9 @@
     "path": "/api/v2/shadow/stats",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3192,7 +3451,9 @@
     "path": "/api/v2/tested-events",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3252,7 +3513,9 @@
     "path": "/api/v2/tested-events/{evaluation_decision_id}/graph",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3265,7 +3528,9 @@
     "path": "/api/v2/user-lists",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3280,7 +3545,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -3302,7 +3569,9 @@
     "path": "/api/v2/user-lists/{list_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3324,7 +3593,9 @@
     "path": "/api/v2/user-lists/{list_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3348,7 +3619,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3370,7 +3643,9 @@
     "path": "/api/v2/user-lists/{list_id}/entries",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3394,7 +3669,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -3418,7 +3695,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -3448,7 +3727,9 @@
     "path": "/api/v2/user-lists/{list_id}/entries/{entry_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3461,7 +3742,9 @@
     "path": "/api/v2/users",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3476,7 +3759,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "201"
@@ -3491,7 +3776,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3513,7 +3800,9 @@
     "path": "/api/v2/users/{user_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3535,7 +3824,9 @@
     "path": "/api/v2/users/{user_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3559,7 +3850,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3583,7 +3876,9 @@
       "application/json"
     ],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
@@ -3613,7 +3908,9 @@
     "path": "/api/v2/users/{user_id}/roles/{role_id}",
     "request_content": [],
     "security": [
-      "OAuth2PasswordBearer"
+      [
+        "OAuth2PasswordBearer"
+      ]
     ],
     "success_responses": [
       "200"
