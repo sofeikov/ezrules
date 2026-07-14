@@ -272,6 +272,13 @@ def test_shadow_routes_and_tested_events_are_org_scoped(session):
         email=_unique_email("phase2-shadow-admin"),
         permissions=[PermissionAction.VIEW_RULES, PermissionAction.MODIFY_RULE],
     )
+    session.add_all(
+        [
+            AllowedOutcome(outcome_name="ORG1_HOLD", severity_rank=1, o_id=int(org.o_id)),
+            AllowedOutcome(outcome_name="ORG2_REVIEW", severity_rank=1, o_id=int(other_org.o_id)),
+        ]
+    )
+    session.commit()
 
     org_rule = _create_rule(
         session,
