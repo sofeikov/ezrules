@@ -125,6 +125,29 @@ def is_active(rule: RuleModel) -> bool:
     return rule.status == RuleStatus.ACTIVE
 
 
+def load_rule_for_activation(db: Any, org_id: int, rule_id: int) -> RuleModel | None:
+    """Lock and refresh the exact rule row that may enter production."""
+    return (
+        db.query(RuleModel)
+        .filter(RuleModel.r_id == rule_id, RuleModel.o_id == org_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+
+
+def validate_rule_for_activation(db: Any, org_id: int, rule: RuleModel) -> None:
+    """Apply the complete current organisation contract before activation."""
+    compile_validated_rule_source(
+        db,
+        org_id,
+        str(rule.logic),
+        evaluation_lane=str(rule.evaluation_lane or RULE_EVALUATION_LANE_MAIN),
+        rid=str(rule.rid),
+        description=str(rule.description),
+    )
+
+
 def delete_rule_result_references(db: Any, rule_id: int) -> None:
     """Remove canonical per-rule result rows that would otherwise block hard deletion."""
     for model in (RuleDeploymentResultsLog, ShadowResultsLog, EvaluationRuleResult):
@@ -787,7 +810,10 @@ def update_rule(
     rule.effective_from = promoted_at
     rule.approved_by = user.id if auto_promote_active_updates else None
     rule.approved_at = promoted_at
-    rule_manager.save_rule(rule)
+    if auto_promote_active_updates:
+        rule_manager.stage_rule(rule)
+    else:
+        rule_manager.save_rule(rule)
 
     # Editing an active rule either updates production in place or removes the rule until it is re-promoted.
     if was_active:
@@ -879,7 +905,7 @@ def promote_rule(
     """Promote a draft rule to active and record who activated it."""
     rule_manager = get_rule_manager(db, current_org_id)
     config_producer = get_config_producer(db, current_org_id)
-    rule = rule_manager.load_rule(rule_id)
+    rule = load_rule_for_activation(db, current_org_id, rule_id)
     if rule is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
     ensure_no_active_candidate_deployment(db, current_org_id, rule_id)
@@ -889,6 +915,10 @@ def promote_rule(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Paused rules must be resumed")
     if rule.status == RuleStatus.ACTIVE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rule is already active")
+    try:
+        validate_rule_for_activation(db, current_org_id, rule)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     promoted_at = datetime.now(UTC)
     save_rule_history(
@@ -905,7 +935,7 @@ def promote_rule(
     rule.effective_from = promoted_at
     rule.approved_by = user.id
     rule.approved_at = promoted_at
-    rule_manager.save_rule(rule)
+    rule_manager.stage_rule(rule)
     config_producer.save_config(rule_manager, changed_by=str(user.email))
 
     return RuleMutationResponse(
@@ -969,7 +999,7 @@ def resume_rule(
     """Resume a paused rule and restore it to active status."""
     rule_manager = get_rule_manager(db, current_org_id)
     config_producer = get_config_producer(db, current_org_id)
-    rule = rule_manager.load_rule(rule_id)
+    rule = load_rule_for_activation(db, current_org_id, rule_id)
     if rule is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rule not found")
     ensure_no_active_candidate_deployment(db, current_org_id, rule_id)
@@ -979,6 +1009,10 @@ def resume_rule(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Draft rules cannot be resumed")
     if rule.status == RuleStatus.ACTIVE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rule is already active")
+    try:
+        validate_rule_for_activation(db, current_org_id, rule)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     resumed_at = datetime.now(UTC)
     save_rule_history(
@@ -995,7 +1029,7 @@ def resume_rule(
     rule.effective_from = resumed_at
     rule.approved_by = user.id
     rule.approved_at = resumed_at
-    rule_manager.save_rule(rule)
+    rule_manager.stage_rule(rule)
     config_producer.save_config(rule_manager, changed_by=str(user.email))
 
     return RuleMutationResponse(

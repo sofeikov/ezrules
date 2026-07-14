@@ -1,4 +1,5 @@
 import ast
+import copy
 import io
 import tokenize
 from collections.abc import Callable
@@ -83,10 +84,11 @@ class Rule:
     def compile_function(code: str) -> tuple[Callable, ast.Module]:
         rule_ast = ast.parse(code)
         OutcomeReturnSyntaxValidator().visit(rule_ast)
-        compiled_code = compile(rule_ast, filename="<string>", mode="exec")
+        runtime_ast = OutcomeHelperCallLowerer().visit(copy.deepcopy(rule_ast))
+        ast.fix_missing_locations(runtime_ast)
+        compiled_code = compile(runtime_ast, filename="<string>", mode="exec")
         namespace = {
             FIELD_LOOKUP_HELPER_NAME: get_field_value,
-            OUTCOME_HELPER_NAME: lambda outcome: outcome,
             STAT_LOOKUP_HELPER_NAME: get_stat_value,
         }
         exec(compiled_code, namespace)
@@ -459,3 +461,13 @@ class OutcomeReturnSyntaxValidator(ast.NodeVisitor):
     def _guess_outcome_name(self, node: ast.AST) -> str:
         inferred_value = self._infer_string_like_value(node)
         return inferred_value if isinstance(inferred_value, str) else ""
+
+
+class OutcomeHelperCallLowerer(ast.NodeTransformer):
+    """Replace validated DSL outcome calls with immutable runtime constants."""
+
+    def visit_Call(self, node: ast.Call) -> Any:
+        outcome = extract_outcome_helper_value(node)
+        if outcome is not None:
+            return ast.copy_location(ast.Constant(value=outcome), node)
+        return self.generic_visit(node)

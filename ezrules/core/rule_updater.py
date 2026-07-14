@@ -120,12 +120,24 @@ class RDBRuleManager(RuleManager):
         self.db = db
         self.o_id = o_id
 
-    def _save_rule(self, rule: RuleModel) -> None:
+    def stage_rule(self, rule: RuleModel) -> None:
+        """Validate and flush a rule without committing its production config separately."""
+        if rule.status == RuleStatus.ACTIVE:
+            with self.db.no_autoflush:
+                compiled_rule = RuleFactory.from_json(
+                    rule.__dict__,
+                    list_values_provider=PersistentUserListManager(db_session=self.db, o_id=self.o_id),
+                )
+                compiled_rule.validate_return_contract()
         if rule.r_id is None:
             rule.o_id = self.o_id
             self.db.add(rule)
         else:
             rule.version += 1
+        self.db.flush()
+
+    def _save_rule(self, rule: RuleModel) -> None:
+        self.stage_rule(rule)
         self.db.commit()
 
     def get_rule_revision_list(self, rule: Rule, return_dates=False) -> list[RuleRevision]:
@@ -199,6 +211,8 @@ class RDBRuleEngineConfigProducer(AbstractRuleEngineConfigProducer):
                 key=lambda rule: (int(rule.execution_order), int(rule.r_id)),
             )
         compiled_rules = [RuleFactory.from_json(r.__dict__, list_values_provider=list_provider) for r in active_rules]
+        for compiled_rule in compiled_rules:
+            compiled_rule.validate_return_contract()
         return [RuleConverter.to_json(r) for r in compiled_rules]
 
     def _save_rules_for_label(
@@ -453,7 +467,13 @@ def promote_candidate_deployment_to_production(
     if deployment_entry is None:
         raise ValueError(f"Rule {r_id} is not in {label} config")
 
-    rule = db.query(RuleModel).filter(RuleModel.r_id == r_id, RuleModel.o_id == o_id).first()
+    rule = (
+        db.query(RuleModel)
+        .filter(RuleModel.r_id == r_id, RuleModel.o_id == o_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
     if rule is None:
         raise ValueError(f"Rule {r_id} does not exist")
 

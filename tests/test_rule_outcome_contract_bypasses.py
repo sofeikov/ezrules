@@ -1,7 +1,10 @@
+import ast
+
 import pytest
 
 from ezrules.backend.rule_validation import validate_rule_source
 from ezrules.core.rule import ReservedRuleIdentifierError, Rule, RuleGeneratorSyntaxError
+from ezrules.core.rule_helpers import OUTCOME_HELPER_NAME, extract_outcome_helper_value
 from ezrules.models.backend_core import AllowedOutcome
 
 
@@ -65,6 +68,33 @@ def test_reserved_helper_text_in_comments_and_strings_is_inert() -> None:
 
 def test_bang_outcome_syntax_remains_valid() -> None:
     rule = Rule(rid="bang-outcome", logic="return !HOLD")
+
+    rule.validate_return_contract()
+
+    assert rule({}) == "HOLD"
+
+
+def test_outcome_helper_is_preserved_for_contract_visitors_but_absent_at_runtime() -> None:
+    rule = Rule(rid="lowered-outcome", logic="return !HOLD")
+    return_node = next(node for node in ast.walk(rule._rule_ast) if isinstance(node, ast.Return))
+
+    rule.validate_return_contract()
+
+    assert extract_outcome_helper_value(return_node.value) == "HOLD"
+    assert OUTCOME_HELPER_NAME not in rule.logic.__globals__
+    assert rule({}) == "HOLD"
+
+
+@pytest.mark.parametrize(
+    "poison_attempt",
+    [
+        'globals()["__ezrules_outcome__"] = lambda value: "NOT_CONFIGURED"',
+        'globals().update({"__ezrules_outcome__": lambda value: "NOT_CONFIGURED"})',
+        ('globals()["__ezrules_outcome__"] = lambda value: "NOT_CONFIGURED"\ndel globals()["__ezrules_outcome__"]'),
+    ],
+)
+def test_runtime_global_poisoning_cannot_change_direct_outcomes(poison_attempt: str) -> None:
+    rule = Rule(rid="poisoned-outcome", logic=f"{poison_attempt}\nreturn !HOLD")
 
     rule.validate_return_contract()
 
