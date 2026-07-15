@@ -2,6 +2,9 @@
 
 ## v1.29.1
 
+* **Recoverable asynchronous delivery**: Celery now acknowledges application tasks only after completion and requeues work when a worker is lost, while Redis-backed observation and shadow drains recover messages left in processing by interrupted workers.
+* **Idempotent shadow replay**: Duplicate shadow deliveries no longer create duplicate shadow or deployment-result ledger rows.
+* **Real multi-worker verification**: CI starts two Redis-backed Celery workers, executes every registered application task through the broker, and checks duplicate delivery, rollback, cancellation, orphan recovery, and queue locking contracts.
 * **Encrypted AI provider credentials**: Organisation-specific AI authoring API keys are now encrypted at rest with the application secret, including explicit cleared-key records, so database dumps no longer contain usable provider credentials.
 * **Fail-closed secret handling**: Invalid or undecryptable stored credentials no longer fall back to a deployment-wide provider key, while organisations without an override continue to use the configured environment default.
 

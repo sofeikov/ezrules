@@ -39,6 +39,13 @@ from ezrules.models.database import db_session
 from ezrules.settings import app_settings
 
 app = Celery("tasks", backend=f"db+{app_settings.DB_ENDPOINT}", broker=app_settings.CELERY_BROKER_URL)
+app.conf.update(
+    broker_transport_options={"visibility_timeout": 3600},
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
+    task_track_started=True,
+    worker_prefetch_multiplier=1,
+)
 app.conf.beat_schedule = {
     "drain-field-observation-queue": {
         "task": "ezrules.backend.tasks.drain_field_observation_queue",
@@ -294,6 +301,8 @@ def generate_rule_quality_report(report_id: int) -> dict[str, str]:
     report = db_session.get(RuleQualityReport, report_id)
     if report is None:
         return {"error": f"Rule quality report {report_id} not found"}
+    if report.status == "SUCCESS":
+        return {"status": "SUCCESS"}
 
     try:
         report.status = "RUNNING"

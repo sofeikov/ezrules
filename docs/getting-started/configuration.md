@@ -170,6 +170,7 @@ If you use async field-observation buffering or async shadow evaluation:
 - leave `EZRULES_OBSERVATION_QUEUE_REDIS_URL` / `EZRULES_SHADOW_EVALUATION_QUEUE_REDIS_URL` unset to reuse the main broker, or point them at dedicated Redis instances
 - keep Celery beat running so queue drain tasks execute on schedule
 - tune the `*_DRAIN_INTERVAL_SECONDS`, `*_DRAIN_BATCH_SIZE`, and `*_MAX_BATCHES_PER_DRAIN` settings only if you need different throughput or lag tradeoffs
+- do not delete the internal `<queue-key>:processing` Redis lists; interrupted workers leave reserved messages there so the next drain can recover them
 
 If you use outbound integration webhooks:
 

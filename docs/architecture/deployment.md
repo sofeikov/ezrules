@@ -69,6 +69,8 @@ Minimum task/service contract:
 - `celery-beat` must share the same code image and runtime env as `api`, plus broker connectivity
 - `init` must run to completion before `api`, `celery-worker`, and `celery-beat` are treated as ready
 
+Celery tasks use late acknowledgement, reject-on-worker-loss, a one-task prefetch multiplier, and a one-hour Redis visibility timeout. Field-observation and shadow drains additionally reserve payloads in `<queue-key>:processing` lists until their database writes commit; a later drain restores any entries orphaned by an interrupted worker. Shadow result ledgers enforce one row per evaluation, rule, and deployment mode so redelivery is safe.
+
 Minimum environment inputs:
 
 - `EZRULES_DB_ENDPOINT`

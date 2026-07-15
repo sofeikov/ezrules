@@ -673,6 +673,7 @@ class EventVersionLabel(Base):
 
 class ShadowResultsLog(Base):
     __tablename__ = "shadow_results_log"
+    __table_args__ = (UniqueConstraint("ed_id", "r_id", name="uq_shadow_results_log_ed_rule"),)
 
     sr_id = Column(Integer, unique=True, primary_key=True)
     ed_id: Mapped[int] = mapped_column(ForeignKey("evaluation_decisions.ed_id", ondelete="CASCADE"), nullable=False)
@@ -687,6 +688,7 @@ class RuleDeploymentResultsLog(Base):
         Index("ix_rule_deployment_results_log_o_id_mode_dr_id", "o_id", "mode", "dr_id"),
         Index("ix_rule_deployment_results_log_o_id_r_id", "o_id", "r_id"),
         Index("ix_rule_deployment_results_log_ed_id", "ed_id"),
+        UniqueConstraint("ed_id", "r_id", "mode", name="uq_rule_deployment_results_log_ed_rule_mode"),
     )
 
     dr_id = Column(Integer, unique=True, primary_key=True)
