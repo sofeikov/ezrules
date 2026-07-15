@@ -6,6 +6,11 @@
 # Verification Policy
 Default to GitHub-hosted verification instead of local test execution.
 
+## Protected CI/CD Configuration
+
+- Do not modify GitHub Actions workflow files, CI/CD configuration, or action/runtime versions unless the user explicitly authorizes the exact file change. Ask before touching any such file, regardless of whether the change appears to be good technical judgment.
+- A failure from the GitHub Actions check that tests whether the package version is already published to PyPI is expected and may be ignored when that is the only cause. Do not search for an unused version, bump the project version, edit release notes, or modify CI/CD in response; another agent owns the version update.
+
 - Always run `uv run poe check` locally before pushing a branch, opening a PR, or updating a PR. Fix any failures locally first so GitHub Actions does not get noisy code-quality/type/lint failures.
 - Do not run local test suites, local Playwright runs, local backend suites, or local docs builds unless the user explicitly asks for local verification or the task is specifically about diagnosing a local-only bug.
 - For normal feature/fix work, implement the change, run `uv run poe check`, create or update the PR, push it, and use GitHub Actions/PR checks as the verification source of truth for tests and full infra validation.
