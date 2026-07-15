@@ -7,8 +7,6 @@ from ezrules.backend.rule_executors.executors import LocalRuleExecutorSQL
 from ezrules.core.rule_engine import InvalidRuleResultError
 from ezrules.core.rule_updater import (
     ROLLOUT_CONFIG_LABEL,
-    RDBRuleEngineConfigProducer,
-    RDBRuleManager,
     deploy_rule_to_rollout,
     list_candidate_deployments,
 )
@@ -85,11 +83,20 @@ def test_direct_rollout_invalid_control_result_is_rejected(
     rollout_test_client,
     active_rollout_rule,
 ) -> None:
-    active_rollout_rule.logic = "return $amount > 100"
-    session.commit()
-    RDBRuleEngineConfigProducer(db=session, o_id=int(active_rollout_rule.o_id)).save_config(
-        RDBRuleManager(db=session, o_id=int(active_rollout_rule.o_id))
+    production_config = (
+        session.query(RuleEngineConfig)
+        .filter(
+            RuleEngineConfig.label == "production",
+            RuleEngineConfig.o_id == active_rollout_rule.o_id,
+        )
+        .one()
     )
+    production_config.config = [
+        {**entry, "logic": "return $amount > 100"} if int(entry["r_id"]) == int(active_rollout_rule.r_id) else entry
+        for entry in production_config.config
+    ]
+    production_config.version += 1
+    session.commit()
 
     with pytest.raises(InvalidRuleResultError, match="returned bool"):
         _evaluate_direct_rollout(session, active_rollout_rule, candidate_logic="return !CANDIDATE")
