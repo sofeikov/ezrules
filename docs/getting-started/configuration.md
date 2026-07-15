@@ -136,6 +136,9 @@ Supported options:
 ### Secrets
 
 - Use strong unique values for `EZRULES_APP_SECRET`
+- Keep `EZRULES_APP_SECRET` stable across deployments and back it up securely. It encrypts stored notification-channel configuration and organisation-specific AI provider credentials; changing it without migrating those values makes them unreadable.
+- Export the real `EZRULES_APP_SECRET` into the migration process before upgrading a database that contains stored credentials; migrations refuse to encrypt existing AI provider keys with the Alembic metadata placeholder.
+- Database backups created before upgrading to v1.29.1 can still contain plaintext organisation-specific AI provider credentials and should be rotated or removed according to your retention policy.
 - Never commit real secrets
 
 ### Database Transport Security

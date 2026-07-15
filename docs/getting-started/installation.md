@@ -62,6 +62,7 @@ docker compose -f docker-compose.prod.yml up --build
 The database is initialised empty. Login with the credentials you set in `.env`.
 By default, SMTP is routed to local Mailpit (`http://localhost:8025`) unless SMTP env vars override it.
 Re-running the same command later keeps the existing Docker volume and applies pending migrations before the stack starts.
+Keep the same `EZRULES_APP_SECRET` for every upgrade. Stored notification and organisation-specific AI credentials are encrypted with it, and the migration process must receive the real value rather than a generated replacement.
 
 Use this single-host stack to validate the production images locally. If you want an AWS-oriented deployment example, follow [Deployment Guide](../architecture/deployment.md) for the documented ECS/Fargate topology.
 
@@ -118,7 +119,7 @@ uv run ezrules bootstrap-org --name your-org --admin-email admin@example.com --a
 `init-db` creates the target database (if missing), applies Alembic migrations, and initializes the global permission action catalogue.
 `bootstrap-org` creates the organisation, seeds default roles and user lists, and creates the first admin user.
 It does not create any outcomes or labels; add those through the UI or API for each environment.
-After pulling future schema changes, run `uv run alembic upgrade head` on existing databases.
+After pulling future schema changes, export the deployment's stable `EZRULES_APP_SECRET` and run `uv run alembic upgrade head` on existing databases.
 
 ### 5) Start API and frontend
 

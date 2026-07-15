@@ -81,6 +81,8 @@ Minimum environment inputs:
 - optional `EZRULES_AI_AUTHORING_MODEL`, `EZRULES_AI_AUTHORING_BASE_URL`, and `EZRULES_AI_AUTHORING_API_KEY` if AI-assisted draft generation should work without per-org Settings configuration
 - optional `EZRULES_CORS_ALLOWED_ORIGINS` / `EZRULES_CORS_ALLOW_ORIGIN_REGEX` only for split-origin deployments
 
+Use one stable `EZRULES_APP_SECRET` across the API, workers, and `init` task. The `init` task must receive the real value during upgrades because migrations use it to encrypt existing organisation-specific AI credentials; rotating it without migrating stored secrets makes those credentials and notification-channel configuration unreadable.
+
 Recommended production rollout sequence:
 
 1. Run the `init` task against the target database.

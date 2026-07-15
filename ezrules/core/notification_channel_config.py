@@ -1,5 +1,3 @@
-import base64
-import hashlib
 import json
 import re
 from collections.abc import Mapping
@@ -7,11 +5,9 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
-from cryptography.fernet import Fernet, InvalidToken
+from ezrules.core.secret_encryption import SECRET_ENCRYPTION_PREFIX, decrypt_secret, encrypt_secret
 
-from ezrules.settings import app_settings
-
-CONFIG_ENCRYPTION_PREFIX = "fernet:v1:"
+CONFIG_ENCRYPTION_PREFIX = SECRET_ENCRYPTION_PREFIX
 REDACTED_VALUE = "[redacted]"
 
 
@@ -92,8 +88,8 @@ def validate_notification_channel_config(channel_type: str, config: Mapping[str,
 
 def encrypt_notification_channel_config(channel_type: str, config: Mapping[str, Any] | None) -> str:
     validated_config = validate_notification_channel_config(channel_type, config)
-    payload = json.dumps(validated_config, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return CONFIG_ENCRYPTION_PREFIX + _fernet().encrypt(payload).decode("utf-8")
+    payload = json.dumps(validated_config, sort_keys=True, separators=(",", ":"))
+    return encrypt_secret(payload)
 
 
 def decrypt_notification_channel_config(channel_type: str, encrypted_config: str | None) -> dict[str, Any]:
@@ -102,14 +98,13 @@ def decrypt_notification_channel_config(channel_type: str, encrypted_config: str
     if not encrypted_config.startswith(CONFIG_ENCRYPTION_PREFIX):
         raise ValueError("Notification channel config is not encrypted with a supported format")
 
-    token = encrypted_config.removeprefix(CONFIG_ENCRYPTION_PREFIX).encode("utf-8")
     try:
-        payload = _fernet().decrypt(token)
-    except InvalidToken as exc:
+        payload = decrypt_secret(encrypted_config)
+    except ValueError as exc:
         raise ValueError("Notification channel config could not be decrypted") from exc
 
     try:
-        decoded = json.loads(payload.decode("utf-8"))
+        decoded = json.loads(payload)
     except json.JSONDecodeError as exc:
         raise ValueError("Notification channel config decrypted to invalid JSON") from exc
     return validate_notification_channel_config(channel_type, decoded)
@@ -136,11 +131,6 @@ def redact_notification_channel_error(
     for pattern, replacement in _SECRET_TEXT_PATTERNS:
         redacted_message = pattern.sub(replacement, redacted_message)
     return redacted_message
-
-
-def _fernet() -> Fernet:
-    digest = hashlib.sha256(app_settings.APP_SECRET.encode("utf-8")).digest()
-    return Fernet(base64.urlsafe_b64encode(digest))
 
 
 def _is_empty_value(value: Any) -> bool:

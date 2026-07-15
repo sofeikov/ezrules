@@ -31,6 +31,7 @@ from ezrules.core.notification_channel_config import (
     encrypt_notification_channel_config,
     redact_notification_channel_config,
 )
+from ezrules.core.secret_encryption import decrypt_secret, encrypt_secret
 from ezrules.models.database import Base
 
 
@@ -228,18 +229,40 @@ class Organisation(Base):
         return f"ID:{self.o_id}, {self.name=}, {len(self.rules)=}"
 
 
+_RUNTIME_SETTING_VALUE_NOT_PROVIDED = object()
+
+
 class RuntimeSetting(Base):
     __tablename__ = "runtime_settings"
 
     key = Column(String(100), primary_key=True)
     o_id: Mapped[int] = mapped_column(ForeignKey("organisation.o_id"), primary_key=True)
     value_type = Column(String(20), nullable=False)
-    value = Column(Text, nullable=False)
+    _stored_value = Column("value", Text, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
 
+    def __init__(self, **kwargs: Any) -> None:
+        value = kwargs.pop("value", _RUNTIME_SETTING_VALUE_NOT_PROVIDED)
+        super().__init__(**kwargs)
+        if value is not _RUNTIME_SETTING_VALUE_NOT_PROVIDED:
+            self.value = str(value)
+
+    @property
+    def value(self) -> str:
+        stored_value = str(self._stored_value or "")
+        if str(self.value_type) == "secret":
+            return decrypt_secret(stored_value)
+        return stored_value
+
+    @value.setter
+    def value(self, value: str) -> None:
+        normalized = str(value)
+        self._stored_value = encrypt_secret(normalized) if str(self.value_type) == "secret" else normalized
+
     def __repr__(self):
-        return f"<RuntimeSetting key={self.key} o_id={self.o_id} value_type={self.value_type} value={self.value}>"
+        value = "[redacted]" if str(self.value_type) == "secret" else self.value
+        return f"<RuntimeSetting key={self.key} o_id={self.o_id} value_type={self.value_type} value={value}>"
 
 
 class RuleEngineConfig(Base):
