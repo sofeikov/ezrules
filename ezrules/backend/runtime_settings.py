@@ -37,6 +37,7 @@ _RUNTIME_VALUE_TYPE_INT = "int"
 _RUNTIME_VALUE_TYPE_FLOAT = "float"
 _RUNTIME_VALUE_TYPE_BOOL = "bool"
 _RUNTIME_VALUE_TYPE_STRING = "string"
+_RUNTIME_VALUE_TYPE_SECRET = "secret"
 _RUNTIME_VALUE_TYPE_JSON = "json"
 
 
@@ -109,7 +110,7 @@ _RUNTIME_SETTING_SPECS: dict[str, RuntimeSettingSpec] = {
     ),
     AI_AUTHORING_API_KEY_KEY: RuntimeSettingSpec(
         key=AI_AUTHORING_API_KEY_KEY,
-        value_type=_RUNTIME_VALUE_TYPE_STRING,
+        value_type=_RUNTIME_VALUE_TYPE_SECRET,
         default=AI_AUTHORING_API_KEY_DEFAULT,
     ),
 }
@@ -122,7 +123,7 @@ def _serialize_value(value_type: str, value: Any) -> str:
         return str(float(value))
     if value_type == _RUNTIME_VALUE_TYPE_BOOL:
         return "true" if bool(value) else "false"
-    if value_type == _RUNTIME_VALUE_TYPE_STRING:
+    if value_type in {_RUNTIME_VALUE_TYPE_STRING, _RUNTIME_VALUE_TYPE_SECRET}:
         return str(value)
     if value_type == _RUNTIME_VALUE_TYPE_JSON:
         return json.dumps(value, separators=(",", ":"), sort_keys=True)
@@ -141,7 +142,7 @@ def _parse_value(value_type: str, raw: str) -> Any:
         if lowered in {"false", "0", "no", "off"}:
             return False
         raise ValueError(f"Invalid boolean runtime setting value: {raw!r}")
-    if value_type == _RUNTIME_VALUE_TYPE_STRING:
+    if value_type in {_RUNTIME_VALUE_TYPE_STRING, _RUNTIME_VALUE_TYPE_SECRET}:
         return raw
     if value_type == _RUNTIME_VALUE_TYPE_JSON:
         return json.loads(raw)
@@ -169,7 +170,7 @@ def _coerce_to_spec(spec: RuntimeSettingSpec, value: Any) -> Any:
             return bool(value)
         raise ValueError(f"{spec.key} must be a boolean-compatible value")
 
-    if spec.value_type == _RUNTIME_VALUE_TYPE_STRING:
+    if spec.value_type in {_RUNTIME_VALUE_TYPE_STRING, _RUNTIME_VALUE_TYPE_SECRET}:
         normalized = str(value).strip()
         if spec.allowed_values is not None and normalized not in spec.allowed_values:
             allowed = ", ".join(str(item) for item in spec.allowed_values)
@@ -199,7 +200,7 @@ def get_runtime_setting(db: Any, key: str, org_id: int) -> Any:
         parsed = _parse_value(setting.value_type, setting.value)
         return _coerce_to_spec(spec, parsed)
     except Exception:
-        return spec.default
+        return "" if spec.value_type == _RUNTIME_VALUE_TYPE_SECRET else spec.default
 
 
 def set_runtime_setting(db: Any, key: str, value: Any, org_id: int) -> None:
