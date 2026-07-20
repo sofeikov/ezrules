@@ -5,6 +5,7 @@
 * **Live alert visibility**: The sidebar notification badge now refreshes automatically while an analyst remains on the current page, so new outcome-spike incidents become visible without a manual reload or navigation.
 * **Usable notification history**: The notification menu now keeps its header visible and scrolls within the viewport when the inbox contains many entries.
 * **Full alert journey coverage**: Playwright now verifies live API-key evaluation through spike detection, notification delivery, alert-filtered cases, duplicate suppression, cooldown updates, and acknowledgement persistence.
+* **Linear migration history**: A merge revision reconciles the asynchronous-delivery and AI-secret migration branches so clean installs and CI can continue using the canonical `alembic upgrade head` command.
 
 ## v1.29.1
 
