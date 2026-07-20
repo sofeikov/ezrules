@@ -356,6 +356,10 @@ test.describe('Live traffic alert workflow', () => {
         baselineUnreadCount > 99 ? '99+' : String(baselineUnreadCount),
       );
     }
+    await page.getByTestId('notification-bell').click();
+    const notificationMenu = page.getByTestId('notification-menu');
+    await expect(notificationMenu).toBeVisible();
+    await expect(notificationMenu.getByText('Loading...')).toHaveCount(0);
 
     const firstEvaluation = await evaluate(
       request,
@@ -427,12 +431,13 @@ test.describe('Live traffic alert workflow', () => {
       { timeout: 10_000 },
     );
 
-    await page.getByTestId('notification-bell').click();
-    const notificationButton = page
-      .getByTestId('notification-menu')
+    const notificationButton = notificationMenu
       .getByRole('button')
       .filter({ hasText: `${outcome} spike detected` });
-    await expect(notificationButton).toHaveCount(1);
+    await expect(
+      notificationButton,
+      'an open notification menu should refresh when a new unread incident arrives',
+    ).toHaveCount(1, { timeout: 10_000 });
     await notificationButton.click();
     await expect(page).toHaveURL(
       new RegExp(`/cases\\?alert_incident_id=${incident!.id}$`),

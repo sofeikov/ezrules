@@ -98,7 +98,11 @@ export class NotificationBellComponent implements OnInit {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((response) => {
+        const unreadCountChanged = response.unread_count !== this.unreadCount;
         this.unreadCount = response.unread_count;
+        if (this.open && unreadCountChanged) {
+          this.loadNotifications();
+        }
       });
   }
 
