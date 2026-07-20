@@ -348,6 +348,31 @@ test.describe('Live traffic alert workflow', () => {
     const dashboard = new DashboardPage(page);
     await dashboard.goto();
     await dashboard.waitForPageToLoad();
+    let releaseInitialNotificationResponse!: () => void;
+    let signalInitialNotificationCaptured!: () => void;
+    let signalInitialNotificationDelivered!: () => void;
+    const initialNotificationResponseRelease = new Promise<void>((resolve) => {
+      releaseInitialNotificationResponse = resolve;
+    });
+    const initialNotificationCaptured = new Promise<void>((resolve) => {
+      signalInitialNotificationCaptured = resolve;
+    });
+    const initialNotificationDelivered = new Promise<void>((resolve) => {
+      signalInitialNotificationDelivered = resolve;
+    });
+    let interceptedInitialNotificationRequest = false;
+    await page.route('**/api/v2/notifications?*', async (route) => {
+      if (interceptedInitialNotificationRequest) {
+        await route.continue();
+        return;
+      }
+      interceptedInitialNotificationRequest = true;
+      const staleResponse = await route.fetch();
+      signalInitialNotificationCaptured();
+      await initialNotificationResponseRelease;
+      await route.fulfill({ response: staleResponse });
+      signalInitialNotificationDelivered();
+    });
     const unreadBadge = page.getByTestId('notification-unread-count');
     if (baselineUnreadCount === 0) {
       await expect(unreadBadge).toHaveCount(0);
@@ -359,7 +384,7 @@ test.describe('Live traffic alert workflow', () => {
     await page.getByTestId('notification-bell').click();
     const notificationMenu = page.getByTestId('notification-menu');
     await expect(notificationMenu).toBeVisible();
-    await expect(notificationMenu.getByText('Loading...')).toHaveCount(0);
+    await initialNotificationCaptured;
 
     const firstEvaluation = await evaluate(
       request,
@@ -438,6 +463,18 @@ test.describe('Live traffic alert workflow', () => {
       notificationButton,
       'an open notification menu should refresh when a new unread incident arrives',
     ).toHaveCount(1, { timeout: 10_000 });
+    releaseInitialNotificationResponse();
+    await initialNotificationDelivered;
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }),
+    );
+    await expect(
+      notificationButton,
+      'a stale earlier response must not overwrite the refreshed notification menu',
+    ).toHaveCount(1);
     await notificationButton.click();
     await expect(page).toHaveURL(
       new RegExp(`/cases\\?alert_incident_id=${incident!.id}$`),

@@ -84,6 +84,7 @@ export class NotificationBellComponent implements OnInit {
   loading = false;
   open = false;
   private readonly destroyRef = inject(DestroyRef);
+  private notificationLoadSequence = 0;
 
   constructor(private alertService: AlertService, private router: Router) {}
 
@@ -114,13 +115,20 @@ export class NotificationBellComponent implements OnInit {
   }
 
   loadNotifications(): void {
+    const loadSequence = ++this.notificationLoadSequence;
     this.loading = true;
     this.alertService.getNotifications(false, 10).subscribe({
       next: (response) => {
+        if (loadSequence !== this.notificationLoadSequence) {
+          return;
+        }
         this.notifications = response.notifications;
         this.loading = false;
       },
       error: () => {
+        if (loadSequence !== this.notificationLoadSequence) {
+          return;
+        }
         this.notifications = [];
         this.loading = false;
       }
