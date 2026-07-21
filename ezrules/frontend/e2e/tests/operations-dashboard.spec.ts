@@ -101,7 +101,7 @@ test.describe('Operations dashboard MVP', () => {
     await operations.goto();
     await expect(operations.activeCases).toBeVisible();
 
-    await operations.period.selectOption('7');
+    await operations.period.selectOption({ label: 'Last 7 days' });
     await expect.poll(() => requestedDays).toEqual(['30', '7']);
     await operations.refresh.click();
     await expect.poll(() => requestedDays).toEqual(['30', '7', '7']);
@@ -193,6 +193,6 @@ test.describe('Operations dashboard MVP', () => {
     await operations.openCases.click();
 
     await expect(page).toHaveURL(/\/cases$/);
-    await expect(page.getByRole('heading', { name: 'Case Review' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Cases', exact: true })).toBeVisible();
   });
 });
