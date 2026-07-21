@@ -3,7 +3,20 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { Change, diffLines } from 'diff';
-import { catchError, exhaustMap, map, merge, Observable, of, Subject, tap, timer } from 'rxjs';
+import {
+  catchError,
+  concatMap,
+  defer,
+  exhaustMap,
+  filter,
+  finalize,
+  map,
+  merge,
+  Observable,
+  of,
+  Subject,
+  timer,
+} from 'rxjs';
 import { SidebarComponent } from '../components/sidebar.component';
 import { AuthService } from '../services/auth.service';
 import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
@@ -17,6 +30,11 @@ import {
 } from '../services/rule.service';
 
 const ROLLOUT_REFRESH_INTERVAL_MS = 5_000;
+
+type RefreshEvent = {
+  showLoading: boolean;
+  required: boolean;
+};
 
 @Component({
   selector: 'app-rollouts',
@@ -50,8 +68,9 @@ export class RolloutsComponent implements OnInit {
   canModifyRules: boolean = false;
   canPromoteRules: boolean = false;
   private readonly destroyRef = inject(DestroyRef);
-  private readonly manualRefresh$ = new Subject<boolean>();
+  private readonly manualRefresh$ = new Subject<void>();
   private hasLoadedConfig = false;
+  private configRefreshInFlight = false;
 
   constructor(
     private ruleService: RuleService,
@@ -78,20 +97,25 @@ export class RolloutsComponent implements OnInit {
   }
 
   loadData(): void {
-    this.manualRefresh$.next(true);
+    this.manualRefresh$.next();
   }
 
   private startDataRefresh(): void {
     this.refreshEvents().pipe(
-      tap(showLoading => {
-        if (showLoading) {
+      filter(event => event.required || !this.configRefreshInFlight),
+      concatMap(event => defer(() => {
+        this.configRefreshInFlight = true;
+        if (event.showLoading) {
           this.loading = true;
         }
-      }),
-      exhaustMap(() => this.ruleService.getRolloutConfig().pipe(
-        map(config => ({ config, failed: false })),
-        catchError(() => of({ config: null, failed: true }))
-      )),
+        return this.ruleService.getRolloutConfig().pipe(
+          map(config => ({ config, failed: false })),
+          catchError(() => of({ config: null, failed: true })),
+          finalize(() => {
+            this.configRefreshInFlight = false;
+          })
+        );
+      })),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe(({ config, failed }) => {
       if (config !== null) {
@@ -123,10 +147,16 @@ export class RolloutsComponent implements OnInit {
     });
   }
 
-  private refreshEvents(): Observable<boolean> {
+  private refreshEvents(): Observable<RefreshEvent> {
     return merge(
-      timer(0, ROLLOUT_REFRESH_INTERVAL_MS).pipe(map(index => index === 0)),
-      this.manualRefresh$
+      timer(0, ROLLOUT_REFRESH_INTERVAL_MS).pipe(map(index => ({
+        showLoading: index === 0,
+        required: false,
+      }))),
+      this.manualRefresh$.pipe(map(() => ({
+        showLoading: true,
+        required: true,
+      })))
     );
   }
 

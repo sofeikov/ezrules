@@ -342,6 +342,54 @@ test.describe(`Live rollout monitoring ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => 
     expect(configRequests).toBe(1);
   });
 
+  test('queues a post-action refresh behind an active configuration request', async ({ page }) => {
+    let configRequests = 0;
+    await page.route('**/api/v2/rollouts/stats', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ rules: [] }),
+      });
+    });
+    await page.route('**/api/v2/rollouts', async (route) => {
+      configRequests += 1;
+      if (configRequests === 2) {
+        await new Promise((resolve) => setTimeout(resolve, 6_500));
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          rules: configRequests < 3 ? [mockedRollout] : [],
+          version: configRequests,
+        }),
+      });
+    });
+    await page.route(`**/api/v2/rules/${mockedRollout.r_id}/rollout`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, message: 'Rollout removed.' }),
+      });
+    });
+
+    const rolloutsPage = new RolloutsPage(page);
+    await rolloutsPage.goto();
+    const rolloutRow = rolloutsPage.rowForRule(mockedRollout.rid);
+    await expect(rolloutRow).toBeVisible();
+    await expect.poll(() => configRequests, { timeout: 7_000 }).toBe(2);
+
+    await rolloutRow.getByTestId('remove-rollout-button').click();
+    await page.getByTestId('confirm-remove-rollout-button').click();
+    await expect(page.getByText('Rollout removed.')).toBeVisible();
+
+    await expect(
+      rolloutsPage.emptyState,
+      'the mutation refresh should run as soon as the active request finishes',
+    ).toBeVisible({ timeout: 8_000 });
+    expect(configRequests).toBe(3);
+  });
+
   test('keeps the last rollout data visible when a background refresh fails', async ({ page }) => {
     let configRequests = 0;
     await page.route('**/api/v2/rollouts/stats', async (route) => {
