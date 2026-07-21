@@ -1,7 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { Change, diffLines } from 'diff';
+import { catchError, forkJoin, map, merge, of, Subject, switchMap, tap, timer } from 'rxjs';
 import { SidebarComponent } from '../components/sidebar.component';
 import { AuthService } from '../services/auth.service';
 import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
@@ -13,6 +15,8 @@ import {
   RuleDetail,
   RuleService,
 } from '../services/rule.service';
+
+const ROLLOUT_REFRESH_INTERVAL_MS = 5_000;
 
 @Component({
   selector: 'app-rollouts',
@@ -43,6 +47,8 @@ export class RolloutsComponent implements OnInit {
   actionError: string | null = null;
   canModifyRules: boolean = false;
   canPromoteRules: boolean = false;
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly manualRefresh$ = new Subject<boolean>();
 
   constructor(
     private ruleService: RuleService,
@@ -52,7 +58,7 @@ export class RolloutsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadPermissions();
-    this.loadData();
+    this.startDataRefresh();
   }
 
   loadPermissions(): void {
@@ -69,27 +75,39 @@ export class RolloutsComponent implements OnInit {
   }
 
   loadData(): void {
-    this.loading = true;
-    this.error = null;
+    this.manualRefresh$.next(true);
+  }
 
-    this.ruleService.getRolloutConfig().subscribe({
-      next: (config) => {
-        this.rolloutConfig = config;
-        this.loading = false;
-      },
-      error: () => {
-        this.error = 'Failed to load rollout configuration.';
-        this.loading = false;
+  private startDataRefresh(): void {
+    merge(
+      timer(0, ROLLOUT_REFRESH_INTERVAL_MS).pipe(map(index => index === 0)),
+      this.manualRefresh$
+    ).pipe(
+      tap(showLoading => {
+        if (showLoading) {
+          this.loading = true;
+        }
+        this.error = null;
+      }),
+      switchMap(() => forkJoin({
+        config: this.ruleService.getRolloutConfig().pipe(
+          map(value => ({ value, failed: false })),
+          catchError(() => of({ value: null, failed: true }))
+        ),
+        stats: this.ruleService.getRolloutStats().pipe(
+          catchError(() => of(null))
+        )
+      })),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(({ config, stats }) => {
+      if (config.value !== null) {
+        this.rolloutConfig = config.value;
       }
-    });
-
-    this.ruleService.getRolloutStats().subscribe({
-      next: (stats) => {
+      if (stats !== null) {
         this.rolloutStats = stats;
-      },
-      error: () => {
-        // Stats are best-effort; don't block the page.
       }
+      this.error = config.failed ? 'Failed to load rollout configuration.' : null;
+      this.loading = false;
     });
   }
 
