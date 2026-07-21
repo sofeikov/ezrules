@@ -37,6 +37,10 @@ export class RolloutsPage {
     return this.page.locator('[data-testid="rollouts-table"] > div').count();
   }
 
+  rowForRule(rid: string): Locator {
+    return this.rolloutsTable.locator(':scope > div').filter({ hasText: rid });
+  }
+
   async clickPromoteButton(index: number = 0) {
     await this.page.locator('[data-testid="promote-rollout-button"]').nth(index).click();
   }

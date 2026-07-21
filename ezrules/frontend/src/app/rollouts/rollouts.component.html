@@ -26,6 +26,15 @@
         </div>
       </div>
 
+      <div
+        *ngIf="configRefreshError || statsRefreshError"
+        class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6"
+        data-testid="rollout-refresh-warning"
+      >
+        <p *ngIf="configRefreshError" class="text-sm font-medium text-amber-800">{{ configRefreshError }}</p>
+        <p *ngIf="statsRefreshError" class="text-sm font-medium text-amber-800">{{ statsRefreshError }}</p>
+      </div>
+
       <div *ngIf="loading" class="flex justify-center items-center py-20">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
       </div>

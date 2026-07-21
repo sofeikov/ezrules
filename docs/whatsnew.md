@@ -1,5 +1,11 @@
 # What's New
 
+## v1.29.3
+
+* **Live rollout monitoring**: The Rule Rollouts page now refreshes its configuration and served-decision statistics every five seconds, so operators can watch candidate and control traffic without manually reloading the page.
+* **Race-safe refreshes**: Configuration and best-effort statistics each refresh one request at a time, so slow responses can finish without overlapping requests or older data replacing newer state.
+* **Real traffic coverage**: Playwright now verifies that a candidate-served API evaluation appears automatically in an already-open rollout monitor.
+
 ## v1.29.2
 
 * **Live alert visibility**: The sidebar notification badge now refreshes automatically while an analyst remains on the current page, so new outcome-spike incidents become visible without a manual reload or navigation.

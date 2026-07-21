@@ -67,6 +67,8 @@ Open **Rule Rollouts** in the sidebar to see:
 - control outcomes for the compared events
 - candidate outcomes for the same events
 
+The page refreshes the rollout configuration and comparison statistics every five seconds while it remains open. Background refreshes keep the current view visible, so operators can monitor newly served decisions without manually reloading the page.
+
 ![Active rollout rule with traffic split summary](../assets/readme/rollout-active-rule.png)
 
 ![Rollout comparison for served split and candidate outcomes](../assets/readme/rollout-comparison.png)
