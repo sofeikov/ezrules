@@ -276,6 +276,35 @@ def test_operations_summary_returns_null_rate_without_dispositions(session):
     assert result["noisy_rules"] == []
 
 
+def test_operations_summary_keeps_deleted_rules_in_case_attribution(session):
+    now = datetime.datetime(2026, 7, 21, 14, 30, tzinfo=datetime.UTC)
+    deleted_rule = _add_rule(session, org_id=1, rid="deleted_velocity_rule")
+    deleted_rule_id = int(deleted_rule.r_id)
+    _add_case(
+        session,
+        org_id=1,
+        transaction_id="opened-before-rule-deletion",
+        created_at=now - datetime.timedelta(days=1),
+        rules=[deleted_rule],
+    )
+    session.query(EvaluationRuleResult).filter(EvaluationRuleResult.r_id == deleted_rule_id).delete()
+    session.delete(deleted_rule)
+    session.commit()
+
+    result = build_operations_summary(session, o_id=1, days=7, now=now)
+
+    assert result["noisy_rules"] == [
+        {
+            "rid": f"rule_{deleted_rule_id}",
+            "description": "Deleted rule",
+            "case_count": 1,
+            "resolved_count": 0,
+            "false_positive_count": 0,
+            "false_positive_rate": None,
+        }
+    ]
+
+
 def test_operations_endpoint_validates_days_and_requires_view_cases(session):
     viewer_token = _add_api_user(session, has_view_cases=True)
     blocked_token = _add_api_user(session, has_view_cases=False)

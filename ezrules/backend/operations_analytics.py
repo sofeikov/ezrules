@@ -7,9 +7,10 @@ from dataclasses import dataclass
 from typing import Any
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 
 from ezrules.backend.cases import ACTIVE_CASE_STATUSES
-from ezrules.models.backend_core import Case, EvaluationRuleResult, Rule, User
+from ezrules.models.backend_core import Case, EvaluationDecision, EvaluationRuleResult, Rule, User
 
 ATTENTION_CASE_LIMIT = 10
 NOISY_RULE_LIMIT = 5
@@ -101,7 +102,7 @@ def _attention_cases(db: Any, *, o_id: int, period: OperationsPeriod) -> list[di
 
 
 def _noisy_rules(db: Any, *, o_id: int, period: OperationsPeriod) -> list[dict[str, Any]]:
-    case_rule_pairs = (
+    snapshot_pairs = (
         db.query(
             Case.case_id.label("case_id"),
             EvaluationRuleResult.r_id.label("rule_id"),
@@ -119,8 +120,43 @@ def _noisy_rules(db: Any, *, o_id: int, period: OperationsPeriod) -> list[dict[s
             EvaluationRuleResult.rule_result.isnot(None),
         )
         .group_by(Case.case_id, EvaluationRuleResult.r_id)
-        .subquery()
     )
+
+    raw_all_rule_results = sa.cast(EvaluationDecision.all_rule_results, JSONB)
+    safe_all_rule_results = sa.case(
+        (sa.func.jsonb_typeof(raw_all_rule_results) == "object", raw_all_rule_results),
+        else_=sa.cast(sa.literal("{}"), JSONB),
+    )
+    expanded_results = sa.func.jsonb_each(safe_all_rule_results).table_valued("key", "value").lateral()
+    expanded_rule_id = sa.cast(expanded_results.c.key, sa.Integer)
+    deleted_rule_pairs = (
+        db.query(
+            Case.case_id.label("case_id"),
+            expanded_rule_id.label("rule_id"),
+            sa.func.coalesce(Rule.rid, sa.func.concat("rule_", expanded_results.c.key)).label("rid"),
+            sa.func.coalesce(Rule.description, sa.literal("Deleted rule")).label("description"),
+            Case.resolved_at.label("resolved_at"),
+            Case.resolution_disposition.label("resolution_disposition"),
+        )
+        .join(EvaluationDecision, EvaluationDecision.ed_id == Case.opened_by_ed_id)
+        .join(expanded_results, sa.true())
+        .outerjoin(
+            EvaluationRuleResult,
+            sa.and_(
+                EvaluationRuleResult.ed_id == EvaluationDecision.ed_id,
+                EvaluationRuleResult.r_id == expanded_rule_id,
+            ),
+        )
+        .outerjoin(Rule, Rule.r_id == expanded_rule_id)
+        .filter(
+            Case.o_id == o_id,
+            Case.created_at >= period.start,
+            Case.created_at < period.end,
+            EvaluationRuleResult.err_id.is_(None),
+            sa.func.jsonb_typeof(expanded_results.c.value) != "null",
+        )
+    )
+    case_rule_pairs = snapshot_pairs.union_all(deleted_rule_pairs).subquery()
 
     case_count = sa.func.count(case_rule_pairs.c.case_id)
     resolved_count = sa.func.sum(sa.case((case_rule_pairs.c.resolved_at.isnot(None), 1), else_=0))
