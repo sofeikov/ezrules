@@ -1,7 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
+import { catchError, exhaustMap, of, timer } from 'rxjs';
 import { AlertService, InAppNotification } from '../services/alert.service';
+
+const UNREAD_COUNT_POLL_INTERVAL_MS = 5_000;
 
 @Component({
   selector: 'app-notification-bell',
@@ -31,10 +35,10 @@ import { AlertService, InAppNotification } from '../services/alert.service';
 
       <div
         *ngIf="open"
-        class="absolute bottom-11 left-0 z-50 w-80 overflow-hidden rounded-md border border-gray-200 bg-white text-gray-900 shadow-xl"
+        class="absolute bottom-11 left-0 z-50 flex max-h-[calc(100vh-4rem)] w-80 flex-col overflow-hidden rounded-md border border-gray-200 bg-white text-gray-900 shadow-xl"
         data-testid="notification-menu"
       >
-        <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+        <div class="flex flex-shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3">
           <h3 class="text-sm font-semibold">Notifications</h3>
           <button
             *ngIf="unreadCount > 0"
@@ -46,28 +50,30 @@ import { AlertService, InAppNotification } from '../services/alert.service';
           </button>
         </div>
 
-        <div *ngIf="loading" class="px-4 py-4 text-sm text-gray-500">Loading...</div>
-        <div *ngIf="!loading && notifications.length === 0" class="px-4 py-4 text-sm text-gray-500">
-          No notifications.
-        </div>
-
-        <button
-          *ngFor="let notification of notifications"
-          type="button"
-          class="block w-full border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50"
-          [class.bg-red-50]="!notification.read_at && notification.severity === 'critical'"
-          (click)="openNotification(notification)"
-        >
-          <div class="flex items-start justify-between gap-3">
-            <p class="text-sm font-semibold text-gray-900">{{ notification.title }}</p>
-            <span
-              *ngIf="!notification.read_at"
-              class="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-red-600"
-              aria-label="Unread"
-            ></span>
+        <div class="min-h-0 overflow-y-auto">
+          <div *ngIf="loading" class="px-4 py-4 text-sm text-gray-500">Loading...</div>
+          <div *ngIf="!loading && notifications.length === 0" class="px-4 py-4 text-sm text-gray-500">
+            No notifications.
           </div>
-          <p class="mt-1 text-xs text-gray-600">{{ notification.body }}</p>
-        </button>
+
+          <button
+            *ngFor="let notification of notifications"
+            type="button"
+            class="block w-full border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50"
+            [class.bg-red-50]="!notification.read_at && notification.severity === 'critical'"
+            (click)="openNotification(notification)"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <p class="text-sm font-semibold text-gray-900">{{ notification.title }}</p>
+              <span
+                *ngIf="!notification.read_at"
+                class="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-red-600"
+                aria-label="Unread"
+              ></span>
+            </div>
+            <p class="mt-1 text-xs text-gray-600">{{ notification.body }}</p>
+          </button>
+        </div>
       </div>
     </div>
   `
@@ -77,11 +83,28 @@ export class NotificationBellComponent implements OnInit {
   notifications: InAppNotification[] = [];
   loading = false;
   open = false;
+  private readonly destroyRef = inject(DestroyRef);
+  private notificationLoadSequence = 0;
 
   constructor(private alertService: AlertService, private router: Router) {}
 
   ngOnInit(): void {
-    this.loadUnreadCount();
+    timer(0, UNREAD_COUNT_POLL_INTERVAL_MS)
+      .pipe(
+        exhaustMap(() =>
+          this.alertService
+            .getUnreadCount()
+            .pipe(catchError(() => of({ unread_count: this.unreadCount }))),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((response) => {
+        const unreadCountChanged = response.unread_count !== this.unreadCount;
+        this.unreadCount = response.unread_count;
+        if (this.open && unreadCountChanged) {
+          this.loadNotifications();
+        }
+      });
   }
 
   toggleOpen(): void {
@@ -91,25 +114,21 @@ export class NotificationBellComponent implements OnInit {
     }
   }
 
-  loadUnreadCount(): void {
-    this.alertService.getUnreadCount().subscribe({
-      next: (response) => {
-        this.unreadCount = response.unread_count;
-      },
-      error: () => {
-        this.unreadCount = 0;
-      }
-    });
-  }
-
   loadNotifications(): void {
+    const loadSequence = ++this.notificationLoadSequence;
     this.loading = true;
     this.alertService.getNotifications(false, 10).subscribe({
       next: (response) => {
+        if (loadSequence !== this.notificationLoadSequence) {
+          return;
+        }
         this.notifications = response.notifications;
         this.loading = false;
       },
       error: () => {
+        if (loadSequence !== this.notificationLoadSequence) {
+          return;
+        }
         this.notifications = [];
         this.loading = false;
       }
