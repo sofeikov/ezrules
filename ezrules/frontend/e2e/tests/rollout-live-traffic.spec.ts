@@ -280,17 +280,22 @@ test.describe(`Live rollout monitoring ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => 
   });
 
   test('renders rollout configuration without waiting for slow best-effort statistics', async ({ page }) => {
-    let releaseStats!: () => void;
-    const statsBlocked = new Promise<void>((resolve) => {
-      releaseStats = resolve;
-    });
-
     await page.route('**/api/v2/rollouts/stats', async (route) => {
-      await statsBlocked;
+      await new Promise((resolve) => setTimeout(resolve, 5_500));
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ rules: [] }),
+        body: JSON.stringify({
+          rules: [{
+            r_id: mockedRollout.r_id,
+            traffic_percent: mockedRollout.traffic_percent,
+            total: 7,
+            served_candidate: 4,
+            served_control: 3,
+            candidate_outcomes: [],
+            control_outcomes: [],
+          }],
+        }),
       });
     });
     await page.route('**/api/v2/rollouts', async (route) => {
@@ -303,14 +308,11 @@ test.describe(`Live rollout monitoring ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => 
 
     const rolloutsPage = new RolloutsPage(page);
     await rolloutsPage.goto();
-    try {
-      await expect(rolloutsPage.rowForRule(mockedRollout.rid)).toBeVisible({
-        timeout: 2_000,
-      });
-    } finally {
-      releaseStats();
-      await page.unrouteAll({ behavior: 'wait' });
-    }
+    const rolloutRow = rolloutsPage.rowForRule(mockedRollout.rid);
+    await expect(rolloutRow).toBeVisible({ timeout: 2_000 });
+    await expect(rolloutRow).toContainText('7 events compared', {
+      timeout: 7_000,
+    });
   });
 
   test('keeps the last rollout data visible when a background refresh fails', async ({ page }) => {
