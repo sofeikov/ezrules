@@ -38,6 +38,14 @@ type RolloutStats = {
   }>;
 };
 
+const mockedRollout = {
+  r_id: 999_001,
+  rid: 'E2E_LIVE_MONITOR',
+  description: 'Existing live rollout',
+  logic: 'return !HOLD',
+  traffic_percent: 50,
+};
+
 function authHeaders(): { Authorization: string } {
   return { Authorization: `Bearer ${getAuthToken()}` };
 }
@@ -269,5 +277,91 @@ test.describe(`Live rollout monitoring ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => 
       rolloutRow,
       'an operator monitoring a live rollout should see newly served decisions without manually refreshing',
     ).toContainText('1 events compared', { timeout: 10_000 });
+  });
+
+  test('renders rollout configuration without waiting for slow best-effort statistics', async ({ page }) => {
+    let releaseStats!: () => void;
+    const statsBlocked = new Promise<void>((resolve) => {
+      releaseStats = resolve;
+    });
+
+    await page.route('**/api/v2/rollouts/stats', async (route) => {
+      await statsBlocked;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ rules: [] }),
+      });
+    });
+    await page.route('**/api/v2/rollouts', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ rules: [mockedRollout], version: 1 }),
+      });
+    });
+
+    const rolloutsPage = new RolloutsPage(page);
+    await rolloutsPage.goto();
+    try {
+      await expect(rolloutsPage.rowForRule(mockedRollout.rid)).toBeVisible({
+        timeout: 2_000,
+      });
+    } finally {
+      releaseStats();
+      await page.unrouteAll({ behavior: 'wait' });
+    }
+  });
+
+  test('keeps the last rollout data visible when a background refresh fails', async ({ page }) => {
+    let configRequests = 0;
+    await page.route('**/api/v2/rollouts/stats', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          rules: [{
+            r_id: mockedRollout.r_id,
+            traffic_percent: mockedRollout.traffic_percent,
+            total: 0,
+            served_candidate: 0,
+            served_control: 0,
+            candidate_outcomes: [],
+            control_outcomes: [],
+          }],
+        }),
+      });
+    });
+    await page.route('**/api/v2/rollouts', async (route) => {
+      configRequests += 1;
+      if (configRequests === 1) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ rules: [mockedRollout], version: 1 }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Temporarily unavailable' }),
+      });
+    });
+
+    const rolloutsPage = new RolloutsPage(page);
+    await rolloutsPage.goto();
+    const rolloutRow = rolloutsPage.rowForRule(mockedRollout.rid);
+    await expect(rolloutRow).toBeVisible();
+    await expect
+      .poll(() => configRequests, {
+        message: 'the background rollout refresh should run',
+        timeout: 7_000,
+      })
+      .toBeGreaterThan(1);
+    await expect(page.getByTestId('rollout-refresh-warning')).toContainText(
+      'Rollout configuration could not be refreshed. Showing the last known data.',
+    );
+    await expect(rolloutRow).toBeVisible();
   });
 });

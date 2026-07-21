@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { Change, diffLines } from 'diff';
-import { catchError, forkJoin, map, merge, of, Subject, switchMap, tap, timer } from 'rxjs';
+import { catchError, map, merge, Observable, of, Subject, switchMap, tap, timer } from 'rxjs';
 import { SidebarComponent } from '../components/sidebar.component';
 import { AuthService } from '../services/auth.service';
 import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
@@ -45,10 +45,13 @@ export class RolloutsComponent implements OnInit {
 
   actionSuccess: string | null = null;
   actionError: string | null = null;
+  configRefreshError: string | null = null;
+  statsRefreshError: string | null = null;
   canModifyRules: boolean = false;
   canPromoteRules: boolean = false;
   private readonly destroyRef = inject(DestroyRef);
   private readonly manualRefresh$ = new Subject<boolean>();
+  private hasLoadedConfig = false;
 
   constructor(
     private ruleService: RuleService,
@@ -79,36 +82,52 @@ export class RolloutsComponent implements OnInit {
   }
 
   private startDataRefresh(): void {
-    merge(
-      timer(0, ROLLOUT_REFRESH_INTERVAL_MS).pipe(map(index => index === 0)),
-      this.manualRefresh$
-    ).pipe(
+    this.refreshEvents().pipe(
       tap(showLoading => {
         if (showLoading) {
           this.loading = true;
         }
-        this.error = null;
       }),
-      switchMap(() => forkJoin({
-        config: this.ruleService.getRolloutConfig().pipe(
-          map(value => ({ value, failed: false })),
-          catchError(() => of({ value: null, failed: true }))
-        ),
-        stats: this.ruleService.getRolloutStats().pipe(
-          catchError(() => of(null))
-        )
-      })),
+      switchMap(() => this.ruleService.getRolloutConfig().pipe(
+        map(config => ({ config, failed: false })),
+        catchError(() => of({ config: null, failed: true }))
+      )),
       takeUntilDestroyed(this.destroyRef)
-    ).subscribe(({ config, stats }) => {
-      if (config.value !== null) {
-        this.rolloutConfig = config.value;
+    ).subscribe(({ config, failed }) => {
+      if (config !== null) {
+        this.rolloutConfig = config;
+        this.hasLoadedConfig = true;
+        this.error = null;
+        this.configRefreshError = null;
+      } else if (failed && this.hasLoadedConfig) {
+        this.configRefreshError = 'Rollout configuration could not be refreshed. Showing the last known data.';
+      } else if (failed) {
+        this.error = 'Failed to load rollout configuration.';
       }
-      if (stats !== null) {
-        this.rolloutStats = stats;
-      }
-      this.error = config.failed ? 'Failed to load rollout configuration.' : null;
       this.loading = false;
     });
+
+    this.refreshEvents().pipe(
+      switchMap(() => this.ruleService.getRolloutStats().pipe(
+        map(stats => ({ stats, failed: false })),
+        catchError(() => of({ stats: null, failed: true }))
+      )),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(({ stats, failed }) => {
+      if (stats !== null) {
+        this.rolloutStats = stats;
+        this.statsRefreshError = null;
+      } else if (failed) {
+        this.statsRefreshError = 'Rollout statistics could not be refreshed. Showing the last known data.';
+      }
+    });
+  }
+
+  private refreshEvents(): Observable<boolean> {
+    return merge(
+      timer(0, ROLLOUT_REFRESH_INTERVAL_MS).pipe(map(index => index === 0)),
+      this.manualRefresh$
+    );
   }
 
   openPromoteDialog(rule: RolloutRuleItem): void {
