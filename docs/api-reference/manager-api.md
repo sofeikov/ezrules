@@ -233,7 +233,7 @@ Operations metric contract:
 - `resolved_cases`, `dispositioned_cases`, and `false_positive_cases` use `resolved_at` in the selected period. `false_positive_rate` is `false_positive_cases / dispositioned_cases`, or `null` when no dispositioned cases exist.
 - `case_flow` contains exactly one UTC calendar-day point per requested day, with cases grouped by `created_at` and `resolved_at`.
 - `attention_cases` contains at most ten active cases, ordered by priority descending, creation time ascending, then case ID. `age_seconds` is measured at `generated_at`.
-- `noisy_rules` contains at most five rules ranked by distinct cases opened in the window. Rule identity and description come from the immutable `evaluation_rule_results` snapshot attached to each case's `opened_by_ed_id`, with the current rule record used only as a legacy fallback. If a hard deletion removed both records, the opening decision's immutable `all_rule_results` snapshot preserves the count under `rule_<id>` / `Deleted rule`.
+- `noisy_rules` contains at most five rules ranked by distinct cases opened in the window. A rule is attributed only when its immutable result equals the opening decision's resolved outcome, so neutral or lower-severity results from the same evaluation do not receive credit for the case. Identity and description come from the `evaluation_rule_results` snapshot attached to `opened_by_ed_id`, with the current rule record used only as a legacy fallback. If a hard deletion removed both records, the opening decision's immutable `all_rule_results` snapshot preserves the count under `rule_<id>` / `Deleted rule`.
 
 ### Agent Tools
 

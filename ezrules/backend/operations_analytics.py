@@ -112,12 +112,13 @@ def _noisy_rules(db: Any, *, o_id: int, period: OperationsPeriod) -> list[dict[s
             sa.func.max(Case.resolution_disposition).label("resolution_disposition"),
         )
         .join(EvaluationRuleResult, EvaluationRuleResult.ed_id == Case.opened_by_ed_id)
+        .join(EvaluationDecision, EvaluationDecision.ed_id == Case.opened_by_ed_id)
         .outerjoin(Rule, Rule.r_id == EvaluationRuleResult.r_id)
         .filter(
             Case.o_id == o_id,
             Case.created_at >= period.start,
             Case.created_at < period.end,
-            EvaluationRuleResult.rule_result.isnot(None),
+            EvaluationRuleResult.rule_result == EvaluationDecision.resolved_outcome,
         )
         .group_by(Case.case_id, EvaluationRuleResult.r_id)
     )
@@ -153,7 +154,7 @@ def _noisy_rules(db: Any, *, o_id: int, period: OperationsPeriod) -> list[dict[s
             Case.created_at >= period.start,
             Case.created_at < period.end,
             EvaluationRuleResult.err_id.is_(None),
-            sa.func.jsonb_typeof(expanded_results.c.value) != "null",
+            expanded_results.c.value == sa.func.to_jsonb(EvaluationDecision.resolved_outcome),
         )
     )
     case_rule_pairs = snapshot_pairs.union_all(deleted_rule_pairs).subquery()

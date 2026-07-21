@@ -38,7 +38,12 @@ def _add_case(
     assignee: User | None = None,
     resolved_at: datetime.datetime | None = None,
     disposition: str | None = None,
+    resolved_outcome: str = "HOLD",
+    rule_outcomes: list[str] | None = None,
 ) -> Case:
+    outcomes = rule_outcomes or [resolved_outcome for _rule in rules]
+    if len(outcomes) != len(rules):
+        raise ValueError("rule_outcomes must match rules")
     event = EventVersion(
         o_id=org_id,
         transaction_id=transaction_id,
@@ -61,19 +66,19 @@ def _add_case(
         decision_type="served",
         served=True,
         is_current=True,
-        outcome_counters={"HOLD": len(rules)},
-        resolved_outcome="HOLD",
-        all_rule_results={str(rule.r_id): "HOLD" for rule in rules},
+        outcome_counters={outcome: outcomes.count(outcome) for outcome in set(outcomes)},
+        resolved_outcome=resolved_outcome,
+        all_rule_results={str(rule.r_id): outcome for rule, outcome in zip(rules, outcomes, strict=True)},
         evaluated_at=created_at,
     )
     session.add(decision)
     session.flush()
-    for rule in rules:
+    for rule, outcome in zip(rules, outcomes, strict=True):
         session.add(
             EvaluationRuleResult(
                 ed_id=int(decision.ed_id),
                 r_id=int(rule.r_id),
-                rule_result="HOLD",
+                rule_result=outcome,
                 rule_rid=str(rule.rid),
                 rule_description=str(rule.description),
             )
@@ -84,7 +89,7 @@ def _add_case(
         current_ev_id=int(event.ev_id),
         current_ed_id=int(decision.ed_id),
         opened_by_ed_id=int(decision.ed_id),
-        resolved_outcome="HOLD",
+        resolved_outcome=resolved_outcome,
         status=status,
         priority=priority,
         assigned_to_user_id=int(assignee.id) if assignee else None,
@@ -303,6 +308,26 @@ def test_operations_summary_keeps_deleted_rules_in_case_attribution(session):
             "false_positive_rate": None,
         }
     ]
+
+
+def test_operations_summary_attributes_only_the_case_opening_outcome(session):
+    now = datetime.datetime(2026, 7, 21, 14, 30, tzinfo=datetime.UTC)
+    neutral_rule = _add_rule(session, org_id=1, rid="release_known_customer")
+    case_rule = _add_rule(session, org_id=1, rid="hold_high_value_transfer")
+    _add_case(
+        session,
+        org_id=1,
+        transaction_id="mixed-opening-outcomes",
+        created_at=now - datetime.timedelta(days=1),
+        rules=[neutral_rule, case_rule],
+        resolved_outcome="HOLD",
+        rule_outcomes=["RELEASE", "HOLD"],
+    )
+    session.commit()
+
+    result = build_operations_summary(session, o_id=1, days=7, now=now)
+
+    assert [rule["rid"] for rule in result["noisy_rules"]] == ["hold_high_value_transfer"]
 
 
 def test_operations_endpoint_validates_days_and_requires_view_cases(session):
