@@ -1,5 +1,11 @@
 # What's New
 
+## v1.30.0
+
+* **Operations dashboard MVP**: A new read-only Operations page gives case viewers one bounded summary of active and unassigned work, cases resolved in the selected 7-, 30-, or 90-day period, and false-positive rate.
+* **Focused queue triage**: Daily opened-versus-resolved flow, the ten highest-priority aging cases, and the five rules opening the most cases point managers toward the existing Cases workflow without introducing a second queue.
+* **Stable metric contract**: The organisation-scoped summary API uses immutable opening-evaluation rule snapshots, returns explicit generated/window timestamps, and represents rates with no valid denominator as unavailable rather than zero.
+
 ## v1.29.2
 
 * **Live alert visibility**: The sidebar notification badge now refreshes automatically while an analyst remains on the current page, so new outcome-spike incidents become visible without a manual reload or navigation.

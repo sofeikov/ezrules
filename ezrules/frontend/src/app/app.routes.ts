@@ -9,6 +9,7 @@ import { LabelAnalyticsComponent } from './label-analytics/label-analytics.compo
 import { RuleQualityComponent } from './rule-quality/rule-quality.component';
 import { UserListsComponent } from './user-lists/user-lists.component';
 import { DashboardComponent } from './dashboard/dashboard.component';
+import { OperationsDashboardComponent } from './operations-dashboard/operations-dashboard.component';
 import { UserManagementComponent } from './user-management/user-management.component';
 import { RoleManagementComponent } from './role-management/role-management.component';
 import { RolePermissionsComponent } from './role-permissions/role-permissions.component';
@@ -48,6 +49,12 @@ export const routes: Routes = [
     component: DashboardComponent,
     canActivate: [authGuard, permissionGuard],
     data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.dashboard }
+  },
+  {
+    path: 'operations',
+    component: OperationsDashboardComponent,
+    canActivate: [authGuard, permissionGuard],
+    data: { permissionRequirement: ROUTE_PERMISSION_REQUIREMENTS.operations }
   },
   {
     path: 'rules',

@@ -1,0 +1,157 @@
+<div class="flex min-h-screen bg-gray-50">
+  <app-sidebar></app-sidebar>
+
+  <main class="ml-64 flex-1 p-8" data-testid="operations-dashboard">
+    <div class="mx-auto max-w-7xl">
+      <div class="flex items-start justify-between gap-6">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-widest text-blue-600">Case operations</p>
+          <h1 class="mt-1 text-2xl font-bold text-gray-900">Operations</h1>
+          <p class="mt-1 text-gray-500">A quick view of queue health and the rules creating review work.</p>
+        </div>
+        <a
+          routerLink="/cases"
+          class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          data-testid="operations-open-cases"
+        >
+          Open Cases
+        </a>
+      </div>
+
+      <div class="mt-6 flex items-center justify-between rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+        <div class="flex items-center gap-2">
+          <label for="operations-period" class="text-sm font-medium text-gray-700">Period</label>
+          <select
+            id="operations-period"
+            data-testid="operations-period"
+            class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            [(ngModel)]="selectedDays"
+            (ngModelChange)="loadSummary()"
+          >
+            <option *ngFor="let period of periods" [ngValue]="period.days">{{ period.label }}</option>
+          </select>
+          <button
+            type="button"
+            data-testid="operations-refresh"
+            class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            (click)="loadSummary()"
+            [disabled]="loading"
+          >
+            Refresh
+          </button>
+        </div>
+        <p *ngIf="data && !loading" class="text-xs text-gray-500" data-testid="operations-generated-at">
+          Generated {{ data.generated_at | date:'medium':'UTC' }} UTC
+        </p>
+      </div>
+
+      <div *ngIf="loading" class="mt-16 flex justify-center" data-testid="operations-loading">
+        <div class="h-10 w-10 animate-spin rounded-full border-b-2 border-blue-600"></div>
+      </div>
+
+      <div *ngIf="!loading && error" class="mt-6 rounded-xl border border-red-200 bg-red-50 p-5 text-red-800">
+        <p class="font-semibold">{{ error }}</p>
+        <button
+          type="button"
+          data-testid="operations-retry"
+          class="mt-3 rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800"
+          (click)="loadSummary()"
+        >
+          Retry
+        </button>
+      </div>
+
+      <ng-container *ngIf="!loading && !error && data">
+        <section class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Case queue summary">
+          <article class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p class="text-sm font-semibold text-gray-500">Active cases now</p>
+            <p class="mt-2 text-4xl font-bold text-gray-900" data-testid="operations-active-cases">{{ data.summary.active_cases }}</p>
+            <p class="mt-1 text-xs text-gray-500">Open, in review, or reopened</p>
+          </article>
+          <article class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p class="text-sm font-semibold text-gray-500">Unassigned now</p>
+            <p class="mt-2 text-4xl font-bold text-red-700" data-testid="operations-unassigned-cases">{{ data.summary.unassigned_cases }}</p>
+            <p class="mt-1 text-xs text-gray-500">Active cases without an owner</p>
+          </article>
+          <article class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p class="text-sm font-semibold text-gray-500">Resolved in period</p>
+            <p class="mt-2 text-4xl font-bold text-gray-900" data-testid="operations-resolved-cases">{{ data.summary.resolved_cases }}</p>
+            <p class="mt-1 text-xs text-gray-500">Selected {{ data.days }}-day window</p>
+          </article>
+          <article class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <p class="text-sm font-semibold text-gray-500">False-positive rate</p>
+            <p class="mt-2 text-4xl font-bold text-gray-900" data-testid="operations-false-positive-rate">
+              {{ formatRate(data.summary.false_positive_rate) }}
+            </p>
+            <p class="mt-1 text-xs text-gray-500">
+              {{ data.summary.false_positive_cases }} of {{ data.summary.dispositioned_cases }} dispositioned cases
+            </p>
+          </article>
+        </section>
+
+        <section class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-5">
+          <article class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-3">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Cases opened vs resolved</h2>
+              <p class="mt-1 text-sm text-gray-500">Daily totals in the selected period.</p>
+            </div>
+            <div class="mt-5 h-72">
+              <canvas id="operationsCaseFlowChart" data-testid="operations-case-flow-chart"></canvas>
+            </div>
+          </article>
+
+          <article class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-2">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Needs attention</h2>
+              <p class="mt-1 text-sm text-gray-500">Oldest active cases, highest priority first.</p>
+            </div>
+            <p *ngIf="data.attention_cases.length === 0" class="mt-8 text-center text-sm text-gray-500" data-testid="operations-attention-empty">
+              No active cases need attention.
+            </p>
+            <div *ngIf="data.attention_cases.length > 0" class="mt-4 overflow-x-auto">
+              <table class="min-w-full text-left text-sm" data-testid="operations-attention-table">
+                <thead class="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
+                  <tr><th class="px-2 py-3">Case</th><th class="px-2 py-3">Outcome</th><th class="px-2 py-3">Owner</th><th class="px-2 py-3">Age</th></tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <tr *ngFor="let item of data.attention_cases">
+                    <td class="px-2 py-3 font-semibold text-blue-700">#{{ item.case_id }}</td>
+                    <td class="px-2 py-3">{{ item.outcome || '—' }}</td>
+                    <td class="px-2 py-3">{{ item.assigned_to_email || 'Unassigned' }}</td>
+                    <td class="px-2 py-3 font-medium">{{ formatAge(item.age_seconds) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="mt-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Noisiest rules</h2>
+            <p class="mt-1 text-sm text-gray-500">Rules that opened the most cases in the selected period.</p>
+          </div>
+          <p *ngIf="data.noisy_rules.length === 0" class="mt-8 text-center text-sm text-gray-500" data-testid="operations-rules-empty">
+            No case-opening rules were recorded in this period.
+          </p>
+          <div *ngIf="data.noisy_rules.length > 0" class="mt-4 overflow-x-auto">
+            <table class="min-w-full text-left text-sm" data-testid="operations-rules-table">
+              <thead class="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
+                <tr><th class="px-3 py-3">Rule</th><th class="px-3 py-3">Cases</th><th class="px-3 py-3">Resolved</th><th class="px-3 py-3">False positives</th><th class="px-3 py-3">FP rate</th></tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr *ngFor="let rule of data.noisy_rules">
+                  <td class="px-3 py-3"><div class="font-semibold text-gray-900">{{ rule.description }}</div><div class="text-xs text-gray-500">{{ rule.rid }}</div></td>
+                  <td class="px-3 py-3 font-semibold">{{ rule.case_count }}</td>
+                  <td class="px-3 py-3">{{ rule.resolved_count }}</td>
+                  <td class="px-3 py-3">{{ rule.false_positive_count }}</td>
+                  <td class="px-3 py-3 font-semibold">{{ formatRate(rule.false_positive_rate) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </ng-container>
+    </div>
+  </main>
+</div>
