@@ -220,6 +220,21 @@ Dashboard analytics source of truth:
 - Time buckets are anchored on `evaluation_decisions.evaluated_at`, so charts show when a decision was served rather than the event's business timestamp.
 - Label analytics and rule-quality endpoints use canonical `event_version_labels` joined to served decisions and event labels; label chart buckets are anchored on served decision time.
 
+### Operations Summary
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/api/v2/operations/summary` | Bearer + `VIEW_CASES` | Return one organisation-scoped case-operations snapshot; `days` accepts only `7`, `30`, or `90` and defaults to `30` |
+
+Operations metric contract:
+
+- `period_start` is midnight UTC on the first calendar day in the window; `period_end` and `generated_at` are the snapshot time.
+- `active_cases` counts cases currently in `open`, `in_review`, or `reopened`; `unassigned_cases` is the subset with no assignee. These two snapshot totals are not constrained by `days`.
+- `resolved_cases`, `dispositioned_cases`, and `false_positive_cases` use `resolved_at` in the selected period. `false_positive_rate` is `false_positive_cases / dispositioned_cases`, or `null` when no dispositioned cases exist.
+- `case_flow` contains exactly one UTC calendar-day point per requested day, with cases grouped by `created_at` and `resolved_at`.
+- `attention_cases` contains at most ten active cases, ordered by priority descending, creation time ascending, then case ID. `age_seconds` is measured at `generated_at`.
+- `noisy_rules` contains at most five rules ranked by distinct cases opened in the window. Rule identity and description come from the immutable `evaluation_rule_results` snapshot attached to each case's `opened_by_ed_id`, with the current rule record used only as a legacy fallback.
+
 ### Agent Tools
 
 Deterministic agent tools expose bounded evidence packets for future fraud-management agents. They do not provide generic database access and they replay current served decisions through the same rule compiler, field normalization, user-list lookup, and computed-feature resolution paths used by rule analysis.

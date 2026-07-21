@@ -5,6 +5,7 @@ export interface PermissionRequirement {
 
 export const ROUTE_PERMISSION_REQUIREMENTS = {
   dashboard: { allOf: ['view_rules', 'view_outcomes'] },
+  operations: { allOf: ['view_cases'] },
   rules: { allOf: ['view_rules'] },
   ruleCreate: { allOf: ['create_rule'] },
   eventTester: { allOf: ['view_rules', 'submit_test_events'] },

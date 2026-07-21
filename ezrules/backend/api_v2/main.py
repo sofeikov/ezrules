@@ -31,6 +31,7 @@ from ezrules.backend.api_v2.routes import (
     features,
     field_types,
     labels,
+    operations,
     outcomes,
     roles,
     rollouts,
@@ -194,6 +195,9 @@ app.include_router(settings.router)
 
 # Case management and integration event routes: /api/v2/cases/*, /api/v2/integration-*
 app.include_router(cases.router)
+
+# Operations dashboard routes: /api/v2/operations/*
+app.include_router(operations.router)
 
 # Deterministic agent tool routes: /api/v2/agent-tools/*
 app.include_router(agent_tools.router)

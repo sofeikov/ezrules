@@ -2,8 +2,9 @@
 
 Monitoring is where rule quality becomes visible. Use this page for a fast operational check.
 
-You should be able to answer four questions quickly:
+You should be able to answer six questions quickly:
 
+- Is the case queue growing, and which work needs attention first?
 - Are events flowing as expected?
 - Which concrete transactions were just processed, and which rules fired for each one?
 - Which active rules are currently noisy, and which active rules are silent?
@@ -12,7 +13,23 @@ You should be able to answer four questions quickly:
 
 ---
 
-## 1) Check Event Flow (Dashboard)
+## 1) Check Case Queue Health (Operations)
+
+Open **Operations** in the sidebar when you need a compact management view rather than another investigation queue. Choose a 7-, 30-, or 90-day window and review:
+
+- **Active cases now**: all open, in-review, and reopened cases at generation time
+- **Unassigned now**: active cases with no owner at generation time
+- **Resolved in period**: cases whose `resolved_at` falls in the selected calendar-day window
+- **False-positive rate**: false-positive dispositions divided by all dispositioned cases resolved in that window; shown as unavailable when the denominator is zero
+- **Cases opened vs resolved**: daily flow for the selected window
+- **Needs attention**: up to ten active cases, ordered by priority descending and then oldest first
+- **Noisiest rules**: up to five rules ranked by cases opened in the selected window, using the immutable rule metadata stored with each case's opening evaluation
+
+The page is read-only and requires `VIEW_CASES`. Use **Refresh** for a new snapshot and **Open Cases** to assign, investigate, note, or resolve work in the existing Cases workflow. The current active/unassigned totals are not constrained by the selected historical window; the resolved, flow, and noisy-rule metrics are.
+
+---
+
+## 2) Check Event Flow (Dashboard)
 
 Open **Dashboard** in the sidebar and verify:
 
@@ -46,7 +63,7 @@ Use **Alerts** when an outcome needs active attention instead of passive chart r
 
 ---
 
-## 2) Inspect Recent Tested Events
+## 3) Inspect Recent Tested Events
 
 Open **Tested Events** in the sidebar and review the latest stored evaluations.
 
@@ -79,7 +96,7 @@ Healthy signal:
 
 ---
 
-## 3) Check Label Feedback (Analytics)
+## 4) Check Label Feedback (Analytics)
 
 Open **Analytics** in the sidebar and verify:
 
@@ -100,7 +117,7 @@ Healthy signal:
 
 ---
 
-## 4) Rank Rule Quality (Rule Quality Page)
+## 5) Rank Rule Quality (Rule Quality Page)
 
 Open **Rule Quality** in the sidebar and review:
 
@@ -129,7 +146,7 @@ Healthy signal:
 
 ---
 
-## 5) Drill Down via API
+## 6) Drill Down via API
 
 - `GET /api/v2/tested-events?limit=50`
 - `GET /api/v2/analytics/transaction-volume?aggregation=30d`
@@ -143,6 +160,7 @@ Healthy signal:
 - `GET /api/v2/alerts/rules`
 - `GET /api/v2/alerts/incidents`
 - `GET /api/v2/notifications/unread-count`
+- `GET /api/v2/operations/summary?days=30`
 
 Tip: responses are structured for Chart.js (`labels` + dataset series).
 
@@ -180,12 +198,13 @@ ORDER BY hour;
 
 ---
 
-## 6) Common Symptoms
+## 7) Common Symptoms
 
 | Symptom | Likely Cause | Fix |
 |---|---|---|
 | Tested Events page is empty | No events have been persisted yet | Send traffic to `POST /api/v2/evaluate` or seed demo/test data |
 | Dashboard charts are empty | No recent events in selected window | Submit new events and switch aggregation to `30d` |
+| Operations false-positive rate is unavailable | No cases resolved with a disposition in the selected window | Resolve cases with a disposition or choose a wider period |
 | Outcome charts empty but volume exists | Rules return no allowed outcomes | Verify rule returns valid outcomes and outcome exists in **Outcomes** |
 | Label charts empty | No labels marked/uploaded | Add labels via UI workflow or `POST /api/v2/labels/mark-event` |
 | Rule quality page empty | No labeled events or support threshold too high | Label events first, then reduce **Min support** |

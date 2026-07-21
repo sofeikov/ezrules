@@ -13,6 +13,7 @@ ezrules gives fraud, risk, and compliance administrators a web workspace for man
 - **Own the rule lifecycle.** Create rules, keep drafts separate from live logic, pause risky rules, restore older revisions, and promote changes deliberately.
 - **See what happened.** Review canonical served decisions, the outcome returned, every rule that fired, and the exact event version those rules used.
 - **Work the exceptions.** Turn non-neutral decisions into resolvable cases, track rescoring changes, and publish case/evaluation events to external systems.
+- **See queue health at a glance.** Use Operations to track active and unassigned work, resolution flow, false-positive rate, aging cases, and the rules creating the most review work.
 - **React to outcome spikes.** See new alert incidents in the live notification badge and open the affected cases directly from a bounded, scrollable inbox.
 - **Improve rules with evidence.** Use labels, precision/recall reports, backtests, shadow rules, and percentage rollouts before changing production decisions.
 - **Use reproducible historical features.** Computed counts, distinct values, sums, averages, extrema, standard deviation, and days-since features follow documented point-in-time, correction, null, and type semantics.
@@ -62,6 +63,10 @@ Create and maintain the rule set from a reviewable UI. Active rules, drafts, ord
 Switch the dashboard to the 30-day window to review sustained traffic and outcome patterns instead of a single point-in-time snapshot.
 
 ![30-day outcome trends](docs/assets/readme/dashboard-30d-outcomes.png)
+
+### Run Case Operations
+
+Open **Operations** for a bounded 7-, 30-, or 90-day view of the case queue. It combines current active and unassigned totals with daily opened/resolved flow, a false-positive rate based on dispositioned cases, the ten highest-priority aging cases, and the five rules that opened the most cases. Use **Open Cases** when the summary shows work that needs action.
 
 ### Inspect Rule Logic And Performance
 
