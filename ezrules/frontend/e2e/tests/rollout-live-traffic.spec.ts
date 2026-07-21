@@ -315,6 +315,33 @@ test.describe(`Live rollout monitoring ${STATEFUL_TAG} ${TEST_DATA_TAG}`, () => 
     });
   });
 
+  test('allows a rollout configuration request to finish beyond the polling interval', async ({ page }) => {
+    let configRequests = 0;
+    await page.route('**/api/v2/rollouts/stats', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ rules: [] }),
+      });
+    });
+    await page.route('**/api/v2/rollouts', async (route) => {
+      configRequests += 1;
+      await new Promise((resolve) => setTimeout(resolve, 5_500));
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ rules: [mockedRollout], version: 1 }),
+      });
+    });
+
+    const rolloutsPage = new RolloutsPage(page);
+    await rolloutsPage.goto();
+    await expect(rolloutsPage.rowForRule(mockedRollout.rid)).toBeVisible({
+      timeout: 7_000,
+    });
+    expect(configRequests).toBe(1);
+  });
+
   test('keeps the last rollout data visible when a background refresh fails', async ({ page }) => {
     let configRequests = 0;
     await page.route('**/api/v2/rollouts/stats', async (route) => {

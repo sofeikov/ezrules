@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { Change, diffLines } from 'diff';
-import { catchError, exhaustMap, map, merge, Observable, of, Subject, switchMap, tap, timer } from 'rxjs';
+import { catchError, exhaustMap, map, merge, Observable, of, Subject, tap, timer } from 'rxjs';
 import { SidebarComponent } from '../components/sidebar.component';
 import { AuthService } from '../services/auth.service';
 import { ACTION_PERMISSION_REQUIREMENTS, hasPermissionRequirement } from '../auth/permissions';
@@ -88,7 +88,7 @@ export class RolloutsComponent implements OnInit {
           this.loading = true;
         }
       }),
-      switchMap(() => this.ruleService.getRolloutConfig().pipe(
+      exhaustMap(() => this.ruleService.getRolloutConfig().pipe(
         map(config => ({ config, failed: false })),
         catchError(() => of({ config: null, failed: true }))
       )),
