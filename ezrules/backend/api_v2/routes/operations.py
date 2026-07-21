@@ -1,6 +1,7 @@
 """Read-only operational case metrics for managers."""
 
-from typing import Any, Literal
+import enum
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 
@@ -18,9 +19,18 @@ from ezrules.models.backend_core import User
 router = APIRouter(prefix="/api/v2/operations", tags=["Operations"])
 
 
+class OperationsDays(enum.IntEnum):
+    SEVEN = 7
+    THIRTY = 30
+    NINETY = 90
+
+
 @router.get("/summary", response_model=OperationsSummaryResponse)
 def get_operations_summary(
-    days: Literal[7, 30, 90] = Query(default=30, description="Calendar-day reporting window"),
+    days: OperationsDays = Query(
+        default=OperationsDays.THIRTY,
+        description="Calendar-day reporting window",
+    ),
     user: User = Depends(get_current_active_user),
     _: None = Depends(require_permission(PermissionAction.VIEW_CASES)),
     current_org_id: int = Depends(get_current_org_id),
