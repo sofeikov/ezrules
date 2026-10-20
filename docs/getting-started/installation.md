@@ -253,7 +253,11 @@ The rest of this guide assumes the endpoint `postgresql://postgres:root@localhos
     ```bash
     brew install postgresql@16
     brew services start postgresql@16
+    "$(brew --prefix postgresql@16)/bin/psql" postgres \
+      -c "CREATE ROLE postgres WITH LOGIN SUPERUSER PASSWORD 'root';"
     ```
+
+    Homebrew's cluster has no `postgres` role; its superuser is your macOS user, without a password. The last command creates the `postgres` role the default endpoint expects. `postgresql@16` is keg-only, so `psql` is called by its full path.
 
 === "Ubuntu/Debian"
 
