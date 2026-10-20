@@ -1,5 +1,10 @@
 # What's New
 
+## v1.29.4
+
+* **Linux setup guide**: Installation, contributing, and troubleshooting docs now cover Linux hosts — Docker Compose plugin packages, rootless Docker, apt PostgreSQL/Redis port clashes, local Playwright browser setup, and the Angular file-watcher limit.
+* **Development startup order**: The development path now starts PostgreSQL, Redis, and Mailpit first and brings up the Celery worker and beat only after `init-db`, so they no longer exit on a missing database.
+
 ## v1.29.2
 
 * **Live alert visibility**: The sidebar notification badge now refreshes automatically while an analyst remains on the current page, so new outcome-spike incidents become visible without a manual reload or navigation.
