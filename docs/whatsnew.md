@@ -1,5 +1,9 @@
 # What's New
 
+## v1.29.3
+
+* **Leaner container startup**: The API image now sets `UV_NO_SYNC` and `UV_NO_DEV`, so `uv run` commands in the API, worker, beat, and init containers use the frozen production environment instead of downloading and installing development tooling at every start.
+
 ## v1.29.2
 
 * **Live alert visibility**: The sidebar notification badge now refreshes automatically while an analyst remains on the current page, so new outcome-spike incidents become visible without a manual reload or navigation.
