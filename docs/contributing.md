@@ -98,7 +98,10 @@ uv run pytest tests/test_api_v2_rules.py::test_create_rule_success -v
 
 `scripts/start-agent-stack.sh` starts the API and the Angular dev server on random high ports against a private database (`ezrules_e2e_<suffix>`), and writes the matching URLs and env vars to `.env.agent-stack`:
 
+The script needs the frontend dependencies, so install them once first:
+
 ```bash
+cd ezrules/frontend && npm install && cd ../..
 docker compose up -d postgres redis mailpit
 ./scripts/start-agent-stack.sh && source .env.agent-stack && ./scripts/verify-stack.sh
 ```
@@ -133,13 +136,15 @@ On macOS and Windows this step is not needed.
 
 Then run the tests against a running stack. With the disposable stack above, `source .env.agent-stack` sets `E2E_BASE_URL` and `E2E_API_BASE_URL`:
 
+The disposable stack starts the API with `EZRULES_TESTING=true`, which skips SMTP sends, so the invite and password-reset specs in `auth-email-flows.spec.ts` would time out waiting for Mailpit. Exclude them when running against this stack:
+
 ```bash
 source .env.agent-stack
 cd ezrules/frontend
-npm run test:e2e
+npm run test:e2e -- --grep-invert "Auth Email Flows"
 ```
 
-See [`ezrules/frontend/e2e/README.md`](https://github.com/sofeikov/ezrules/blob/main/ezrules/frontend/e2e/README.md) for manual setup with custom ports and the email-flow requirements.
+To run the full suite, including the email flows, start the API yourself with `EZRULES_TESTING=false` and Mailpit SMTP (`EZRULES_SMTP_HOST=localhost`, `EZRULES_SMTP_PORT=1025`, `EZRULES_FROM_EMAIL=...`), as described in [`ezrules/frontend/e2e/README.md`](https://github.com/sofeikov/ezrules/blob/main/ezrules/frontend/e2e/README.md).
 
 ---
 
