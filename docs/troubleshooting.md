@@ -15,7 +15,8 @@ Use this page as the default entry point when local setup, rule testing, or anal
 ```bash
 docker compose ps
 uv run ezrules api --port 8888
-lsof -i :8888
+lsof -i :8888          # macOS
+ss -ltnp | grep 8888   # Linux
 ```
 
 **Fix**
@@ -28,6 +29,120 @@ lsof -i :8888
 
 - `http://localhost:8888/ping` returns a success response
 - `http://localhost:8888/docs` opens
+
+## `docker compose` is an unknown command (Linux)
+
+**Likely causes**
+
+- Docker was installed from Ubuntu's `docker.io` package, which does not include the Compose plugin
+
+**Diagnose**
+
+```bash
+docker compose version
+```
+
+`docker: 'compose' is not a docker command` or `unknown command` means the plugin is missing.
+
+**Fix**
+
+```bash
+# Ubuntu's own packages (docker.io)
+sudo apt install docker-compose-v2
+
+# Docker's apt repository (docker-ce)
+sudo apt install docker-compose-plugin
+```
+
+Optionally install `docker-buildx` (or `docker-buildx-plugin` from Docker's repository) to remove the `Docker Compose is configured to build using Bake, but buildx isn't installed` warning on every build.
+See [Installation: Linux prerequisites](getting-started/installation.md#linux-prerequisites) for the `docker` group, rootless Docker, and `loginctl enable-linger`.
+
+**Verify**
+
+- `docker compose version` prints a version
+
+## Port `5432` or `6379` is already in use
+
+**Likely causes**
+
+- A PostgreSQL server installed with apt or Homebrew is listening on `5432`
+- A Redis server (for example apt's `redis-server`) is listening on `6379`
+- A PostgreSQL or Redis container from another project is still running
+
+**Diagnose**
+
+```bash
+ss -ltnp | grep -E ':(5432|6379)\b'   # Linux
+lsof -i :5432 -i :6379                # macOS
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+```
+
+`ss` shows the owning process only for your own processes; prefix it with `sudo` to see system services such as `postgres` or `redis-server`.
+
+**Fix**
+
+1. Stop the system services if you want to use the compose containers:
+
+   ```bash
+   sudo systemctl disable --now postgresql redis-server   # Ubuntu/Debian
+   brew services stop postgresql@16                       # macOS
+   ```
+
+2. Or keep the system services and do not start the compose `postgres`/`redis` containers. Make `EZRULES_DB_ENDPOINT` match the system server's credentials (see [Installation: Appendix B](getting-started/installation.md#appendix-b-manual-postgresql-setup-without-docker))
+3. Stop containers from other projects that publish the same ports
+
+**Verify**
+
+- `docker compose up -d postgres redis mailpit` starts without a `port is already allocated` or `address already in use` error
+
+## Celery worker or beat exits with `database "ezrules" does not exist`
+
+**Likely causes**
+
+- `docker compose up -d` was run before `uv run ezrules init-db` created the database. The `worker` and `beat` containers have no restart policy, so they stay stopped
+
+**Diagnose**
+
+```bash
+docker compose ps -a
+docker compose logs worker beat
+```
+
+**Fix**
+
+1. Create the database: `uv run ezrules init-db`
+2. Start the containers again: `docker compose up -d worker beat`
+
+**Verify**
+
+- `docker compose ps` shows `worker` and `beat` as running
+
+## Angular dev server fails with `ENOSPC` (Linux)
+
+**Likely causes**
+
+- The Angular dev server watches many files and exceeds the inotify limit `fs.inotify.max_user_watches`
+
+**Diagnose**
+
+```bash
+cat /proc/sys/fs/inotify/max_user_watches
+```
+
+The error reads `ENOSPC: System limit for number of file watchers reached`.
+
+**Fix**
+
+```bash
+echo fs.inotify.max_user_watches=524288 | sudo tee /etc/sysctl.d/60-inotify-watches.conf
+sudo sysctl --system
+```
+
+Then restart `npm start`.
+
+**Verify**
+
+- `npm start` serves the app without the `ENOSPC` error
 
 ## Cannot log in to the frontend
 
@@ -218,12 +333,13 @@ curl "http://localhost:8888/api/v2/analytics/labels-summary"
 **Diagnose**
 
 ```bash
-docker compose ps
+docker compose ps -a
+docker compose logs worker
 ```
 
 **Fix**
 
-1. Start infrastructure with `docker compose up -d`
+1. Start infrastructure with `docker compose up -d`. If the worker exited with `database "ezrules" does not exist`, see [Celery worker or beat exits](#celery-worker-or-beat-exits-with-database-ezrules-does-not-exist)
 2. If running manually, start worker:
 
    ```bash
