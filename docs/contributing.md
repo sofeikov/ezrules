@@ -6,7 +6,7 @@ If you already know the project, use this checklist:
 
 1. Fork and clone
 2. `uv sync`
-3. Initialize test DB
+3. Start infrastructure and initialize the DB
 4. Create branch
 5. Implement change + tests
 6. Run checks:
@@ -29,11 +29,17 @@ git remote add upstream https://github.com/sofeikov/ezrules.git
 
 ## 2) Set Up Development Environment
 
+On Linux, install the Docker Compose plugin first; see [Installation: Linux prerequisites](getting-started/installation.md#linux-prerequisites).
+
 ```bash
 uv sync
+docker compose up -d postgres redis mailpit
 uv run ezrules init-db --auto-delete
 uv run ezrules bootstrap-org --name test_org --admin-email admin@test_org.com --admin-password 12345678
+docker compose up -d worker beat
 ```
+
+Start the `worker` and `beat` containers only after `init-db` has created the database; otherwise they exit with `database "ezrules" does not exist`. See [Installation: Path 3](getting-started/installation.md#path-3-development-contributing-to-the-project) for the `EZRULES_APP_SECRET` difference between `settings.env` and `docker-compose.yml`.
 
 When validating migrations directly (without re-initializing the full DB), apply the current head:
 
@@ -87,6 +93,58 @@ uv run poe check
 uv run pytest tests/test_api_v2_rules.py -v
 uv run pytest tests/test_api_v2_rules.py::test_create_rule_success -v
 ```
+
+### Run a disposable local stack
+
+`scripts/start-agent-stack.sh` starts the API and the Angular dev server on random high ports against a private database (`ezrules_e2e_<suffix>`), and writes the matching URLs and env vars to `.env.agent-stack`:
+
+The script needs the frontend dependencies, so install them once first:
+
+```bash
+cd ezrules/frontend && npm install && cd ../..
+docker compose up -d postgres redis mailpit
+./scripts/start-agent-stack.sh && source .env.agent-stack && ./scripts/verify-stack.sh
+```
+
+Open `${FRONTEND_URL}/login` in a browser. The script's help text uses the macOS `open` command; on Linux use `xdg-open`:
+
+```bash
+xdg-open "${FRONTEND_URL}/login"
+```
+
+Stop the stack with `./scripts/stop-agent-stack.sh`.
+
+### Run Playwright E2E tests locally
+
+CI installs the Playwright browser on its own, but a local checkout has none. After `npm install` in `ezrules/frontend`, download Chromium:
+
+```bash
+cd ezrules/frontend
+npx playwright install chromium
+```
+
+On Linux, the browser also needs system libraries. Install them once; the command runs `apt-get` through `sudo` and asks for your password:
+
+```bash
+npx playwright install-deps chromium
+```
+
+On macOS and Windows this step is not needed.
+
+!!! note "Unsupported Linux distributions"
+    `install-deps` only knows the distributions that the installed Playwright version supports. Playwright 1.58 does not support Ubuntu 26.04, so `install-deps` stops with `Cannot install dependencies for ubuntu26.04-x64`. On such systems, either install the missing libraries with your package manager (Playwright lists them in a `Host system is missing dependencies to run browsers` error when it cannot launch Chromium), or run the tests on a supported distribution or in a container such as the official `mcr.microsoft.com/playwright` image.
+
+Then run the tests against a running stack. With the disposable stack above, `source .env.agent-stack` sets `E2E_BASE_URL` and `E2E_API_BASE_URL`:
+
+The disposable stack starts the API with `EZRULES_TESTING=true`, which skips SMTP sends, so the invite and password-reset specs in `auth-email-flows.spec.ts` would time out waiting for Mailpit. Exclude them when running against this stack:
+
+```bash
+source .env.agent-stack
+cd ezrules/frontend
+npm run test:e2e -- --grep-invert "Auth Email Flows"
+```
+
+To run the full suite, including the email flows, start the API yourself with `EZRULES_TESTING=false` and Mailpit SMTP (`EZRULES_SMTP_HOST=localhost`, `EZRULES_SMTP_PORT=1025`, `EZRULES_FROM_EMAIL=...`), as described in [`ezrules/frontend/e2e/README.md`](https://github.com/sofeikov/ezrules/blob/main/ezrules/frontend/e2e/README.md).
 
 ---
 

@@ -1,5 +1,10 @@
 # What's New
 
+## v1.29.4
+
+* **Linux setup guide**: Installation, contributing, and troubleshooting docs now cover Linux hosts — Docker Compose plugin packages, rootless Docker, apt PostgreSQL/Redis port clashes, local Playwright browser setup, and the Angular file-watcher limit.
+* **Development startup order**: The development path now starts PostgreSQL, Redis, and Mailpit first and brings up the Celery worker and beat only after `init-db`, so they no longer exit on a missing database.
+
 ## v1.29.3
 
 * **Leaner container startup**: The API image now sets `UV_NO_SYNC` and `UV_NO_DEV`, so `uv run` commands in the API, worker, beat, and init containers use the frozen production environment instead of downloading and installing development tooling at every start.

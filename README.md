@@ -155,6 +155,8 @@ uv sync
 uv run poe check
 ```
 
+On Linux, install the Docker Compose plugin before using any of the `docker compose` commands; see [Linux prerequisites](docs/getting-started/installation.md#linux-prerequisites).
+
 Frontend dependencies live in `ezrules/frontend/`.
 
 ```bash
@@ -163,7 +165,7 @@ npm install
 npm start
 ```
 
-See [docs/contributing.md](docs/contributing.md) for contribution guidance.
+See [docs/contributing.md](docs/contributing.md) for contribution guidance, including local Playwright setup.
 
 ## License
 
